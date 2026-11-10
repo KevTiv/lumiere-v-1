@@ -118,13 +118,22 @@ test.describe("ERP module smoke", () => {
       aiPanel.getByRole("button", { name: "Save", exact: true }).click(),
     ])
     expect(saveSourceResponse.ok()).toBe(true)
+    const submittedSource = saveSourceResponse.request().postDataJSON() as {
+      name: string
+      content: string
+      wordCount: number
+    }
+    expect(submittedSource).toMatchObject({ content: "Local source document draft", wordCount: 4 })
+    // The list endpoint exposes source metadata, while the write carries the body.
     await expect.poll(async () => {
       const response = await page.request.get("/api/query/proposal-source-docs")
       expect(response.ok()).toBe(true)
-      const body = await response.json() as { data: Array<{ proposalId: unknown; content: string }> }
+      const body = await response.json() as {
+        data: Array<{ proposalId: unknown; name: string; wordCount: number }>
+      }
       return body.data.filter((row) => String(scalarQueryId(row.proposalId)) === String(proposalId))
-        .map((row) => row.content)
-    }).toEqual(["Local source document draft"])
+        .map(({ name, wordCount }) => ({ name, wordCount }))
+    }).toEqual([{ name: submittedSource.name, wordCount: 4 }])
     expect(await aiPanel.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
     await workspace.getByRole("button", { name: "Version History", exact: true }).click()
     await expect(workspace.getByRole("complementary", { name: "Version History", exact: true })).toBeVisible()

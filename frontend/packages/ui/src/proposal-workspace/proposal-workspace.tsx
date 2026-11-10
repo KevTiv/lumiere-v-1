@@ -488,7 +488,7 @@ export function ProposalWorkspace({
   currentSourceScope.current = sourceScope
   const [sourceDraftState, setSourceDraftState] = useState<{
     scope: string
-    drafts: Record<string, { source: SourceDocument; saved: boolean }>
+    drafts: Record<string, { source: SourceDocument; saved: boolean; contentEdited: boolean }>
   }>({ scope: sourceScope, drafts: {} })
   const [savingSource, setSavingSource] = useState<{ scope: string; id: string } | null>(null)
   const sourceSaveInFlight = useRef(false)
@@ -613,12 +613,16 @@ export function ProposalWorkspace({
     [templatesList, _companyId],
   )
 
-  const editSource = useCallback((source: SourceDocument) => {
+  const editSource = useCallback((source: SourceDocument, contentEdited = false) => {
     setSourceDraftState((previous) => ({
       scope: sourceScope,
       drafts: {
         ...(previous.scope === sourceScope ? previous.drafts : {}),
-        [source.id]: { source, saved: false },
+        [source.id]: {
+          source,
+          saved: false,
+          contentEdited: contentEdited || (previous.scope === sourceScope && previous.drafts[source.id]?.contentEdited === true),
+        },
       },
     }))
   }, [sourceScope])
@@ -636,7 +640,7 @@ export function ProposalWorkspace({
       })
     } else if (action.type === "UPDATE_SOURCE_CONTENT") {
       const source = draftSources.find((row) => row.id === action.id)
-      if (source) editSource({ ...source, content: action.content, wordCount: countWords(action.content) })
+      if (source) editSource({ ...source, content: action.content, wordCount: countWords(action.content) }, true)
     }
   }, [deleteSourceDoc, draftSources, editSource, sourceScope])
 
@@ -654,14 +658,19 @@ export function ProposalWorkspace({
     }
     try {
       if (isPersisted) {
-        await updateSourceDoc.mutateAsync({ docId: BigInt(source.id), ...params })
+        const contentEdited = sourceDrafts[source.id]?.contentEdited
+        await updateSourceDoc.mutateAsync({
+          docId: BigInt(source.id),
+          name: source.name,
+          ...(contentEdited ? { content: source.content, wordCount: source.wordCount } : {}),
+        })
       } else {
         await addSourceDoc.mutateAsync({ proposalId: proposalIdBig, ...params })
       }
       setSourceDraftState((previous) => {
         if (previous.scope !== sourceScope || previous.drafts[source.id]?.source !== source) return previous
         const drafts = { ...previous.drafts }
-        if (isPersisted) drafts[source.id] = { source, saved: true }
+        if (isPersisted) drafts[source.id] = { source, saved: true, contentEdited: false }
         else delete drafts[source.id]
         return { scope: sourceScope, drafts }
       })
@@ -676,7 +685,7 @@ export function ProposalWorkspace({
       sourceSaveInFlight.current = false
       setSavingSource(null)
     }
-  }, [addSourceDoc, updateSourceDoc, proposalIdBig, sourceScope, t])
+  }, [addSourceDoc, updateSourceDoc, proposalIdBig, sourceDrafts, sourceScope, t])
 
   // ── Presence cleanup on unmount ─────────────────────────────────────────────
   const clearPresenceMutateRef = useRef(clearPresence.mutate)

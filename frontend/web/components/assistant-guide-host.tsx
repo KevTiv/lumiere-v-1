@@ -56,7 +56,10 @@ export function AssistantGuideHost({ request, companyId, organizationId, onClose
       const load = () => {
         setBusy(true); setError(null)
         void readAssistantGuide(reference, String(companyId), controller.signal).then((guide) => {
-          if (!controller.signal.aborted && epoch === generation.current && currentScope.current === scope) setState({ scope, document: guide })
+          if (!controller.signal.aborted && epoch === generation.current && currentScope.current === scope) {
+            setBusy(false)
+            setState({ scope, document: guide })
+          }
         }).catch((cause) => {
           if (!controller.signal.aborted && epoch === generation.current) setError(cause instanceof Error ? cause.message : "The guide is unavailable.")
         }).finally(() => { if (epoch === generation.current) setBusy(false) })

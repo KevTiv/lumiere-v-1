@@ -329,6 +329,15 @@ describe("proposal source drafts", () => {
     expect(screen.queryByRole("alert")).toBeNull()
   })
 
+  it("renames a source without replacing content omitted from the read projection", async () => {
+    sourceDocs = [{ ...sourceRow, content: undefined }]
+    renderWorkspace()
+    openSources()
+    fireEvent.change(screen.getByDisplayValue("RFP"), { target: { value: "Renamed RFP" } })
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "common.save" })) })
+    expect(updateSourceAsync).toHaveBeenCalledWith({ docId: 41n, name: "Renamed RFP" })
+  })
+
   it("keeps persisted-source edits through stale readback and later typing", async () => {
     sourceDocs = [sourceRow]
     const view = renderWorkspace()
