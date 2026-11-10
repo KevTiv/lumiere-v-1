@@ -32,7 +32,7 @@ import { usePosLoyaltyPrograms } from "@lumiere/query-hooks/hooks/sales"
 import { usePOS } from "./use-pos"
 import { posSessionHref } from "./pos-session"
 import { useModuleTab } from "@/hooks/use-module-tab"
-import { ModulePageComposition } from "@lumiere/ui/pages/page-composition-host"
+import { ModulePageComposition, usePageCompositionActionSlot } from "@lumiere/ui/pages/page-composition-host"
 import type { PosConfig, PosSession, PosTerminal, Product } from "@lumiere/stdb/types"
 
 interface PosClientProps {
@@ -125,6 +125,8 @@ function PosClientLoaded({
     setPosAction(null)
   }
 
+  const { target, slot } = usePageCompositionActionSlot()
+
   const adminActions: PosFormAction[] = [
     "createTerminal",
     "updateTerminal",
@@ -142,7 +144,7 @@ function PosClientLoaded({
       data-testid="module-view-pos"
       data-hydrated={pos.isHydrated ? "true" : "false"}
     >
-      <DashboardHeader title={moduleConfig.title} description={moduleConfig.description} />
+      <DashboardHeader secondaryAction={slot} title={moduleConfig.title} description={moduleConfig.description} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">
         <TabsList>
@@ -153,13 +155,17 @@ function PosClientLoaded({
           ))}
         </TabsList>
 
-        <ModulePageComposition moduleId="pos" pageId={activeTab} title={`${moduleConfig.title} · ${moduleConfig.tabs.find((tab) => tab.id === activeTab)?.label ?? activeTab}`} />
-
         <TabsContent value="register" className="mt-4 min-h-0 flex-1">
+          <ModulePageComposition moduleId="pos" pageId="register" title={moduleConfig.tabs.find((tab) => tab.id === "register")?.label ?? moduleConfig.title} placement="content" actionTarget={target}>
+          <div className="flex h-[calc(100dvh-14rem)] min-h-96 min-w-0 flex-col">
           <POSPage {...pos} onOpenPosAction={(action) => setPosAction(action as PosFormAction)} />
+          </div>
+          </ModulePageComposition>
         </TabsContent>
 
         <TabsContent value="admin" className="mt-4 space-y-6 overflow-y-auto">
+          <ModulePageComposition moduleId="pos" pageId="admin" title={moduleConfig.tabs.find((tab) => tab.id === "admin")?.label ?? moduleConfig.title} placement="content" actionTarget={target}>
+          <div className="min-w-0 space-y-4">
           <div className="rounded-lg border border-border p-4">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {t("pos.admin.operations")}
@@ -188,10 +194,11 @@ function PosClientLoaded({
               </p>
             ) : null}
           </div>
-
           <EntityView config={posTerminalsAdminTableConfig(t)} data={pos.terminals} />
           <EntityView config={posConfigsAdminTableConfig(t)} data={pos.configs} />
           <EntityView config={posSessionsAdminTableConfig(t, { recordHref: posSessionHref })} data={pos.sessions} />
+          </div>
+          </ModulePageComposition>
         </TabsContent>
       </Tabs>
 

@@ -9,6 +9,7 @@ import {
   expectFormModalVisible,
   fetchAccountSelectLabelByInternalType,
   fetchDraftCreditNoteMoveIdForReturnOrder,
+  fetchLeadIdByName,
   fetchOpportunityIdByName,
   fetchReturnOrderIdBySaleOrderId,
   fetchSaleOrderIdByOpportunityId,
@@ -21,10 +22,10 @@ import {
   postDraftInvoiceViaUi,
   scalarQueryId,
   selectEntityRowById,
-  selectEntityRowByText,
   smokeName,
   submitForm,
   waitForAuditLogEntry,
+  waitForBffQueryMinRows,
   waitForEntityActionEnabled,
   waitForMovePosted,
   waitForOpportunityLineExists,
@@ -117,9 +118,11 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
       submitForm(page, "new-lead"),
     ])
 
-    await gotoModule(page, "/crm", "crm")
+    const leadId = await fetchLeadIdByName(page, leadName)
+    await gotoModule(page, "/crm?tab=leads", "crm")
     await selectModuleTab(page, "crm", "leads")
-    await selectEntityRowByText(page, leadName)
+    await waitForBffQueryMinRows(page, "/api/query/opportunity-stages")
+    await selectEntityRowById(page, leadId)
     await waitForEntityActionEnabled(page, "entity-action-convert-lead")
     await page.getByTestId("entity-action-convert-lead").click()
     await expectFormModalVisible(page, "convert-lead")
@@ -155,7 +158,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
 
     await gotoModule(page, "/crm", "crm")
     await selectModuleTab(page, "crm", "opportunities")
-    await selectEntityRowByText(page, opportunityName)
+    await selectEntityRowById(page, opportunityId)
     await waitForEntityActionEnabled(page, "entity-action-convert-opp-order")
     await page.getByTestId("entity-action-convert-opp-order").click()
     await chooseFirstEnabledOption(page, "pricelistId")

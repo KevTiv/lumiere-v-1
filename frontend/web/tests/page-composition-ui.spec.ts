@@ -68,7 +68,7 @@ test("gallery preview, adding, sizing and drag reorder persist through reload", 
       exact: true,
     })
     .click()
-  await expect(grid.locator("[data-placement-id]").nth(3)).toHaveAttribute(
+  await expect(grid.locator("[data-placement-id]").nth(4)).toHaveAttribute(
     "data-widget-key",
     "saved:101",
   )
@@ -105,7 +105,7 @@ test("gallery preview, adding, sizing and drag reorder persist through reload", 
     (await page.getByTestId("fixture-saved-layout").textContent()) ?? "{}",
   )
   expect(snapshot.revision).toBe("1")
-  expect(snapshot.value).toHaveLength(5)
+  expect(snapshot.value).toHaveLength(6)
   expect(snapshot.value[0].widgetId).toBe("open-orders")
   expect(
     snapshot.value.find(
@@ -195,5 +195,71 @@ test("assistant additions use the same cancellable draft and reset restores the 
   ).toHaveValue("")
   await expect(gallery).toContainText("Show invoice metrics on this page")
   await gallery.getByRole("button", { name: "Cancel", exact: true }).click()
+  await page.getByRole("button", { name: "Cancel", exact: true }).click()
+})
+
+test("native table accepts widgets immediately below it and remains movable at desktop and phone widths", async ({
+  page,
+}) => {
+  const header = page.locator("header")
+  await expect(
+    header.getByRole("button", { name: "Edit page", exact: true }),
+  ).toBeVisible()
+  await header.getByRole("button", { name: "Edit page", exact: true }).click()
+  await page
+    .getByRole("button", { name: "Add widget below Sales orders", exact: true })
+    .click()
+  const gallery = page.getByRole("dialog", { name: "Add widget", exact: true })
+  await gallery
+    .getByRole("textbox", { name: "Search widgets" })
+    .fill("Invoices by month")
+  await gallery
+    .getByRole("button", { name: "Add to page", exact: true })
+    .click()
+  const grid = page.getByTestId("page-composition-grid")
+  const order = () =>
+    grid
+      .locator("[data-widget-key]")
+      .evaluateAll((items) =>
+        items.map((item) => item.getAttribute("data-widget-key")),
+      )
+  expect((await order()).slice(-2)).toEqual([
+    "builtin:order-table",
+    "saved:101",
+  ])
+  await page
+    .getByRole("button", { name: "Move Sales orders later", exact: true })
+    .click()
+  expect((await order()).slice(-2)).toEqual([
+    "saved:101",
+    "builtin:order-table",
+  ])
+  await page.getByRole("button", { name: "Undo", exact: true }).click()
+  expect((await order()).slice(-2)).toEqual([
+    "builtin:order-table",
+    "saved:101",
+  ])
+  await expect(
+    page.getByRole("button", { name: "Remove Sales orders", exact: true }),
+  ).toHaveCount(0)
+  await page.getByRole("button", { name: "Done", exact: true }).click()
+  await page.reload()
+  await expect(
+    header.getByRole("button", { name: "Edit page", exact: true }),
+  ).toBeVisible()
+  await expect(page.getByRole("table")).toContainText("SO-1042")
+  await page.setViewportSize({ width: 390, height: 844 })
+  await header.getByRole("button", { name: "Edit page", exact: true }).click()
+  await expect(
+    page.getByRole("button", {
+      name: "Add widget below Sales orders",
+      exact: true,
+    }),
+  ).toBeVisible()
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - innerWidth,
+    ),
+  ).toBeLessThanOrEqual(1)
   await page.getByRole("button", { name: "Cancel", exact: true }).click()
 })

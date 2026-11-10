@@ -19178,6 +19178,8 @@
     "openImportTask": "Open saved import and ERP results"
   },
   "pageComposition": {
+    "addBelow": "Add widget below",
+    "addBelowNamed": "Add widget below {{title}}",
     "capacity": "This page supports up to {{count}} widgets. Remove a widget before adding another.",
     "added": "Added {{title}} to the page.",
     "moved": "Moved {{title}} to position {{position}} of {{count}}.",

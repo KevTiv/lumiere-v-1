@@ -319,65 +319,68 @@ function TasksClientLoaded({
           {compositionSlot}
         </>}
       />
+      <OperationalPageComposition moduleId="tasks" title={t("tasks.page.title")} actionTarget={compositionTarget}>
+        <div className="flex min-h-[calc(100dvh-12rem)] min-w-0 flex-col gap-4">
 
-      <TaskBoardView
-        className="min-h-0 flex-1"
-        items={boardItems}
-        columns={boardColumns}
-        onMove={canAssign ? handleMoveTask : undefined}
-        onTaskClick={canAssign ? openEditTask : undefined}
-        onCreateInColumn={canCreate ? () => setModal({ type: "create", form: taskFormConfig, action: "createTask" }) : undefined}
-        priorityLabel={(priority) => t(`projects.tasks.priority.${priority}`, { defaultValue: priority })}
-        projects={projectOptions}
-        storageKey="lumiere:tasks-board-view"
-        renderTable={(visibleIds) => (
-          <EntityView
-            config={tableConfig}
-            useCard={false}
-            data={tasks.filter((task) => visibleIds.has(String(task.id)))}
-            onRowClick={canAssign ? (row) => openEditTask(String(row.id)) : undefined}
+          <TaskBoardView
+            className="min-h-0 flex-1"
+            items={boardItems}
+            columns={boardColumns}
+            onMove={canAssign ? handleMoveTask : undefined}
+            onTaskClick={canAssign ? openEditTask : undefined}
+            onCreateInColumn={canCreate ? () => setModal({ type: "create", form: taskFormConfig, action: "createTask" }) : undefined}
+            priorityLabel={(priority) => t(`projects.tasks.priority.${priority}`, { defaultValue: priority })}
+            projects={projectOptions}
+            storageKey="lumiere:tasks-board-view"
+            renderTable={(visibleIds) => (
+              <EntityView
+                config={tableConfig}
+                useCard={false}
+                data={tasks.filter((task) => visibleIds.has(String(task.id)))}
+                onRowClick={canAssign ? (row) => openEditTask(String(row.id)) : undefined}
+              />
+            )}
           />
-        )}
-      />
 
-      <FormModal
-        open={modal.type === "create" ? canCreate : modal.type === "edit" && canAssign}
-        onOpenChange={(open) => !open && setModal({ type: null })}
-        config={modal.type ? modal.form : taskFormConfig}
-        isPending={isPending}
-        formLeadingActions={modal.type === "edit" && canAssign ? (
-          <Button type="button" variant="outline" disabled={isPending} onClick={() => setAssignmentTaskId(String(modal.entityId))}>
-            <Users className="mr-2 h-4 w-4" /> Assign people
-          </Button>
-        ) : undefined}
-        onSubmit={async (formData) => {
-          if (!modal.type) return
-          if (modal.type === "create" ? !canCreate : !canAssign) throw new Error("Task permission is required")
-          await handleFormSubmit(modal.action, formData)
-          setModal({ type: null })
-        }}
-      />
-      {assignmentTask && canAssign ? (
-        <TaskAssigneesDialog key={`${organizationId}:${assignmentTask.companyId}:${assignmentTask.id}`} organizationId={orgId} task={assignmentTask} onClose={() => setAssignmentTaskId(null)} />
-      ) : null}
-      <details className="border-t pt-3">
-        <summary className="w-fit cursor-pointer rounded-sm text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">
-          {t("tasks.board.stats.summary", { defaultValue: "Project task summary" })}
-        </summary>
-        <p className="mt-2 text-sm text-muted-foreground">{t("tasks.board.stats.scope", { defaultValue: "Counts cover loaded project tasks, before board filters." })}</p>
-        <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {([
-            ["total", stats.total],
-            ["inProgress", stats.inProgress],
-            ["done", stats.done],
-            ["overdue", stats.overdue],
-          ] as const).map(([key, value]) => <div key={key} className="min-w-0">
-            <dt className="text-sm text-muted-foreground">{t(`tasks.board.stats.${key}`)}</dt>
-            <dd className="mt-1 text-xl font-semibold tabular-nums">{value}</dd>
-          </div>)}
-        </dl>
-      </details>
-      <OperationalPageComposition moduleId="tasks" title={t("tasks.page.title")} actionTarget={compositionTarget} />
+          <FormModal
+            open={modal.type === "create" ? canCreate : modal.type === "edit" && canAssign}
+            onOpenChange={(open) => !open && setModal({ type: null })}
+            config={modal.type ? modal.form : taskFormConfig}
+            isPending={isPending}
+            formLeadingActions={modal.type === "edit" && canAssign ? (
+              <Button type="button" variant="outline" disabled={isPending} onClick={() => setAssignmentTaskId(String(modal.entityId))}>
+                <Users className="mr-2 h-4 w-4" /> Assign people
+              </Button>
+            ) : undefined}
+            onSubmit={async (formData) => {
+              if (!modal.type) return
+              if (modal.type === "create" ? !canCreate : !canAssign) throw new Error("Task permission is required")
+              await handleFormSubmit(modal.action, formData)
+              setModal({ type: null })
+            }}
+          />
+          {assignmentTask && canAssign ? (
+            <TaskAssigneesDialog key={`${organizationId}:${assignmentTask.companyId}:${assignmentTask.id}`} organizationId={orgId} task={assignmentTask} onClose={() => setAssignmentTaskId(null)} />
+          ) : null}
+          <details className="border-t pt-3">
+            <summary className="w-fit cursor-pointer rounded-sm text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">
+              {t("tasks.board.stats.summary", { defaultValue: "Project task summary" })}
+            </summary>
+            <p className="mt-2 text-sm text-muted-foreground">{t("tasks.board.stats.scope", { defaultValue: "Counts cover loaded project tasks, before board filters." })}</p>
+            <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {([
+                ["total", stats.total],
+                ["inProgress", stats.inProgress],
+                ["done", stats.done],
+                ["overdue", stats.overdue],
+              ] as const).map(([key, value]) => <div key={key} className="min-w-0">
+                <dt className="text-sm text-muted-foreground">{t(`tasks.board.stats.${key}`)}</dt>
+                <dd className="mt-1 text-xl font-semibold tabular-nums">{value}</dd>
+              </div>)}
+            </dl>
+          </details>
+        </div>
+      </OperationalPageComposition>
     </div>
   )
 }

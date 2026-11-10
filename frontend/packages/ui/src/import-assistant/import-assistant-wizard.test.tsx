@@ -16,8 +16,8 @@ const hooks = vi.hoisted(() => {
 
 vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
 vi.mock("@lumiere/query-hooks/hooks/ai-import-mapping", () => ({
-  useAnalyzeImportMapping: () => hooks.analyze,
-  usePreviewImportMapping: () => hooks.preview,
+  useAnalyzeImportMapping: () => ({ ...hooks.analyze }),
+  usePreviewImportMapping: () => ({ ...hooks.preview }),
 }))
 vi.mock("@lumiere/query-hooks/hooks/import-mapping-templates", () => ({
   importMappingTemplateMatchesHeaders: () => false,
@@ -71,6 +71,15 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe("ImportAssistantWizard source readiness", () => {
+  it("resets once when closed even as mutation results receive new identities", () => {
+    const view = render(wizard(ready))
+    view.rerender(wizard(ready, undefined, { open: false }))
+    view.rerender(wizard(ready, undefined, { open: false }))
+
+    expect(hooks.analyze.reset).toHaveBeenCalledTimes(1)
+    expect(hooks.preview.reset).toHaveBeenCalledTimes(1)
+  })
+
   it("hides an unsubmitted stale preview and prevents another dispatch after access is denied", async () => {
     const onImport = vi.fn().mockResolvedValue(undefined)
     const view = render(wizard(ready, onImport))

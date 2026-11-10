@@ -124,6 +124,8 @@ export function ImportAssistantWizard({
   const orgId = BigInt(organizationId)
   const analyze = useAnalyzeImportMapping()
   const preview = usePreviewImportMapping()
+  const { reset: resetAnalysis } = analyze
+  const { reset: resetPreview } = preview
   const saveTemplate = useSaveImportMappingTemplate(orgId)
   const deleteTemplate = useDeleteImportMappingTemplate(orgId)
   const finalizeJob = useFinalizeImportAssistantJob(orgId)
@@ -203,9 +205,9 @@ export function ImportAssistantWizard({
     submissionStartedRef.current = false
     importCompletedRef.current = false
     finalizedJobIdRef.current = null
-    analyze.reset()
-    preview.reset()
-  }, [analyze, preview])
+    resetAnalysis()
+    resetPreview()
+  }, [resetAnalysis, resetPreview])
 
   useEffect(() => {
     if (!open && !isSubmitting) reset()

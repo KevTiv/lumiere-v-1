@@ -43,6 +43,8 @@ import {
   createPageCompositionHistory,
   createPageWidgetPlacement,
   findBuiltinPagePlacement,
+  includeRequiredPageWidgets,
+  insertPageWidget,
   movePageWidget,
   pageCompositionHistoryReducer,
   pageLayoutsEqual,
@@ -124,7 +126,10 @@ export function PageComposition({
   const [localCatalog, setLocalCatalog] = useState<
     readonly PageWidgetCatalogItem[]
   >([])
-  const [gallery, setGallery] = useState<{ prompt?: string } | null>(null)
+  const [gallery, setGallery] = useState<{
+    prompt?: string
+    afterId?: string
+  } | null>(null)
   const [operation, setOperation] = useState<
     "save" | "create" | "configure" | null
   >(null)
@@ -141,7 +146,11 @@ export function PageComposition({
       const editor = rootRef.current
       // A page can put its insights in a collapsed native disclosure. The header
       // launcher and assistant requests must reveal it before moving focus.
-      for (let ancestor = editor?.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      for (
+        let ancestor = editor?.parentElement;
+        ancestor;
+        ancestor = ancestor.parentElement
+      ) {
         if (ancestor instanceof HTMLDetailsElement) ancestor.open = true
       }
       editor?.focus()
@@ -182,7 +191,15 @@ export function PageComposition({
     [items],
   )
   const visibleValue = editing ? history.present : value
-  const widgets = visibleValue ?? defaultValue
+  const widgets = useMemo(
+    () =>
+      includeRequiredPageWidgets(
+        visibleValue ?? defaultValue,
+        defaultValue,
+        items,
+      ),
+    [visibleValue, defaultValue, items],
+  )
   const atCapacity = widgets.length >= PERSONAL_PAGE_MAX_WIDGETS
   const capacityMessage = t("pageComposition.capacity", {
     defaultValue:
@@ -316,7 +333,13 @@ export function PageComposition({
       focusExisting(existing, item)
       return
     }
-    change([...widgets, { ...createPageWidgetPlacement(item), width }])
+    change(
+      insertPageWidget(
+        widgets,
+        { ...createPageWidgetPlacement(item), width },
+        gallery?.afterId,
+      ),
+    )
     setGallery(null)
     setAnnouncement(
       t("pageComposition.added", {
@@ -361,6 +384,7 @@ export function PageComposition({
   const create = async () => {
     if (!onCreateWidget || controlsDisabled || pending.current || atCapacity)
       return
+    const afterId = gallery?.afterId
     setGallery(null)
     pending.current = true
     setOperation("create")
@@ -376,7 +400,11 @@ export function PageComposition({
         remember(item)
         dispatch({
           type: "change",
-          value: [...widgets, createPageWidgetPlacement(item)],
+          value: insertPageWidget(
+            widgets,
+            createPageWidgetPlacement(item),
+            afterId,
+          ),
         })
         setAnnouncement(
           t("pageComposition.added", {
@@ -492,28 +520,44 @@ export function PageComposition({
   const editLabel = insights
     ? t("pageComposition.editInsights", { defaultValue: "Customize insights" })
     : t("pageComposition.edit", { defaultValue: "Edit page" })
-  const launcher = canEdit && !editing ? (
-    <Button
-      ref={launcherRef}
-      type="button"
-      variant="outline"
-      size="sm"
-      disabled={isLoading}
-      onClick={() => {
-        if (startEditing()) {
-          restoreLauncher.current = true
-        }
-      }}
-    >
-      <Pencil aria-hidden="true" />
-      {editLabel}
-    </Button>
-  ) : null
-  const headerAction = actionTarget && launcher ? createPortal(launcher, actionTarget) : null
-  if (insights && !editing && widgets.length === 0 && actionTarget !== undefined) {
-    return <>{headerAction}<span role="status" className="sr-only">{announcement}</span></>
+  const launcher =
+    canEdit && !editing ? (
+      <Button
+        ref={launcherRef}
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={isLoading}
+        onClick={() => {
+          if (startEditing()) {
+            restoreLauncher.current = true
+          }
+        }}
+      >
+        <Pencil aria-hidden="true" />
+        {editLabel}
+      </Button>
+    ) : null
+  const headerAction =
+    actionTarget && launcher ? createPortal(launcher, actionTarget) : null
+  if (
+    insights &&
+    !editing &&
+    widgets.length === 0 &&
+    actionTarget !== undefined
+  ) {
+    return (
+      <>
+        {headerAction}
+        <span role="status" className="sr-only">
+          {announcement}
+        </span>
+      </>
+    )
   }
-  const showScopeNote = scopeNote && (editing || widgets.some((widget) => widget.source === "saved"))
+  const showScopeNote =
+    scopeNote &&
+    (editing || widgets.some((widget) => widget.source === "saved"))
 
   return (
     <div
@@ -523,11 +567,21 @@ export function PageComposition({
       data-editing={editing || undefined}
       tabIndex={editing ? -1 : undefined}
       role={insights ? "region" : undefined}
-      aria-label={insights ? t("pageComposition.insights", { defaultValue: "Page insights" }) : undefined}
+      aria-label={
+        insights
+          ? t("pageComposition.insights", { defaultValue: "Page insights" })
+          : undefined
+      }
     >
       {headerAction}
-      {insights ? <h2 className="text-lg font-semibold">{t("pageComposition.insights", { defaultValue: "Page insights" })}</h2> : null}
-      {showScopeNote ? <p className="text-sm text-muted-foreground">{scopeNote}</p> : null}
+      {insights ? (
+        <h2 className="text-lg font-semibold">
+          {t("pageComposition.insights", { defaultValue: "Page insights" })}
+        </h2>
+      ) : null}
+      {showScopeNote ? (
+        <p className="text-sm text-muted-foreground">{scopeNote}</p>
+      ) : null}
       {editing || (launcher && actionTarget === undefined) ? (
         <div
           className={cn(
@@ -716,6 +770,8 @@ export function PageComposition({
                           ),
                         )
                       }
+                      onAddBelow={() => setGallery({ afterId: placement.id })}
+                      canAdd={!atCapacity}
                       onConfigure={
                         onConfigureWidget &&
                         item &&

@@ -175,8 +175,8 @@ export async function expectModuleTabSurface(page: Page, moduleId: string, tabId
   const panel = moduleView.getByTestId(panelId)
   await expect(panel).toHaveCount(1)
   if (moduleId === "accounting" && tabId === "payment-operations") {
-    // Optional insights can collapse into a header action. The payment controller
-    // stays outside ModuleView to retain in-flight operations when tabs change.
+    // The edit launcher lives in the header. The payment controller stays
+    // outside ModuleView to retain in-flight operations when tabs change.
     await expect(
       moduleView.getByTestId("module-tab-accounting-payment-operations"),
     ).toHaveAttribute("aria-selected", "true")
@@ -187,7 +187,7 @@ export async function expectModuleTabSurface(page: Page, moduleId: string, tabId
       panel.getByTestId("module-page-composition-accounting-payment-operations"),
     ).toHaveCount(1)
     const header = moduleView.locator('[data-ui="page-header"]')
-    await expect(header.getByRole("button", { name: "Customize insights", exact: true })).toBeVisible()
+    await expect(header.getByRole("button", { name: "Edit page", exact: true })).toBeVisible()
     const operations = page.getByRole("region", { name: "Payment operations", exact: true })
     await expect(moduleView.getByRole("region", { name: "Payment operations", exact: true })).toHaveCount(0)
     await expect(operations).toHaveCount(1)
