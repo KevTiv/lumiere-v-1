@@ -166,8 +166,10 @@ for (const viewport of [{ width: 320, height: 844 }, { width: 390, height: 844 }
         // A constrained host must stack even though the desktop viewport is unchanged.
         await dialog.evaluate((node) => node.style.setProperty("max-width", "36rem"))
       }
-      const [paper, rail] = await Promise.all([document.boundingBox(), summary.boundingBox()])
-      expect(rail!.y).toBeGreaterThanOrEqual(paper!.y + paper!.height - 1)
+      await expect.poll(async () => {
+        const [paper, rail] = await Promise.all([document.boundingBox(), summary.boundingBox()])
+        return paper && rail ? rail.y - (paper.y + paper.height) : Number.NEGATIVE_INFINITY
+      }).toBeGreaterThanOrEqual(-1)
       await expect(page.getByTestId("invoice-detail-post-draft")).toBeVisible()
       await expectNoHorizontalOverflow(page)
       await page.screenshot({ path: testInfo.outputPath(`invoice-review-${viewport.width}.png`), fullPage: true })
