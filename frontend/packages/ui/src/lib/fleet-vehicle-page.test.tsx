@@ -288,6 +288,7 @@ beforeEach(() => {
       licensePlate: "RAA 201",
       vehicleType: "van",
       status: "Active",
+      driverName: { some: "Morgan Lee" },
     },
     {
       id: "42",
@@ -297,12 +298,23 @@ beforeEach(() => {
       licensePlate: "OTHER",
       vehicleType: "truck",
       status: "Active",
+      driverName: "Outside Company",
     },
   ]);
 });
 afterEach(cleanup);
 
 describe("Fleet vehicle record read and action boundaries", () => {
+  it("shows the scoped driver and an existing history destination in the overview", () => {
+    render(view())
+    expect(screen.getByText("Driver")).toBeTruthy()
+    expect(screen.getByText("Morgan Lee")).toBeTruthy()
+    expect(screen.queryByText("Outside Company")).toBeNull()
+    expect(
+      screen.getByRole("button", { name: "History & sources" }),
+    ).toBeTruthy()
+  })
+
   it("distinguishes loading, failed reads and a genuinely missing vehicle", () => {
     query.vehicles = { ...ready(), isLoading: true };
     const { rerender } = render(view());

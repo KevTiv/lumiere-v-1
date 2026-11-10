@@ -27,6 +27,7 @@ const PASSTHROUGH_HEADERS = [
   "accept",
   "accept-language",
 ] as const
+const EXPECTED_ORGANIZATION_HEADER = "x-lumiere-organization-id"
 
 export function resolveApiServerBaseUrl(): string | null {
   const raw = process.env.LUMIERE_API_SERVER_URL
@@ -40,7 +41,9 @@ export function resolveApiServerBaseUrl(): string | null {
  * If an API server base URL is configured, proxy the incoming request and return the response.
  * Otherwise return `null` so the route handler runs its legacy implementation.
  */
-export async function forwardToApiServerIfEnabled(request: NextRequest): Promise<NextResponse | null> {
+export async function forwardToApiServerIfEnabled(
+  request: NextRequest,
+): Promise<NextResponse | null> {
   const base = resolveApiServerBaseUrl()
   if (!base) return null
 
@@ -57,33 +60,49 @@ export async function forwardToApiServerIfEnabled(request: NextRequest): Promise
     const v = request.headers.get(name)
     if (v) headers.set(name, v)
   }
+  if (request.method === "POST" && /^\/v1\/operations\/[^/]+$/.test(path)) {
+    // The operation handler uses this only to reject a session organization mismatch.
+    const expectedOrganization = request.headers.get(
+      EXPECTED_ORGANIZATION_HEADER,
+    )
+    if (expectedOrganization !== null) {
+      headers.set(EXPECTED_ORGANIZATION_HEADER, expectedOrganization)
+    }
+  }
 
   if (isWorkOsEnabled()) {
-    const { workOsRedirectUri } = await import('./workos-config')
-    const { resolveRequestCredentials } = await import('./auth-credentials')
+    const { workOsRedirectUri } = await import("./workos-config")
+    const { resolveRequestCredentials } = await import("./auth-credentials")
     // Browser cookies are consumed by AuthKit, never forwarded to Rust. Explicit
     // caller credentials keep precedence, including malformed/rejected credentials.
-    headers.delete('cookie')
-    headers.delete('x-stdb-identity')
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
-      const origin = request.headers.get('origin')
-      const site = request.headers.get('sec-fetch-site')
+    headers.delete("cookie")
+    headers.delete("x-stdb-identity")
+    if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+      const origin = request.headers.get("origin")
+      const site = request.headers.get("sec-fetch-site")
       const expectedOrigin = new URL(workOsRedirectUri()).origin
       // Sealed browser sessions authenticate same-origin requests only.
-      if (!request.headers.has('authorization') &&
-          ((origin !== null && origin !== expectedOrigin) || (site !== null && site !== 'same-origin' && site !== 'none'))) {
-        return NextResponse.json({ error: 'Cross-origin request rejected' }, { status: 403 })
+      if (
+        !request.headers.has("authorization") &&
+        ((origin !== null && origin !== expectedOrigin) ||
+          (site !== null && site !== "same-origin" && site !== "none"))
+      ) {
+        return NextResponse.json(
+          { error: "Cross-origin request rejected" },
+          { status: 403 },
+        )
       }
     }
     const credentials = await resolveRequestCredentials(request)
-    if (credentials.authorization !== null) headers.set('authorization', credentials.authorization)
+    if (credentials.authorization !== null)
+      headers.set("authorization", credentials.authorization)
   }
 
   const init: RequestInit = {
     method: request.method,
     headers,
-    cache: 'no-store',
-    redirect: 'manual',
+    cache: "no-store",
+    redirect: "manual",
   }
 
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -106,8 +125,8 @@ export async function forwardToApiServerIfEnabled(request: NextRequest): Promise
   out.delete("transfer-encoding")
   out.delete("connection")
   if (isWorkOsEnabled()) {
-    out.delete('set-cookie')
-    out.set('Cache-Control', 'private, no-store')
+    out.delete("set-cookie")
+    out.set("Cache-Control", "private, no-store")
   }
 
   return new NextResponse(res.body, {
@@ -123,7 +142,9 @@ const FORWARD_REQUIRED_MSG =
 /**
  * Always proxy to api-server, or return 503 if forwarding is disabled (no legacy body in the route).
  */
-export async function forwardToApiServerRequired(request: NextRequest): Promise<NextResponse> {
+export async function forwardToApiServerRequired(
+  request: NextRequest,
+): Promise<NextResponse> {
   const r = await forwardToApiServerIfEnabled(request)
   if (r) return r
   return NextResponse.json({ error: FORWARD_REQUIRED_MSG }, { status: 503 })

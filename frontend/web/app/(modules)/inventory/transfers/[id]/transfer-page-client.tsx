@@ -20,6 +20,7 @@ import {
   RecordChatter,
   RecordPage,
   RecordWorkflowActions,
+  recordWorkflowNextSteps,
   SmartButtons,
   StatusBar,
   stockMovesTableConfig,
@@ -373,6 +374,11 @@ function TransferPageLoaded({
           />
           </>
         }
+        nextSteps={recordWorkflowNextSteps(
+          headerActions,
+          record,
+          PRIMARY_ACTION_IDS,
+        )}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         tabs={[
@@ -445,9 +451,14 @@ function TransferPageLoaded({
             ),
           },
           {
-            id: 'audit',
-            label: t('businessHistory.title', { defaultValue: 'History & sources' }),
-            content: <RecordAuditTab tableName="stock_picking" recordId={transferId} />,
+            id: "audit",
+            evidence: true,
+            label: t("businessHistory.title", {
+              defaultValue: "History & sources",
+            }),
+            content: (
+              <RecordAuditTab tableName="stock_picking" recordId={transferId} />
+            ),
           },
         ]}
       />

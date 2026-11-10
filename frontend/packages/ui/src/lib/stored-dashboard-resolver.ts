@@ -30,6 +30,8 @@ export interface StoredDashboardResolverOptions {
   endMs?: number
   sourceStates?: StoredDashboardSourceStates
   onDrillTarget?: (target: StoredDashboardDrillTarget) => void
+  /** Personal pages disclose source units and never infer a currency symbol. */
+  useSourceUnits?: boolean
 }
 
 export type StoredDashboardResolutionState =
@@ -216,6 +218,24 @@ function parseBinding(raw: unknown): ParseResult<StoredDashboardBindingV1 | null
       message: "This widget has an invalid time or measure binding.",
     }
   }
+}
+
+export function describeStoredDashboardWidgetBinding(row: DashboardRecord) {
+  const binding = parseBinding(row.configuration)
+  const aggregation = normalizeAggregation(row.aggregation)
+  if (!binding.ok || !aggregation.ok) return null
+
+  const type = widgetTypeTag(row.widgetType ?? row.widget_type)
+  const measure = Array.isArray(row.fields)
+    ? String(row.fields[0] ?? "id")
+    : "id"
+  const unit =
+    type === "Table" || type === "List"
+      ? "fields"
+      : aggregation.value === "count"
+        ? "records"
+        : "measure"
+  return { timeField: binding.value?.timeField ?? null, unit, measure }
 }
 
 interface SortOrder {
@@ -565,8 +585,14 @@ export function resolveStoredDashboard(
     const widgetType = widgetTypeTag(row.widgetType ?? row.widget_type)
 
     if (widgetType === "Kpi") {
-      const value = aggregateValue(sourceRows, primaryField, aggregationResult.value)
-      const isCurrency = primaryField.includes("amount") || primaryField.includes("revenue")
+      const value = aggregateValue(
+        sourceRows,
+        primaryField,
+        aggregationResult.value,
+      )
+      const isCurrency =
+        !options?.useSourceUnits &&
+        (primaryField.includes("amount") || primaryField.includes("revenue"))
       widgets.push({
         id: widgetId,
         type: "kpi",

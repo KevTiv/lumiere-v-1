@@ -435,9 +435,14 @@ function ManufacturingOrderPageLoaded({
             ),
           },
           {
-            id: 'audit',
-            label: t('common.audit', { defaultValue: 'Audit' }),
-            content: <RecordAuditTab tableName="mrp_production" recordId={orderId} />,
+            id: "audit",
+            evidence: true,
+            label: t("businessHistory.title", {
+              defaultValue: "History & sources",
+            }),
+            content: (
+              <RecordAuditTab tableName="mrp_production" recordId={orderId} />
+            ),
           },
         ]}
       />

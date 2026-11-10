@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
@@ -24,8 +24,19 @@ import {
   useWorkActivities,
   type WorkActivityRow,
 } from "@lumiere/query-hooks/hooks/work-activities"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@lumiere/ui/components/select"
 import { groupActivityDeadlines } from "./activity-deadline-groups"
+import {
+  WorkActivityBatchReview,
+  type ActivityBatchEntry,
+} from "./work-activity-batch-review"
+import { recordFollowupHref } from "./workflow-work-queue"
+import { useRBAC } from "@lumiere/ui/lib/rbac-context"
+
+const MAX_BATCH_SIZE = 20
+const canComplete = (row: WorkActivityRow) =>
+  row.state === "open" && row.workActions.includes("complete")
 
 export function WorkActivitiesContent({
   scope,
@@ -43,6 +54,7 @@ export function WorkActivitiesContent({
   onTeamChange: (team: string | null) => void
 }) {
   const { t } = useTranslation()
+  const { checkPermission } = useRBAC()
   const ownership = (row: WorkActivityRow) => row.workAssignedToMe
     ? t("workBoard.mineBadge")
     : row.workIsAssigned ? t("workBoard.assigned", { defaultValue: "Assigned" }) : t("tasks.assignee.unassigned")
@@ -56,9 +68,21 @@ export function WorkActivitiesContent({
   const [review, setReview] = useState<WorkActivityRow | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [selected, setSelected] = useState<number[]>([])
+  const [batch, setBatch] = useState<ActivityBatchEntry[] | null>(null)
+  const [batchRunning, setBatchRunning] = useState(false)
+  const [runningId, setRunningId] = useState<number | null>(null)
   const submitting = useRef(false)
   const mounted = useRef(true)
   const pendingReview = useRef<WorkActivityRow | null>(null)
+  const liveAccess = useRef({ available: false, layout })
+  liveAccess.current = {
+    available:
+      online && !navigationPending && !authorityRefreshing && !query.isError,
+    layout,
+  }
+  const canDispatch = () =>
+    mounted.current && liveAccess.current.available && navigator.onLine
   useEffect(() => {
     mounted.current = true
     return () => {
@@ -79,14 +103,17 @@ export function WorkActivitiesContent({
           ),
     [query.data, query.isError],
   )
-  const deadlineGroups = useMemo(() => groupActivityDeadlines(rows, now), [rows, now])
+  const deadlineGroups = useMemo(() => groupActivityDeadlines(rows, now), [rows, now],
+  )
   const groupLabels = {
     overdue: t("workspace.dailyWork.overdue", { defaultValue: "Overdue" }),
     today: t("workspace.dailyWork.today", { defaultValue: "Today" }),
     upcoming: t("workspace.dailyWork.upcoming", { defaultValue: "Upcoming" }),
     undated: t("workspace.dailyWork.undated", { defaultValue: "No due date" }),
-    unavailable: t("workspace.dailyWork.deadlineUnavailable", { defaultValue: "Due date unavailable" }),
-    completed: t("workspace.dailyWork.completed", { defaultValue: "Completed" }),
+    unavailable: t("workspace.dailyWork.deadlineUnavailable", { defaultValue: "Due date unavailable",
+    }),
+    completed: t("workspace.dailyWork.completed", { defaultValue: "Completed",
+    }),
   }
   const teams = useMemo(
     () =>
@@ -121,11 +148,79 @@ export function WorkActivitiesContent({
     !online ||
     query.isError ||
     query.isFetching ||
-    complete.isPending
-  const canComplete = (row: WorkActivityRow) =>
-    row.state === "open" && row.workActions.includes("complete")
+    complete.isPending ||
+    batchRunning
   const title = (row: WorkActivityRow) =>
     row.summary || row.workSourceTitle || t("workBoard.followUp")
+  const deadline = (row: WorkActivityRow) =>
+    row.dateDeadline ||
+    (row.dateDeadline === undefined
+      ? groupLabels.unavailable
+      : groupLabels.undated)
+  const selectedRows = deadlineGroups.flatMap(({ rows }) =>
+    rows.filter((row) => selected.includes(row.id) && canComplete(row)),
+  )
+  useEffect(() => {
+    if (!query.isSuccess) return
+    const eligibleIds = new Set(rows.filter(canComplete).map((row) => row.id))
+    setSelected((previous) => {
+      const available = previous.filter((id) => eligibleIds.has(id))
+      return available.length === previous.length ? previous : available
+    })
+  }, [query.isSuccess, rows])
+  useEffect(() => {
+    if (layout !== "list") {
+      setBatch(null)
+      setSelected([])
+    }
+  }, [layout])
+  const runBatch = async (entries: readonly ActivityBatchEntry[]) => {
+    if (disabled || submitting.current || !canDispatch()
+    )
+      return
+    submitting.current = true
+    setBatchRunning(true)
+    const canDispatchBatch = () =>
+      canDispatch() && liveAccess.current.layout === "list"
+    try {
+      for (const { activity } of entries) {
+        if (!mounted.current) return
+        setRunningId(activity.id)
+        let result: ActivityBatchEntry
+        try {
+          if (!canDispatchBatch())
+            throw new Error(t("workBoard.batch.interrupted"))
+          await complete.mutateAsync({ activity,
+            canDispatch: canDispatchBatch,
+          })
+          result = { activity, status: "completed" }
+        } catch (cause) {
+          result = {
+            activity,
+            status: "failed",
+            error:
+              cause instanceof Error ? cause.message : t("workBoard.updateFailed"),
+          }
+        }
+        if (!mounted.current) return
+        setBatch(
+          (previous) =>
+            previous?.map((entry) =>
+              entry.activity.id === activity.id ? result : entry,
+            ) ?? null,
+        )
+        if (result.status === "completed") {
+          setSelected((previous) => previous.filter((id) => id !== activity.id))
+        }
+      }
+    } finally {
+      submitting.current = false
+      if (mounted.current) {
+        setRunningId(null)
+        setBatchRunning(false)
+      }
+    }
+  }
   const openReview = (row: WorkActivityRow) => {
     setReview(row)
     setError(null)
@@ -145,7 +240,7 @@ export function WorkActivitiesContent({
     pendingReview.current = review
     setError(null)
     try {
-      await complete.mutateAsync({ activity: review })
+      await complete.mutateAsync({ activity: review, canDispatch })
       if (!mounted.current || pendingReview.current !== review) return
       setReview(null)
       setNotice(t("workBoard.followUpCompleted"))
@@ -162,6 +257,10 @@ export function WorkActivitiesContent({
   }
   const href = current
     ? approvalRecordHref(current.resModel, current.resId)
+    : undefined
+  const followupHref =
+    current && checkPermission("activity", "create").allowed
+      ? recordFollowupHref(current.resModel, current.resId)
     : undefined
   return (
     <>
@@ -297,23 +396,87 @@ export function WorkActivitiesContent({
               }}
             />
           ) : (
-            <div className="overflow-x-auto rounded-lg border">
+            <>
+              {rows.some(canComplete) && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={disabled || selectedRows.length === 0}
+                    onClick={() =>
+                      setBatch(
+                        selectedRows.map((activity) => ({
+                          activity,
+                          status: "ready",
+                        })),
+                      )
+                    }
+                  >
+                    {t("workBoard.batch.review", {
+                      total: selectedRows.length,
+                    })}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {t("workBoard.batch.limit", { limit: MAX_BATCH_SIZE })}
+                  </span>
+                </div>
+              )}
+              <div className="overflow-x-auto rounded-lg border">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b bg-muted/40">
+                    <th scope="col" className="w-10 ps-3">
+                        <span className="sr-only">
+                          {t("workBoard.batch.selectColumn")}
+                        </span>
+                      </th>
                     <th className="p-3">{t("workBoard.followUp")}</th>
                     <th className="p-3">{t("workBoard.scope")}</th>
-                    <th className="p-3">{t("workspace.dailyWork.due", { defaultValue: "Due" })}</th>
+                      <th className="p-3">
+                        {t("workspace.dailyWork.due", { defaultValue: "Due" })}</th>
                     <th scope="col" className="p-3">{t("workBoard.statusLabel")}</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {deadlineGroups.map((group) => <Fragment key={group.id}>
+                  {deadlineGroups.map((group) => (
+                    <tbody key={group.id}>
                     <tr className="border-b bg-muted/20">
-                      <th scope="rowgroup" colSpan={4} className="px-3 py-2 text-xs font-semibold">{groupLabels[group.id]} <span className="font-normal text-muted-foreground">({group.rows.length})</span></th>
+                      <th scope="rowgroup" colSpan={5} className="px-3 py-2 text-xs font-semibold">{groupLabels[group.id]}{" "}
+                          <span className="font-normal text-muted-foreground">({group.rows.length})</span></th>
                     </tr>
                     {group.rows.map((row) => (
                     <tr key={row.id} className="border-b last:border-0">
+                          <td className="ps-3">
+                            {canComplete(row) && (
+                              <input
+                                type="checkbox"
+                                className="size-4 accent-primary"
+                                aria-label={t("workBoard.batch.selectItem", {
+                                  title: title(row),
+                                })}
+                                checked={selected.includes(row.id)}
+                                disabled={
+                                  disabled ||
+                                  (!selected.includes(row.id) &&
+                                    selectedRows.length >= MAX_BATCH_SIZE)
+                                }
+                                onChange={(event) => {
+                                  const checked = event.target.checked
+                                  setSelected((previous) => {
+                                    if (!checked)
+                                      return previous.filter(
+                                        (id) => id !== row.id,
+                                      )
+                                    if (
+                                      previous.length >= MAX_BATCH_SIZE ||
+                                      previous.includes(row.id)
+                                    )
+                                      return previous
+                                    return [...previous, row.id]
+                                  })
+                                }}
+                              />
+                            )}
+                          </td>
                       <td className="p-3">
                         <button
                           type="button"
@@ -328,17 +491,27 @@ export function WorkActivitiesContent({
                       <td className="p-3">
                         {t(`workBoard.module.${row.workModule}`)}
                       </td>
-                      <td className="p-3 whitespace-nowrap">{row.dateDeadline || (row.dateDeadline === undefined ? groupLabels.unavailable : groupLabels.undated)}</td>
+                      <td className="p-3 whitespace-nowrap">{deadline(row)}</td>
                       <td className="p-3">
                         {row.isDone
                           ? t("workBoard.status.Completed")
                           : t("workBoard.status.Open")}
-                      </td>
+                            {!row.isDone && (
+                              <p className="text-xs text-muted-foreground">
+                                {t(
+                                  canComplete(row)
+                                    ? "workBoard.nextStep.reviewCompletion"
+                                    : "workBoard.nextStep.inspect",
+                                )}
+                              </p>
+                            )}
+                          </td>
                     </tr>
-                  ))}</Fragment>)}
-                </tbody>
-              </table>
+                  ))}</tbody>
+                  ))}
+                </table>
             </div>
+            </>
           )}
           {query.hasNextPage && (
             <Button
@@ -353,6 +526,26 @@ export function WorkActivitiesContent({
           )}
         </>
       )}
+      <WorkActivityBatchReview
+        entries={query.isError || authorityRefreshing ? null : batch}
+        runningId={runningId}
+        busy={batchRunning}
+        disabled={disabled}
+        title={title}
+        details={(row) =>
+          [
+            row.workSourceTitle,
+            t(`workBoard.module.${row.workModule}`),
+            ownership(row),
+            deadline(row),
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        }
+        currentActivity={(id) => rows.find((row) => row.id === id)}
+        onClose={() => setBatch(null)}
+        onSubmit={(entries) => void runBatch(entries)}
+      />
       <Sheet
         open={review != null && current != null && !query.isError}
         onOpenChange={(open) => {
@@ -371,7 +564,7 @@ export function WorkActivitiesContent({
               <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 <span>{ownership(current)}</span>
                 <span aria-hidden="true">·</span>
-                <span>{current.dateDeadline || (current.dateDeadline === undefined ? groupLabels.unavailable : groupLabels.undated)}</span>
+                <span>{deadline(current)}</span>
               </div>
               <Badge variant="secondary">
                 {current.isDone
@@ -379,11 +572,19 @@ export function WorkActivitiesContent({
                   : t("workBoard.status.Open")}
               </Badge>
               {href && (
-                <p>
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
                   <Link className="text-sm font-medium underline" href={href}>
                     {t("workBoard.openRecord")}
                   </Link>
-                </p>
+                  {followupHref && (
+                    <Link
+                      className="text-sm font-medium underline"
+                      href={followupHref}
+                    >
+                      {t("workBoard.scheduleOnRecord")}
+                    </Link>
+                  )}
+                </div>
               )}
               {stale ? (
                 <div role="alert" className="space-y-2">

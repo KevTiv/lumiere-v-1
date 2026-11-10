@@ -10,6 +10,7 @@ use super::super::{
 use crate::error::ApiError;
 
 pub(super) const KIND: &str = "historical_expense_journals";
+pub(super) const OPENING_BALANCES: &str = "opening_balances";
 pub(super) const MAX_ROWS: usize = 200;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -22,6 +23,8 @@ pub(super) struct RowSelection {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct Configuration {
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub opening_balances: bool,
     pub journal_id: String,
     pub debit_account_id: String,
     pub credit_account_id: String,
@@ -78,6 +81,10 @@ impl PrepareBody {
     }
 }
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 impl Configuration {
     pub fn validate(&self) -> Result<(), ApiError> {
         for value in [
@@ -119,6 +126,18 @@ impl Configuration {
                     "choose an existing source field".into(),
                 ));
             }
+        }
+        if self.opening_balances
+            && (self.posting_date.is_none()
+                || self.amount_field != "debit"
+                || !matches!(
+                    self.date_field.as_str(),
+                    "date" | "business_date" | "as_of" | "balance_date"
+                )
+                || self.description_field.is_some()
+                || !self.distinct_expenses.is_empty())
+        {
+            return Err(ApiError::BadRequest("opening balances need an explicit cutover date and the reviewed debit and credit fields".into()));
         }
         if let Some(date) = &self.posting_date {
             calendar_date(date).map_err(ApiError::BadRequest)?;
@@ -258,6 +277,7 @@ pub(super) enum Phase {
     Lines,
     Verification,
     Complete,
+    RolledBack,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -334,7 +354,12 @@ pub(super) fn build_definition(
         }
     }
     let mut definition = Definition {
-        kind: KIND.into(),
+        kind: if configuration.opening_balances {
+            OPENING_BALANCES
+        } else {
+            KIND
+        }
+        .into(),
         configuration: configuration.clone(),
         summary: Summary {
             record_count: 0,
@@ -403,7 +428,9 @@ fn build_entry(
             "This source was excluded and will not create ERP records.",
         ));
     }
-    if !matches!(row.target.as_str(), "source_observation" | "hr_expense")
+    if config.opening_balances {
+        validate_opening_balance(row, config)?;
+    } else if !matches!(row.target.as_str(), "source_observation" | "hr_expense")
         || confirmed_value(row, "observation_kind") != Some("expense")
     {
         return Err((
@@ -416,7 +443,7 @@ fn build_entry(
         .filter(|amount| *amount > 0)
         .ok_or((
             "amount_unconfirmed",
-            "Confirm a positive expense amount in the selected source field.",
+            "Confirm a positive amount in the selected source field.",
         ))?;
     if currency_decimals > 6 || amount % 10_i128.pow(u32::from(6 - currency_decimals)) != 0 {
         return Err((
@@ -452,7 +479,14 @@ fn build_entry(
         }
         value.to_owned()
     };
-    let description = if let Some(field) = &config.description_field {
+    let description = if config.opening_balances {
+        confirmed_value(row, "description")
+            .ok_or((
+                "description_unconfirmed",
+                "Confirm the description of this opening-balance pair.",
+            ))?
+            .to_owned()
+    } else if let Some(field) = &config.description_field {
         confirmed_value(row, field)
             .ok_or((
                 "description_unconfirmed",
@@ -465,7 +499,7 @@ fn build_entry(
     if description.is_empty() || description.len() > 2000 {
         return Err((
             "description_invalid",
-            "Provide a bounded description for this expense.",
+            "Provide a bounded description for this source row.",
         ));
     }
     let business_identity = business_identity(row, config, &date)?;
@@ -485,6 +519,59 @@ fn build_entry(
     // Business references survive re-preparation and a renamed identical upload.
     entry.reference = format!("SOURCE-{}", &claim_key(&entry)[..24]);
     Ok(entry)
+}
+
+fn validate_opening_balance(
+    row: &ReviewedRow,
+    config: &Configuration,
+) -> Result<(), (&'static str, &'static str)> {
+    if row.target != "source_observation"
+        || confirmed_value(row, "observation_kind") != Some("opening_balance")
+    {
+        return Err((
+            "opening_balance_unconfirmed",
+            "Confirm that the row represents an opening-balance pair.",
+        ));
+    }
+    let debit = confirmed_value(row, "debit").and_then(decimal);
+    let credit = confirmed_value(row, "credit").and_then(decimal);
+    if debit != credit || !debit.is_some_and(|value| value > 0) {
+        return Err((
+            "opening_balance_unbalanced",
+            "Confirm equal positive debit and credit amounts from the source pair.",
+        ));
+    }
+    for (field, expected) in [
+        ("debit_account_id", config.debit_account_id.as_str()),
+        ("credit_account_id", config.credit_account_id.as_str()),
+        ("currency_id", config.currency_id.as_str()),
+    ] {
+        if confirmed_value(row, field) != Some(expected) {
+            return Err((
+                "opening_balance_references",
+                "Confirm both account IDs and the currency ID shown in the preview.",
+            ));
+        }
+    }
+    let source_date = confirmed_value(row, &config.date_field);
+    if source_date.is_none()
+        || source_date != config.posting_date.as_deref()
+        || row.source.business_date.as_ref().is_some_and(|date| {
+            date.precision != DatePrecision::Day || date.from.as_deref() != source_date
+        })
+    {
+        return Err((
+            "opening_balance_cutover",
+            "Confirm the exact source day and select that same day as the cutover date.",
+        ));
+    }
+    if confirmed_value(row, "document_reference").is_none() {
+        return Err((
+            "opening_balance_reference",
+            "Confirm the source's opening-balance reference.",
+        ));
+    }
+    Ok(())
 }
 
 fn business_identity(
@@ -526,9 +613,13 @@ fn business_identity(
     Ok(BusinessIdentity {
         date_from,
         date_to_exclusive,
-        external_reference: ["external_reference", "external_ref", "document_reference"]
-            .into_iter()
-            .find_map(normalized),
+        external_reference: if config.opening_balances {
+            normalized("document_reference")
+        } else {
+            ["external_reference", "external_ref", "document_reference"]
+                .into_iter()
+                .find_map(normalized)
+        },
         category: normalized("category"),
     })
 }

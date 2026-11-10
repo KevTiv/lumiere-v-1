@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  describeStoredDashboardWidgetBinding,
   resolveStoredDashboard,
   resolveStoredDashboardWidgets,
   storedDashboardExportGate,
@@ -28,6 +29,25 @@ const baseWidget: Record<string, unknown> = {
 }
 
 describe("stored dashboard resolver", () => {
+  it("identifies the declared date field and renders personal KPI measures in source units", () => {
+    const widget = {
+      ...baseWidget,
+      configuration: strictBinding("date_order", "amount_total"),
+    }
+    expect(describeStoredDashboardWidgetBinding(widget)).toEqual({
+      timeField: "date_order",
+      unit: "measure",
+      measure: "amount_total",
+    })
+    const sources = { sale_order: [{ amount_total: 120.25 }] }
+    expect(
+      resolveStoredDashboard([widget], [1], sources, { useSourceUnits: true })
+        .widgets[0],
+    ).toMatchObject({ type: "kpi", data: { value: "120.25" } })
+    expect(
+      resolveStoredDashboard([widget], [1], sources).widgets[0],
+    ).toMatchObject({ type: "kpi", data: { value: "$120" } })
+  })
   it("includes typed pre-epoch dates and excludes the exact final boundary", () => {
     const result = resolveStoredDashboard(
       [{ ...baseWidget, aggregation: "count", fields: [], configuration: strictBinding("date_order", null) }],

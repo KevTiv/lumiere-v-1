@@ -1,10 +1,11 @@
-'use client';
+"use client"
 
-import { useCallback, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { FileText, ListOrdered, MoreHorizontal, PackagePlus, Truck } from 'lucide-react';
-import { useTranslation } from '@lumiere/i18n';
+import { useCallback, useMemo, useState } from "react"
+import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { FileText, ListOrdered, MoreHorizontal, PackagePlus, Truck,
+} from "lucide-react"
+import { useTranslation } from "@lumiere/i18n"
 import {
   Button,
   EntityDetail,
@@ -24,7 +25,7 @@ import {
   buildModuleTabHref,
   useFormDialog,
   useCurrencyFormat,
-} from '@lumiere/ui';
+} from "@lumiere/ui"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,16 +35,17 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@lumiere/ui/components/alert-dialog';
+} from "@lumiere/ui/components/alert-dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@lumiere/ui/components/dropdown-menu';
-import { Skeleton } from '@lumiere/ui/components/skeleton';
-import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
+} from "@lumiere/ui/components/dropdown-menu"
+import { Skeleton } from "@lumiere/ui/components/skeleton"
+import { Badge } from "@lumiere/ui/components/badge"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import {
   isSaleOrderConfirmed,
   isSaleOrderLocked,
@@ -52,14 +54,16 @@ import {
   type AnyWorkflowAction,
   type RowValueMap,
   type TransitionNotice,
-} from '@lumiere/erp-workflows';
-import { saleOrderPrimaryLabel } from '@lumiere/stdb/read-models';
-import type { StockPicking } from '@lumiere/stdb/types';
-import { useAccountMoves, useAccountPayments } from '@lumiere/query-hooks/hooks/accounting';
-import { useContacts, type Contact } from '@lumiere/query-hooks/hooks/crm';
+} from "@lumiere/erp-workflows"
+import { saleOrderPrimaryLabel } from "@lumiere/stdb/read-models"
+import type { StockPicking } from "@lumiere/stdb/types"
+import { useAccountMoves, useAccountPayments,
+} from "@lumiere/query-hooks/hooks/accounting"
+import { useContacts, type Contact } from "@lumiere/query-hooks/hooks/crm"
 
-import { useProducts, useStockPickings } from '@lumiere/query-hooks/hooks/inventory';
-import { orderHandoffs } from '@lumiere/query-hooks/hooks/order-to-cash';
+import { useProducts, useStockPickings,
+} from "@lumiere/query-hooks/hooks/inventory"
+import { orderHandoffs } from "@lumiere/query-hooks/hooks/order-to-cash"
 import {
   useAccrueSaleCommission,
   useApplyOmnichannelAllocation,
@@ -71,64 +75,78 @@ import {
   useReturnOrders,
   type SaleOrder,
   type SaleOrderLine,
-} from '@lumiere/query-hooks/hooks/sales';
-import { useReturnOrderWorkflow } from '@lumiere/query-hooks/hooks/return-order-workflow';
-import { useSaleOrderLineWorkflow } from '@lumiere/query-hooks/hooks/sale-order-line-workflow';
-import { useSaleOrderWorkflow } from '@lumiere/query-hooks/hooks/sales-order-workflow';
-import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
-import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
-import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
-import { useRecordNavigation } from '@/hooks/use-record-navigation';
-import { approvalInboxHref } from '../../../approvals/approval-inbox-view';
-import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
-import { useManagedDocumentUpload } from "@/lib/use-managed-document-upload";
-import { useSalesModuleSubscription } from '@/lib/module-subscription-hooks';
-import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
-import { toCreateSaleOrderLineParams, toUpdateSaleOrderLineParams } from '@/lib/sales-create-params';
-import { phCapture } from '@/lib/posthog-browser';
-import { RecordDocumentAttachments } from '../../../../../components/record-document-attachments';
-import { ReadOnlyRows } from '../../../../../components/read-only-rows';
-import { OrderHandoffLinks } from '../../../../../components/order-handoff-links';
-import { CreateInvoiceFromOrderDialog, EditSaleOrderDialog } from '../../sale-order-dialogs';
+} from "@lumiere/query-hooks/hooks/sales"
+import { useReturnOrderWorkflow } from "@lumiere/query-hooks/hooks/return-order-workflow"
+import { useSaleOrderLineWorkflow } from "@lumiere/query-hooks/hooks/sale-order-line-workflow"
+import { useSaleOrderWorkflow } from "@lumiere/query-hooks/hooks/sales-order-workflow"
+import { downloadDocumentPdf } from "@lumiere/query-hooks/hooks/templates"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { useWorkflowSurface } from "@/hooks/use-workflow-surface"
+import { useRecordNavigation } from "@/hooks/use-record-navigation"
+import { approvalInboxHref } from "../../../approvals/approval-inbox-view"
+import { archiveRenderedPdfAsDocument } from "@/lib/archive-document-pdf"
+import { useManagedDocumentUpload } from "@/lib/use-managed-document-upload"
+import { useSalesModuleSubscription } from "@/lib/module-subscription-hooks"
+import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { toCreateSaleOrderLineParams, toUpdateSaleOrderLineParams,
+} from "@/lib/sales-create-params"
+import { phCapture } from "@/lib/posthog-browser"
+import { RecordDocumentAttachments } from "../../../../../components/record-document-attachments"
+import { ReadOnlyRows } from "../../../../../components/read-only-rows"
+import { OrderHandoffLinks } from "../../../../../components/order-handoff-links"
+import { CreateInvoiceFromOrderDialog, EditSaleOrderDialog,
+} from "../../sale-order-dialogs"
 import {
   downloadCommercialPacket,
   linesOfOrder,
   saleOrderDetailWithPartners,
-} from '../../sale-order-record';
-import { buildReturnParams, canCreateReturn, returnQtyFieldId, returnableLines } from '../../sale-order-return';
-import { saleOrderStatusBar } from '../../sale-order-status';
-import { parseCommissionRatePercent } from '../../sales-ops-panel';
-import { optionRowsForOrder } from '../../commission-plans';
-import { saleOrderNextStep, nextStepActionIds } from '../../sale-order-next-step';
-import { SaleOrderNextAction, SaleOrderWorkspace } from '../../sale-order-workspace';
-import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
+} from "../../sale-order-record"
+import { buildReturnParams, canCreateReturn, returnQtyFieldId, returnableLines,
+} from "../../sale-order-return"
+import { saleOrderStatusBar } from "../../sale-order-status"
+import { parseCommissionRatePercent } from "../../sales-ops-panel"
+import { optionRowsForOrder } from "../../commission-plans"
+import { saleOrderNextStep, nextStepActionIds,
+} from "../../sale-order-next-step"
+import { SaleOrderNextAction, SaleOrderWorkspace,
+} from "../../sale-order-workspace"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 
 interface SaleOrderPageClientProps {
-  orderId: string;
-  initialOrders?: SaleOrder[];
-  initialOrderLines?: SaleOrderLine[];
-  initialStockPickings?: StockPicking[];
-  initialContacts?: Contact[];
-  organizationId?: number;
+  orderId: string
+  initialOrders?: SaleOrder[]
+  initialOrderLines?: SaleOrderLine[]
+  initialStockPickings?: StockPicking[]
+  initialContacts?: Contact[]
+  organizationId?: number
 }
 
-type OrderRow = Record<string, unknown>;
-type WorkflowAction = AnyWorkflowAction<RowValueMap>;
+type OrderRow = Record<string, unknown>
+type WorkflowAction = AnyWorkflowAction<RowValueMap>
 
 /** These render their own failure inline in their dialog, so the toast stays quiet. */
 const INLINE_ERROR_TRANSITIONS: ReadonlySet<string> = new Set([
-  'sales.order.create-invoice',
-  'sales.order.update',
-]);
+  "sales.order.create-invoice",
+  "sales.order.update",
+])
 
-const TAB_IDS = ['overview', 'lines', 'options', 'handoffs', 'discussion', 'audit'] as const;
-type TabId = (typeof TAB_IDS)[number];
+const TAB_IDS = [
+  "overview",
+  "lines",
+  "options",
+  "handoffs",
+  "discussion",
+  "audit",
+] as const
+type TabId = (typeof TAB_IDS)[number]
 
 export function SaleOrderPageClient(props: SaleOrderPageClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
-    return <MissingOrganization />;
+    return <MissingOrganization />
   }
-  return <SaleOrderPageLoaded {...props} organizationId={props.organizationId} />;
+  return (
+    <SaleOrderPageLoaded {...props} organizationId={props.organizationId} />
+  )
 }
 
 function SaleOrderPageLoaded({
@@ -139,170 +157,192 @@ function SaleOrderPageLoaded({
   initialContacts,
   organizationId,
 }: SaleOrderPageClientProps & { organizationId: number }) {
-  useSalesModuleSubscription();
-  const { t } = useTranslation();
-  const { locale } = useCurrencyFormat();
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const { askForm, formDialog } = useFormDialog();
-  const { orgId } = orgBigInts(organizationId);
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
+  useSalesModuleSubscription()
+  const { t } = useTranslation()
+  const { locale } = useCurrencyFormat()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const { askForm, formDialog } = useFormDialog()
+  const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
 
-  const ordersQuery = useSaleOrders(orgId, initialOrders);
-  const { data: orders = [], isLoading: ordersLoading } = ordersQuery;
-  const linesQuery = useSaleOrderLines(orgId, initialOrderLines);
-  const { data: orderLines = [] } = linesQuery;
-  const stockPickingsQuery = useStockPickings(orgId, initialStockPickings);
-  const stockPickings = stockPickingsQuery.isSuccess && !stockPickingsQuery.isError ? stockPickingsQuery.data ?? [] : [];
-  const accountMovesQuery = useAccountMoves(orgId);
-  const accountMoves = accountMovesQuery.isSuccess && !accountMovesQuery.isError ? accountMovesQuery.data ?? [] : [];
-  const accountPaymentsQuery = useAccountPayments(orgId);
-  const accountPayments = accountPaymentsQuery.isSuccess && !accountPaymentsQuery.isError ? accountPaymentsQuery.data ?? [] : [];
-  const returnOrdersQuery = useReturnOrders(orgId);
-  const returnOrders = returnOrdersQuery.isSuccess && !returnOrdersQuery.isError ? returnOrdersQuery.data ?? [] : [];
-  const { data: contacts = [] } = useContacts(orgId, initialContacts);
-  const productRowsQuery = useProducts(orgId);
-  const productRows = productRowsQuery.isSuccess && !productRowsQuery.isError ? productRowsQuery.data ?? [] : [];
-  const currenciesQuery = useCurrencies();
-  const orderOptionsQuery = useSaleOrderOptions(orgId);
+  const ordersQuery = useSaleOrders(orgId, initialOrders)
+  const { data: orders = [], isLoading: ordersLoading } = ordersQuery
+  const linesQuery = useSaleOrderLines(orgId, initialOrderLines)
+  const { data: orderLines = [] } = linesQuery
+  const stockPickingsQuery = useStockPickings(orgId, initialStockPickings)
+  const stockPickings = stockPickingsQuery.isSuccess && !stockPickingsQuery.isError ? (stockPickingsQuery.data ?? [])
+      : []
+  const accountMovesQuery = useAccountMoves(orgId)
+  const accountMoves = accountMovesQuery.isSuccess && !accountMovesQuery.isError ? (accountMovesQuery.data ?? [])
+      : []
+  const accountPaymentsQuery = useAccountPayments(orgId)
+  const accountPayments = accountPaymentsQuery.isSuccess && !accountPaymentsQuery.isError ? (accountPaymentsQuery.data ?? [])
+      : []
+  const returnOrdersQuery = useReturnOrders(orgId)
+  const returnOrders = returnOrdersQuery.isSuccess && !returnOrdersQuery.isError ? (returnOrdersQuery.data ?? [])
+      : []
+  const { data: contacts = [] } = useContacts(orgId, initialContacts)
+  const productRowsQuery = useProducts(orgId)
+  const productRows = productRowsQuery.isSuccess && !productRowsQuery.isError ? (productRowsQuery.data ?? [])
+      : []
+  const currenciesQuery = useCurrencies()
+  const orderOptionsQuery = useSaleOrderOptions(orgId)
 
-  const applySalePromotion = useApplySalePromotion(orgId);
-  const applySaleOrderOptions = useApplySaleOrderOptions(orgId);
-  const accrueSaleCommission = useAccrueSaleCommission(orgId);
-  const applyOmnichannelAllocation = useApplyOmnichannelAllocation(orgId, operatingCompanyId);
-  const documentUploads = useManagedDocumentUpload(orgId, operatingCompanyId);
+  const applySalePromotion = useApplySalePromotion(orgId)
+  const applySaleOrderOptions = useApplySaleOrderOptions(orgId)
+  const accrueSaleCommission = useAccrueSaleCommission(orgId)
+  const applyOmnichannelAllocation = useApplyOmnichannelAllocation(orgId, operatingCompanyId,
+  )
+  const documentUploads = useManagedDocumentUpload(orgId, operatingCompanyId)
 
-  const [transitionError, setTransitionError] = useState<string>();
-  const workflowSurface = useWorkflowSurface({ organizationId });
+  const [transitionError, setTransitionError] = useState<string>()
+  const workflowSurface = useWorkflowSurface({ organizationId })
   const saleOrderWorkflow = useSaleOrderWorkflow(
     orgId,
     operatingCompanyId,
     {
-      confirm: t('sales.actions.confirmSelected'),
-      createInvoice: t('sales.actions.createInvoice'),
-      sendQuotation: t('sales.actions.sendQuotation'),
-      acceptQuotation: t('sales.actions.acceptQuotation', { defaultValue: 'Accept quotation' }),
-      cancel: t('sales.actions.cancelOrders'),
-      recalculateTotals: t('sales.actions.recalculateTotals'),
-      lock: t('sales.actions.lockOrders'),
-      unlock: t('sales.actions.unlockOrders'),
-      edit: t('sales.actions.editOrder'),
+      confirm: t("sales.actions.confirmSelected"),
+      createInvoice: t("sales.actions.createInvoice"),
+      sendQuotation: t("sales.actions.sendQuotation"),
+      acceptQuotation: t("sales.actions.acceptQuotation", {
+        defaultValue: "Accept quotation",
+      }),
+      cancel: t("sales.actions.cancelOrders"),
+      recalculateTotals: t("sales.actions.recalculateTotals"),
+      lock: t("sales.actions.lockOrders"),
+      unlock: t("sales.actions.unlockOrders"),
+      edit: t("sales.actions.editOrder"),
     },
     {
       navigate: workflowSurface.navigate,
       record: workflowSurface.record,
       notify: (notice: TransitionNotice) => {
-        if (notice.kind === 'error' && INLINE_ERROR_TRANSITIONS.has(notice.transitionId)) return;
-        if (notice.kind === 'error') setTransitionError(notice.error?.message);
-        else setTransitionError(undefined);
-        workflowSurface.notify(notice);
-        if (notice.kind === 'success' && notice.transitionId === 'sales.order.confirm') {
-          phCapture('sale_order_confirmed', { organization_id: organizationId });
+        if (notice.kind === "error" && INLINE_ERROR_TRANSITIONS.has(notice.transitionId)) return
+        if (notice.kind === "error") setTransitionError(notice.error?.message)
+        else setTransitionError(undefined)
+        workflowSurface.notify(notice)
+        if (notice.kind === "success" && notice.transitionId === "sales.order.confirm"
+        ) {
+          phCapture("sale_order_confirmed", { organization_id: organizationId })
         }
-        if (notice.kind === 'success' && notice.transitionId === 'sales.order.cancel') {
-          phCapture('sale_order_cancelled', { organization_id: organizationId });
+        if (notice.kind === "success" && notice.transitionId === "sales.order.cancel"
+        ) {
+          phCapture("sale_order_cancelled", { organization_id: organizationId })
         }
       },
     },
-  );
+  )
 
   const lineWorkflow = useSaleOrderLineWorkflow(
     orgId,
     operatingCompanyId,
     {
-      create: t('sales.orderLines.add', { defaultValue: 'Add line' }),
-      update: t('sales.orderLines.update', { defaultValue: 'Update line' }),
-      delete: t('sales.orderLines.delete', { defaultValue: 'Remove line' }),
+      create: t("sales.orderLines.add", { defaultValue: "Add line" }),
+      update: t("sales.orderLines.update", { defaultValue: "Update line" }),
+      delete: t("sales.orderLines.delete", { defaultValue: "Remove line" }),
     },
-    { navigate: workflowSurface.navigate, record: workflowSurface.record, notify: workflowSurface.notify },
-  );
+    { navigate: workflowSurface.navigate, record: workflowSurface.record, notify: workflowSurface.notify,
+    },
+  )
 
   const returnWorkflow = useReturnOrderWorkflow(
     orgId,
     operatingCompanyId,
     {
-      create: t('sales.returnOrders.actions.create'),
-      confirm: t('sales.returnOrders.actions.confirm'),
-      receive: t('sales.returnOrders.actions.receive'),
-      exchange: t('sales.returnOrders.actions.createExchange', { defaultValue: 'Create exchange order' }),
-      cancel: t('sales.returnOrders.actions.cancel'),
-      createCreditNote: t('sales.returnOrders.actions.createCreditNote'),
-      notReceivable: t('sales.returnOrders.errors.notReceivable'),
+      create: t("sales.returnOrders.actions.create"),
+      confirm: t("sales.returnOrders.actions.confirm"),
+      receive: t("sales.returnOrders.actions.receive"),
+      exchange: t("sales.returnOrders.actions.createExchange", {
+        defaultValue: "Create exchange order",
+      }),
+      cancel: t("sales.returnOrders.actions.cancel"),
+      createCreditNote: t("sales.returnOrders.actions.createCreditNote"),
+      notReceivable: t("sales.returnOrders.errors.notReceivable"),
     },
-    { navigate: workflowSurface.navigate, record: workflowSurface.record, notify: workflowSurface.notify },
-  );
+    { navigate: workflowSurface.navigate, record: workflowSurface.record, notify: workflowSurface.notify,
+    },
+  )
 
-  const [dialog, setDialog] = useState<'invoice' | 'edit' | null>(null);
-  const [pendingConfirm, setPendingConfirm] = useState<WorkflowAction | null>(null);
+  const [dialog, setDialog] = useState<"invoice" | "edit" | null>(null)
+  const [pendingConfirm, setPendingConfirm] = useState<WorkflowAction | null>(null,
+  )
 
   const order = useMemo(
-    () => (orders as unknown as OrderRow[]).find((row) => String(row.id) === orderId),
+    () => (orders as unknown as OrderRow[]).find((row) => String(row.id) === orderId,
+      ),
     [orders, orderId],
-  );
+  )
   const lines = useMemo(
     () => linesOfOrder(orderLines as unknown as OrderRow[], orderId),
     [orderLines, orderId],
-  );
+  )
   const gridProducts = useMemo(
     () =>
       (productRows as unknown as OrderRow[]).map((row) => ({
         id: String(row.id),
-        label: String(row.displayName ?? row.name ?? row.defaultCode ?? row.code ?? row.id),
+        label: String(row.displayName ?? row.name ?? row.defaultCode ?? row.code ?? row.id,
+        ),
         uomId: row.uomId == null ? undefined : String(row.uomId),
-        listPrice: typeof row.listPrice === 'number' ? row.listPrice : undefined,
+        listPrice: typeof row.listPrice === "number" ? row.listPrice : undefined,
       })),
     [productRows],
-  );
+  )
   const optionRows = useMemo(() => {
-    const productNameById = new Map<string, string>();
+    const productNameById = new Map<string, string>()
     for (const product of gridProducts) {
-      if (product.label) productNameById.set(product.id, product.label);
+      if (product.label) productNameById.set(product.id, product.label)
     }
-    return optionRowsForOrder(orderId, (orderOptionsQuery.data ?? []) as OrderRow[], productNameById);
-  }, [orderId, orderOptionsQuery.data, gridProducts]);
+    return optionRowsForOrder(orderId, (orderOptionsQuery.data ?? []) as OrderRow[], productNameById,
+    )
+  }, [orderId, orderOptionsQuery.data, gridProducts])
   const partnerLabelById = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, string>()
     for (const contact of contacts as unknown as OrderRow[]) {
-      map.set(String(contact.id), String(contact.name ?? contact.displayName ?? contact.id));
+      map.set(String(contact.id), String(contact.name ?? contact.displayName ?? contact.id),
+      )
     }
-    return map;
-  }, [contacts]);
+    return map
+  }, [contacts])
 
   // Previous / next follow the list the record was opened from, else newest first.
   const navigation = useRecordNavigation<OrderRow>({
     rows: orders as unknown as OrderRow[],
     currentId: orderId,
-    basePath: '/sales/orders',
+    basePath: "/sales/orders",
     labelOf: (row) => saleOrderPrimaryLabel(row as never) || String(row.id),
-  });
+  })
 
-  const requestedTab = searchParams.get('tab');
-  const activeTab: TabId = (TAB_IDS as readonly string[]).includes(requestedTab ?? '')
+  const requestedTab = searchParams.get("tab")
+  const activeTab: TabId = (TAB_IDS as readonly string[]).includes(requestedTab ?? "",
+  )
     ? (requestedTab as TabId)
-    : 'overview';
+    : "overview"
   const setActiveTab = useCallback(
     (tab: string) => {
-      const next = new URLSearchParams(searchParams.toString());
-      if (tab === 'overview') next.delete('tab');
-      else next.set('tab', tab);
-      const query = next.toString();
-      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+      const next = new URLSearchParams(searchParams.toString())
+      if (tab === "overview") next.delete("tab")
+      else next.set("tab", tab)
+      const query = next.toString()
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false,
+      })
     },
     [pathname, router, searchParams],
-  );
+  )
 
   const report = useCallback((error: unknown, title: string) => {
     showWorkflowToast({
-      kind: 'error',
+      kind: "error",
       title,
       description: error instanceof Error ? error.message : String(error),
-    });
-  }, []);
+    })
+  }, [])
 
   const headerActions = useMemo(
     (): WorkflowAction[] => [
-      ...saleOrderWorkflow.actions.filter((action) => action.id !== 'sales.order.create-invoice'),
+      ...saleOrderWorkflow.actions.filter((action) => action.id !== "sales.order.create-invoice",
+      ),
       saleOrderWorkflow.acceptQuotation,
       saleOrderWorkflow.createInvoice,
       saleOrderWorkflow.update,
@@ -312,49 +352,57 @@ function SaleOrderPageLoaded({
       saleOrderWorkflow.cancel,
     ],
     [saleOrderWorkflow],
-  );
+  )
 
   const runWorkflowAction = useCallback(
     async (action: WorkflowAction, record: RowValueMap) => {
-      setTransitionError(undefined);
+      setTransitionError(undefined)
       switch (action.id) {
-        case 'sales.order.create-invoice':
-          setDialog('invoice');
-          return;
-        case 'sales.order.update':
-          setDialog('edit');
-          return;
-        case 'sales.order.accept-quotation': {
+        case "sales.order.create-invoice":
+          setDialog("invoice")
+          return
+        case "sales.order.update":
+          setDialog("edit")
+          return
+        case "sales.order.accept-quotation": {
           const values = await askForm({
             title: action.label,
             fields: [
               {
-                id: 'signedBy',
-                name: 'signedBy',
-                label: t('sales.actions.acceptQuotationPrompt', { defaultValue: 'Accepted by (name)' }),
-                type: 'text',
+                id: "signedBy",
+                name: "signedBy",
+                label: t("sales.actions.acceptQuotationPrompt", {
+                  defaultValue: "Accepted by (name)",
+                }),
+                type: "text",
                 required: true,
               },
             ],
-          });
-          const signedBy = typeof values?.signedBy === 'string' ? values.signedBy.trim() : '';
-          if (!signedBy) return;
+          })
+          const signedBy = typeof values?.signedBy === "string" ? values.signedBy.trim() : ""
+          if (!signedBy) return
           // The workflow surface reports a typed failure.
-          await saleOrderWorkflow.acceptQuotation.execute({ orderId, signedBy }).catch(() => undefined);
-          return;
+          await saleOrderWorkflow.acceptQuotation.execute({ orderId, signedBy }).catch(() => undefined)
+          return
         }
       }
-      if (action.kind === 'destructive' || action.kind === 'confirm' || action.id === 'sales.order.confirm') {
-        setPendingConfirm(action);
-        return;
+      if (action.kind === "destructive" || action.kind === "confirm" || action.id === "sales.order.confirm"
+      ) {
+        setPendingConfirm(action)
+        return
       }
-      await action.execute(action.prepare?.(record)).catch(() => undefined);
+      await action.execute(action.prepare?.(record)).catch(() => undefined)
     },
     [askForm, orderId, saleOrderWorkflow, t],
-  );
+  )
 
   if (ordersQuery.isError) {
-    return <div role="alert" className="space-y-3 p-4"><p>{t('sales.workspace.orderReadFailed', { defaultValue: 'The order could not be loaded. Refresh to try again.' })}</p><Button variant="outline" onClick={() => void ordersQuery.refetch()}>{t('common.retry', { defaultValue: 'Retry' })}</Button></div>;
+    return (
+      <div role="alert" className="space-y-3 p-4"><p>{t("sales.workspace.orderReadFailed", {
+            defaultValue:
+              "The order could not be loaded. Refresh to try again.",
+          })}</p><Button variant="outline" onClick={() => void ordersQuery.refetch()}>{t("common.retry", { defaultValue: "Retry" })}</Button></div>
+    )
   }
 
   if (!order) {
@@ -365,37 +413,41 @@ function SaleOrderPageLoaded({
           <Skeleton className="h-10 w-96" />
           <Skeleton className="h-64 w-full" />
         </div>
-      );
+      )
     }
     return (
       <Empty data-testid="sale-order-page-not-found">
         <EmptyHeader>
-          <EmptyTitle>{t('sales.order.notFound', { defaultValue: 'Order not found' })}</EmptyTitle>
+          <EmptyTitle>{t("sales.order.notFound", { defaultValue: "Order not found" })}</EmptyTitle>
           <EmptyDescription>
-            {t('sales.order.notFoundHint', {
-              defaultValue: 'It may have been deleted, or belong to another organization.',
+            {t("sales.order.notFoundHint", {
+              defaultValue:
+                "It may have been deleted, or belong to another organization.",
             })}
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <Button variant="outline" render={<Link href={buildModuleTabHref('sales', 'orders')} />} nativeButton={false}>
-            {t('sales.order.backToOrders', { defaultValue: 'Back to orders' })}
+          <Button variant="outline" render={<Link href={buildModuleTabHref("sales", "orders")} />} nativeButton={false}>
+            {t("sales.order.backToOrders", { defaultValue: "Back to orders" })}
           </Button>
         </EmptyContent>
       </Empty>
-    );
+    )
   }
 
-  const record = order as RowValueMap;
-  const state = saleOrderState(record);
-  const label = saleOrderPrimaryLabel(order as never) || String(order.reference ?? `#${orderId}`);
-  const partnerId = order.partnerId ?? order.partner_id;
+  const record = order as RowValueMap
+  const state = saleOrderState(record)
+  const label = saleOrderPrimaryLabel(order as never) || String(order.reference ?? `#${orderId}`)
+  const partnerId = order.partnerId ?? order.partner_id
   const customer =
-    String(order.partnerName ?? order.partner_name ?? '').trim() ||
-    (partnerId != null ? (partnerLabelById.get(String(partnerId)) ?? '') : '');
-  const status = saleOrderStatusBar(order, t);
-  const editable = (state === 'Draft' || state === 'Sent') && !isSaleOrderLocked(record) && linesQuery.isSuccess;
-  const rate = parseCommissionRatePercent(order);
+    String(order.partnerName ?? order.partner_name ?? "").trim() ||
+    (partnerId != null ? (partnerLabelById.get(String(partnerId)) ?? "") : "")
+  const status = saleOrderStatusBar(order, t)
+  const currentStatus =
+    status.terminal?.label ??
+    status.steps.find((step) => step.id === status.current)?.label
+  const editable = (state === "Draft" || state === "Sent") && !isSaleOrderLocked(record) && linesQuery.isSuccess
+  const rate = parseCommissionRatePercent(order)
   const handoffs = orderHandoffs(
     BigInt(orderId),
     { organizationId: orgId, companyId: operatingCompanyId },
@@ -403,196 +455,254 @@ function SaleOrderPageLoaded({
     accountMoves as never,
     returnOrders as never,
     accountPayments as never,
-  );
+  )
 
-  const createReturnLabel = t('sales.order.createReturn', { defaultValue: 'Create return' });
+  const createReturnLabel = t("sales.order.createReturn", {
+    defaultValue: "Create return",
+  })
   const createReturn = async () => {
     const values = await askForm({
       title: createReturnLabel,
-      description: t('sales.order.createReturnHint', {
-        defaultValue: 'Enter the quantity to return per delivered line; leave a line blank to keep it.',
+      description: t("sales.order.createReturnHint", {
+        defaultValue:
+          "Enter the quantity to return per delivered line; leave a line blank to keep it.",
       }),
       fields: [
         ...returnableLines(lines).map((line) => ({
           id: returnQtyFieldId(line),
           name: returnQtyFieldId(line),
-          label: t('sales.order.createReturnLine', {
-            defaultValue: '{{name}} (delivered {{qty}})',
+          label: t("sales.order.createReturnLine", {
+            defaultValue: "{{name}} (delivered {{qty}})",
             name: String(line.name ?? line.id),
             qty: String(line.qtyDelivered ?? line.qty_delivered ?? 0),
           }),
-          type: 'number' as const,
+          type: "number" as const,
           min: 0,
         })),
         {
-          id: 'reason',
-          name: 'reason',
-          label: t('sales.order.createReturnReason', { defaultValue: 'Reason (optional)' }),
-          type: 'text' as const,
+          id: "reason",
+          name: "reason",
+          label: t("sales.order.createReturnReason", {
+            defaultValue: "Reason (optional)",
+          }),
+          type: "text" as const,
         },
       ],
-    });
-    if (!values) return;
-    const params = buildReturnParams(order, lines, values);
+    })
+    if (!values) return
+    const params = buildReturnParams(order, lines, values)
     if (!params) {
       showWorkflowToast({
-        kind: 'error',
-        title: t('sales.order.createReturnFailed', { defaultValue: 'Create return failed' }),
-        description: t('sales.order.createReturnInvalid', {
-          defaultValue: 'Enter a quantity above 0 for at least one line, no more than what was delivered.',
+        kind: "error",
+        title: t("sales.order.createReturnFailed", {
+          defaultValue: "Create return failed",
         }),
-      });
-      return;
+        description: t("sales.order.createReturnInvalid", {
+          defaultValue:
+            "Enter a quantity above 0 for at least one line, no more than what was delivered.",
+        }),
+      })
+      return
     }
     // The workflow surface reports a typed failure.
-    await returnWorkflow.create.execute({ saleOrderId: orderId, params }).catch(() => undefined);
-  };
+    await returnWorkflow.create.execute({ saleOrderId: orderId, params }).catch(() => undefined)
+  }
 
-  const moreActions: Array<{ id: string; label: string; show: boolean; run: () => Promise<void> | void }> = [
+  const moreActions: Array<{ id: string
+    label: string
+    show: boolean
+    run: () => Promise<void> | void }> = [
     {
-      id: 'view-deliveries',
-      label: t('sales.actions.viewDeliveries'),
+      id: "view-deliveries",
+      label: t("sales.actions.viewDeliveries"),
       show: isSaleOrderConfirmed(record),
-      run: () => router.push(buildModuleTabHref('sales', 'fulfillment', { saleId: orderId })),
+      run: () => router.push(buildModuleTabHref("sales", "fulfillment", { saleId: orderId }),
+        ),
     },
     {
-      id: 'create-return',
+      id: "create-return",
       label: createReturnLabel,
       show: canCreateReturn(order, lines),
       run: createReturn,
     },
     {
-      id: 'apply-promotion',
-      label: t('sales.actions.applyPromotion', { defaultValue: 'Apply promotion' }),
+      id: "apply-promotion",
+      label: t("sales.actions.applyPromotion", {
+        defaultValue: "Apply promotion",
+      }),
       show: editable,
       run: async () => {
         const values = await askForm({
-          title: t('sales.actions.applyPromotion', { defaultValue: 'Apply promotion' }),
+          title: t("sales.actions.applyPromotion", {
+            defaultValue: "Apply promotion",
+          }),
           fields: [
             {
-              id: 'code',
-              name: 'code',
-              label: t('sales.actions.applyPromotionPrompt', { defaultValue: 'Promotion code' }),
-              type: 'text',
+              id: "code",
+              name: "code",
+              label: t("sales.actions.applyPromotionPrompt", {
+                defaultValue: "Promotion code",
+              }),
+              type: "text",
               required: true,
             },
           ],
-        });
-        const code = typeof values?.code === 'string' ? values.code.trim() : '';
-        if (!code) return;
-        await applySalePromotion.mutateAsync({ orderId: order.id as string | number | bigint, promotionCode: code });
+        })
+        const code = typeof values?.code === "string" ? values.code.trim() : ""
+        if (!code) return
+        await applySalePromotion.mutateAsync({ orderId: order.id as string | number | bigint, promotionCode: code,
+        })
       },
     },
     {
-      id: 'apply-options',
-      label: t('sales.actions.applyOptions', { defaultValue: 'Apply CPQ options' }),
+      id: "apply-options",
+      label: t("sales.actions.applyOptions", {
+        defaultValue: "Apply CPQ options",
+      }),
       show: editable,
       run: async () => {
-        await applySaleOrderOptions.mutateAsync(order.id as string | number | bigint);
+        await applySaleOrderOptions.mutateAsync(order.id as string | number | bigint,
+        )
       },
     },
     {
-      id: 'apply-omnichannel',
-      label: t('sales.actions.applyOmnichannel', { defaultValue: 'Apply omnichannel allocation' }),
+      id: "apply-omnichannel",
+      label: t("sales.actions.applyOmnichannel", {
+        defaultValue: "Apply omnichannel allocation",
+      }),
       show: true,
       run: async () => {
         const values = await askForm({
-          title: t('sales.actions.applyOmnichannel', { defaultValue: 'Apply omnichannel allocation' }),
+          title: t("sales.actions.applyOmnichannel", {
+            defaultValue: "Apply omnichannel allocation",
+          }),
           fields: [
             {
-              id: 'channel',
-              name: 'channel',
-              label: t('sales.actions.omnichannelChannelPrompt', {
-                defaultValue: 'Channel (optional, e.g. web, store)',
+              id: "channel",
+              name: "channel",
+              label: t("sales.actions.omnichannelChannelPrompt", {
+                defaultValue: "Channel (optional, e.g. web, store)",
               }),
-              type: 'text',
+              type: "text",
             },
             {
-              id: 'route',
-              name: 'route',
-              label: t('sales.actions.omnichannelRoutePrompt', { defaultValue: 'Preferred route id (optional)' }),
-              type: 'number',
+              id: "route",
+              name: "route",
+              label: t("sales.actions.omnichannelRoutePrompt", {
+                defaultValue: "Preferred route id (optional)",
+              }),
+              type: "number",
               min: 1,
             },
           ],
-        });
-        if (!values) return;
-        const channel = typeof values.channel === 'string' && values.channel.trim() ? values.channel.trim() : undefined;
-        const route = values.route === '' || values.route == null ? undefined : BigInt(String(values.route));
+        })
+        if (!values) return
+        const channel = typeof values.channel === "string" && values.channel.trim() ? values.channel.trim() : undefined
+        const route = values.route === "" || values.route == null ? undefined : BigInt(String(values.route))
         await applyOmnichannelAllocation.mutateAsync({
           orderId: order.id as string | number | bigint,
           params: { preferredRouteId: route, channel, metadata: undefined },
-        });
+        })
       },
     },
     {
-      id: 'accrue-commission',
-      label: t('sales.actions.accrueCommission', { defaultValue: 'Accrue commission' }),
-      show: (state === 'Sale' || state === 'Done') && rate > 0,
+      id: "accrue-commission",
+      label: t("sales.actions.accrueCommission", {
+        defaultValue: "Accrue commission",
+      }),
+      show: (state === "Sale" || state === "Done") && rate > 0,
       run: async () => {
         await accrueSaleCommission.mutateAsync({
           orderId: order.id as string | number | bigint,
           ratePercent: rate,
-        });
+        })
       },
     },
     {
-      id: 'download-pdf',
-      label: t('sales.actions.downloadPdf', { defaultValue: 'Download PDF' }),
+      id: "download-pdf",
+      label: t("sales.actions.downloadPdf", { defaultValue: "Download PDF" }),
       show: true,
       run: async () => {
-        await downloadDocumentPdf('sale-order', Number(orderId));
+        await downloadDocumentPdf("sale-order", Number(orderId))
       },
     },
     {
-      id: 'archive-pdf-dms',
-      label: t('sales.actions.archivePdfToDocuments', { defaultValue: 'Archive PDF to Documents' }),
+      id: "archive-pdf-dms",
+      label: t("sales.actions.archivePdfToDocuments", {
+        defaultValue: "Archive PDF to Documents",
+      }),
       show: true,
       run: async () => {
         await archiveRenderedPdfAsDocument({
-          kind: 'sale-order',
+          kind: "sale-order",
           recordId: Number(orderId),
           saveGenerated: documentUploads.submitGenerated,
           name: String(order.name ?? `Sale order ${orderId}`),
-        });
+        })
       },
     },
     {
-      id: 'export-commercial-packet',
-      label: t('sales.actions.exportCommercialPacket', { defaultValue: 'Export commercial packet' }),
+      id: "export-commercial-packet",
+      label: t("sales.actions.exportCommercialPacket", {
+        defaultValue: "Export commercial packet",
+      }),
       show: true,
       run: () => downloadCommercialPacket(order, lines),
     },
-  ].filter((action) => action.show);
+  ].filter((action) => action.show)
 
-  const linesReady = linesQuery.isSuccess && !linesQuery.isError;
-  const linesUnavailable = t('sales.workspace.linesReadFailed', { defaultValue: 'Order lines are unavailable. Wait for loading to finish or refresh to try again.' });
-  const step = saleOrderNextStep(record, lines, linesReady);
-  const recommendedActionId = nextStepActionIds[step];
+  const linesReady = linesQuery.isSuccess && !linesQuery.isError
+  const linesUnavailable = t("sales.workspace.linesReadFailed", {
+    defaultValue:
+      "Order lines are unavailable. Wait for loading to finish or refresh to try again.",
+  })
+  const step = saleOrderNextStep(record, lines, linesReady)
+  const recommendedActionId = nextStepActionIds[step]
   const recordActions = headerActions.map((action) => ({ ...action, blockedReason: (row: RowValueMap) => {
-    if (['sales.order.confirm', 'sales.order.send-quotation'].includes(action.id) && linesReady && lines.length === 0) return t('sales.workspace.productsRequired', { defaultValue: 'Add at least one product before continuing.' });
-    if (isSaleOrderLocked(row) && ['sales.order.confirm', 'sales.order.send-quotation', 'sales.order.accept-quotation'].includes(action.id)) return t('sales.workspace.unlockRequired', { defaultValue: 'Unlock this order before continuing.' });
-    return action.blockedReason?.(row);
-  } }));
-  const recommendedAction = linesReady || step === 'locked' ? presentableActions(recordActions, record).find((action) => action.id === recommendedActionId) : undefined;
-  const blockedReason = recommendedAction?.blockedReason?.(record);
+    if (["sales.order.confirm", "sales.order.send-quotation"].includes(action.id,
+        ) && linesReady && lines.length === 0) return t("sales.workspace.productsRequired", {
+          defaultValue: "Add at least one product before continuing.",
+        })
+      if (isSaleOrderLocked(row) && [
+          "sales.order.confirm",
+          "sales.order.send-quotation",
+          "sales.order.accept-quotation",
+        ].includes(action.id)) return t("sales.workspace.unlockRequired", {
+          defaultValue: "Unlock this order before continuing.",
+        })
+      return action.blockedReason?.(row)
+    },
+  }))
+  const recommendedAction = linesReady || step === "locked"
+      ? presentableActions(recordActions, record).find((action) => action.id === recommendedActionId,
+        )
+      : undefined
+  const blockedReason = recommendedAction?.blockedReason?.(record)
   const continueStep = recommendedAction
     ? () => void runWorkflowAction(recommendedAction, record)
-    : step === 'add-products' ? () => setActiveTab('lines')
-    : step === 'approval' ? () => router.push(approvalInboxHref('sale_order', orderId))
-    : step === 'delivery' || step === 'review' ? () => setActiveTab('handoffs')
-    : undefined;
-  const nextAction = <SaleOrderNextAction step={step} actionLabel={recommendedAction?.label}
-    blockedReason={blockedReason} error={transitionError} pending={saleOrderWorkflow.isPending} onContinue={continueStep} />;
-  const lineGrid = !linesReady ? <p role="status" className="text-sm text-muted-foreground">{linesUnavailable}</p> : (
+    : step === "add-products"
+      ? () => setActiveTab("lines")
+    : step === "approval"
+        ? () => router.push(approvalInboxHref("sale_order", orderId))
+    : step === "delivery" || step === "review"
+          ? () => setActiveTab("handoffs")
+          : undefined
+  const nextAction = (
+    <SaleOrderNextAction step={step} actionLabel={recommendedAction?.label}
+    blockedReason={blockedReason} error={transitionError} pending={saleOrderWorkflow.isPending} onContinue={continueStep} />
+  )
+  const lineGrid = !linesReady ? (
+    <p role="status" className="text-sm text-muted-foreground">{linesUnavailable}</p>
+  ) : (
     <SaleOrderLineGrid
       lines={lines}
       products={gridProducts}
       editable={editable}
       onUpdateLine={async (lineId, patch) => {
-        const params = toUpdateSaleOrderLineParams(patch as Record<string, unknown>);
-        if (!params) throw new Error('Enter a valid quantity, price or discount.');
-        await lineWorkflow.update.execute({ lineId, params });
+        const params = toUpdateSaleOrderLineParams(patch as Record<string, unknown>,
+        )
+        if (!params) throw new Error("Enter a valid quantity, price or discount.")
+        await lineWorkflow.update.execute({ lineId, params })
       }}
       onCreateLine={async (line) => {
         const params = toCreateSaleOrderLineParams({
@@ -601,101 +711,139 @@ function SaleOrderPageLoaded({
           quantity: line.quantity,
           priceUnit: line.priceUnit,
           discount: line.discount,
-        });
-        if (!params) throw new Error('Choose a product and a quantity above zero.');
-        await lineWorkflow.create.execute({ orderId, params });
+        })
+        if (!params) throw new Error("Choose a product and a quantity above zero.")
+        await lineWorkflow.create.execute({ orderId, params })
       }}
       onDeleteLine={async (lineId) => {
-        await lineWorkflow.remove.execute(lineId);
+        await lineWorkflow.remove.execute(lineId)
       }}
     />
-  );
-  const handoffQueries = [stockPickingsQuery, accountMovesQuery, accountPaymentsQuery, returnOrdersQuery];
-  const handoffLinks = handoffQueries.some((query) => !query.isSuccess || query.isError)
-    ? <p role="status" className="text-sm text-muted-foreground">{t('sales.workspace.handoffsUnavailable', { defaultValue: 'Linked records are unavailable. Wait for loading to finish or refresh to try again.' })}</p>
-    : <div data-testid="sale-order-handoffs"><OrderHandoffLinks testIdPrefix="sale-order-handoff" handoffs={handoffs} /></div>;
-  const currencyId = order.currencyId ?? order.currency_id;
-  const currency = currenciesQuery.data?.find((row) => String(row.id) === String(currencyId));
-  const code = currenciesQuery.isSuccess && typeof currency?.code === 'string' ? currency.code : undefined;
+  )
+  const handoffQueries = [stockPickingsQuery, accountMovesQuery, accountPaymentsQuery, returnOrdersQuery,
+  ]
+  const handoffLinks = handoffQueries.some((query) => !query.isSuccess || query.isError,
+  ) ? (
+    <p role="status" className="text-sm text-muted-foreground">{t("sales.workspace.handoffsUnavailable", {
+        defaultValue:
+          "Linked records are unavailable. Wait for loading to finish or refresh to try again.",
+      })}</p>
+  ) : (
+    <div data-testid="sale-order-handoffs"><OrderHandoffLinks testIdPrefix="sale-order-handoff" handoffs={handoffs} /></div>
+  )
+  const currencyId = order.currencyId ?? order.currency_id
+  const currency = currenciesQuery.data?.find((row) => String(row.id) === String(currencyId),
+  )
+  const code = currenciesQuery.isSuccess && typeof currency?.code === "string"
+      ? currency.code : undefined
   const money = (raw: unknown): string => {
-    if (raw == null || raw === '' || !Number.isFinite(Number(raw)) || !code) return t('sales.workspace.amountUnavailable', { defaultValue: 'Unavailable' });
-    try { return new Intl.NumberFormat(locale, { style: 'currency', currency: code }).format(Number(raw)); }
-    catch { return t('sales.workspace.amountUnavailable', { defaultValue: 'Unavailable' }); }
-  };
-  const detailConfig = saleOrderDetailWithPartners(t, partnerLabelById);
+    if (raw == null || raw === "" || !Number.isFinite(Number(raw)) || !code) return t("sales.workspace.amountUnavailable", {
+        defaultValue: "Unavailable",
+      })
+    try { return new Intl.NumberFormat(locale, { style: "currency",
+        currency: code,
+      }).format(Number(raw))
+    }
+    catch { return t("sales.workspace.amountUnavailable", {
+        defaultValue: "Unavailable",
+      })
+    }
+  }
+  const detailConfig = saleOrderDetailWithPartners(t, partnerLabelById)
   const workspaceDetailConfig = {
     ...detailConfig,
     sections: detailConfig.sections.map((section) => ({
       ...section,
-      fields: section.fields.map((field) => field.type === 'currency'
-        ? { ...field, render: (_value: unknown, row: OrderRow) => money(row[field.key]) }
-        : field),
+      fields: section.fields.map((field) => field.type === "currency"
+          ? { ...field, render: (_value: unknown, row: OrderRow) => money(row[field.key]),
+            }
+          : field,
+      ),
     })),
-  };
+  }
   const totals = [
-    { label: t('sales.workspace.subtotal', { defaultValue: 'Subtotal' }), value: money(order.amountUntaxed ?? order.amount_untaxed) },
-    { label: t('sales.workspace.tax', { defaultValue: 'Tax' }), value: money(order.amountTax ?? order.amount_tax) },
-    { label: t('sales.workspace.total', { defaultValue: 'Total' }), value: money(order.amountTotal ?? order.amount_total) },
-  ];
+    { label: t("sales.workspace.subtotal", { defaultValue: "Subtotal" }), value: money(order.amountUntaxed ?? order.amount_untaxed),
+    },
+    { label: t("sales.workspace.tax", { defaultValue: "Tax" }), value: money(order.amountTax ?? order.amount_tax),
+    },
+    { label: t("sales.workspace.total", { defaultValue: "Total" }), value: money(order.amountTotal ?? order.amount_total),
+    },
+  ]
 
   return (
     <>
       <RecordPage
         testIdPrefix="sale-order"
         breadcrumbs={[
-          { label: t('nav.sales'), href: '/sales' },
-          { label: t('sales.salesOrders.title'), href: buildModuleTabHref('sales', 'orders') },
+          { label: t("nav.sales"), href: "/sales" },
+          { label: t("sales.salesOrders.title"), href: buildModuleTabHref("sales", "orders"),
+          },
           { label },
         ]}
         title={label}
         subtitle={customer || undefined}
+        badge={
+          currentStatus ? (
+            <Badge variant={status.terminal ? "destructive" : "secondary"}>
+              {currentStatus}
+            </Badge>
+          ) : undefined
+        }
         statusBar={<StatusBar steps={status.steps} current={status.current} terminal={status.terminal} />}
         navigation={navigation}
+        guidance={nextAction}
         smartButtons={
-          <div className="space-y-4">
           <SmartButtons
             testIdPrefix="sale-order"
             buttons={[
               {
-                id: 'lines',
-                label: t('sales.orderLines.title'),
+                id: "lines",
+                label: t("sales.orderLines.title"),
                 count: lines.length,
                 icon: <ListOrdered className="h-4 w-4" />,
-                onClick: () => setActiveTab('lines'),
+                onClick: () => setActiveTab("lines"),
               },
               {
-                id: 'options',
-                label: t('sales.order.optionalProducts', { defaultValue: 'Optional products' }),
+                id: "options",
+                label: t("sales.order.optionalProducts", {
+                  defaultValue: "Optional products",
+                }),
                 count: optionRows.length,
                 icon: <PackagePlus className="h-4 w-4" />,
-                onClick: () => setActiveTab('options'),
+                onClick: () => setActiveTab("options"),
                 hideWhenZero: true,
               },
               {
-                id: 'deliveries',
-                label: t('sales.order.deliveries', { defaultValue: 'Deliveries' }),
+                id: "deliveries",
+                label: t("sales.order.deliveries", {
+                  defaultValue: "Deliveries",
+                }),
                 count: handoffs.pickings.length,
                 icon: <Truck className="h-4 w-4" />,
-                onClick: () => setActiveTab('handoffs'),
+                onClick: () => setActiveTab("handoffs"),
                 hideWhenZero: true,
               },
               {
-                id: 'invoices',
-                label: t('sales.order.invoices', { defaultValue: 'Invoices' }),
+                id: "invoices",
+                label: t("sales.order.invoices", { defaultValue: "Invoices" }),
                 count: handoffs.invoices.length,
                 icon: <FileText className="h-4 w-4" />,
-                onClick: () => setActiveTab('handoffs'),
+                onClick: () => setActiveTab("handoffs"),
                 hideWhenZero: true,
               },
             ]}
           />
-          {nextAction}
-          </div>
         }
         actions={
           <>
             <RecordWorkflowActions
-              actions={recordActions.filter((action) => action.id !== recommendedAction?.id && (linesReady || !['sales.order.confirm', 'sales.order.send-quotation', 'sales.order.create-invoice', 'sales.order.accept-quotation'].includes(action.id)))}
+              actions={recordActions.filter((action) => action.id !== recommendedAction?.id && (linesReady || ![
+                      "sales.order.confirm",
+                      "sales.order.send-quotation",
+                      "sales.order.create-invoice",
+                      "sales.order.accept-quotation",
+                    ].includes(action.id)),
+              )}
               record={record}
               onRun={(action, row) => void runWorkflowAction(action, row)}
               pendingActionIds={
@@ -707,17 +855,20 @@ function SaleOrderPageLoaded({
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" data-testid="sale-order-more-actions">
                     <MoreHorizontal className="mr-1 h-4 w-4" />
-                    {t('sales.order.moreActions', { defaultValue: 'More' })}
+                    {t("sales.order.moreActions", { defaultValue: "More" })}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {moreActions.map((action, index) => (
                     <div key={action.id}>
-                      {index === moreActions.length - 3 && index > 0 ? <DropdownMenuSeparator /> : null}
+                      {index === moreActions.length - 3 && index > 0 ? (
+                        <DropdownMenuSeparator />
+                      ) : null}
                       <DropdownMenuItem
                         data-testid={`sale-order-action-${action.id}`}
                         onSelect={() => {
-                          void Promise.resolve(action.run()).catch((error: unknown) => report(error, action.label));
+                          void Promise.resolve(action.run()).catch((error: unknown) => report(error, action.label),
+                          )
                         }}
                       >
                         {action.label}
@@ -733,26 +884,33 @@ function SaleOrderPageLoaded({
         onTabChange={setActiveTab}
         tabs={[
           {
-            id: 'overview',
-            label: t('common.overview', { defaultValue: 'Overview' }),
+            id: "overview",
+            label: t("common.overview", { defaultValue: "Overview" }),
             content: (
               <SaleOrderWorkspace nextAction={null} totals={totals} lines={lineGrid} handoffs={handoffLinks}
                 details={<EntityDetail config={workspaceDetailConfig} data={order} />} />
             ),
           },
           {
-            id: 'lines',
-            label: t('sales.orderLines.title'),
+            id: "lines",
+            label: t("sales.orderLines.title"),
             content: (
               <div className="space-y-3">
-                {searchParams.get('created') === '1' && <p role="status" className="text-sm text-muted-foreground">{t('sales.workspace.savedAddProducts', { defaultValue: 'Draft quotation saved. Add products below to continue.' })}</p>}
+                {searchParams.get("created") === "1" && (
+                  <p role="status" className="text-sm text-muted-foreground">{t("sales.workspace.savedAddProducts", {
+                      defaultValue:
+                        "Draft quotation saved. Add products below to continue.",
+                    })}</p>
+                )}
                 {lineGrid}
               </div>
             ),
           },
           {
-            id: 'options',
-            label: t('sales.order.optionalProducts', { defaultValue: 'Optional products' }),
+            id: "options",
+            label: t("sales.order.optionalProducts", {
+              defaultValue: "Optional products",
+            }),
             content: (
               <ReadOnlyRows
                 id="sale-order-options"
@@ -760,29 +918,56 @@ function SaleOrderPageLoaded({
                 isLoading={orderOptionsQuery.isLoading}
                 error={orderOptionsQuery.error}
                 rows={optionRows}
-                emptyMessage={t('sales.order.optionalProductsEmpty', {
-                  defaultValue: 'No optional products offered on this order.',
+                emptyMessage={t("sales.order.optionalProductsEmpty", {
+                  defaultValue: "No optional products offered on this order.",
                 })}
                 columns={[
-                  { key: 'product', label: t('sales.order.options.product', { defaultValue: 'Product' }), width: 'min-w-40' },
-                  { key: 'description', label: t('sales.order.options.description', { defaultValue: 'Description' }), width: 'min-w-48' },
-                  { key: 'quantity', label: t('sales.order.options.quantity', { defaultValue: 'Quantity' }), type: 'number', align: 'right' },
-                  { key: 'priceUnit', label: t('sales.order.options.priceUnit', { defaultValue: 'Unit price' }), type: 'number', align: 'right' },
-                  { key: 'discount', label: t('sales.order.options.discount', { defaultValue: 'Discount %' }), type: 'number', align: 'right' },
-                  { key: 'subtotal', label: t('sales.order.options.subtotal', { defaultValue: 'Subtotal' }), type: 'number', align: 'right' },
-                  { key: 'isPresent', label: t('sales.order.options.added', { defaultValue: 'Added to order' }), type: 'boolean' },
+                  { key: "product", label: t("sales.order.options.product", {
+                      defaultValue: "Product",
+                    }), width: "min-w-40",
+                  },
+                  { key: "description", label: t("sales.order.options.description", {
+                      defaultValue: "Description",
+                    }), width: "min-w-48",
+                  },
+                  { key: "quantity", label: t("sales.order.options.quantity", {
+                      defaultValue: "Quantity",
+                    }), type: "number",
+                    align: "right",
+                  },
+                  { key: "priceUnit", label: t("sales.order.options.priceUnit", {
+                      defaultValue: "Unit price",
+                    }), type: "number",
+                    align: "right",
+                  },
+                  { key: "discount", label: t("sales.order.options.discount", {
+                      defaultValue: "Discount %",
+                    }), type: "number",
+                    align: "right",
+                  },
+                  { key: "subtotal", label: t("sales.order.options.subtotal", {
+                      defaultValue: "Subtotal",
+                    }), type: "number",
+                    align: "right",
+                  },
+                  { key: "isPresent", label: t("sales.order.options.added", {
+                      defaultValue: "Added to order",
+                    }), type: "boolean",
+                  },
                 ]}
               />
             ),
           },
           {
-            id: 'handoffs',
-            label: t('sales.order.handoffs', { defaultValue: 'Deliveries & invoices' }),
+            id: "handoffs",
+            label: t("sales.order.handoffs", {
+              defaultValue: "Deliveries & invoices",
+            }),
             content: handoffLinks,
           },
           {
-            id: 'discussion',
-            label: t('sales.order.discussion', { defaultValue: 'Discussion' }),
+            id: "discussion",
+            label: t("sales.order.discussion", { defaultValue: "Discussion" }),
             content: (
               <div className="grid gap-6 lg:grid-cols-2" data-testid="sale-order-discussion">
                 <RecordChatter
@@ -795,20 +980,27 @@ function SaleOrderPageLoaded({
                   organizationId={orgId}
                   resModel="sale_order"
                   resId={BigInt(orderId)}
-                  title={t('sales.order.attachments', { defaultValue: 'Attachments' })}
+                  title={t("sales.order.attachments", {
+                    defaultValue: "Attachments",
+                  })}
                 />
               </div>
             ),
           },
           {
-            id: 'audit',
-            label: t('businessHistory.title', { defaultValue: 'History & sources' }),
-            content: <RecordAuditTab tableName="sale_order" recordId={orderId} />,
+            id: "audit",
+            evidence: true,
+            label: t("businessHistory.title", {
+              defaultValue: "History & sources",
+            }),
+            content: (
+              <RecordAuditTab tableName="sale_order" recordId={orderId} />
+            ),
           },
         ]}
       />
 
-      {dialog === 'invoice' ? (
+      {dialog === "invoice" ? (
         <CreateInvoiceFromOrderDialog
           order={order}
           organizationId={organizationId}
@@ -816,7 +1008,7 @@ function SaleOrderPageLoaded({
           onClose={() => setDialog(null)}
         />
       ) : null}
-      {dialog === 'edit' ? (
+      {dialog === "edit" ? (
         <EditSaleOrderDialog
           order={order}
           organizationId={organizationId}
@@ -831,24 +1023,27 @@ function SaleOrderPageLoaded({
         <AlertDialogContent data-testid="sale-order-action-confirm">
           <AlertDialogHeader>
             <AlertDialogTitle>{pendingConfirm?.label}</AlertDialogTitle>
-            <AlertDialogDescription>{pendingConfirm?.id === 'sales.order.confirm'
-              ? t('sales.workspace.confirmHelp', { defaultValue: 'Confirming checks stock availability and credit rules, and may request approval. Review the products, prices and delivery details before continuing.' })
-              : t('erpWorkflow.confirm.description')}</AlertDialogDescription>
+            <AlertDialogDescription>{pendingConfirm?.id === "sales.order.confirm"
+                ? t("sales.workspace.confirmHelp", {
+                    defaultValue:
+                      "Confirming checks stock availability and credit rules, and may request approval. Review the products, prices and delivery details before continuing.",
+                  })
+                : t("erpWorkflow.confirm.description")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('erpWorkflow.confirm.dismiss')}</AlertDialogCancel>
+            <AlertDialogCancel>{t("erpWorkflow.confirm.dismiss")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                const action = pendingConfirm;
-                setPendingConfirm(null);
-                if (action) void action.execute(action.prepare?.(record)).catch(() => undefined);
+                const action = pendingConfirm
+                setPendingConfirm(null)
+                if (action) void action.execute(action.prepare?.(record)).catch(() => undefined)
               }}
             >
-              {t('erpWorkflow.confirm.confirm')}
+              {t("erpWorkflow.confirm.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
-  );
+  )
 }

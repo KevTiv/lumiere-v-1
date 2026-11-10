@@ -1,6 +1,13 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { useState } from "react"
+import {
+  cleanup, fireEvent, render, screen,
+  within,
+} from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { RecordPage, type RecordPageProps } from "./record-page"
+import { RecordPage,
+  recordWorkflowNextSteps,
+  type RecordPageProps,
+} from "./record-page"
 import { StatusBar } from "./status-bar"
 import { workspaceStyles } from "../lib/workspace-styles"
 
@@ -10,6 +17,15 @@ vi.mock("next/link", () => ({
       {children}
     </a>
   ),
+}))
+
+vi.mock("@lumiere/i18n", () => ({
+  useTranslation: () => ({
+    t: (
+      key: string,
+      options?: { defaultValue?: string; defaultValue_one?: string },
+    ) => options?.defaultValue ?? options?.defaultValue_one ?? key,
+  }),
 }))
 
 afterEach(cleanup)
@@ -122,5 +138,109 @@ describe("RecordPage", () => {
     renderPage({ navigation: { position: 1, total: 1 } })
 
     expect(screen.queryByTestId("order-navigation")).toBeNull()
+  })
+})
+
+describe("Record overview", () => {
+  it("shows existing workflow, responsibility, related records and blocker without duplicating actions", () => {
+    const action = {
+      id: "confirm",
+      label: "Confirm order",
+      kind: "confirm" as const,
+      canPresent: () => true,
+      blockedReason: () => "Add at least one product.",
+      execute: vi.fn(),
+    }
+    const hidden = {
+      ...action,
+      id: "reserve",
+      label: "Reserve stock",
+      canPresent: () => false,
+    }
+    const secondary = { ...action, id: "edit", label: "Edit order" }
+    renderPage({
+      statusBar: <StatusBar steps={steps} current="sent" />,
+      responsibility: { label: "Buyer", name: "Morgan Lee" },
+      smartButtons: <a href="/purchasing/orders/7?tab=handoffs">Receipts</a>,
+      nextSteps: recordWorkflowNextSteps(
+        [action, hidden, secondary],
+        {},
+        new Set(["confirm", "reserve"]),
+      ),
+    })
+
+    const overview = within(
+      screen.getByRole("region", { name: "Record overview" }),
+    )
+    expect(overview.getByText("Sent").getAttribute("aria-current")).toBe("step")
+    expect(overview.getByText("Buyer")).toBeTruthy()
+    expect(overview.getByText("Morgan Lee")).toBeTruthy()
+    expect(
+      within(
+        overview.getByRole("group", { name: "Related records" }),
+      ).getByRole("link", { name: "Receipts" }),
+    ).toBeTruthy()
+    expect(overview.getByText("Confirm order")).toBeTruthy()
+    expect(overview.getByText("Add at least one product.")).toBeTruthy()
+    expect(overview.queryByText("Reserve stock")).toBeNull()
+    expect(overview.queryByText("Edit order")).toBeNull()
+    expect(overview.queryByRole("button", { name: "Confirm order" })).toBeNull()
+    expect(action.execute).not.toHaveBeenCalled()
+  })
+
+  it("opens the existing evidence view and focuses its selected tab", () => {
+    function StatefulPage() {
+      const [activeTab, onTabChange] = useState("overview")
+      return (
+        <RecordPage
+          testIdPrefix="order"
+          breadcrumbs={[{ label: "SO-7" }]}
+          title="SO-7"
+          activeTab={activeTab}
+          onTabChange={onTabChange}
+          tabs={[
+            {
+              id: "overview",
+              label: "Overview",
+              content: <p>Order details</p>,
+            },
+            {
+              id: "audit",
+              label: "History & sources",
+              evidence: true,
+              content: <p>Saved evidence</p>,
+            },
+          ]}
+        />
+      )
+    }
+
+    render(<StatefulPage />)
+    expect(screen.queryByText("Saved evidence")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "History & sources" }))
+    const evidenceTab = screen.getByRole("tab", {
+      name: "History & sources",
+      selected: true,
+    })
+    expect(document.activeElement).toBe(evidenceTab)
+    expect(
+      within(
+        screen.getByRole("tabpanel", { name: "History & sources" }),
+      ).getByText("Saved evidence"),
+    ).toBeTruthy()
+  })
+
+  it("omits unavailable overview facts and evidence navigation", () => {
+    renderPage()
+    const overview = within(
+      screen.getByRole("region", { name: "Record overview" }),
+    )
+    expect(overview.queryByRole("heading", { name: "Next step" })).toBeNull()
+    expect(
+      overview.queryByRole("group", { name: "Related records" }),
+    ).toBeNull()
+    expect(
+      overview.queryByRole("button", { name: "History & sources" }),
+    ).toBeNull()
   })
 })

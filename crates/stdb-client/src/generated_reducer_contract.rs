@@ -5380,6 +5380,12 @@ const PARAMS_SETTLE_AI_SPEND: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SettleAiSpendParams") },
 ];
+const PARAMS_SETTLE_BANK_LINE_WITH_PAYMENT_TRANSACTION: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "line_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("SettleBankLineWithPaymentTransactionParams") },
+];
 const PARAMS_SETTLE_SALE_COMMISSIONS: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -7891,6 +7897,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "set_workflow_migration_plan_active", contract_operation_id: "erp.set_workflow_migration_plan_active", params: PARAMS_SET_WORKFLOW_MIGRATION_PLAN_ACTIVE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "settle_ai_metered_spend", contract_operation_id: "erp.settle_ai_metered_spend", params: PARAMS_SETTLE_AI_METERED_SPEND, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "settle_ai_spend", contract_operation_id: "erp.settle_ai_spend", params: PARAMS_SETTLE_AI_SPEND, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "settle_bank_line_with_payment_transaction", contract_operation_id: "erp.settle_bank_line_with_payment_transaction", params: PARAMS_SETTLE_BANK_LINE_WITH_PAYMENT_TRANSACTION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "settle_sale_commissions", contract_operation_id: "erp.settle_sale_commissions", params: PARAMS_SETTLE_SALE_COMMISSIONS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "setup_fiscal_calendar", contract_operation_id: "erp.setup_fiscal_calendar", params: PARAMS_SETUP_FISCAL_CALENDAR, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "share_ai_owner_agent", contract_operation_id: "erp.share_ai_owner_agent", params: PARAMS_SHARE_AI_OWNER_AGENT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -9402,6 +9409,7 @@ pub mod reducer_names {
     pub const SET_WORKFLOW_MIGRATION_PLAN_ACTIVE: ReducerName = ReducerName::new("set_workflow_migration_plan_active");
     pub const SETTLE_AI_METERED_SPEND: ReducerName = ReducerName::new("settle_ai_metered_spend");
     pub const SETTLE_AI_SPEND: ReducerName = ReducerName::new("settle_ai_spend");
+    pub const SETTLE_BANK_LINE_WITH_PAYMENT_TRANSACTION: ReducerName = ReducerName::new("settle_bank_line_with_payment_transaction");
     pub const SETTLE_SALE_COMMISSIONS: ReducerName = ReducerName::new("settle_sale_commissions");
     pub const SETUP_FISCAL_CALENDAR: ReducerName = ReducerName::new("setup_fiscal_calendar");
     pub const SHARE_AI_OWNER_AGENT: ReducerName = ReducerName::new("share_ai_owner_agent");
@@ -10898,6 +10906,7 @@ macro_rules! reducer_call {
     ("set_workflow_migration_plan_active", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_WORKFLOW_MIGRATION_PLAN_ACTIVE, $args) };
     ("settle_ai_metered_spend", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SETTLE_AI_METERED_SPEND, $args) };
     ("settle_ai_spend", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SETTLE_AI_SPEND, $args) };
+    ("settle_bank_line_with_payment_transaction", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SETTLE_BANK_LINE_WITH_PAYMENT_TRANSACTION, $args) };
     ("settle_sale_commissions", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SETTLE_SALE_COMMISSIONS, $args) };
     ("setup_fiscal_calendar", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SETUP_FISCAL_CALENDAR, $args) };
     ("share_ai_owner_agent", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SHARE_AI_OWNER_AGENT, $args) };

@@ -59,7 +59,7 @@ OBSERVATION_DATES = frozenset({"date", "business_date", "as_of", "invoice_date",
 OBSERVATION_FIELDS = frozenset({
     "description", "name", "product_label", "category", "counterparty", "document_reference",
     "external_reference", "currency", "unit", "reported_method", "reported_destination",
-    "business_interpretation", "observation_kind",
+    "business_interpretation", "observation_kind", "debit_account_id", "credit_account_id", "currency_id",
 }) | OBSERVATION_DECIMALS | OBSERVATION_DATES
 
 

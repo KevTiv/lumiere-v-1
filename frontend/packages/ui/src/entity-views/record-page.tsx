@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Fragment, type ReactNode } from "react"
+import { Fragment, useRef, type ReactNode } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { cn } from "../lib/utils"
@@ -17,6 +17,13 @@ import {
 import { Tabs, TabsContent } from "../components/tabs"
 import { ContextTabsList, ContextTabsTrigger } from "../components/context-tabs"
 import { workspaceStyles } from "../lib/workspace-styles"
+import {
+  RecordPageOverview,
+  type RecordNextStep,
+  type RecordResponsibility,
+} from "./record-page-overview"
+
+export { recordWorkflowNextSteps } from "./record-page-overview"
 
 export interface RecordPageCrumb {
   label: string
@@ -36,6 +43,8 @@ export interface RecordPageTab {
   id: string
   label: string
   content: ReactNode
+  /** Identifies the existing history or evidence view for the overview shortcut. */
+  evidence?: boolean
 }
 
 export interface RecordPageProps {
@@ -52,6 +61,10 @@ export interface RecordPageProps {
   smartButtons?: ReactNode
   /** Task guidance that remains visible when switching record views. */
   guidance?: ReactNode
+  /** An explicitly labeled person resolved from this record. */
+  responsibility?: RecordResponsibility
+  /** An overview readback of primary workflow actions shown in the header. */
+  nextSteps?: ReadonlyArray<RecordNextStep>
   navigation?: RecordPageNavigation
   tabs: ReadonlyArray<RecordPageTab>
   activeTab: string
@@ -75,6 +88,8 @@ export function RecordPage({
   actions,
   smartButtons,
   guidance,
+  responsibility,
+  nextSteps,
   navigation,
   tabs,
   activeTab,
@@ -82,6 +97,9 @@ export function RecordPage({
   testIdPrefix,
   className,
 }: RecordPageProps) {
+  const evidenceTab = tabs.find((tab) => tab.evidence)
+  const evidenceTrigger = useRef<HTMLButtonElement>(null)
+
   return (
     <div className={cn("min-w-0 space-y-6", className)} data-testid={`${testIdPrefix}-page`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -116,36 +134,71 @@ export function RecordPage({
         ) : null}
       </div>
 
-      <header className="space-y-4">
-        <div className={workspaceStyles.pageHeader} data-ui="page-header">
-          <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className={workspaceStyles.pageTitle} data-ui="page-title" data-testid={`${testIdPrefix}-title`}>
-                {title}
-              </h1>
-              {badge}
-            </div>
-            {subtitle ? <p className={workspaceStyles.pageDescription}>{subtitle}</p> : null}
-          </div>
-          {actions ? (
-            <div className={workspaceStyles.actions} data-testid={`${testIdPrefix}-actions`}>
-              {actions}
-            </div>
-          ) : null}
-        </div>
-        {smartButtons}
-        {statusBar}
+      <header>
+        <RecordPageOverview
+          header={
+            <>
+              <div className={workspaceStyles.pageHeader} data-ui="page-header">
+                <div className="min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h1
+                      className={workspaceStyles.pageTitle}
+                      data-ui="page-title"
+                      data-testid={`${testIdPrefix}-title`}
+                    >
+                      {title}
+                    </h1>
+                    {badge}
+                  </div>
+                  {subtitle ? (
+                    <p className={workspaceStyles.pageDescription}>
+                      {subtitle}
+                    </p>
+                  ) : null}
+                </div>
+                {actions ? (
+                  <div
+                    className={workspaceStyles.actions}
+                    data-testid={`${testIdPrefix}-actions`}
+                  >
+                    {actions}
+                  </div>
+                ) : null}
+              </div>
+              {statusBar}
+            </>
+          }
+          responsibility={responsibility}
+          guidance={guidance}
+          nextSteps={nextSteps}
+          smartButtons={smartButtons}
+          evidence={
+            evidenceTab
+              ? {
+                  label: evidenceTab.label,
+                  open: () => {
+                    onTabChange(evidenceTab.id)
+                    evidenceTrigger.current?.focus()
+                  },
+                }
+              : undefined
+          }
+          testIdPrefix={testIdPrefix}
+        />
       </header>
 
-      {guidance}
-
-      <Tabs value={activeTab} onValueChange={(tabId) => onTabChange(String(tabId))} className="flex min-w-0 flex-col">
+      <Tabs
+        value={activeTab}
+        onValueChange={(tabId) => onTabChange(String(tabId))}
+        className="flex min-w-0 flex-col"
+      >
         <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
           <ContextTabsList aria-label="Record views">
             {tabs.map((tab) => (
               <ContextTabsTrigger
                 key={tab.id}
                 value={tab.id}
+                ref={tab === evidenceTab ? evidenceTrigger : undefined}
                 data-testid={`${testIdPrefix}-tab-${tab.id}`}
               >
                 {tab.label}

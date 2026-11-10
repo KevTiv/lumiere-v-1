@@ -106,6 +106,24 @@ class PreparationRecipeTests(unittest.TestCase):
         self.assertEqual(next(field for field in item["fields"] if field["key"] == "category")["sourceValue"], " umuriro ")
         self.assertEqual(result, prepare([file], [options]))
 
+    def test_mapped_opening_balance_pairs_preserve_reviewable_source_facts(self):
+        headers = ["observation_kind", "document_reference", "description", "balance_date",
+                   "debit", "credit", "debit_account_id", "credit_account_id", "currency_id"]
+        values = ["opening_balance", "OB-001", "Reviewed opening pair", "2024-01-05",
+                  "120.00", "120", "8", "9", "2"]
+        file = csv_source("opening.csv", [headers, values])
+        result = prepare([file], [config(file, sections=[section("opening", headers)])])
+        dataset = result["datasets"][0]
+        item = dataset["items"][0]
+        self.assertEqual(dataset["targetEntity"], "source_observation")
+        self.assertEqual(item["source"]["row"], 2)
+        self.assertEqual(item["businessDate"]["from"], "2024-01-05")
+        self.assertEqual(item["proposed"]["debit"], "120")
+        self.assertEqual(item["proposed"]["credit"], "120")
+        self.assertEqual({key: item["proposed"][key] for key in headers[6:]},
+                         {"debit_account_id": "8", "credit_account_id": "9", "currency_id": "2"})
+        self.assertTrue(all(not field["export"] for field in item["fields"]))
+
     def test_side_by_side_sections_preserve_unselected_cells_and_control_totals(self):
         file = csv_source("mixed.csv", [
             ["name", "email", "", "name", "usage"],

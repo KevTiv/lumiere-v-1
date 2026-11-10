@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
+import { useRBAC } from "@lumiere/ui"
 import {
   createExpenseReceiptAndResolveId,
   useCreateExpense,
@@ -47,6 +48,7 @@ import {
   discardExpenseCapture,
   enqueueExpenseCapture,
   getOrCreateExpenseCaptureDeviceId,
+  isExpenseCaptureReadbackOnly,
   listQueuedExpenseCaptures,
   newExpenseClientRequestId,
   saveExpenseCaptureCheckpoint,
@@ -58,23 +60,66 @@ import { expenseCompanyLookupRows, expenseCreateContext, expenseDefaultEmployee,
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
-import { captureFileMatches, syncExpenseCapture } from "./expense-capture-sync"
+import {
+  CaptureReadbackError,
+  captureFileMatches,
+  syncExpenseCapture,
+} from "./expense-capture-sync"
 import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
 import { EXPENSE_RECEIPT_ACCEPT, expenseReceiptContentType } from "./expense-receipt-file"
 import { CaptureAttachmentPreview } from "./capture-attachment-preview"
 import { DatePicker } from "@lumiere/ui/components/date-picker"
 import { useExplainErpError } from "@/lib/erp-ai-context"
 
+import { CaptureSyncBadge } from "../../../components/capture/capture-sync-badge"
+import { useBrowserOnline } from "@/hooks/use-browser-online"
+import { isCaptureOwnedBy } from "@/lib/capture-sync-state"
+
 export function ExpensesCapturePanel({
   organizationId,
 }: {
   organizationId: number
 }) {
+  const companyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+  const session = useErpSession()
+  const actorIdentity =
+    session.identity &&
+    session.organizationId === organizationId &&
+    session.activeCompanyReady !== false
+      ? session.identity
+      : ""
+  return (
+    <ScopedExpensesCapturePanel
+      key={JSON.stringify([actorIdentity, organizationId, String(companyId)])}
+      organizationId={organizationId}
+      companyId={companyId}
+      actorIdentity={actorIdentity}
+    />
+  )
+}
+
+function ScopedExpensesCapturePanel({
+  organizationId,
+  companyId,
+  actorIdentity: identity,
+}: {
+  organizationId: number
+  companyId: bigint
+  actorIdentity: string
+}) {
   const { t } = useTranslation()
   const explainError = useExplainErpError()
   const orgId = BigInt(organizationId)
-  const companyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
-  const { identity } = useErpSession()
+  const online = useBrowserOnline()
+  const { permissionsReady, checkPermission } = useRBAC()
+  const mayCreate =
+    permissionsReady !== false &&
+    checkPermission("hr_expense", "create").allowed
+  const mayRead =
+    permissionsReady !== false && checkPermission("hr_expense", "read").allowed
+  const canSave = Boolean(identity && companyId > 0n && mayCreate && mayRead)
+  const livePermission = useRef({ mayCreate, mayRead })
+  livePermission.current = { mayCreate, mayRead }
   const createExpense = useCreateExpense(orgId, companyId)
   const employeesQuery = useEmployees(orgId)
   const employees = employeesQuery.data ?? []
@@ -95,6 +140,15 @@ export function ExpensesCapturePanel({
   )
   const [deviceId, setDeviceId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [syncingId, setSyncingId] = useState<string | null>(null)
+  const [confirmed, setConfirmed] = useState(false)
+  const active = useRef(false)
+  useEffect(() => {
+    active.current = true
+    return () => {
+      active.current = false
+    }
+  }, [])
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
@@ -112,8 +166,21 @@ export function ExpensesCapturePanel({
     }
   }, [t])
   const queued = useMemo(
-    () => (deviceId ? listQueuedExpenseCaptures(organizationId, deviceId).filter((item) => !item.formOrigin) : []),
-    [organizationId, deviceId, tick],
+    () =>
+      deviceId ? listQueuedExpenseCaptures(organizationId, deviceId).filter((item) => !item.formOrigin &&
+              isCaptureOwnedBy(item, {
+                actorIdentity: identity,
+                companyId: String(companyId),
+              }),
+          )
+        : [],
+    [organizationId, deviceId, identity, companyId, tick],
+  )
+  const syncable = queued.filter(
+    (item) =>
+      (item.syncState === "queued" || item.syncState === "error") &&
+      (!item.payload.hasReceipt ||
+        Boolean(item.receipt?.uploaded || files.get(item.clientRequestId))),
   )
   const [employeeId, setEmployeeId] = useState("")
   const employeeWasChosen = useRef(false)
@@ -193,14 +260,36 @@ export function ExpensesCapturePanel({
   }
 
   const syncOne = async (item: ExpenseCaptureOutboxItem) => {
-    if (!deviceId) return
+    if (!deviceId ||
+      !active.current ||
+      !livePermission.current.mayRead ||
+      !navigator.onLine
+    ) return
     setStatus(null)
+    setConfirmed(false)
+    setSyncingId(item.clientRequestId)
+    let checkpoint = item
     try {
       const result = await syncExpenseCapture(
         item,
-        { organizationId: orgId, companyId },
+        { organizationId: orgId, companyId, actorIdentity: identity },
         files.get(item.clientRequestId),
         {
+          assertWriteAllowed: () => {
+            if (
+              !active.current ||
+              !livePermission.current.mayRead ||
+              !livePermission.current.mayCreate
+            )
+              throw new Error(t("common.recordsUnavailable"))
+            if (!navigator.onLine) {
+              throw new Error(
+                t("captureSync.resumeOnline", {
+                  defaultValue: "Reconnect to sync saved captures.",
+                }),
+              )
+            }
+          },
           readExpenses: () =>
             fetchQueryList(
               "/api/query/expenses",
@@ -217,12 +306,14 @@ export function ExpensesCapturePanel({
           create: (params) => createExpense.mutateAsync(params),
           save: (next) => {
             saveExpenseCaptureCheckpoint(organizationId, deviceId, next)
+            checkpoint = next
             setTick((value) => value + 1)
           },
         },
       )
       if (result.syncState === "synced") {
         files.delete(result.clientRequestId)
+        setConfirmed(true)
         setStatus(
           t("expenses.capture.attachments.confirmed", {
             id: result.expenseId,
@@ -247,6 +338,26 @@ export function ExpensesCapturePanel({
         )
     } catch (cause) {
       setStatus(null)
+      const mismatch =
+        cause instanceof CaptureReadbackError && cause.code !== "unavailable"
+      if (mismatch || checkpoint.syncState === "queued") {
+        try {
+          saveExpenseCaptureCheckpoint(organizationId, deviceId, {
+            ...checkpoint,
+            syncState: mismatch ? "conflict" : "error",
+            lastError: cause instanceof Error
+          ? cause.message
+          : String(cause),
+          })
+        } catch (storageError) {
+          setError(
+            storageError instanceof Error
+              ? storageError.message
+              : String(storageError),
+          )
+          return
+        }
+      }
       setError(
         cause instanceof Error
           ? cause.message
@@ -255,6 +366,8 @@ export function ExpensesCapturePanel({
             }),
       )
       setTick((value) => value + 1)
+    } finally {
+      setSyncingId(null)
     }
   }
 
@@ -266,7 +379,7 @@ export function ExpensesCapturePanel({
       return
     }
     const payload = buildPayload()
-    if (!payload || !deviceId) {
+    if (!payload || !deviceId || !canSave) {
       setError(t("expenses.capture.validation"))
       return
     }
@@ -278,12 +391,14 @@ export function ExpensesCapturePanel({
     }
     setError(null)
     setStatus(null)
+    setConfirmed(false)
     const clientRequestId = newExpenseClientRequestId()
     try {
       const item = enqueueExpenseCapture(organizationId, {
         clientRequestId,
         deviceId,
         companyId: String(companyId),
+        actorIdentity: identity,
         payload,
         receipt:
           hasReceipt && receiptFile
@@ -372,22 +487,17 @@ export function ExpensesCapturePanel({
             size="sm"
             disabled={
               busy ||
-              !queued.some(
-                (item) =>
-                  item.syncState === "queued" || item.syncState === "error",
-              )
+              !online || !mayRead || !canSave || syncable.length === 0
             }
             onClick={() =>
-              void runQueued(
-                queued.filter(
-                  (item) =>
-                    item.syncState === "queued" || item.syncState === "error",
-                ),
-              )
+              void runQueued(syncable)
             }
             data-testid="expenses-capture-flush"
           >
-            {t("expenses.capture.flushQueue")} ({queued.length})
+            {t("captureSync.syncPending", {
+              defaultValue: "Sync pending captures",
+            })}{" "}
+            ({syncable.length})
           </Button>
         </div>
       </CardHeader>
@@ -400,6 +510,14 @@ export function ExpensesCapturePanel({
             })}
           </AlertDescription>
         </Alert>
+        {!online && canSave ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            {t("captureSync.expenseOffline", {
+              defaultValue:
+                "Offline. You can save expense details here and sync them when you reconnect.",
+            })}
+          </p>
+        ) : null}
         {error ? (
           <Alert variant="destructive">
             <AlertDescription data-testid="expenses-capture-status">
@@ -411,9 +529,10 @@ export function ExpensesCapturePanel({
         {status ? (
           <p
             role="status"
-            className="text-sm text-muted-foreground"
+            className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
             data-testid="expenses-capture-status"
           >
+            {confirmed ? <CaptureSyncBadge state="synced" /> : null}
             {status}
           </p>
         ) : null}
@@ -757,14 +876,18 @@ export function ExpensesCapturePanel({
           <Button
             type="button"
             size="sm"
-            disabled={busy || !deviceId || companyId <= 0n}
+            disabled={busy || !deviceId || !canSave}
             onClick={() => void captureDelayedSync()}
             data-testid="expenses-capture-submit"
           >
-            {t("expenses.capture.submit")}
+            {online
+              ? t("expenses.capture.submit")
+              : t("captureSync.saveOnDevice", {
+                  defaultValue: "Save on this device",
+                })}
           </Button>
         </div>
-        {queued.length > 0 ? (
+        {mayRead && queued.length > 0 ? (
           <ul
             className="flex flex-col gap-3"
             data-testid="expenses-capture-queue"
@@ -774,7 +897,7 @@ export function ExpensesCapturePanel({
               const missing =
                 item.payload.hasReceipt && !item.receipt?.uploaded && !file
               const unknown =
-                item.syncState === "unknown" || item.syncState === "submitting"
+                isExpenseCaptureReadbackOnly(item.syncState)
               return (
                 <li
                   key={item.clientRequestId}
@@ -783,24 +906,17 @@ export function ExpensesCapturePanel({
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <strong>{item.payload.name}</strong>
-                    <Badge
-                      variant="outline"
-                      className="min-w-0 max-w-full whitespace-normal"
-                    >
-                      {unknown
-                        ? t("expenses.capture.attachments.awaiting", {
-                            defaultValue: "Awaiting confirmation",
-                          })
-                        : item.syncState === "rejected" ||
-                            item.syncState === "error" ||
-                            item.syncState === "conflict"
-                          ? t("expenses.capture.attachments.failed", {
-                              defaultValue: "Capture failed",
-                            })
-                          : t("expenses.capture.attachments.queuedLabel", {
-                              defaultValue: "Queued",
-                            })}
-                    </Badge>
+                    <CaptureSyncBadge
+                      state={
+                        syncingId === item.clientRequestId
+                          ? "syncing"
+                          : unknown
+                            ? "conflict"
+                            : item.syncState === "rejected" || item.syncState === "error"
+                              ? "failed"
+                              : "pending"
+                      }
+                    />
                     {item.receipt ? (
                       <Badge
                         variant="secondary"
@@ -831,19 +947,11 @@ export function ExpensesCapturePanel({
                       {item.receipt.fileName}
                     </p>
                   ) : null}
-                  {!item.companyId ||
-                  (item.payload.hasReceipt && !item.receipt) ? (
+                  {unknown ? (
                     <p className="text-sm text-muted-foreground">
-                      {t("expenses.capture.attachments.legacy", {
+                      {t("captureSync.expenseReview", {
                         defaultValue:
-                          "This older capture cannot be resumed safely. Discard it and capture it again.",
-                      })}
-                    </p>
-                  ) : item.companyId !== String(companyId) ? (
-                    <p className="text-sm text-muted-foreground">
-                      {t("expenses.capture.attachments.companyMismatch", {
-                        defaultValue:
-                          "Switch to the company saved with this capture before syncing.",
+                          "Check the saved expense before capturing it again. This check only reads the saved records.",
                       })}
                     </p>
                   ) : null}
@@ -890,7 +998,8 @@ export function ExpensesCapturePanel({
                       variant="outline"
                       disabled={
                         busy ||
-                        item.companyId !== String(companyId) ||
+                        !online ||
+                        (!unknown && !canSave) ||
                         (missing && !unknown)
                       }
                       onClick={() => void runQueued([item])}
@@ -910,16 +1019,28 @@ export function ExpensesCapturePanel({
                       type="button"
                       size="sm"
                       variant="ghost"
-                      disabled={busy}
+                      disabled={busy || unknown}
                       onClick={() => {
-                        if (deviceId)
+                        if (!deviceId) return
+                        try {
                           discardExpenseCapture(
                             organizationId,
                             deviceId,
                             item.clientRequestId,
+                            {
+                              actorIdentity: identity,
+                              companyId: String(companyId),
+                            },
                           )
                         files.delete(item.clientRequestId)
                         setTick((value) => value + 1)
+                      } catch (cause) {
+                          setError(
+                            cause instanceof Error
+                              ? cause.message
+                              : String(cause),
+                          )
+                        }
                       }}
                       data-testid="expenses-capture-discard"
                     >

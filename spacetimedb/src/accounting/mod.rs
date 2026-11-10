@@ -37,6 +37,7 @@ pub mod analytic_accounting;
 pub mod bank_reconciliation;
 pub mod bank_settlement_lifecycle;
 pub(crate) mod bank_settlement_reversal;
+pub mod bank_transaction_settlement;
 pub(crate) mod bill_economics;
 pub mod budgeting;
 pub mod chart_of_accounts;

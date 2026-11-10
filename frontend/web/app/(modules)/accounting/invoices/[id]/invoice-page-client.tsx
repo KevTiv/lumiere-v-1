@@ -980,9 +980,14 @@ function InvoicePageLoaded({
             content: <AccountMoveChanges organizationId={organizationId} companyId={operatingCompanyId} recordId={moveId} />,
           },
           {
-            id: 'audit',
-            label: t('businessHistory.title', { defaultValue: 'History & sources' }),
-            content: <RecordAuditTab tableName="account_move" recordId={moveId} />,
+            id: "audit",
+            evidence: true,
+            label: t("businessHistory.title", {
+              defaultValue: "History & sources",
+            }),
+            content: (
+              <RecordAuditTab tableName="account_move" recordId={moveId} />
+            ),
           },
         ]}
       />

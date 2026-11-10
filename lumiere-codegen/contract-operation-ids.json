@@ -806,6 +806,7 @@
     "recompute_lead_score": "erp.recompute_lead_score",
     "recompute_relationship_insights": "erp.recompute_relationship_insights",
     "recompute_workflow_timers_for_calendar": "erp.recompute_workflow_timers_for_calendar",
+    "settle_bank_line_with_payment_transaction": "erp.settle_bank_line_with_payment_transaction",
     "reconcile_account_bank_statement_line": "erp.reconcile_account_bank_statement_line",
     "reconcile_ai_provider_attempt": "erp.reconcile_ai_provider_attempt",
     "reconcile_ai_run_effect": "erp.reconcile_ai_run_effect",

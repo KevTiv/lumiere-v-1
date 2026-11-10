@@ -392,13 +392,15 @@ export function useCreateTask(organizationId: bigint, companyId?: bigint) {
 export function useCreateTimesheet(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
+    networkMode: "always",
+    retry: false,
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost("log_timesheet", {
         params: stdbParamsToJson(withCompanyScope(params, companyId), "LogTimesheetParams"),
       })
 
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to create timesheet')
+      await decodeOperationDispatch(r, "Failed to create timesheet")
     },
     onSuccess: () => invalidateTimesheetQueues(qc, organizationId),
   })

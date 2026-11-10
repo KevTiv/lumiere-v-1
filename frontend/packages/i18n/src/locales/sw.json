@@ -341,7 +341,8 @@
       },
       "groupBy": "Panga kwa makundi kwa",
       "records": "Rekodi",
-      "showFullValue": "Onyesha thamani kamili"
+      "showFullValue": "Onyesha thamani kamili",
+      "record": "Rekodi"
     },
     "retry": "Jaribu tena",
     "recordsDenied": "Huna ruhusa ya kufikia rekodi hizi.",

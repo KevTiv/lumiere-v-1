@@ -1,40 +1,26 @@
-/**
- * Online-first timesheet capture outbox (Wave E).
- * Queues log/timer payloads with `client_request_id` when the create call fails
- * (brief offline / flaky net); flush retries `log_timesheet` idempotently.
- * Mirrors `expense-capture-outbox.ts`.
- */
-
+/** Tracks interrupted timesheet writes. The native operation has no replay key. */
+import { isCaptureOwnedBy, type CaptureOwner } from "./capture-sync-state"
 import {
   getOrCreateLocalStorageDeviceId,
   readLocalStorageArray,
   writeLocalStorageArray,
 } from "./local-outbox"
 
-export type TimesheetCapturePayload = {
+export interface TimesheetCapturePayload {
   projectId: string
   taskId: string
   employeeId: string
   date: string
   unitAmount: number
-  name?: string
-  description?: string
-  timesheetInvoiceType?: string
-  currencyId?: string
 }
 
-export type TimesheetCaptureSyncState = "queued" | "synced" | "error" | "conflict"
-
-export interface TimesheetCaptureOutboxItem {
+export interface TimesheetCaptureOutboxItem extends CaptureOwner {
   clientRequestId: string
-  deviceId: string
   payload: TimesheetCapturePayload
-  createdAt: string
-  syncState: TimesheetCaptureSyncState
-  lastError?: string
+  syncState: "submitting" | "failed" | "conflict"
 }
 
-function storageKey(organizationId: string | number, deviceId: string): string {
+function storageKey(organizationId: number, deviceId: string): string {
   return `lumiere.timesheet-capture-outbox.${organizationId}.${deviceId}`
 }
 
@@ -42,110 +28,42 @@ export function getOrCreateTimesheetCaptureDeviceId(): string {
   return getOrCreateLocalStorageDeviceId("lumiere.timesheet-capture-device-id")
 }
 
-export function newTimesheetClientRequestId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `ts-cap-${crypto.randomUUID()}`
-  }
-  return `ts-cap-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-}
-
-export function readTimesheetCaptureOutbox(
-  organizationId: string | number,
+export function listTimesheetCaptures(
+  organizationId: number,
   deviceId: string,
+  owner: CaptureOwner,
 ): TimesheetCaptureOutboxItem[] {
-  return readLocalStorageArray<TimesheetCaptureOutboxItem>(storageKey(organizationId, deviceId))
+  return readLocalStorageArray<TimesheetCaptureOutboxItem>(
+    storageKey(organizationId, deviceId),
+  ).filter((item) => isCaptureOwnedBy(item, owner))
 }
 
-function writeTimesheetCaptureOutbox(
-  organizationId: string | number,
+export function writeTimesheetCapture(
+  organizationId: number,
   deviceId: string,
-  items: TimesheetCaptureOutboxItem[],
+  attempt: TimesheetCaptureOutboxItem,
+  { remove = false }: { remove?: boolean } = {},
 ): void {
-  writeLocalStorageArray(storageKey(organizationId, deviceId), items)
-}
-
-export function enqueueTimesheetCapture(
-  organizationId: string | number,
-  item: Omit<TimesheetCaptureOutboxItem, "createdAt" | "syncState">,
-): TimesheetCaptureOutboxItem {
-  const items = readTimesheetCaptureOutbox(organizationId, item.deviceId)
-  const existing = items.find((i) => i.clientRequestId === item.clientRequestId)
-  if (existing) return existing
-  const row: TimesheetCaptureOutboxItem = {
-    ...item,
-    createdAt: new Date().toISOString(),
-    syncState: "queued",
-  }
-  items.push(row)
-  writeTimesheetCaptureOutbox(organizationId, item.deviceId, items)
-  return row
-}
-
-export function markTimesheetCaptureSynced(
-  organizationId: string | number,
-  deviceId: string,
-  clientRequestId: string,
-): void {
-  const items = readTimesheetCaptureOutbox(organizationId, deviceId).map((i) =>
-    i.clientRequestId === clientRequestId
-      ? { ...i, syncState: "synced" as const, lastError: undefined }
-      : i,
+  const key = storageKey(organizationId, deviceId)
+  const others = readLocalStorageArray<TimesheetCaptureOutboxItem>(key).filter(
+    (item) =>
+      !isCaptureOwnedBy(item, attempt) ||
+      item.clientRequestId !== attempt.clientRequestId,
   )
-  writeTimesheetCaptureOutbox(organizationId, deviceId, items)
+  writeLocalStorageArray(key, remove ? others : [...others, attempt])
 }
 
-export function markTimesheetCaptureError(
-  organizationId: string | number,
-  deviceId: string,
-  clientRequestId: string,
-  lastError: string,
-): void {
-  const conflict =
-    /already exists|idempotenc|conflict|duplicate client_request/i.test(lastError)
-  const items = readTimesheetCaptureOutbox(organizationId, deviceId).map((i) =>
-    i.clientRequestId === clientRequestId
-      ? {
-          ...i,
-          syncState: (conflict ? "conflict" : "error") as TimesheetCaptureSyncState,
-          lastError,
-        }
-      : i,
-  )
-  writeTimesheetCaptureOutbox(organizationId, deviceId, items)
-}
-
-export function requeueTimesheetCapture(
-  organizationId: string | number,
-  deviceId: string,
-  clientRequestId: string,
-): void {
-  const items = readTimesheetCaptureOutbox(organizationId, deviceId).map((i) =>
-    i.clientRequestId === clientRequestId
-      ? { ...i, syncState: "queued" as const, lastError: undefined }
-      : i,
-  )
-  writeTimesheetCaptureOutbox(organizationId, deviceId, items)
-}
-
-export function discardTimesheetCapture(
-  organizationId: string | number,
-  deviceId: string,
-  clientRequestId: string,
-): void {
-  const items = readTimesheetCaptureOutbox(organizationId, deviceId).filter(
-    (i) => i.clientRequestId !== clientRequestId,
-  )
-  writeTimesheetCaptureOutbox(organizationId, deviceId, items)
-}
-
-export function listQueuedTimesheetCaptures(
-  organizationId: string | number,
-  deviceId: string,
-): TimesheetCaptureOutboxItem[] {
-  return readTimesheetCaptureOutbox(organizationId, deviceId).filter(
-    (i) =>
-      i.syncState === "queued" ||
-      i.syncState === "error" ||
-      i.syncState === "conflict",
+export function hasUnconfirmedTimesheetCapture(
+  items: readonly TimesheetCaptureOutboxItem[],
+  payload: TimesheetCapturePayload,
+): boolean {
+  return items.some(
+    ({ syncState, payload: saved }) =>
+      syncState !== "failed" &&
+      saved.projectId === payload.projectId &&
+      saved.taskId === payload.taskId &&
+      saved.employeeId === payload.employeeId &&
+      saved.date === payload.date &&
+      saved.unitAmount === payload.unitAmount,
   )
 }

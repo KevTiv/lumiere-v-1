@@ -47,6 +47,10 @@ pub(super) async fn hold_candidates(
         "currencyId":definition.configuration.currency_id,"dateFrom":entry.business_identity.date_from,
         "dateTo":entry.business_identity.date_to_exclusive,"externalReference":entry.business_identity.external_reference,
     })).collect::<Vec<_>>());
+    // Both Accounting draft types share source/reference claims so changing
+    // classification cannot create a second effect for the same evidence.
+    // Amount/period alone is ambiguous for paired opening balances.
+    let compare_expense_amounts = !definition.configuration.opening_balances;
     // The 26th candidate is a sentinel. A truncated set has no resolvable
     // fingerprint; operators can never approve only the displayed subset.
     let rows = tx.query(
@@ -70,12 +74,13 @@ pub(super) async fn hold_candidates(
                AND (claim.source_key=selected.value->>'sourceKey'
                     OR (claim.currency_id=(selected.value->>'currencyId')::numeric
                         AND ((claim.external_reference IS NOT NULL AND claim.external_reference=selected.value->>'externalReference')
-                             OR (claim.amount=(selected.value->>'amount')::numeric
+                             OR ($6 AND proposal.definition_json->>'kind' = $4
+                                 AND claim.amount=(selected.value->>'amount')::numeric
                                  AND claim.business_date_from<(selected.value->>'dateTo')::date
                                  AND claim.business_date_to>(selected.value->>'dateFrom')::date))))
              ORDER BY claim.proposal_id,claim.item_id LIMIT 26
          ) candidate ON true ORDER BY current_item,candidate.proposal_id,candidate.item_id",
-        &[&scope.organization.to_string(),&scope.company.to_string(),&entries,&KIND,&own_proposal]
+        &[&scope.organization.to_string(),&scope.company.to_string(),&entries,&KIND,&own_proposal,&compare_expense_amounts]
     ).await.map_err(ApiError::internal)?;
     let mut candidates: BTreeMap<String, Vec<OverlapCandidate>> = BTreeMap::new();
     for row in rows {
@@ -101,14 +106,20 @@ pub(super) async fn hold_candidates(
     apply_candidate_holds(scope, definition, candidates)
 }
 
-fn selected_candidate(left: &Entry, right: &Entry, currency: &str) -> Option<OverlapCandidate> {
+fn selected_candidate(
+    left: &Entry,
+    right: &Entry,
+    currency: &str,
+    compare_expense_amounts: bool,
+) -> Option<OverlapCandidate> {
     let a = &left.business_identity;
     let b = &right.business_identity;
     let reason = if claim_key(left) == claim_key(right) {
         "same_source"
     } else if a.external_reference.is_some() && a.external_reference == b.external_reference {
         "same_reference"
-    } else if left.amount == right.amount
+    } else if compare_expense_amounts
+        && left.amount == right.amount
         && a.date_from < b.date_to_exclusive
         && b.date_from < a.date_to_exclusive
     {
@@ -170,7 +181,12 @@ pub(super) fn apply_candidate_holds(
                 .iter()
                 .filter(|other| other.item_id != entry.item_id)
                 .filter_map(|other| {
-                    selected_candidate(entry, other, &definition.configuration.currency_id)
+                    selected_candidate(
+                        entry,
+                        other,
+                        &definition.configuration.currency_id,
+                        !definition.configuration.opening_balances,
+                    )
                 }),
         );
         candidates.sort();
@@ -209,7 +225,9 @@ pub(super) fn apply_candidate_holds(
         let prior_match = candidates
             .iter()
             .any(|candidate| candidate.origin == "saved_proposal");
-        let message = if !complete {
+        let message = if definition.configuration.opening_balances {
+            "This opening-balance pair shares its original source row or confirmed reference with another import row. Review the matching source before preparing another draft."
+        } else if !complete {
             "More than 25 candidate records overlap this expense. The row remains held; narrow the source group or resolve earlier imports before making a distinct-record decision."
         } else if !uncertain_only {
             "This expense shares its original source row or confirmed external reference with another record. Exclude the duplicate or correct its supported identity; a distinct-record assertion cannot waive this hold."

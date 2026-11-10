@@ -3,7 +3,8 @@
 import { useRef, useState } from "react"
 import { reconciliationModules } from "./reconciliation-modules"
 import { Button } from "@lumiere/ui/components/button"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@lumiere/ui/components/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle,
+} from "@lumiere/ui/components/dialog"
 
 const labels = {
   review_candidate: "Ready for review",
@@ -16,8 +17,14 @@ const labels = {
 
 type Status = keyof typeof labels
 type RecordRef = { kind: string; id: number; revision: number }
-type Proposal = { key: string; rule: string; source: RecordRef; targets: RecordRef[]; matchedFields: string[]; status: Status }
-type Feedback = { action: "unresolved" | "needs evidence" | "preferred match"; targetId?: number }
+type Proposal = { key: string
+  rule: string
+  source: RecordRef
+  targets: RecordRef[]
+  matchedFields: string[]
+  status: Status }
+type Feedback = { action: "unresolved" | "needs evidence" | "preferred match"
+  targetId?: number }
 
 type PreviewObject = {
   organization_id?: unknown
@@ -49,7 +56,8 @@ function recordRef(value: unknown): RecordRef {
   return { kind, id, revision }
 }
 
-function parsePreview(value: unknown, organizationId: number, companyId: number): Proposal[] {
+function parsePreview(value: unknown, organizationId: number, companyId: number,
+): Proposal[] {
   const bundle = object(value)
   if (bundle.organization_id !== organizationId || bundle.company_id !== companyId) {
     throw new Error("Choose a preview for the current company.")
@@ -64,16 +72,30 @@ function parsePreview(value: unknown, organizationId: number, companyId: number)
       || typeof status !== "string" || !Object.hasOwn(labels, status)
       || !Array.isArray(row.targets) || row.targets.length > 100) throw new Error()
     if (!Array.isArray(row.matched_fields) || row.matched_fields.length > 16
-      || !row.matched_fields.every((field: unknown) => typeof field === "string" && /^[a-z_]{1,80}$/.test(field))) throw new Error()
+      || !row.matched_fields.every((field: unknown) => typeof field === "string" && /^[a-z_]{1,80}$/.test(field),
+      )) throw new Error()
     keys.add(key)
     const targets = row.targets.map(recordRef)
-    if (new Set(targets.map(target => target.id)).size !== targets.length) throw new Error()
-    return { key, rule, status: status as Status, source: recordRef(row.source), targets, matchedFields: row.matched_fields as string[] }
+    if (new Set(targets.map((target) => target.id)).size !== targets.length) throw new Error()
+    return { key, rule, status: status as Status, source: recordRef(row.source), targets, matchedFields: row.matched_fields as string[],
+    }
   })
 }
 
+function accountingReviewHref(reference: RecordRef): string | null {
+  if (
+    reference.kind === "customer_invoice" ||
+    reference.kind === "vendor_bill" ||
+    reference.kind === "subscription_invoice"
+  ) {
+    return `/accounting/invoices/${reference.id}`
+  }
+  return null
+}
+
 /** Mounted with the chat scope as its key, so changing company or conversation discards the preview. */
-export function ChatReconciliationPreview({ organizationId, companyId }: {
+export function ChatReconciliationPreview({ organizationId, companyId,
+}: {
   organizationId: number
   companyId: number
 }) {
@@ -91,7 +113,8 @@ export function ChatReconciliationPreview({ organizationId, companyId }: {
     setError(null)
     try {
       if (file.size > 5_000_000) throw new Error("Preview files must be under 5 MB.")
-      const next = parsePreview(JSON.parse(await file.text()), organizationId, companyId)
+      const next = parsePreview(JSON.parse(await file.text()), organizationId, companyId,
+      )
       if (version !== importVersion.current) return
       setProposals(next)
       setFeedback({})
@@ -102,13 +125,20 @@ export function ChatReconciliationPreview({ organizationId, companyId }: {
       if (version !== importVersion.current) return
       setError(cause instanceof Error && cause.message.startsWith("Choose a preview")
         ? cause.message
-        : "Could not read this reconciliation preview. Choose a valid export under 5 MB.")
+        : "Could not read this reconciliation preview. Choose a valid export under 5 MB.",
+      )
     }
   }
 
-  const selectedModule = reconciliationModules.find(module => module.id === moduleId)
-  const moduleProposals = (proposals ?? []).filter(item => !selectedModule || selectedModule.rules.includes(item.rule))
-  const filtered = moduleProposals.filter(item => filter === "all" || item.status === filter)
+  const selectedModule = reconciliationModules.find(
+    (module) => module.id === moduleId,
+  )
+  const moduleProposals = (proposals ?? []).filter(
+    (item) => !selectedModule || selectedModule.rules.includes(item.rule),
+  )
+  const filtered = moduleProposals.filter(
+    (item) => filter === "all" || item.status === filter,
+  )
   const visible = filtered.slice(page * 20, (page + 1) * 20)
   const feedbackCount = Object.keys(feedback).length
 
@@ -117,9 +147,11 @@ export function ChatReconciliationPreview({ organizationId, companyId }: {
       <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
         {proposals ? "Resume reconciliation preview" : "Open reconciliation preview"}
       </Button>
-      {proposals ? <p className="text-xs text-muted-foreground">
-        {proposals.length} proposals · {feedbackCount} marked for follow-up or matched
-      </p> : null}
+      {proposals ? (
+        <p className="text-xs text-muted-foreground">
+        {proposals.length} proposals · {feedbackCount} with preview feedback
+        </p>
+      ) : null}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogTitle>Review reconciliation preview</DialogTitle>
@@ -129,78 +161,113 @@ export function ChatReconciliationPreview({ organizationId, companyId }: {
           </DialogDescription>
           <label className="space-y-1 text-sm">
             <span className="block">Proposal export</span>
-            <input type="file" accept=".json,application/json" onChange={event => {
+            <input type="file" accept=".json,application/json" onChange={(event) => {
               const file = event.currentTarget.files?.[0]
               event.currentTarget.value = ""
               if (file) void load(file)
             }} />
           </label>
-          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">{error}</p>
+          ) : null}
           <div className="space-y-2">
             <p className="text-sm font-medium">Alpha modules</p>
             <div className="flex flex-wrap gap-2" aria-label="Filter by Alpha module">
               <Button size="sm" variant="outline" aria-pressed={moduleId === "all"}
-                onClick={() => { setModuleId("all"); setFilter("all"); setPage(0) }}>All modules</Button>
-              {reconciliationModules.map(module => (
+                onClick={() => { setModuleId("all")
+                  setFilter("all")
+                  setPage(0) }}>All modules</Button>
+              {reconciliationModules.map((module) => (
                 <Button key={module.id} size="sm" variant="outline" aria-pressed={moduleId === module.id}
-                  onClick={() => { setModuleId(module.id); setFilter("all"); setPage(0) }}>
+                  onClick={() => { setModuleId(module.id)
+                    setFilter("all")
+                    setPage(0) }}>
                   {module.label}
                 </Button>
               ))}
             </div>
-            {selectedModule ? <p className="text-sm text-muted-foreground">{selectedModule.role}</p> : null}
+            {selectedModule ? (
+              <p className="text-sm text-muted-foreground">{selectedModule.role}</p>
+            ) : null}
           </div>
           {proposals && (!selectedModule || selectedModule.rules.length > 0) ? (
             <>
               <div className="flex flex-wrap gap-2" aria-label="Filter proposals">
                 <Button size="sm" variant="outline" aria-pressed={filter === "all"}
-                  onClick={() => { setFilter("all"); setPage(0) }}>All ({moduleProposals.length})</Button>
-                {(Object.keys(labels) as Status[]).map(status => {
-                  const count = moduleProposals.filter(item => item.status === status).length
-                  return count > 0 ? <Button key={status} size="sm" variant="outline"
-                    aria-pressed={filter === status} onClick={() => { setFilter(status); setPage(0) }}>
+                  onClick={() => { setFilter("all")
+                    setPage(0) }}>All ({moduleProposals.length})</Button>
+                {(Object.keys(labels) as Status[]).map((status) => {
+                  const count = moduleProposals.filter(
+                    (item) => item.status === status,
+                  ).length
+                  return count > 0 ? (
+                    <Button key={status} size="sm" variant="outline"
+                    aria-pressed={filter === status} onClick={() => { setFilter(status)
+                        setPage(0) }}>
                     {labels[status]} ({count})
-                  </Button> : null
+                  </Button>
+                  ) : null
                 })}
               </div>
               {visible.length === 0 ? <p>No proposals in this view.</p> : null}
               <ul className="space-y-3">
-                {visible.map(item => (
+                {visible.map((item) => (
                   <li key={item.key} className="space-y-2 rounded-lg border p-3 text-sm">
                     <p className="font-medium">{item.rule.replaceAll("_", " ")}</p>
                     <p>{labels[item.status]}</p>
-                    {item.matchedFields.length ? <p>Matching fields: {item.matchedFields.join(", ")}</p> : null}
-                    <p>Source: {item.source.kind} #{item.source.id} · revision {item.source.revision}</p>
-                    {item.targets.map(target => (
+                    {item.matchedFields.length ? (
+                      <p>Matching fields: {item.matchedFields.join(", ")}</p>
+                    ) : null}
+                    <p>Source: {item.source.kind} #{item.source.id} · revision {" "}
+                      {item.source.revision}</p>
+                    {accountingReviewHref(item.source) ? (
+                      <a
+                        className="inline-flex min-h-11 items-center font-medium text-primary underline underline-offset-4"
+                        href={accountingReviewHref(item.source)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Open current accounting record #{item.source.id}
+                      </a>
+                    ) : null}
+                    {item.targets.map((target) => (
                       <div key={target.id} className="flex flex-wrap items-center gap-2">
-                        <span>Candidate: {target.kind} #{target.id} · revision {target.revision}</span>
-                        {item.status === "ambiguous" ? <Button size="sm" variant="outline"
-                          onClick={() => setFeedback(previous => ({
-                            ...previous, [item.key]: { action: "preferred match", targetId: target.id },
-                          }))}>Prefer match #{target.id}</Button> : null}
+                        <span>Candidate: {target.kind} #{target.id} · revision {" "}
+                          {target.revision}</span>
+                        {item.status === "ambiguous" ? (
+                          <Button size="sm" variant="outline"
+                          onClick={() => setFeedback((previous) => ({
+                            ...previous, [item.key]: { action: "preferred match", targetId: target.id,
+                                },
+                          }))}>Prefer match #{target.id}</Button>
+                        ) : null}
                       </div>
                     ))}
                     <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setFeedback(previous => ({
+                      <Button size="sm" variant="outline" onClick={() => setFeedback((previous) => ({
                         ...previous, [item.key]: { action: "unresolved" },
                       }))}>Leave unresolved</Button>
-                      <Button size="sm" variant="outline" onClick={() => setFeedback(previous => ({
+                      <Button size="sm" variant="outline" onClick={() => setFeedback((previous) => ({
                         ...previous, [item.key]: { action: "needs evidence" },
                       }))}>Mark as needing evidence</Button>
                     </div>
-                    {feedback[item.key] ? <p role="status">
+                    {feedback[item.key] ? (
+                      <p role="status">
                       Preview feedback: {feedback[item.key].action}
                       {feedback[item.key].targetId ? ` #${feedback[item.key].targetId}` : ""}
-                    </p> : null}
+                    </p>
+                    ) : null}
                   </li>
                 ))}
               </ul>
-              {filtered.length > 20 ? <div className="flex gap-2">
+              {filtered.length > 20 ? (
+                <div className="flex gap-2">
                 <Button size="sm" variant="outline" disabled={page === 0}
                   onClick={() => setPage(page - 1)}>Previous</Button>
                 <Button size="sm" variant="outline" disabled={(page + 1) * 20 >= filtered.length}
                   onClick={() => setPage(page + 1)}>Next</Button>
-              </div> : null}
+              </div>
+              ) : null}
             </>
           ) : null}
         </DialogContent>

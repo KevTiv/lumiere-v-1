@@ -57,6 +57,7 @@ type FixtureState = {
   authorityWait?: Promise<void>
   boardWait?: Promise<void>
   rejectWrite: boolean
+  rejectActivityId?: number
   holdNextWrite: boolean
   pendingWrite?: Route
 }
@@ -340,7 +341,7 @@ async function fixtureBackend(page: Page): Promise<FixtureState> {
       const row = state.activities.find(
         (candidate) => candidate.id === activityId,
       )
-      if (!row || state.rejectWrite)
+      if (!row || state.rejectWrite || activityId === state.rejectActivityId)
         return respond(
           route,
           { error: "Synthetic unauthorized follow-up action" },
@@ -1633,6 +1634,82 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
       page.getByTestId("kanban-column-done").getByTestId("kanban-card-71"),
     ).toBeVisible()
     expect(state.writes).toHaveLength(1)
+  })
+
+  test("follow-up batch previews each row and retries only the failed item", async ({
+    page,
+  }) => {
+    const state = await fixtureBackend(page)
+    const first = state.activities[0]!
+    state.activities = [
+      { ...first, dateDeadline: "2020-01-01" },
+      {
+        ...first,
+        id: 72,
+        summary: "Call second supplier",
+        dateDeadline: "2020-01-02",
+      },
+      { ...first, id: 73, summary: "Read-only follow-up", workActions: [] },
+    ]
+    state.rejectActivityId = 72
+    await page.goto("/work-board?workSource=activities&workLayout=list")
+    const firstSelect = page.getByRole("checkbox", {
+      name: "Select Follow up supplier order",
+    })
+    const secondSelect = page.getByRole("checkbox", {
+      name: "Select Call second supplier",
+    })
+    await expect(firstSelect).toBeEnabled()
+    await expect(
+      page.getByRole("checkbox", { name: "Select Read-only follow-up" }),
+    ).toHaveCount(0)
+    await firstSelect.check()
+    await secondSelect.check()
+    await page.getByRole("button", { name: "Review selected (2)" }).click()
+    const review = page.getByRole("dialog", {
+      name: "Review follow-up completion",
+    })
+    await expect(
+      review.getByText("Follow up supplier order", { exact: true }),
+    ).toBeVisible()
+    await expect(
+      review.getByText("Call second supplier", { exact: true }),
+    ).toBeVisible()
+    expect(state.writes).toHaveLength(0)
+
+    await review
+      .getByRole("button", { name: "Complete selected follow-ups" })
+      .click()
+    await expect(
+      review.getByText("1 completed · 1 need attention"),
+    ).toBeVisible()
+    await expect(
+      review.getByText("Synthetic unauthorized follow-up action"),
+    ).toBeVisible()
+    expect(state.activities.map((row) => row.isDone)).toEqual([
+      true,
+      false,
+      false,
+    ])
+    state.rejectActivityId = undefined
+    await review
+      .getByRole("button", { name: "Retry Call second supplier" })
+      .click()
+    await expect(
+      review.getByText("2 completed · 0 need attention"),
+    ).toBeVisible()
+    expect(
+      state.writes.map(({ path, params }) => [path, Number(params.activityId)]),
+    ).toEqual([
+      [completeActivityPath, 71],
+      [completeActivityPath, 72],
+      [completeActivityPath, 72],
+    ])
+    expect(state.activities.map((row) => row.isDone)).toEqual([
+      true,
+      true,
+      false,
+    ])
   })
 
   for (const width of [390, 1440]) {

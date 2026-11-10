@@ -525,7 +525,8 @@
       },
       "groupBy": "Group by",
       "showFullValue": "Show full value",
-      "records": "Records"
+      "records": "Records",
+      "record": "Record"
     },
     "retry": "Retry",
     "recordsDenied": "You do not have access to these records.",
@@ -3972,7 +3973,42 @@
       "openDocument": "Open {{document}} in a new tab",
       "copyDetails": "Copy review details",
       "copied": "Review details copied.",
-      "copyUnavailable": "Clipboard is unavailable. Select and copy the review details above."
+      "copyUnavailable": "Clipboard is unavailable. Select and copy the review details above.",
+      "allocationVerified": "Allocation #{{id}} applied {{amount}} to journal item #{{itemId}}.",
+      "ambiguousTransactions": "Several posted transactions claim this bank line. Review their references in Payment Operations.",
+      "applyReview": "Apply {{amount}} from this posted transaction and match the bank line. The document balance will be {{remaining}}. Unapplied payment credit will be {{credit}}.",
+      "authorizeTransaction": "I reviewed the bank line, posted transaction, journal item and amounts.",
+      "bankHandoffChanged": "The bank payment source changed. Return to the original bank line and review it again.",
+      "bankPaymentHandoff": "Payment for reviewed bank line",
+      "bankReversalChecking": "Checking the original transaction and bank line…",
+      "bankReversalConfirmed": "Reversal verified. Compensating journal entry #{{id}} is posted and the bank line is unmatched.",
+      "bankReversalUnconfirmed": "The reversal has not been verified. Check its approval and the original bank line before sending another request.",
+      "checkBankReversal": "Check bank reversal",
+      "checkTransaction": "Check the saved bank match",
+      "checkingTransaction": "Checking the bank match and posted balances…",
+      "confirmTransaction": "Apply payment and match bank line",
+      "fxHandoffNote": "Verify the posted payment, document currency and approved functional amounts before posting a realized FX difference. The bank line stays unmatched after this FX entry.",
+      "fxSource": "Bank line awaiting FX review",
+      "handoffAccountMissing": "An active payment account in this bank journal and currency is required to record a payment.",
+      "handoffInstructions": "Record the payment only if it does not already exist. Once it posts through any required approval, return to the bank line to review and confirm the allocation.",
+      "handoffMatched": "Review the matched transaction and its credit. A completed reversal posts a compensating entry and reopens the original bank line.",
+      "handoffScope": "Statement #{{statementId}} · Bank line #{{lineId}}",
+      "invalidBankDraft": "Choose an account in this bank journal and enter the exact transaction reference. Review any existing draft before recording another payment.",
+      "openFxReview": "Open FX review",
+      "postedNeeded": "A posted transaction tied to this bank line is required. Record or review it in Payment Operations, then return here to match it.",
+      "postedPath": "Use the posted transaction tied to this bank line to review the allocation and any remaining balance.",
+      "postedReference": "Posted transaction #{{id}} · {{reference}}",
+      "postedReview": "Review posted transaction for bank matching",
+      "postedUnavailable": "Posted transaction details are unavailable. Refresh the source before settling.",
+      "prepareBankPayment": "Prepare payment from this bank line",
+      "remainingBalance": "Current document balance {{amount}}",
+      "retryTransaction": "Retry the reviewed bank match",
+      "returnBankLine": "Return to original bank line",
+      "reviewBankDraft": "Review the payment draft",
+      "reviewMatchedTransaction": "Open payment transaction",
+      "transactionMatched": "Bank line matched",
+      "transactionUnconfirmed": "The bank match and allocation could not be verified. Check this exact transaction before taking another action.",
+      "unappliedCredit": "Current unapplied payment credit {{amount}}"
     }
   },
   "crm": {
@@ -16208,7 +16244,8 @@
         "approved": "Approved; ready to create",
         "executing": "Execution awaiting verification",
         "verified": "Verified in ERP",
-        "blocked": "Held for review"
+        "blocked": "Held for review",
+        "rolled_back": "Drafts removed"
       },
       "savedPreviewAttempt": "Saved preview request",
       "savedPreviewIntent": "Retained request for {{count}} source rows · journal #{{journal}}. Its exact source revisions and accounting choices will be reused.",
@@ -16256,7 +16293,19 @@
       "savedPreviewCounts": "{{date}} · {{status}} · {{drafts}} previewed drafts · {{held}} held",
       "openNativeCorrection": "Review or correct {{destination}} in the owning module",
       "reviewHeldGroup": "Review current source decisions",
-      "correctInAccounting": "Open a record in Accounting to make corrections. This import keeps its original approval and receipt."
+      "correctInAccounting": "Open a record in Accounting to make corrections. This import keeps its original approval and receipt.",
+      "accountingTreatment": "Accounting draft setup",
+      "draftType": "Draft type",
+      "openingBalanceTreatment": "Paired opening-balance drafts",
+      "openingBalanceFacts": "Map and confirm each source pair's opening_balance type, unique reference, description, equal debit and credit, exact date, and both account and currency IDs. Choose the same cutover date, account pair, and currency for this group.",
+      "cutoverDate": "Cutover date",
+      "rollbackComplete": "Accounting confirmed that these drafts were removed. The approval and receipts remain in the import history. Update the source decisions or mapping, then prepare a new preview.",
+      "rollbackDrafts": "Remove imported drafts",
+      "rollbackDescription_one": "Accounting will remove {{count}} draft and its lines if they are unchanged. The original approval and receipt will remain available.",
+      "rollbackDescription_other": "Accounting will remove {{count}} drafts and their lines if they are unchanged. The original approval and receipts will remain available.",
+      "rollbackConfirm": "Remove drafts",
+      "openingDebitAccount": "Debit account",
+      "rollbackDescription": "Accounting will remove the unchanged drafts and their lines. The original approval and receipts will remain available."
     },
     "importTask": {
       "loading": "Checking the saved import…",
@@ -16365,7 +16414,8 @@
       "progressOpenExceptions": "Review source exceptions",
       "progressLabel": "Progress from source to ERP",
       "progressOpenHeld": "Inspect rows held in ERP previews",
-      "nextResults": "Continue to ERP results"
+      "nextResults": "Continue to ERP results",
+      "cardRolledBack": "Proposal #{{id}}: Accounting confirmed removal of the imported drafts."
     },
     "importPreparation": {
       "addAlias": "Add a label alias",
@@ -18860,7 +18910,42 @@
       "department": "Department #{{id}}"
     },
     "assigned": "Assigned",
-    "moduleAssignment": "{{module}} assignment"
+    "moduleAssignment": "{{module}} assignment",
+    "nextStep": {
+      "title": "Next step",
+      "claim": "Claim assignment",
+      "resubmit": "Review resubmission",
+      "review": "Review workflow action",
+      "chooseActor": "Choose who to act for",
+      "inspect": "Inspect source record",
+      "wait": "Waiting for eligible reviewer",
+      "view": "View outcome",
+      "reviewCompletion": "Review completion"
+    },
+    "queue": {
+      "blocked": "Needs attention",
+      "active": "In progress",
+      "resolved": "Resolved"
+    },
+    "scheduleOnRecord": "Schedule follow-up on record",
+    "batch": {
+      "title": "Review follow-up completion",
+      "description": "Complete the selected follow-ups. Business approvals stay in their workflow.",
+      "inProgress": "Completing follow-ups individually…",
+      "result": "{{completed}} completed · {{failed}} need attention",
+      "selected": "Selected follow-ups: {{total}}",
+      "retryItem": "Retry {{title}}",
+      "retryUnavailableItem": "Check and retry item {{number}}",
+      "unavailableItem": "Item {{number}} is outside the current view",
+      "retry": "Check and retry",
+      "complete": "Complete selected follow-ups",
+      "close": "Close review",
+      "interrupted": "The queue changed before this follow-up could run. Check the current view and try again.",
+      "review": "Review selected ({{total}})",
+      "limit": "Select up to {{limit}} follow-ups",
+      "selectColumn": "Select follow-ups",
+      "selectItem": "Select {{title}}"
+    }
   },
   "approvals": {
     "errors": {
@@ -19151,6 +19236,78 @@
     "insights": "Page insights",
     "savedWidgetScope": "Saved widgets follow the operating company and date range, with their own model, date field and filters. Currency and queue selections above apply to the built-in insights.",
     "insightScope": "Widgets use the operating company and their own filters. A date range applies to each widget’s configured date field.",
-    "overviewScope": "Saved widgets follow the operating company and selected date range. Open work and other current-state totals use the period stated on each built-in section."
+    "overviewScope": "Saved widgets follow the operating company and selected date range. Open work and other current-state totals use the period stated on each built-in section.",
+    "startingLayouts": "Starting layouts",
+    "startingLayoutHint": "Choose a starting layout to replace the widget draft. Undo restores the previous draft.",
+    "startingLayoutApplied": "{{title}} applied to the draft.",
+    "starter": {
+      "dailyReview": "Daily review",
+      "performanceReview": "Performance review",
+      "workReview": "Work review",
+      "periodReview": "Period review",
+      "collectionsReview": "Collections review",
+      "cashReview": "Cash review"
+    },
+    "companyNumber": "Company #{{id}}",
+    "dateUnavailable": "Date range unavailable",
+    "dateThrough": "Through {{date}}",
+    "dateFrom": "From {{date}}",
+    "dateFieldRange": "{{range}} via {{field}}",
+    "dateFieldMissing": "No date field configured for this range",
+    "unitRecords": "Records",
+    "unitMeasure": "{{field}} in source units",
+    "unitFields": "Source field values",
+    "unitUnavailable": "Unavailable",
+    "companyLabel": "Company",
+    "dateLabel": "Dates",
+    "unitLabel": "Unit",
+    "personalLayout": "Only you see this saved layout for this page and operating company.",
+    "widgetScope": "Saved widgets use the operating company and their configured filters, date field and source units.",
+    "widgetCatalogPersistence": "Saving creates a widget in the company catalog. Select Done in the page editor to save its placement in your personal layout."
+  },
+  "recordOverview": {
+    "title": "Record overview",
+    "nextStep_one": "Next step",
+    "nextStep_other": "Next steps",
+    "relatedRecords": "Related records",
+    "inLibrary": "In library",
+    "nextStep": "Next steps"
+  },
+  "captureSync": {
+    "barcode": "Barcode scan",
+    "countLine": "Count line",
+    "countOffline": "Reconnect to save changes to this count. Keep the wizard open to retain what you entered.",
+    "countRecorded": "Count line recorded.",
+    "countReview": "The count line could not be confirmed. Check the saved count before recording it again.",
+    "dismiss": "Dismiss",
+    "expenseOffline": "Offline. You can save expense details here and sync them when you reconnect.",
+    "expenseReview": "Check the saved expense before capturing it again. This check only reads the saved records.",
+    "markReviewed": "Mark reviewed",
+    "openTimesheets": "Open Timesheets",
+    "resumeOnline": "Reconnect to sync saved captures.",
+    "saveOnDevice": "Save on this device",
+    "status": {
+      "conflict": "Conflict",
+      "failed": "Failed",
+      "pending": "Pending",
+      "synced": "Synced",
+      "syncing": "Syncing"
+    },
+    "storageUnavailable": "Recovery storage is unavailable on this device.",
+    "syncPending": "Sync pending captures",
+    "timesheetEntry": "{{date}} · {{hours}} h · Project {{project}}",
+    "timesheetInvalid": "Complete the required timesheet details before submitting.",
+    "timesheetOffline": "Reconnect to submit this timesheet. Keep this form open to preserve your current entries.",
+    "timesheetRejected": "The server rejected this entry. Correct the details in the form before trying again.",
+    "timesheetReview": "Check Timesheets for this entry before submitting it again.",
+    "timesheetScope": "Select an active company and confirm your timesheet access before submitting.",
+    "timesheetTitle": "Timesheet recovery",
+    "warehouseConflict": "The saved sync request differs from this capture. Review the warehouse record before creating a new capture.",
+    "warehouseOffline": "Reconnect and confirm your active company before syncing warehouse captures.",
+    "warehouseQueue": "{{local}} on this device · {{server}} pending on the server",
+    "warehouseReadFailed": "Warehouse sync could not be confirmed. Check its status again before creating a new capture.",
+    "warehouseRejected": "The server rejected this capture. Review the warehouse record before creating a new capture.",
+    "warehouseTitle": "Warehouse sync",
+    "timesheetInProgress": "A timesheet is already being submitted. Wait for its result before trying again."
   }
 }

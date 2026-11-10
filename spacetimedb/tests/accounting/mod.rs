@@ -2,6 +2,7 @@
 pub mod active_company_matrix_test;
 pub mod adversarial_p0_fixes_test;
 pub mod bank_settlement_lifecycle_test;
+pub mod bank_transaction_settlement_test;
 pub mod budgeting_test;
 pub mod business_changes_test;
 pub mod fixed_assets_test;
@@ -106,6 +107,8 @@ pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), Stri
 
 #[spacetimedb::reducer]
 pub fn run_accounting_payment_reconcile_test(ctx: &ReducerContext) -> Result<(), String> {
+    bank_transaction_settlement_test::test_posted_operational_bank_matches(ctx)
+        .map_err(|error| format!("posted_operational_bank_matches: {error}"))?;
     payments_test::test_bank_statement_settlement_exact_effect(ctx)
         .map_err(|e| format!("bank_statement_settlement_exact_effect: {e}"))?;
     payments_test::test_bank_settlement_approval_and_last_cent(ctx)

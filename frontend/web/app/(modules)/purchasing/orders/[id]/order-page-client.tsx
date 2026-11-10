@@ -20,6 +20,7 @@ import {
   RecordChatter,
   RecordPage,
   RecordWorkflowActions,
+  recordWorkflowNextSteps,
   SmartButtons,
   StatusBar,
   buildModuleTabHref,
@@ -595,6 +596,11 @@ function PurchaseOrderPageLoaded({
             ) : null}
           </div>
         }
+        nextSteps={recordWorkflowNextSteps(
+          headerActions,
+          record,
+          PRIMARY_ACTION_IDS,
+        )}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         tabs={[
@@ -655,9 +661,14 @@ function PurchaseOrderPageLoaded({
             ),
           },
           {
-            id: 'audit',
-            label: t('businessHistory.title', { defaultValue: 'History & sources' }),
-            content: <RecordAuditTab tableName="purchase_order" recordId={orderId} />,
+            id: "audit",
+            evidence: true,
+            label: t("businessHistory.title", {
+              defaultValue: "History & sources",
+            }),
+            content: (
+              <RecordAuditTab tableName="purchase_order" recordId={orderId} />
+            ),
           },
         ]}
       />

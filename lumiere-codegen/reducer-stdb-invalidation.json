@@ -329,6 +329,17 @@
   "update_stock_picking": [
     "stock-pickings"
   ],
+  "settle_bank_line_with_payment_transaction": [
+    "bank-statements",
+    "bank-statement-lines",
+    "payment-reconciliations",
+    "payment-transactions",
+    "account-payments",
+    "account-moves",
+    "account-move-lines",
+    "sale-orders",
+    "audit-log"
+  ],
   "reconcile_account_bank_statement_line": [
     "bank-statements",
     "bank-statement-lines",

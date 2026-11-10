@@ -453,9 +453,20 @@ fn proposal_summary(proposal: &Value, company_id: u64) -> Result<Value> {
     let status = choice(
         proposal,
         "status",
-        &["prepared", "approved", "executing", "verified", "blocked"],
+        &[
+            "prepared",
+            "approved",
+            "executing",
+            "verified",
+            "blocked",
+            "rolled_back",
+        ],
     )?;
-    let kind = choice(proposal, "kind", &["historical_expense_journals"])?;
+    let kind = choice(
+        proposal,
+        "kind",
+        &["historical_expense_journals", "opening_balances"],
+    )?;
     let digest = string(proposal, "digest", 64)?;
     let revision = count(proposal, "revision")?;
     if !lower_hex(digest, 64) || revision == 0 {
@@ -482,10 +493,13 @@ fn proposal_summary(proposal: &Value, company_id: u64) -> Result<Value> {
             "lines",
             "verification",
             "complete",
+            "rolled_back",
         ],
     )?;
     let result = proposal.get("result").filter(|value| !value.is_null());
-    if (status == "verified") != result.is_some() || (status == "verified") != (phase == "complete")
+    if (status == "verified") != result.is_some()
+        || (status == "verified") != (phase == "complete")
+        || (status == "rolled_back") != (phase == "rolled_back")
     {
         bail!("incomplete import verification");
     }

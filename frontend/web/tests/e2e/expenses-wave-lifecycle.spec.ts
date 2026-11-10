@@ -41,19 +41,22 @@ async function openExpensesTab(page: Page, tabId: string) {
 async function selectExpenseReport(page: Page, id: number | string) {
   const table = activeTabEntityTable(page)
   await expect(table).toBeVisible()
-  const selected = table.locator('[data-testid^="entity-select-row-"][aria-checked="true"]')
+  const selected = table.locator('[data-testid^="entity-select-row-"][aria-checked="true"]',
+  )
   const selectedCount = await selected.count()
   for (let index = 0; index < selectedCount; index += 1) await selected.first().click()
   const checkbox = table.getByTestId(`entity-select-row-${id}`)
   await expect(checkbox).toBeVisible({ timeout: 30_000 })
   await checkbox.click()
   await expect(checkbox).toBeChecked()
-  await expect(table.getByTestId(`entity-row-${id}`)).toHaveAttribute("data-state", "selected")
+  await expect(table.getByTestId(`entity-row-${id}`)).toHaveAttribute("data-state", "selected",
+  )
   await expect(page).toHaveURL(/\/expenses(?:\?[^#]*)?$/)
 }
 
 test.describe("Expenses wave lifecycle e2e @expenses", () => {
-  test("toolbar actions and capture/ops panels render @p0", async ({ page }) => {
+  test("toolbar actions and capture/ops panels render @p0", async ({ page,
+  }) => {
     await gotoModule(page, "/expenses?tab=operations", "expenses")
 
     await expect(page.getByTestId("expenses-capture-panel")).toBeVisible()
@@ -69,15 +72,18 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     await openExpensesTab(page, "expense-sheets")
     const firstReport = activeTabEntityTable(page).locator('[data-testid^="entity-row-"]').first()
     await expect(firstReport).toBeVisible()
-    const reportId = (await firstReport.getAttribute("data-testid"))!.replace("entity-row-", "")
+    const reportId = (await firstReport.getAttribute("data-testid"))!.replace("entity-row-", "",
+    )
     expect(reportId).toMatch(/^\d+$/)
     // Opening a row should navigate; selecting its checkbox should stay on the list.
     await firstReport.click()
-    await expect(page).toHaveURL(new RegExp(`/expenses/reports/${reportId}(?:\\?.*)?$`))
+    await expect(page).toHaveURL(new RegExp(`/expenses/reports/${reportId}(?:\\?.*)?$`),
+    )
     await expect(page.getByTestId("expense-report-title")).toBeVisible()
     await gotoModule(page, "/expenses?tab=expense-sheets", "expenses")
     await selectExpenseReport(page, reportId)
-    for (const actionId of ["submit-sheets", "post-sheets", "reimburse-sheets"]) {
+    for (const actionId of ["submit-sheets", "post-sheets", "reimburse-sheets",
+    ]) {
       await expect(page.getByTestId(`entity-action-${actionId}`)).toBeVisible()
     }
     await expectNoAppError(page)
@@ -89,11 +95,13 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     const newReport = page.getByRole("button", { name: /New Report/i }).first()
     await expect(newReport).toBeVisible()
     await newReport.click()
-    await expect(page.getByText(/New Expense Report|Report Name/i).first()).toBeVisible()
+    await expect(page.getByText(/New Expense Report|Report Name/i).first(),
+    ).toBeVisible()
     await expectNoAppError(page)
   })
 
-  test("capture panel queues an expense without a receipt for delayed sync @p0", async ({ page, context }) => {
+  test("capture panel queues an expense without a receipt for delayed sync @p0", async ({ page, context,
+  }) => {
     await gotoModule(page, "/expenses?tab=operations", "expenses")
     await expect(page.getByTestId("expenses-capture-panel")).toBeVisible()
 
@@ -112,7 +120,8 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
       await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false)
       await page.getByTestId("expenses-capture-submit").click()
 
-      await expect(page.getByTestId("expenses-capture-status")).toHaveText("Capture queued on this device.")
+      await expect(page.getByTestId("expenses-capture-status")).toHaveText("Capture queued on this device.",
+      )
       await expect(item).toBeVisible()
     } finally {
       await context.setOffline(false)
@@ -126,23 +135,29 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     await expectNoAppError(page)
   })
 
-  test("ops FX fee + allocations form from expense row @p0", async ({ page }) => {
+  test("ops FX fee + allocations form from expense row @p0", async ({ page,
+  }) => {
     await gotoModule(page, "/expenses?tab=card-reconciliation", "expenses")
     // Wave D/E ops surface: FX fee on statement create (post advance covered in domain tests).
     await expect(page.getByTestId("expenses-ops-panel")).toBeVisible()
     await expect(page.getByTestId("expenses-ops-amount")).toBeVisible()
     const cardFields = page.getByTestId("expenses-ops-panel")
-    await expect(cardFields.getByLabel("Statement reference", { exact: true })).toBeVisible()
-    await expect(cardFields.getByLabel("Merchant reference", { exact: true })).toBeVisible()
-    await expect(cardFields.getByLabel("Amount", { exact: true })).toHaveAttribute("inputmode", "decimal")
-    await expect(cardFields.getByLabel("FX fee", { exact: true })).toHaveAttribute("inputmode", "decimal")
+    await expect(cardFields.getByLabel("Statement reference", { exact: true }),
+    ).toBeVisible()
+    await expect(cardFields.getByLabel("Merchant reference", { exact: true }),
+    ).toBeVisible()
+    await expect(cardFields.getByLabel("Amount", { exact: true }),
+    ).toHaveAttribute("inputmode", "decimal")
+    await expect(cardFields.getByLabel("FX fee", { exact: true }),
+    ).toHaveAttribute("inputmode", "decimal")
     await expect(cardFields.getByLabel("FX fee", { exact: true })).toBeVisible()
 
     // Allocations: create a Draft expense via BFF (seed rows are often Approved), then open form.
     const organizationId = await fetchSessionOrganizationId(page)
     const currencyId = await fetchCurrencyIdByCode(page, "USD")
     const employees = await page.request.get("/api/query/employees")
-    const employeeId = Number(((await employees.json()) as { data?: Array<{ id?: number }> }).data?.[0]?.id)
+    const employeeId = Number(((await employees.json()) as { data?: Array<{ id?: number }> }).data?.[0]?.id,
+    )
     expect(employeeId).toBeGreaterThan(0)
     const name = smokeName("alloc")
     const receiptKey = `e2e-rcpt-${Date.now()}`
@@ -160,8 +175,11 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     ])
     const receipts = await page.request.get("/api/query/expense-receipts")
     const receiptId = Number(
-      ((await receipts.json()) as { data?: Array<{ id?: number; clientRequestId?: string; client_request_id?: string }> })
-        .data?.find((r) => (r.clientRequestId ?? r.client_request_id) === receiptKey)?.id,
+      ((await receipts.json()) as { data?: Array<{ id?: number
+            clientRequestId?: string
+            client_request_id?: string }> })
+        .data?.find((r) => (r.clientRequestId ?? r.client_request_id) === receiptKey,
+      )?.id,
     )
     expect(receiptId).toBeGreaterThan(0)
     await callReducerBff(page, "create_expense", [
@@ -204,28 +222,34 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     await page.getByTestId("expense-create-report-continuation").click()
     await expect(page.getByTestId("form-modal-new-expense-sheet")).toBeVisible()
     await page.getByRole("button", { name: "Cancel", exact: true }).click()
-    await expect(page.getByTestId("form-modal-add-expense-to-report")).toBeVisible()
+    await expect(page.getByTestId("form-modal-add-expense-to-report"),
+    ).toBeVisible()
     await page.getByTestId("expense-create-report-continuation").click()
     const reportName = smokeName("report-for-alloc")
     await fillField(page, "name", reportName)
     await chooseSelectOptionByLabel(page, "pricelistId", /USD/)
     await submitForm(page, "new-expense-sheet")
-    await expect(page.getByTestId("form-modal-add-expense-to-report")).toBeVisible()
+    await expect(page.getByTestId("form-modal-add-expense-to-report"),
+    ).toBeVisible()
     await page.getByTestId("form-field-sheetId").click()
-    await expect(page.getByRole("option", { name: reportName, exact: true })).toBeVisible()
+    await expect(page.getByRole("option", { name: reportName, exact: true }),
+    ).toBeVisible()
     await page.keyboard.press("Escape")
     await page.getByRole("button", { name: "Cancel", exact: true }).click()
     await page.getByText(name, { exact: true }).first().click()
     const allocBtn = page.getByRole("button", { name: "Split allocations" })
     await expect(allocBtn).toBeVisible({ timeout: 15_000 })
     await allocBtn.click()
-    await expect(page.getByText(/Split expense allocations|allocation|share/i).first()).toBeVisible()
+    await expect(page.getByText(/Split expense allocations|allocation|share/i).first(),
+    ).toBeVisible()
     await expectNoAppError(page)
   })
 
-  test("capture conflict controls appear after forced error @expenses", async ({ page }) => {
+  test("older ownerless captures stay hidden on shared devices @expenses", async ({
+    page,
+  }) => {
     await gotoModule(page, "/expenses", "expenses")
-    // Seed a conflict item via localStorage to assert retry/discard UI without flaky network.
+    // Older capture metadata lacks a signed-in owner and company.
     const organizationId = await fetchSessionOrganizationId(page)
     const currencyId = await fetchCurrencyIdByCode(page, "USD")
     await page.evaluate(
@@ -260,14 +284,17 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     )
     await page.reload()
     await gotoModule(page, "/expenses?tab=operations", "expenses")
-    await expect(page.getByTestId("expenses-capture-item-conflict")).toBeVisible()
-    await expect(page.getByTestId("expenses-capture-retry")).toBeVisible()
-    await expect(page.getByTestId("expenses-capture-discard")).toBeVisible()
-    await page.getByTestId("expenses-capture-discard").click()
-    await expect(page.getByTestId("expenses-capture-item-conflict")).toHaveCount(0)
+    await expect(page.getByTestId("expenses-capture-panel")).toBeVisible()
+    await expect(page.getByText("Conflict meal", { exact: true })).toHaveCount(
+      0,
+    )
+    await expect(
+      page.getByTestId("expenses-capture-item-conflict"),
+    ).toHaveCount(0)
   })
 
-  test("ops panel can create card statement line @expenses", async ({ page }) => {
+  test("ops panel can create card statement line @expenses", async ({ page,
+  }) => {
     await gotoModule(page, "/expenses?tab=card-reconciliation", "expenses")
     await expect(page.getByTestId("expenses-ops-panel")).toBeVisible()
     const ref = smokeName("stmt")
@@ -277,19 +304,23 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     await page.getByTestId("expenses-ops-currency").click()
     await page.getByRole("option", { name: /USD/ }).first().click()
     await page.getByTestId("expenses-ops-create-statement").click()
-    await expect(page.getByTestId("expenses-ops-status")).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByTestId("expenses-ops-status")).not.toContainText(/error|failed|invalid/i)
+    await expect(page.getByTestId("expenses-ops-status")).toBeVisible({ timeout: 30_000,
+    })
+    await expect(page.getByTestId("expenses-ops-status")).not.toContainText(/error|failed|invalid/i,
+    )
     await expectNoAppError(page)
   })
 
-  test("submit → SoD block → post → reimburse lifecycle @expenses @p0", async ({ page }) => {
+  test("submit → SoD block → post → reimburse lifecycle @expenses @p0", async ({ page,
+  }) => {
     test.setTimeout(180_000)
     await gotoModule(page, "/expenses", "expenses")
     const organizationId = await fetchSessionOrganizationId(page)
     const currencyId = await fetchCurrencyIdByCode(page, "USD")
 
     const employees = await page.request.get("/api/query/employees")
-    const employeeId = Number(((await employees.json()) as { data?: Array<{ id?: number }> }).data?.[0]?.id)
+    const employeeId = Number(((await employees.json()) as { data?: Array<{ id?: number }> }).data?.[0]?.id,
+    )
     expect(employeeId).toBeGreaterThan(0)
 
     const sheetName = smokeName("lifecycle-sheet")
@@ -310,8 +341,11 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     ])
     const receipts = await page.request.get("/api/query/expense-receipts")
     const receiptId = Number(
-      ((await receipts.json()) as { data?: Array<{ id?: number; clientRequestId?: string; client_request_id?: string }> })
-        .data?.find((r) => (r.clientRequestId ?? r.client_request_id) === receiptKey)?.id,
+      ((await receipts.json()) as { data?: Array<{ id?: number
+            clientRequestId?: string
+            client_request_id?: string }> })
+        .data?.find((r) => (r.clientRequestId ?? r.client_request_id) === receiptKey,
+      )?.id,
     )
     expect(receiptId).toBeGreaterThan(0)
 
@@ -329,8 +363,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     const sheetsRes = await page.request.get("/api/query/expense-sheets")
     const sheetId = Number(
       ((await sheetsRes.json()) as { data?: Array<{ id?: number; name?: string }> }).data?.find(
-        (s) => s.name === sheetName,
-      )?.id,
+        (s) => s.name === sheetName)?.id,
     )
     expect(sheetId).toBeGreaterThan(0)
 
@@ -366,13 +399,14 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     const expensesRes = await page.request.get("/api/query/expenses")
     const expenseId = Number(
       ((await expensesRes.json()) as { data?: Array<{ id?: number; name?: string }> }).data?.find(
-        (e) => e.name === expenseName,
-      )?.id,
+        (e) => e.name === expenseName)?.id,
     )
     expect(expenseId).toBeGreaterThan(0)
 
-    await callReducerBff(page, "submit_expense", [organizationId, expenseId, sheetId])
-    await callReducerBff(page, "submit_expense_sheet", [organizationId, sheetId])
+    await callReducerBff(page, "submit_expense", [organizationId, expenseId, sheetId,
+    ])
+    await callReducerBff(page, "submit_expense_sheet", [organizationId, sheetId,
+    ])
 
     await expect
       .poll(async () => {
@@ -384,16 +418,18 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
         const row = (json.data ?? []).find((s) => Number(s.id) === sheetId)
         const state = row?.state
         return typeof state === "string" ? state : String(state?.tag ?? "")
-      }, { timeout: 45_000 })
+      }, { timeout: 45_000 },
+      )
       .toMatch(/Submitted/i)
 
     // Single-user fixture: public approve must SoD-fail (second identity covered in domain Wave F).
     const approveResult = await callReducerBffResult(page, "approve_expense_sheet", [
       organizationId,
-      sheetId,
-    ])
+      sheetId],
+    )
     expect(approveResult.ok).toBe(false)
-    expect(approveResult.error ?? "").toMatch(/sod|cannot approve|submitter|employee/i)
+    expect(approveResult.error ?? "").toMatch(/sod|cannot approve|submitter|employee/i,
+    )
 
     // Post + reimburse via seeded "Q1 Business Trips" (Approved on fresh seed; Posted if prior run).
     const sheetState = (state: unknown) => {
@@ -425,13 +461,16 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
         reimbursement_move_id?: number | string | null
       }>
     }
-    const seedSheet = (seedJson.data ?? []).find((s) => s.name === "Q1 Business Trips")
-    expect(seedSheet?.id, "seeded sheet Q1 Business Trips required for post/reimburse").toBeTruthy()
+    const seedSheet = (seedJson.data ?? []).find((s) => s.name === "Q1 Business Trips",
+    )
+    expect(seedSheet?.id, "seeded sheet Q1 Business Trips required for post/reimburse",
+    ).toBeTruthy()
     const postSheetId = Number(seedSheet!.id)
     let seedState = sheetState(seedSheet!.state)
     let accountMoveId = scalarQueryId(seedSheet!.accountMoveId ?? seedSheet!.account_move_id) ?? 0
     const existingReimbursementMoveId =
-      scalarQueryId(seedSheet!.reimbursementMoveId ?? seedSheet!.reimbursement_move_id) ?? 0
+      scalarQueryId(seedSheet!.reimbursementMoveId ?? seedSheet!.reimbursement_move_id,
+      ) ?? 0
 
     const journals = await page.request.get("/api/query/account-journals")
     const journalData =
@@ -444,19 +483,23 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
         ? `${journalRow!.code} — ${journalRow!.name}`
         : String(journalRow!.name ?? journalRow!.code)
 
-    const expenseLabel = await fetchAccountSelectLabelByInternalType(page, "expense")
-    const payableLabel = await fetchAccountSelectLabelByInternalType(page, "payable")
+    const expenseLabel = await fetchAccountSelectLabelByInternalType(page, "expense",
+    )
+    const payableLabel = await fetchAccountSelectLabelByInternalType(page, "payable",
+    )
 
     if (/Approved/i.test(seedState)) {
       await gotoModule(page, "/expenses", "expenses")
       await openExpensesTab(page, "expense-sheets")
       await selectExpenseReport(page, postSheetId)
       await page.getByTestId("entity-action-post-sheets").click()
-      await expect(page.getByTestId("form-modal-post-expense-report")).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByTestId("form-modal-post-expense-report"),
+      ).toBeVisible({ timeout: 15_000 })
 
       await fillField(page, "accountingDate", isoDate(0))
       await chooseSelectOptionByLabel(page, "journalId", journalLabel)
-      await chooseSelectOptionByLabel(page, "defaultExpenseAccountId", expenseLabel)
+      await chooseSelectOptionByLabel(page, "defaultExpenseAccountId", expenseLabel,
+      )
       await chooseSelectOptionByLabel(page, "payableAccountId", payableLabel)
 
       const [postRes] = await Promise.all([
@@ -480,14 +523,17 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
               account_move_id?: number | string | null
             }>
           }
-          const row = (json.data ?? []).find((s) => Number(s.id) === postSheetId)
+          const row = (json.data ?? []).find((s) => Number(s.id) === postSheetId,
+            )
           seedState = sheetState(row?.state)
           accountMoveId = scalarQueryId(row?.accountMoveId ?? row?.account_move_id) ?? 0
           return seedState
-        }, { timeout: 60_000 })
+        }, { timeout: 60_000 },
+        )
         .toMatch(/Posted/i)
     } else {
-      expect(seedState, "Q1 sheet must be Approved or Posted").toMatch(/Posted|Done/i)
+      expect(seedState, "Q1 sheet must be Approved or Posted").toMatch(/Posted|Done/i,
+      )
       expect(accountMoveId).toBeGreaterThan(0)
     }
     expect(accountMoveId).toBeGreaterThan(0)
@@ -506,12 +552,14 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     await openExpensesTab(page, "expense-sheets")
     await selectExpenseReport(page, postSheetId)
     await page.getByTestId("entity-action-reimburse-sheets").click()
-    await expect(page.getByTestId("form-modal-reimburse-expense-report")).toBeVisible({
+    await expect(page.getByTestId("form-modal-reimburse-expense-report"),
+    ).toBeVisible({
       timeout: 15_000,
     })
 
     const liquidityLabel =
-      (await fetchAccountSelectLabelByInternalType(page, "liquidity").catch(() => null)) ??
+      (await fetchAccountSelectLabelByInternalType(page, "liquidity").catch(() => null,
+      )) ??
       (await (async () => {
         const bankId = await fetchAccountIdByCode(page, "1200")
         const res = await page.request.get("/api/query/account-accounts")
@@ -529,7 +577,8 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
 
     const [reimRes] = await Promise.all([
       page.waitForResponse(
-        (res) => matchesOperationResponse(res, "create_expense_reimbursement_payment") && res.ok(),
+        (res) => matchesOperationResponse(res, "create_expense_reimbursement_payment",
+          ) && res.ok(),
         { timeout: 45_000 },
       ),
       submitForm(page, "reimburse-expense-report"),
@@ -543,10 +592,12 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
         const json = (await res.json()) as {
           data?: Array<{ id?: number; state?: string | { tag?: string } }>
         }
-        const row = (json.data ?? []).find((s) => Number(s.id) === postSheetId)
+        const row = (json.data ?? []).find((s) => Number(s.id) === postSheetId,
+          )
         const state = typeof row?.state === "string" ? row.state : String(row?.state?.tag ?? "")
         return state
-      }, { timeout: 60_000 })
+      }, { timeout: 60_000 },
+      )
       .toMatch(/Done/i)
 
     await expectNoAppError(page)
@@ -559,7 +610,8 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
   // to a Posted move. The lifecycle test above covers the browser-visible
   // submit→post→reimburse path; this test covers the approve→post reducer
   // contract that SoD hides from the UI.
-  test("approve → post domain path (second-identity SoD) @p0", async ({ page }) => {
+  test("approve → post domain path (second-identity SoD) @p0", async ({ page,
+  }) => {
     test.setTimeout(300_000)
     await gotoModule(page, "/expenses", "expenses")
     await callReducerOwner("run_expenses_wave_f_test", [])

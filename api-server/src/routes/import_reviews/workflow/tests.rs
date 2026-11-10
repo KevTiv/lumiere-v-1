@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 fn configuration() -> Configuration {
     Configuration {
+        opening_balances: false,
         journal_id: "7".into(),
         debit_account_id: "8".into(),
         credit_account_id: "9".into(),
@@ -66,6 +67,7 @@ fn saved(definition: Definition) -> SavedProposal {
         last_error: None,
         created_at: "2026-11-07T12:00:00Z".into(),
         approved_at: Some("2026-11-07T12:01:00Z".into()),
+        has_draft_bundle_receipts: false,
     }
 }
 
@@ -84,6 +86,139 @@ fn partial_confirmation_uses_only_known_facts_and_exact_decimal_totals() -> Resu
         .entries
         .iter()
         .all(|entry| !entry.description.contains("MOMO")));
+    Ok(())
+}
+
+fn opening_pair(id: i64, row_number: u32, reference: &str) -> Result<ReviewedRow> {
+    let mut row = reviewed(id, row_number, "12000")?;
+    for (field, value) in [
+        ("observation_kind", "opening_balance"),
+        ("debit", "12000.00"),
+        ("credit", "12000"),
+        ("debit_account_id", "8"),
+        ("credit_account_id", "9"),
+        ("currency_id", "2"),
+        ("document_reference", reference),
+        ("description", "Reviewed opening pair"),
+    ] {
+        row.values.insert(field.into(), Some(value.into()));
+        row.confirmed.insert(field.into());
+    }
+    Ok(row)
+}
+
+#[test]
+fn opening_balances_require_reviewed_pairs_cutover_currency_and_accounts() -> Result<()> {
+    let mut config = configuration();
+    config.opening_balances = true;
+    config.amount_field = "debit".into();
+    config.posting_date = Some("2024-01-05".into());
+    let valid = opening_pair(1, 8, "BAL-01")?;
+    let mut unbalanced = opening_pair(2, 9, "BAL-02")?;
+    unbalanced
+        .values
+        .insert("credit".into(), Some("11999".into()));
+    let mut foreign = opening_pair(3, 10, "BAL-03")?;
+    foreign
+        .values
+        .insert("currency_id".into(), Some("3".into()));
+    let mut unconfirmed = opening_pair(4, 11, "BAL-04")?;
+    unconfirmed.confirmed.remove("credit_account_id");
+    let mut wrong_day = opening_pair(5, 12, "BAL-05")?;
+    wrong_day
+        .values
+        .insert("date".into(), Some("2024-01-06".into()));
+    let mut no_reference = opening_pair(6, 13, "BAL-06")?;
+    no_reference.confirmed.remove("document_reference");
+    let result = build_definition(
+        &[
+            valid,
+            unbalanced,
+            foreign,
+            unconfirmed,
+            wrong_day,
+            no_reference,
+        ],
+        &config,
+        2,
+    )?;
+    ensure!(result.kind == OPENING_BALANCES);
+    ensure!(result.summary.record_count == 1 && result.summary.line_count == 2);
+    ensure!(result.summary.total_debit == "12000" && result.summary.total_credit == "12000");
+    ensure!(
+        result
+            .issues
+            .iter()
+            .map(|issue| issue.code.as_str())
+            .collect::<Vec<_>>()
+            == [
+                "opening_balance_unbalanced",
+                "opening_balance_references",
+                "opening_balance_references",
+                "opening_balance_cutover",
+                "opening_balance_reference",
+            ]
+    );
+    let proposal = saved(result);
+    let headers = native::header_request(scoped(), "task", &proposal)?;
+    let lines = native::line_request(scoped(), "task", &proposal, &[56])?;
+    ensure!(headers.csv.contains("2024-01-05"));
+    ensure!(lines.csv.contains("12000"));
+
+    config.posting_date = None;
+    ensure!(config.validate().is_err());
+    Ok(())
+}
+
+#[test]
+fn opening_balance_overlap_uses_source_and_reference_even_when_equal_totals_are_common(
+) -> Result<()> {
+    let mut config = configuration();
+    config.opening_balances = true;
+    config.amount_field = "debit".into();
+    config.posting_date = Some("2024-01-05".into());
+    let mut ready = build_definition(
+        &[opening_pair(1, 8, "BAL-01")?, opening_pair(2, 9, "BAL-02")?],
+        &config,
+        2,
+    )?;
+    overlap::apply_candidate_holds(scoped(), &mut ready, BTreeMap::new())?;
+    ensure!(ready.summary.record_count == 2);
+    let mut duplicates = build_definition(
+        &[opening_pair(1, 8, "BAL-01")?, opening_pair(2, 9, "bal-01")?],
+        &config,
+        2,
+    )?;
+    overlap::apply_candidate_holds(scoped(), &mut duplicates, BTreeMap::new())?;
+    ensure!(duplicates.entries.is_empty());
+    ensure!(duplicates
+        .issues
+        .iter()
+        .all(|issue| issue.resolution.is_none()));
+    Ok(())
+}
+
+#[test]
+fn rollback_requires_both_exact_native_receipts() -> Result<()> {
+    let parent = json!({"status":"success","requestId":"parent","jobId":"11","totalRows":1,"rowsImported":1,"errorRows":0,"records":[{"recordId":"15","rowNumber":2}]});
+    let child = json!({"status":"success","requestId":"child","jobId":"12","totalRows":2,"rowsImported":2,"errorRows":0,"records":[{"recordId":"16","rowNumber":2},{"recordId":"17","rowNumber":3}]});
+    ensure!(
+        correction::bundle_state(&parent, &child, &parent, &child)?
+            == correction::BundleState::Draft
+    );
+    let removed_parent = json!({"status":"rolled_back","requestId":"parent","jobId":"11","totalRows":1,"rowsImported":1,"errorRows":0});
+    let removed_child = json!({"status":"rolled_back","requestId":"child","jobId":"12","totalRows":2,"rowsImported":2,"errorRows":0});
+    ensure!(
+        correction::bundle_state(&removed_parent, &removed_child, &parent, &child)?
+            == correction::BundleState::Removed
+    );
+    ensure!(correction::bundle_state(&removed_parent, &child, &parent, &child).is_err());
+    let mut unrelated = removed_child;
+    unrelated["jobId"] = json!("13");
+    ensure!(correction::bundle_state(&removed_parent, &unrelated, &parent, &child).is_err());
+    let mut remapped = child.clone();
+    remapped["records"][0]["recordId"] = json!("20");
+    ensure!(correction::bundle_state(&parent, &remapped, &parent, &child).is_err());
     Ok(())
 }
 
@@ -455,7 +590,24 @@ async fn exercise_storage(pool: &deadpool_postgres::Pool) -> Result<()> {
         &json!({"jobId":"901","status":"success","rowsImported":1,"totalRows":1,"errorRows":0,"records":[{"rowNumber":2,"recordId":"100"}]}),
     )
     .await?;
+    ensure!(
+        storage::load(&tx, scoped(), &task, proposal_id)
+            .await?
+            .view()["canRollback"]
+            == false
+    );
     storage::record_receipt(&tx,scoped(),proposal.id,"lines",&"c".repeat(32),&"b".repeat(64),&json!({"jobId":"902","status":"success","rowsImported":2,"totalRows":2,"errorRows":0,"records":[{"rowNumber":3,"recordId":"201"},{"rowNumber":2,"recordId":"200"}]})).await?;
+    let mut blocked = storage::load(&tx, scoped(), &task, proposal_id).await?;
+    blocked.state = "blocked".into();
+    blocked.execution.phase = Phase::Headers;
+    blocked.last_error = Some("Temporary ERP readback error".into());
+    storage::save_progress(&tx, &blocked).await?;
+    let reloaded = storage::load(&tx, scoped(), &task, proposal_id)
+        .await?
+        .view();
+    ensure!(reloaded["result"].is_null() && reloaded["canRollback"] == true);
+    ensure!(storage::list(&tx, scoped(), &task).await?[0]["canRollback"] == true);
+    storage::save_progress(&tx, &proposal).await?;
     tx.commit().await?;
     let bound = binding::read_saved_binding(
         &client,

@@ -380,6 +380,22 @@ pub(super) async fn read_records(
     Ok((moves, lines))
 }
 
+pub(super) async fn verify_removed(
+    context: &TrustedOperationContext,
+    company: u64,
+    header_ids: &[u64],
+    line_ids: &[u64],
+) -> Result<(), ApiError> {
+    let (moves, lines) = read_records(context, company, header_ids).await?;
+    let org = context.organization_id();
+    let exact_lines = id_filter("id", line_ids)?;
+    let detached_lines = context.client().query_sql(&format!("SELECT id FROM account_move_line WHERE organization_id = {org} AND company_id = {company} AND ({exact_lines})")).await.map_err(ApiError::internal)?;
+    if moves.is_empty() && lines.is_empty() && detached_lines.is_empty() {
+        return Ok(());
+    }
+    Err(ApiError::Conflict("Some of the imported Accounting records are still present. Their source claims are retained.".into()))
+}
+
 fn metadata_matches(row: &Value, expected: &Value) -> bool {
     row["metadata"]
         .as_str()

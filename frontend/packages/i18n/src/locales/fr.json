@@ -341,7 +341,8 @@
       },
       "groupBy": "Regrouper par",
       "records": "Enregistrements",
-      "showFullValue": "Afficher la valeur complète"
+      "showFullValue": "Afficher la valeur complète",
+      "record": "Fiche"
     },
     "retry": "Réessayer",
     "recordsDenied": "Vous n’avez pas accès à ces enregistrements.",

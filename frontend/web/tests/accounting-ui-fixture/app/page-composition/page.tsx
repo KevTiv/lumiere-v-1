@@ -97,6 +97,11 @@ const invoiceChart: PageWidgetCatalogItem = {
   category: "Saved accounting insights",
   description: "Posted customer invoices grouped by invoice month.",
   defaultWidth: 6,
+  scope: [
+    { label: "Company", value: "Sample company" },
+    { label: "Dates", value: "August–November 2026 via invoice_date" },
+    { label: "Unit", value: "Records" },
+  ],
   widget: {
     id: "101",
     type: "bar-chart",
@@ -244,6 +249,25 @@ function Preview() {
           value={snapshot.value}
           revision={snapshot.revision}
           defaultValue={createDefaultPageLayout(sections)}
+          startingLayouts={[
+            {
+              id: "work-review",
+              label: "Work review",
+              widgets: [
+                { widgetId: "open-orders", width: 6 },
+                { widgetId: "active-customers", width: 6 },
+              ],
+            },
+            {
+              id: "period-review",
+              label: "Period review",
+              widgets: [
+                { widgetId: "order-trend", width: 8 },
+                { widgetId: "confirmed-order-value", width: 4 },
+              ],
+            },
+          ]}
+          persistenceNote="This preview saves your layout in this browser."
           catalog={[
             ...createBuiltinWidgetCatalog(sections),
             invoiceChart,

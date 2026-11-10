@@ -664,3 +664,11 @@ export function invalidateBankStatementQueries(qc: ReturnType<typeof useQueryCli
   invalidateStdbQueryResources(qc, organizationId, ["account-payments", "account-moves", "account-move-lines", "workflow-human-tasks", "sale-orders"])
   void qc.invalidateQueries({ queryKey: ["workflow-human-tasks-inbox"] })
 }
+
+export {
+  readBankTransactionSettlement,
+  readBankTransactionReversal,
+  useSettleBankLineWithPaymentTransaction,
+  type BankTransactionSettlementRequest,
+  type BankTransactionSettlementResult,
+} from "./bank-transaction-settlement"

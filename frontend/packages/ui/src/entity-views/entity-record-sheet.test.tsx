@@ -1,4 +1,9 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react"
+import {
+  cleanup,
+  fireEvent,
+  render, screen, waitFor,
+  within,
+} from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 const session = vi.hoisted(() => ({ organizationId: 7 as number | undefined }))
@@ -28,7 +33,99 @@ function open(config: EntityRecordSheetConfig, record: Record<string, unknown> =
   return render(<EntityRecordSheet open onOpenChange={() => {}} config={config} record={record} />)
 }
 
+describe("EntityRecordSheet overview", () => {
+  it("reuses its scoped status, actions and evidence view", async () => {
+    open(
+      {
+        ...base,
+        statusKey: "state",
+        actions: <button>Review leave</button>,
+        responsibility: () => ({ label: "Employee", name: "Morgan Lee" }),
+      },
+      { id: 12, name: "Leave", state: "pending" },
+    )
+
+    const overview = within(
+      screen.getByRole("region", { name: "Record overview" }),
+    )
+    expect(overview.getByText("Pending")).toBeTruthy()
+    expect(overview.getByText("Morgan Lee")).toBeTruthy()
+    expect(
+      overview.getAllByRole("button", { name: "Review leave" }),
+    ).toHaveLength(1)
+    expect(screen.queryByText("audit")).toBeNull()
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("heading", { name: "Leave" }),
+      ),
+    )
+    fireEvent.click(overview.getByRole("button", { name: "History & sources" }))
+    const tab = await screen.findByRole("tab", {
+      name: "History & sources",
+      selected: true,
+    })
+    expect(document.activeElement).toBe(tab)
+    expect(
+      within(
+        screen.getByRole("tabpanel", { name: "History & sources" }),
+      ).getByText("audit"),
+    ).toBeTruthy()
+  })
+
+  it("has no evidence shortcut for an unconfigured table or an invalid ID", () => {
+    const { rerender } = open({ ...base, auditTableName: undefined })
+    expect(
+      screen.queryByRole("button", { name: "History & sources" }),
+    ).toBeNull()
+    rerender(
+      <EntityRecordSheet
+        open
+        onOpenChange={() => {}}
+        config={base}
+        record={{ id: "invalid", name: "Leave" }}
+      />,
+    )
+    expect(
+      screen.queryByRole("button", { name: "History & sources" }),
+    ).toBeNull()
+  })
+})
+
 describe("EntityRecordSheet discussion", () => {
+  it("unwraps record labels and statuses without coercing unknown shapes", () => {
+    open(
+      { ...base, statusKey: "state", discussion: {} },
+      {
+        id: { some: "18446744073709551615" },
+        name: { some: "Reviewed record" },
+        state: { some: { inProgress: [] } },
+      },
+    )
+    expect(
+      screen.getByRole("heading", { name: "Reviewed record" }),
+    ).toBeTruthy()
+    expect(screen.getByText("In progress")).toBeTruthy()
+    expect(
+      screen.getByTestId("entity-record-sheet-tab-discussion"),
+    ).toBeTruthy()
+    expect(screen.queryByText(/\[object Object\]/)).toBeNull()
+  })
+
+  it("uses an exact record reference when its title is unavailable", () => {
+    open(
+      { ...base, statusKey: "state" },
+      {
+        id: "18446744073709551615",
+        name: { unknown: "name" },
+        state: { value: "paid" },
+      },
+    )
+    expect(
+      screen.getByRole("heading", { name: "#18446744073709551615" }),
+    ).toBeTruthy()
+    expect(screen.queryByText(/\[object Object\]/)).toBeNull()
+  })
+
   it("opens a product record at its heading before record actions", async () => {
     const productName = "Workshop fastener set — " + "SKU".repeat(60)
     open({ ...base, actions: <button>Update quantity</button> }, { id: 12, name: productName })

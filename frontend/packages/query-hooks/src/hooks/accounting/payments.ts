@@ -471,6 +471,9 @@ export function invalidateOperationalPaymentQueries(qc: ReturnType<typeof useQue
     "account-moves",
     "account-move-lines",
     "account-payments",
+    "bank-statement-lines",
+    "bank-statements",
+    "sale-orders",
   ]) {
     void qc.invalidateQueries({ queryKey: ["stdb", resource, String(organizationId)] })
   }

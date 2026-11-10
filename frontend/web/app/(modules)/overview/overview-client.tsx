@@ -19,19 +19,39 @@ import {
   timeRangeToMs,
 } from "@lumiere/ui"
 import { Skeleton } from "@lumiere/ui/components/skeleton"
-import { ModulePageComposition, usePageCompositionActionSlot } from "@lumiere/ui/pages/page-composition-host"
-import { createPageContentSection } from "@lumiere/ui/lib/page-composition"
-import { toDashboardSections, overviewDashboardWebOptions } from "@lumiere/ui/lib/presentation-dashboard"
-import { overviewDashboardDefinition, type DashboardDefinition, type OverviewDashboardData } from "@lumiere/presentation-core"
+import { ModulePageComposition, usePageCompositionActionSlot,
+} from "@lumiere/ui/pages/page-composition-host"
+import {
+  toDashboardSections,
+  overviewDashboardWebOptions,
+} from "@lumiere/ui/lib/presentation-dashboard"
+import {
+  overviewDashboardDefinition,
+  type DashboardDefinition,
+  type OverviewDashboardData,
+} from "@lumiere/presentation-core"
 import { useOverviewModuleSubscription } from "@/lib/module-subscription-hooks"
 import { enumTag } from "@/lib/accounting-post-draft"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useSaleOrders, type SaleOrder } from "@lumiere/query-hooks/hooks/sales"
 import { useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
-import { usePaymentReconciliations, usePaymentTransactions } from "@lumiere/query-hooks/hooks/accounting"
-import { useStockQuants, useProducts } from "@lumiere/query-hooks/hooks/inventory"
-import { usePurchaseOrders, type PurchaseOrder } from "@lumiere/query-hooks/hooks/purchasing"
-import { useTasks, useProjects, type ProjectTask, type ProjectProject } from "@lumiere/query-hooks/hooks/projects"
+import {
+  usePaymentReconciliations,
+  usePaymentTransactions,
+} from "@lumiere/query-hooks/hooks/accounting"
+import { useStockQuants,
+  useProducts,
+} from "@lumiere/query-hooks/hooks/inventory"
+import {
+  usePurchaseOrders,
+  type PurchaseOrder,
+} from "@lumiere/query-hooks/hooks/purchasing"
+import {
+  useTasks,
+  useProjects,
+  type ProjectTask,
+  type ProjectProject,
+} from "@lumiere/query-hooks/hooks/projects"
 import { useContacts, type Contact } from "@lumiere/query-hooks/hooks/crm"
 import { useAiActionDraftInboxCount } from "@lumiere/query-hooks/hooks/ai-action-drafts"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -41,14 +61,17 @@ import { useExpenseSheetsToApprove } from "@lumiere/query-hooks/hooks/expenses"
 import { useMessageBatches } from "@lumiere/query-hooks/hooks/messages"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
-import { isDraftVendorBill, lowStockQuants, overduePostedInvoices } from "@/lib/owner-queues"
+import { isDraftVendorBill, lowStockQuants, overduePostedInvoices,
+} from "@/lib/owner-queues"
 import { OwnerControlLoop } from "./owner-control-loop"
 import { ActivationChecklistPanel } from "./activation-checklist-panel"
 import { useProductivitySections } from "@/lib/use-productivity-sections"
 import { DailyWorkWorkspace } from "../../../components/daily-work-workspace"
-import { overviewResourceStatus, resourceStatusLabel, combinedResourceStatus, type OverviewInitialStates } from "./resource-state"
+import { overviewResourceStatus, resourceStatusLabel, combinedResourceStatus, type OverviewInitialStates,
+} from "./resource-state"
 import type { StockQuant, Product } from "@lumiere/stdb/types"
-import { confirmedOrder, confirmedOrderTrend, orderDate, overviewFinancialInputsComplete, overviewMoneySummary } from "./financial-summary"
+import { confirmedOrder, confirmedOrderTrend, orderDate, overviewFinancialInputsComplete, overviewMoneySummary,
+} from "./financial-summary"
 
 interface OverviewClientProps {
   organizationId?: number
@@ -62,7 +85,15 @@ interface OverviewClientProps {
   initialContacts?: Contact[]
 }
 
-function matchesCompany(row: Record<string, unknown>, companyId: number | null): boolean {
+const fixedOverviewWidgetIds = [
+  "overview-owner-control-loop",
+  "overview-daily-work",
+  "overview-activation",
+  "overview-work-quick-actions-widget",
+]
+
+function matchesCompany(row: Record<string, unknown>, companyId: number | null,
+): boolean {
   if (companyId == null || companyId <= 0) return false
   return String(row.companyId ?? row.company_id ?? "") === String(companyId)
 }
@@ -102,7 +133,9 @@ export function OverviewClient(props: OverviewClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />
   }
-  return <OverviewClientLoaded {...props} organizationId={props.organizationId} />
+  return (
+    <OverviewClientLoaded {...props} organizationId={props.organizationId} />
+  )
 }
 
 function OverviewClientLoaded({
@@ -120,11 +153,13 @@ function OverviewClientLoaded({
   const { t, i18n } = useTranslation()
   const [timeRange, setTimeRange, invalidPeriod] = useHistoryPeriod()
   const { target: compositionTarget, slot: compositionSlot } = usePageCompositionActionSlot()
-  const historyBounds = useMemo(() => invalidPeriod ? null : resolveHistoryPeriod(timeRange, { timeZone: "UTC" }), [invalidPeriod, timeRange])
+  const historyBounds = useMemo(() => invalidPeriod ? null : resolveHistoryPeriod(timeRange, { timeZone: "UTC" }), [invalidPeriod, timeRange],
+  )
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useOperatingCompanyId(organizationId)
   const companies = useCompanies(organizationId, true)
-  const companyName = companies.data?.find((company) => String(company.id) === String(operatingCompanyId))?.name
+  const companyName = companies.data?.find((company) => String(company.id) === String(operatingCompanyId),
+  )?.name
 
   const ordersQuery = useSaleOrders(orgId, initialOrders)
   const movesQuery = useAccountMoves(orgId)
@@ -138,7 +173,8 @@ function OverviewClientLoaded({
   const paymentReconciliationsQuery = usePaymentReconciliations(orgId)
   const messageBatchesQuery = useMessageBatches(orgId)
   const currenciesQuery = useCurrencies()
-  const currencyCodes = useMemo(() => currencyCodeMap(currenciesQuery.data ?? []), [currenciesQuery.data])
+  const currencyCodes = useMemo(() => currencyCodeMap(currenciesQuery.data ?? []), [currenciesQuery.data],
+  )
   const expenseApprovalsQuery = useExpenseSheetsToApprove(orgId)
   const aiDraftsQuery = useAiActionDraftInboxCount(
     organizationId,
@@ -156,30 +192,44 @@ function OverviewClientLoaded({
   const messageBatches = messageBatchesQuery.data ?? []
   const pendingAiDrafts = aiDraftsQuery.count
   const resourceStates = {
-    "sale-orders": overviewResourceStatus(ordersQuery, initialResourceStates?.["sale-orders"]),
+    "sale-orders": overviewResourceStatus(ordersQuery, initialResourceStates?.["sale-orders"],
+    ),
     "account-moves": overviewResourceStatus(movesQuery),
-    "stock-quants": overviewResourceStatus(stockQuantsQuery, initialResourceStates?.["stock-quants"]),
-    products: overviewResourceStatus(productsQuery, initialResourceStates?.products),
+    "stock-quants": overviewResourceStatus(stockQuantsQuery, initialResourceStates?.["stock-quants"],
+    ),
+    products: overviewResourceStatus(productsQuery, initialResourceStates?.products,
+    ),
     tasks: overviewResourceStatus(tasksQuery, initialResourceStates?.tasks),
-    projects: overviewResourceStatus(projectsQuery, initialResourceStates?.projects),
-    "purchase-orders": overviewResourceStatus(purchaseOrdersQuery, initialResourceStates?.["purchase-orders"]),
-    contacts: overviewResourceStatus(contactsQuery, initialResourceStates?.contacts),
+    projects: overviewResourceStatus(projectsQuery, initialResourceStates?.projects,
+    ),
+    "purchase-orders": overviewResourceStatus(purchaseOrdersQuery, initialResourceStates?.["purchase-orders"],
+    ),
+    contacts: overviewResourceStatus(contactsQuery, initialResourceStates?.contacts,
+    ),
     "payment-transactions": overviewResourceStatus(paymentTransactionsQuery),
-    "payment-reconciliations": overviewResourceStatus(paymentReconciliationsQuery),
+    "payment-reconciliations": overviewResourceStatus(paymentReconciliationsQuery,
+    ),
     "message-batches": overviewResourceStatus(messageBatchesQuery),
     "ai-action-drafts": overviewResourceStatus(aiDraftsQuery),
     currencies: overviewResourceStatus(currenciesQuery),
   }
   const companyState = operatingCompanyId != null && operatingCompanyId > 0 ? undefined
-    : t("overview.financial.selectCompany", { defaultValue: "Select an operating company" })
-  const salesState = invalidPeriod ? t("common.historyPeriod.invalidLink", { defaultValue: "This link has an invalid date range. Choose a valid period to inspect records." }) : companyState ?? resourceStatusLabel(resourceStates["sale-orders"])
+    : t("overview.financial.selectCompany", { defaultValue: "Select an operating company",
+        })
+  const salesState = invalidPeriod ? t("common.historyPeriod.invalidLink", { defaultValue: "This link has an invalid date range. Choose a valid period to inspect records.",
+      })
+    : (companyState ?? resourceStatusLabel(resourceStates["sale-orders"]))
   const tasksState = companyState ?? resourceStatusLabel(resourceStates.tasks)
   const contactsState = companyState ?? resourceStatusLabel(resourceStates.contacts)
   const movesState = companyState ?? resourceStatusLabel(resourceStates["account-moves"])
   const currencyState = resourceStatusLabel(resourceStates.currencies)
   const aiState = resourceStatusLabel(resourceStates["ai-action-drafts"])
-  const paymentsState = companyState ?? resourceStatusLabel(combinedResourceStatus(resourceStates["payment-transactions"], resourceStates["payment-reconciliations"]))
-  const stockState = companyState ?? resourceStatusLabel(combinedResourceStatus(resourceStates["stock-quants"], resourceStates.products))
+  const paymentsState = companyState ?? resourceStatusLabel(combinedResourceStatus(resourceStates["payment-transactions"], resourceStates["payment-reconciliations"],
+      ),
+    )
+  const stockState = companyState ?? resourceStatusLabel(combinedResourceStatus(resourceStates["stock-quants"], resourceStates.products,
+      ),
+    )
   const messagesState = companyState ?? resourceStatusLabel(resourceStates["message-batches"])
   const [isHydrated, setIsHydrated] = useState(false)
 
@@ -187,28 +237,35 @@ function OverviewClientLoaded({
     setIsHydrated(true)
   }, [])
 
-  const { startMs, endMs } = useMemo(() => timeRangeToMs(timeRange), [timeRange])
+  const { startMs, endMs } = useMemo(() => timeRangeToMs(timeRange), [timeRange],
+  )
   const previousRange = useMemo(() => previousPeriodMs(timeRange), [timeRange])
 
   const scopedOrders = useMemo(
-    () => orders.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
+    () => orders.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId),
+      ),
     [orders, operatingCompanyId],
   )
   const scopedMoves = useMemo(
-    () => moves.filter((row) => row.organizationId === orgId && matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
+    () => moves.filter((row) => row.organizationId === orgId && matchesCompany(row as Record<string, unknown>, operatingCompanyId),
+      ),
     [moves, operatingCompanyId, orgId],
   )
   const scopedTasks = useMemo(
-    () => tasks.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
+    () => tasks.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId),
+      ),
     [tasks, operatingCompanyId],
   )
   const scopedContacts = useMemo(
-    () => contacts.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId)),
+    () => contacts.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId),
+      ),
     [contacts, operatingCompanyId],
   )
   const ordersComplete = overviewFinancialInputsComplete(scopedOrders, "orders")
-  const invoicesComplete = overviewFinancialInputsComplete(scopedMoves, "invoices")
-  const incompleteFinancialData = t("overview.financial.incompleteSource", { defaultValue: "Required financial fields unavailable" })
+  const invoicesComplete = overviewFinancialInputsComplete(scopedMoves, "invoices",
+  )
+  const incompleteFinancialData = t("overview.financial.incompleteSource", { defaultValue: "Required financial fields unavailable",
+  })
 
   const periodMetrics = useMemo(() => {
     const currentOrders = scopedOrders
@@ -227,7 +284,9 @@ function OverviewClientLoaded({
     const previousOpenOrders = scopedOrders.filter((order) => {
       if (!isOpenSaleOrder(order as Record<string, unknown>)) return false
       const ms = orderTimestampMs(order as Record<string, unknown>)
-      return previousRange != null && isTimestampInRange(ms, previousRange.startMs, previousRange.endMs)
+      return (
+        previousRange != null && isTimestampInRange(ms, previousRange.startMs, previousRange.endMs)
+      )
     }).length
 
     return {
@@ -237,16 +296,20 @@ function OverviewClientLoaded({
     }
   }, [scopedOrders, startMs, endMs, previousRange])
 
-  const salesTrendValues = useMemo(() => confirmedOrderTrend(scopedOrders, new Date(), i18n.language, timeRange), [scopedOrders, i18n.language, timeRange])
+  const salesTrendValues = useMemo(() => confirmedOrderTrend(scopedOrders, new Date(), i18n.language, timeRange), [scopedOrders, i18n.language, timeRange],
+  )
 
   const liveSections = useMemo(() => {
     const openTasks = scopedTasks.filter((task) => !task.isClosed).length
     const { currentOrders, currentOpenOrders, openOrdersChange } = periodMetrics
     const nowMs = Date.now()
     const overdueInvoices = overduePostedInvoices(scopedMoves)
-    const unavailableMoney = t("overview.financial.incompleteMoney", { defaultValue: "Amount or currency unavailable" })
-    const orderTotal = overviewMoneySummary(currentOrders, currencyCodes, "amountTotal", i18n.language)
-    const overdueTotal = overviewMoneySummary(overdueInvoices, currencyCodes, "amountResidual", i18n.language)
+    const unavailableMoney = t("overview.financial.incompleteMoney", { defaultValue: "Amount or currency unavailable",
+    })
+    const orderTotal = overviewMoneySummary(currentOrders, currencyCodes, "amountTotal", i18n.language,
+    )
+    const overdueTotal = overviewMoneySummary(overdueInvoices, currencyCodes, "amountResidual", i18n.language,
+    )
 
     const overdueTaskCount = scopedTasks.filter((task) => {
       if (task.isClosed) return false
@@ -258,7 +321,8 @@ function OverviewClientLoaded({
       {
         reference: `${t("overview.dashboard.overdue")} Invoices`,
         amount: movesState ?? (!invoicesComplete ? incompleteFinancialData : String(overdueInvoices.length)),
-        status: movesState ?? currencyState ?? (!invoicesComplete ? incompleteFinancialData : overdueTotal == null ? unavailableMoney : overdueTotal || t("overview.financial.noOverdueBalance", { defaultValue: "No known overdue balance" })),
+        status: movesState ?? currencyState ?? (!invoicesComplete ? incompleteFinancialData : overdueTotal == null ? unavailableMoney : overdueTotal || t("overview.financial.noOverdueBalance", { defaultValue: "No known overdue balance",
+                })),
       },
       {
         reference: t("overview.dashboard.stats.pendingAiDrafts"),
@@ -275,9 +339,11 @@ function OverviewClientLoaded({
     const data: OverviewDashboardData = {
       metrics: {
         revenue: {
-          value: salesState ?? currencyState ?? (!ordersComplete ? incompleteFinancialData : orderTotal == null ? unavailableMoney : orderTotal || t("overview.financial.noConfirmedOrders", { defaultValue: "No confirmed orders" })),
+          value: salesState ?? currencyState ?? (!ordersComplete ? incompleteFinancialData : orderTotal == null ? unavailableMoney : orderTotal || t("overview.financial.noConfirmedOrders", { defaultValue: "No confirmed orders",
+                  })),
         },
-        "open-sales-orders": { value: salesState ?? (!ordersComplete ? incompleteFinancialData : String(currentOpenOrders)), change: salesState || !ordersComplete ? undefined : openOrdersChange },
+        "open-sales-orders": { value: salesState ?? (!ordersComplete ? incompleteFinancialData : String(currentOpenOrders)), change: salesState || !ordersComplete ? undefined : openOrdersChange,
+        },
         "open-tasks": { value: tasksState ?? String(openTasks) },
         contacts: { value: contactsState ?? String(scopedContacts.length) },
       },
@@ -289,38 +355,65 @@ function OverviewClientLoaded({
     // The shared presentation binding is retained; visible labels describe order values/counts.
     const definition: DashboardDefinition = { ...overviewDashboardDefinition,
       sections: overviewDashboardDefinition.sections
-        .filter((section) => !(salesState || !ordersComplete) || section.id !== "overview-revenue")
+        .filter((section) => !(salesState || !ordersComplete) || section.id !== "overview-revenue",
+        )
         .map((section) => section.id === "overview-revenue" ? { ...section, widgets: [{ ...section.widgets[0],
-          series: [{ id: t("overview.financial.orders", { defaultValue: "Confirmed orders" }), binding: "revenue" }],
-        }] } : section),
+          series: [{ id: t("overview.financial.orders", { defaultValue: "Confirmed orders",
+                        }), binding: "revenue",
+                      },
+                    ],
+                  },
+                ],
+              }
+            : section,
+        ),
     }
     return toDashboardSections(definition, data, (key) => key === "sales.dashboard.widgets.revenue"
-      ? t("overview.financial.confirmedOrderValue", { defaultValue: "Confirmed order value · by currency" })
+      ? t("overview.financial.confirmedOrderValue", { defaultValue: "Confirmed order value · by currency",
+            })
       : key === "overview.dashboard.widgets.salesTrend"
-        ? t("overview.financial.selectedOrderTrend", { defaultValue: "Confirmed orders · selected period" }) : t(key), overviewDashboardWebOptions)
-  }, [scopedMoves, scopedTasks, scopedContacts, pendingAiDrafts, salesTrendValues, periodMetrics, salesState, tasksState, contactsState, movesState, aiState, currencyState, currencyCodes, i18n.language, ordersComplete, invoicesComplete, incompleteFinancialData, t])
+        ? t("overview.financial.selectedOrderTrend", { defaultValue: "Confirmed orders · selected period",
+              }) : t(key), overviewDashboardWebOptions,
+    )
+  }, [scopedMoves, scopedTasks, scopedContacts, pendingAiDrafts, salesTrendValues, periodMetrics, salesState, tasksState, contactsState, movesState, aiState, currencyState, currencyCodes, i18n.language, ordersComplete, invoicesComplete, incompleteFinancialData, t,
+  ])
 
   const ownerControlLoop = useMemo(() => {
-    const reconciledTransactionIds = new Set(paymentReconciliations.map((row) => String((row as Record<string, unknown>).paymentTransactionId ?? "")))
+    const reconciledTransactionIds = new Set(paymentReconciliations.map((row) => String((row as Record<string, unknown>).paymentTransactionId ?? ""),
+      ),
+    )
     const unreconciledPayments = paymentTransactions.filter((row) => {
       const payment = row as Record<string, unknown>
-      return matchesCompany(payment, operatingCompanyId) && enumTag(payment.status) === "Posted" && !reconciledTransactionIds.has(String(payment.id))
+      return (
+        matchesCompany(payment, operatingCompanyId) && enumTag(payment.status) === "Posted" && !reconciledTransactionIds.has(String(payment.id))
+      )
     }).length
-    const lowStockProducts = lowStockQuants(stockQuants, products, { organizationId: orgId, companyId: operatingCompanyId }).length
-    const pendingMessageApprovals = messageBatches.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId) && enumTag((row as Record<string, unknown>).status) === "PendingApproval").length
+    const lowStockProducts = lowStockQuants(stockQuants, products, { organizationId: orgId, companyId: operatingCompanyId,
+    }).length
+    const pendingMessageApprovals = messageBatches.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId) && enumTag((row as Record<string, unknown>).status) === "PendingApproval",
+    ).length
     const overdueInvoices = invoicesComplete ? overduePostedInvoices(scopedMoves).length : incompleteFinancialData
     const draftBills = scopedMoves.filter(isDraftVendorBill).length
-    return { overdueInvoices, unreconciledPayments, lowStockProducts, pendingMessageApprovals, draftBills }
-  }, [messageBatches, operatingCompanyId, orgId, paymentReconciliations, paymentTransactions, products, scopedMoves, stockQuants, invoicesComplete, incompleteFinancialData])
+    return { overdueInvoices, unreconciledPayments, lowStockProducts, pendingMessageApprovals, draftBills,
+    }
+  }, [messageBatches, operatingCompanyId, orgId, paymentReconciliations, paymentTransactions, products, scopedMoves, stockQuants, invoicesComplete, incompleteFinancialData,
+  ])
 
   const router = useRouter()
   const workspaceProfile = useWorkspaceProfile()
   const myWorkActions = useMemo(
     () => [
-      ...(workspaceProfile !== "finance-alpha" ? [{ id: "new-task", label: t("workspace.actions.openMyWork", { defaultValue: "Open my work" }), icon: "plus", color: "blue" as const, onClick: () => router.push("/tasks") }] : []),
-      { id: "upload", label: t("workspace.actions.upload"), icon: "upload", color: "green" as const, onClick: () => router.push("/documents?tab=documents") },
-      ...(isWorkspaceSurfaceVisible(workspaceProfile, "projects") ? [{ id: "log-time", label: t("workspace.actions.logTime"), icon: "refresh", color: "orange" as const, onClick: () => router.push("/projects?tab=timesheets") }] : []),
-      { id: "new-event", label: t("workspace.actions.newEvent"), icon: "calendar", color: "purple" as const, onClick: () => router.push("/calendar?tab=calendar&create=event") },
+      ...(workspaceProfile !== "finance-alpha" ? [{ id: "new-task", label: t("workspace.actions.openMyWork", { defaultValue: "Open my work",
+              }), icon: "plus", color: "blue" as const, onClick: () => router.push("/tasks"),
+            },
+          ] : []),
+      { id: "upload", label: t("workspace.actions.upload"), icon: "upload", color: "green" as const, onClick: () => router.push("/documents?tab=documents"),
+      },
+      ...(isWorkspaceSurfaceVisible(workspaceProfile, "projects") ? [{ id: "log-time", label: t("workspace.actions.logTime"), icon: "refresh", color: "orange" as const, onClick: () => router.push("/projects?tab=timesheets"),
+            },
+          ] : []),
+      { id: "new-event", label: t("workspace.actions.newEvent"), icon: "calendar", color: "purple" as const, onClick: () => router.push("/calendar?tab=calendar&create=event"),
+      },
     ],
     [t, router, workspaceProfile],
   )
@@ -338,80 +431,136 @@ function OverviewClientLoaded({
     await exportDashboardToPng(dashboardGridRef.current, "overview-dashboard")
   }, [])
 
-  const keyMetrics = liveSections.filter((section) => section.id === "overview-kpis")
-  const analysisSections = liveSections.filter((section) => section.id !== "overview-kpis")
-  const workSections = myWorkSections.map((section) => section.id === "overview-work-quick-actions" ? { ...section, title: undefined } : section)
+  const keyMetrics = liveSections.filter((section) => section.id === "overview-kpis",
+  )
+  const analysisSections = liveSections.filter((section) => section.id !== "overview-kpis",
+  )
+  const quickActionSections = myWorkSections
+    .filter((section) => section.id === "overview-work-quick-actions")
+    .map((section) => ({ ...section, title: undefined }))
+  const workSections = myWorkSections.filter((section) => section.id !== "overview-work-quick-actions",
+  )
+  const hasSalesTrend = analysisSections.some(
+    (section) => section.id === "overview-revenue",
+  )
   const ownerContent = (
     <OwnerControlLoop
       companyReady={operatingCompanyId != null && operatingCompanyId > 0}
       draftBills={movesState ?? ownerControlLoop.draftBills}
       expenseApprovals={resourceStatusLabel(overviewResourceStatus(expenseApprovalsQuery))
-        ?? ((expenseApprovalsQuery.data ?? []).some((row) => !(Number(row.companyId ?? row.company_id) > 0))
+        ?? ((expenseApprovalsQuery.data ?? []).some((row) => !(Number(row.companyId ?? row.company_id) > 0),
+        )
           ? "Scope unavailable"
-          : (expenseApprovalsQuery.data ?? []).filter((row) => matchesCompany(row, operatingCompanyId)).length)}
+          : (expenseApprovalsQuery.data ?? []).filter((row) => matchesCompany(row, operatingCompanyId),
+            ).length)}
       overdueInvoices={movesState ?? ownerControlLoop.overdueInvoices}
       unreconciledPayments={paymentsState ?? ownerControlLoop.unreconciledPayments}
       lowStockProducts={stockState ?? ownerControlLoop.lowStockProducts}
       pendingMessageApprovals={messagesState ?? ownerControlLoop.pendingMessageApprovals}
     />
   )
-  const activationContent = <ActivationChecklistPanel organizationId={organizationId} companyId={operatingCompanyId} collapseWhenReady />
-  const dailyWorkContent = workspaceProfile === "finance-alpha" ? <DailyWorkWorkspace organizationId={organizationId} summary /> : null
-  const compositionSections = [
-    createPageContentSection({ id: "overview-owner-control-loop", title: t("financeReview.queueTitle", { defaultValue: "Finance work queue" }), content: ownerContent }),
-    ...keyMetrics,
-    ...analysisSections,
-    ...(dailyWorkContent ? [createPageContentSection({ id: "overview-daily-work", title: t("workspace.actions.openMyWork", { defaultValue: "My work" }), content: dailyWorkContent })] : []),
-    ...workSections,
-    createPageContentSection({ id: "overview-activation", title: t("activation.title", { defaultValue: "Getting started" }), content: activationContent }),
-  ]
+  const activationContent = (
+    <ActivationChecklistPanel organizationId={organizationId} companyId={operatingCompanyId} collapseWhenReady />
+  )
+  const dailyWorkContent = workspaceProfile === "finance-alpha" ? (
+      <DailyWorkWorkspace organizationId={organizationId} summary />
+    ) : null
 
   return (
     <div className="space-y-6">
       <DashboardHeader
         title={t(overviewDashboardDefinition.titleKey)}
-        description={companyName ? t("overview.financial.companyContext", { defaultValue: "Overview for {{company}}", company: companyName }) : t(overviewDashboardDefinition.descriptionKey)}
+        description={companyName ? t("overview.financial.companyContext", { defaultValue: "Overview for {{company}}", company: companyName,
+              }) : t(overviewDashboardDefinition.descriptionKey)}
         secondaryAction={compositionSlot}
         timeZone="UTC"
         timeRange={timeRange}
         onTimeRangeChange={setTimeRange}
         onExport={() => void handleDashboardExport()}
       />
-      {invalidPeriod && <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive"><p>{salesState}</p><Button type="button" variant="outline" onClick={() => setTimeRange("all")}>{t("common.historyPeriod.clear", { defaultValue: "Clear date range" })}</Button></div>}
+      {invalidPeriod && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive"><p>{salesState}</p><Button type="button" variant="outline" onClick={() => setTimeRange("all")}>{t("common.historyPeriod.clear", { defaultValue: "Clear date range",
+            })}</Button></div>
+      )}
       {isHydrated ? (
         <div ref={dashboardGridRef} data-testid="overview-dashboard" className="flex flex-col gap-6">
           <section aria-label="Dashboard resource status" data-testid="overview-resource-status" className="space-y-1 text-sm">
             {Object.entries(resourceStates).flatMap(([resource, state]) => {
               const label = resourceStatusLabel(state)
-              return label ? [<p key={resource} data-resource={resource} data-state={state}>{resource}: {label}</p>] : []
+              return label ? [<p key={resource} data-resource={resource} data-state={state}>{resource}: {label}</p>,
+                  ] : []
             })}
           </section>
-          {salesState ? <p data-testid="overview-sales-trend-state">Sales trend: {salesState}</p> : null}
+          {salesState ? (
+            <p data-testid="overview-sales-trend-state">Sales trend: {salesState}</p>
+          ) : null}
+          {ownerContent}
+          {dailyWorkContent}
+          <DashboardGrid
+            sections={quickActionSections}
+            widgetTestIdPrefix="overview-widget"
+          />
           <ModulePageComposition
             moduleId="overview"
             pageId="dashboard"
             title={t(overviewDashboardDefinition.titleKey)}
-            sections={compositionSections}
+            sections={[...keyMetrics, ...analysisSections, ...workSections]}
+            fixedWidgetIds={fixedOverviewWidgetIds}
+            startingLayouts={[
+              {
+                id: "daily-review",
+                label: t("pageComposition.starter.dailyReview", {
+                  defaultValue: "Daily review",
+                }),
+                widgets: [
+                  { widgetId: "overview-needs-attention" },
+                  { widgetId: "overview-stat-cards" },
+                  ...workSections.flatMap((section) =>
+                    section.widgets.map((widget) => ({ widgetId: widget.id })),
+                  ),
+                ],
+              },
+              {
+                id: "performance-review",
+                label: t("pageComposition.starter.performanceReview", {
+                  defaultValue: "Performance review",
+                }),
+                widgets: [
+                  { widgetId: "overview-stat-cards" },
+                  { widgetId: "overview-sales-trend", width: 8 },
+                  {
+                    widgetId: "overview-needs-attention",
+                    width: hasSalesTrend ? 4 : 12,
+                  },
+                ],
+              },
+            ]}
             actionTarget={compositionTarget}
             historyBounds={historyBounds}
-            savedWidgetScopeNote={t("pageComposition.overviewScope", { defaultValue: "Saved widgets follow the operating company and selected date range. Open work and other current-state totals use the period stated on each built-in section." })}
+            historyTimeZone="UTC"
+            savedWidgetScopeNote={t("pageComposition.overviewScope", { defaultValue: "Saved widgets follow the operating company and selected date range. Open work and other current-state totals use the period stated on each built-in section.",
+            })}
           >
             <div className="flex flex-col gap-6">
-              {ownerContent}
               <DashboardGrid sections={keyMetrics} testId="overview-key-metrics" widgetTestIdPrefix="overview-widget" />
               <DashboardGrid sections={analysisSections} testId="overview-analysis" widgetTestIdPrefix="overview-widget" />
-              {dailyWorkContent}
               <DashboardGrid sections={workSections} testId="overview-my-work" widgetTestIdPrefix="overview-widget" />
-              {activationContent}
             </div>
           </ModulePageComposition>
+          {activationContent}
           <details className="border-t pt-3 text-sm">
             <summary className="w-fit cursor-pointer rounded-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">
-              {t("overview.financial.dataNotes", { defaultValue: "How figures are calculated" })}
+              {t("overview.financial.dataNotes", { defaultValue: "How figures are calculated",
+              })}
             </summary>
             <div className="mt-2 max-w-prose space-y-2">
-              <p className="text-sm text-muted-foreground"><Link className="underline underline-offset-2" href="/settings?section=imports#available-history">{t("moduleInsights.availableHistory", { defaultValue: "Available history" })}</Link> · {t("overview.financial.historyLink", { defaultValue: "Inspect imported dates and source records awaiting review." })}</p>
-              <p className="text-sm text-muted-foreground">{t("overview.financial.meaning", { defaultValue: "Confirmed order values are shown separately by transaction currency; they are not accounting revenue. Overdue invoices are posted customer invoices with an unpaid balance and a known due date before today." })}</p>
+              <p className="text-sm text-muted-foreground"><Link className="underline underline-offset-2" href="/settings?section=imports#available-history">{t("moduleInsights.availableHistory", { defaultValue: "Available history",
+                  })}</Link>{" "}
+                ·{" "}
+                {t("overview.financial.historyLink", { defaultValue: "Inspect imported dates and source records awaiting review.",
+                })}</p>
+              <p className="text-sm text-muted-foreground">{t("overview.financial.meaning", { defaultValue: "Confirmed order values are shown separately by transaction currency; they are not accounting revenue. Overdue invoices are posted customer invoices with an unpaid balance and a known due date before today.",
+                })}</p>
             </div>
           </details>
         </div>

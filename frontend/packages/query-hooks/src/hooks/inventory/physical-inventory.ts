@@ -1,11 +1,14 @@
 "use client"
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { decodeOperationDispatch } from "@lumiere/api-client"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
-import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../../http"
+import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey,
+} from "../../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { workflowErrorFromResponse } from "@lumiere/erp-workflows"
-import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
+import { scalarToU64 as toScalarU64, type ScalarId,
+} from "@lumiere/erp-shared/u64"
 import {
   toCreateStockInventoryParams,
   toCreateStockInventoryLineParams,
@@ -110,7 +113,7 @@ import type {
   UpdateProductSupplierInfoParams,
   UpdateProductPackagingParams,
   CreateStockQuantParams,
-} from '@lumiere/stdb/types';
+} from "@lumiere/stdb/types"
 
 export function useInventoryAdjustments(
   organizationId: bigint,
@@ -119,15 +122,15 @@ export function useInventoryAdjustments(
 ) {
   return useQuery<InventoryAdjustment[]>({
     enabled,
-    queryKey: ['inventory-adjustments', rqBigIntKey(organizationId)],
+    queryKey: ["inventory-adjustments", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
-        '/api/query/inventory-adjustments',
-        'Failed to fetch inventory adjustments',
+        "/api/query/inventory-adjustments",
+        "Failed to fetch inventory adjustments",
       ),
     staleTime: 30_000,
     initialData: coalesceQueryInitialData(initialData),
-  });
+  })
 }
 
 
@@ -138,15 +141,15 @@ export function useStockCycleCounts(
 ) {
   return useQuery<StockCycleCount[]>({
     enabled,
-    queryKey: ['stock-cycle-counts', rqBigIntKey(organizationId)],
+    queryKey: ["stock-cycle-counts", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
-        '/api/query/stock-cycle-counts',
-        'Failed to fetch cycle counts',
+        "/api/query/stock-cycle-counts",
+        "Failed to fetch cycle counts",
       ),
     staleTime: 30_000,
     initialData: coalesceQueryInitialData(initialData),
-  });
+  })
 }
 
 export function useStockInventories(
@@ -156,15 +159,15 @@ export function useStockInventories(
 ) {
   return useQuery<StockInventory[]>({
     enabled,
-    queryKey: ['stock-inventories', rqBigIntKey(organizationId)],
+    queryKey: ["stock-inventories", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
-        '/api/query/stock-inventories',
-        'Failed to fetch stock inventories',
+        "/api/query/stock-inventories",
+        "Failed to fetch stock inventories",
       ),
     staleTime: 30_000,
     initialData: coalesceQueryInitialData(initialData),
-  });
+  })
 }
 
 
@@ -175,57 +178,57 @@ export function useAdjustmentReasons(
 ) {
   return useQuery<AdjustmentReason[]>({
     enabled,
-    queryKey: ['adjustment-reasons', rqBigIntKey(organizationId)],
+    queryKey: ["adjustment-reasons", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
-        '/api/query/adjustment-reasons',
-        'Failed to fetch adjustment reasons',
+        "/api/query/adjustment-reasons",
+        "Failed to fetch adjustment reasons",
       ),
     staleTime: 30_000,
     initialData: coalesceQueryInitialData(initialData),
-  });
+  })
 }
 
 
 export function useCreateInventoryAdjustment(organizationId: bigint) {
-  const qc = useQueryClient();
+  const qc = useQueryClient()
   return useMutation<void, Error, CreateInventoryAdjustmentParams>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
-        'create_inventory_adjustment',
+        "create_inventory_adjustment",
         {
           params: stdbParamsToJson(
             params as object,
-            'CreateInventoryAdjustmentParams',
+            "CreateInventoryAdjustmentParams",
           ),
         },
-      );
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to create inventory adjustment');
+      )
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create inventory adjustment")
     },
     onSuccess: () =>
       qc.invalidateQueries({
-        queryKey: ['inventory-adjustments', rqBigIntKey(organizationId)],
+        queryKey: ["inventory-adjustments", rqBigIntKey(organizationId)],
       }),
-  });
+  })
 }
 
 export function useProcessInventoryAdjustment(organizationId: bigint) {
-  const qc = useQueryClient();
+  const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (adjustmentId) => {
       const { urlPath, init } = stdbBffCommandPost(
-        'process_inventory_adjustment',
+        "process_inventory_adjustment",
         { adjustmentId: toScalarU64(adjustmentId) },
-      );
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to process inventory adjustment');
+      )
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to process inventory adjustment")
     },
     onSuccess: () =>
       qc.invalidateQueries({
-        queryKey: ['inventory-adjustments', rqBigIntKey(organizationId)],
+        queryKey: ["inventory-adjustments", rqBigIntKey(organizationId)],
       }),
-  });
+  })
 }
 
 
@@ -233,7 +236,7 @@ export function useCreateCycleCountPlan(
   organizationId: bigint,
   companyId?: bigint,
 ) {
-  const qc = useQueryClient();
+  const qc = useQueryClient()
   return useMutation<
     void,
     Error,
@@ -241,100 +244,102 @@ export function useCreateCycleCountPlan(
   >({
     mutationFn: async ({ locationId, params }) => {
       if (companyId == null || companyId <= 0n)
-        throw new Error('A selected company is required');
-      const { urlPath, init } = stdbBffCommandPost('create_cycle_count_plan', {
+        throw new Error("A selected company is required")
+      const { urlPath, init } = stdbBffCommandPost("create_cycle_count_plan", {
         companyId,
         locationId: toScalarU64(locationId),
         params: stdbParamsToJson(
           params as object,
-          'CreateCycleCountPlanParams',
+          "CreateCycleCountPlanParams",
         ),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to create cycle count plan');
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create cycle count plan")
     },
     onSuccess: () =>
       qc.invalidateQueries({
-        queryKey: ['stock-cycle-counts', rqBigIntKey(organizationId)],
+        queryKey: ["stock-cycle-counts", rqBigIntKey(organizationId)],
       }),
-  });
+  })
 }
 
 export function useStartCycleCountSession(
   organizationId: bigint,
   companyId?: bigint,
 ) {
-  const qc = useQueryClient();
+  const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (cycleCountId) => {
       if (companyId == null || companyId <= 0n)
-        throw new Error('A selected company is required');
+        throw new Error("A selected company is required")
       const { urlPath, init } = stdbBffCommandPost(
-        'start_cycle_count_session',
+        "start_cycle_count_session",
         { companyId, cycleCountId: toScalarU64(cycleCountId) },
-      );
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to start cycle count session');
+      )
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to start cycle count session")
     },
     onSuccess: () =>
       qc.invalidateQueries({
-        queryKey: ['stock-cycle-counts', rqBigIntKey(organizationId)],
+        queryKey: ["stock-cycle-counts", rqBigIntKey(organizationId)],
       }),
-  });
+  })
 }
 
 export function useRecordCycleCountLine(
   organizationId: bigint,
   companyId?: bigint,
 ) {
-  const qc = useQueryClient();
+  const qc = useQueryClient()
   return useMutation<
     void,
     Error,
     { cycleCountId: ScalarId; params: RecordCycleCountLineParams }
   >({
+    networkMode: "always",
+    retry: false,
     mutationFn: async ({ cycleCountId, params }) => {
       if (companyId == null || companyId <= 0n)
-        throw new Error('A selected company is required');
-      const { urlPath, init } = stdbBffCommandPost('record_cycle_count_line', {
+        throw new Error("A selected company is required")
+      const { urlPath, init } = stdbBffCommandPost("record_cycle_count_line", {
         companyId,
         cycleCountId: toScalarU64(cycleCountId),
         params: stdbParamsToJson(
           params as object,
-          'RecordCycleCountLineParams',
+          "RecordCycleCountLineParams",
         ),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to record cycle count line');
+      })
+      const r = await apiFetch(urlPath, init)
+      await decodeOperationDispatch(r, "Failed to record cycle count line")
     },
     onSuccess: () =>
       qc.invalidateQueries({
-        queryKey: ['stock-cycle-counts', rqBigIntKey(organizationId)],
+        queryKey: ["stock-cycle-counts", rqBigIntKey(organizationId)],
       }),
-  });
+  })
 }
 
 export function useValidateCycleCount(
   organizationId: bigint,
   companyId?: bigint,
 ) {
-  const qc = useQueryClient();
+  const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (cycleCountId) => {
       if (companyId == null || companyId <= 0n)
-        throw new Error('A selected company is required');
-      const { urlPath, init } = stdbBffCommandPost('validate_cycle_count', {
+        throw new Error("A selected company is required")
+      const { urlPath, init } = stdbBffCommandPost("validate_cycle_count", {
         companyId,
         cycleCountId: toScalarU64(cycleCountId),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to validate cycle count');
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to validate cycle count")
     },
     onSuccess: () =>
       qc.invalidateQueries({
-        queryKey: ['stock-cycle-counts', rqBigIntKey(organizationId)],
+        queryKey: ["stock-cycle-counts", rqBigIntKey(organizationId)],
       }),
-  });
+  })
 }
 
 /** Underlying command for the `inventory.cycle-count.post` workflow (`useCycleCountAdjustmentWorkflow`). */
@@ -342,17 +347,17 @@ export async function postCycleCountAdjustmentsCommand(
   companyId: bigint,
   cycleCountId: ScalarId,
 ): Promise<void> {
-  const { urlPath, init } = stdbBffCommandPost('post_cycle_count_adjustments', {
+  const { urlPath, init } = stdbBffCommandPost("post_cycle_count_adjustments", {
     companyId,
     cycleCountId: toScalarU64(cycleCountId),
-  });
-  const r = await apiFetch(urlPath, init);
+  })
+  const r = await apiFetch(urlPath, init)
   if (!r.ok) {
     throw workflowErrorFromResponse(
       r.status,
-      await r.text().catch(() => ''),
-      'Failed to post cycle count adjustments',
-    );
+      await r.text().catch(() => ""),
+      "Failed to post cycle count adjustments",
+    )
   }
 }
 
@@ -361,64 +366,64 @@ export function useCreateStockInventory(
   organizationId: bigint,
   _companyId?: bigint,
 ) {
-  const qc = useQueryClient();
+  const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const mapped = toCreateStockInventoryParams(params);
-      if (!mapped) throw new Error('Invalid stock inventory params');
-      const { urlPath, init } = stdbBffCommandPost('create_stock_inventory', {
-        params: stdbParamsToJson(mapped, 'CreateStockInventoryParams'),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to create stock inventory');
+      const mapped = toCreateStockInventoryParams(params)
+      if (!mapped) throw new Error("Invalid stock inventory params")
+      const { urlPath, init } = stdbBffCommandPost("create_stock_inventory", {
+        params: stdbParamsToJson(mapped, "CreateStockInventoryParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create stock inventory")
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  });
+  })
 }
 
 export function useCreateStockInventoryLine(
   organizationId: bigint,
   _companyId?: bigint,
 ) {
-  const qc = useQueryClient();
+  const qc = useQueryClient()
   return useMutation<
     void,
     Error,
     { inventoryId: ScalarId; params: Record<string, unknown> }
   >({
     mutationFn: async ({ inventoryId, params }) => {
-      const mapped = toCreateStockInventoryLineParams(params);
-      if (!mapped) throw new Error('Invalid stock inventory line params');
+      const mapped = toCreateStockInventoryLineParams(params)
+      if (!mapped) throw new Error("Invalid stock inventory line params")
       const { urlPath, init } = stdbBffCommandPost(
-        'create_stock_inventory_line',
+        "create_stock_inventory_line",
         {
           inventoryId: toScalarU64(inventoryId),
-          params: stdbParamsToJson(mapped, 'CreateStockInventoryLineParams'),
+          params: stdbParamsToJson(mapped, "CreateStockInventoryLineParams"),
         },
-      );
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to create stock inventory line');
+      )
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create stock inventory line")
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  });
+  })
 }
 
 export function useUpdateStockInventoryState(
   organizationId: bigint,
   _companyId?: bigint,
 ) {
-  const qc = useQueryClient();
+  const qc = useQueryClient()
   return useMutation<void, Error, { inventoryId: ScalarId; newState: string }>({
     mutationFn: async ({ inventoryId, newState }) => {
       const { urlPath, init } = stdbBffCommandPost(
-        'update_stock_inventory_state',
+        "update_stock_inventory_state",
         { inventoryId: toScalarU64(inventoryId), newState: newState },
-      );
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to update stock inventory state');
+      )
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to update stock inventory state")
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  });
+  })
 }
 
 
@@ -426,19 +431,21 @@ export function useCreateAdjustmentReason(
   organizationId: bigint,
   _companyId?: bigint,
 ) {
-  const qc = useQueryClient();
-  const orgKey = rqBigIntKey(organizationId);
+  const qc = useQueryClient()
+  const orgKey = rqBigIntKey(organizationId)
   return useMutation<void, Error, CreateAdjustmentReasonParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = stdbBffCommandPost('create_adjustment_reason', {
-        params: stdbParamsToJson(params as object, 'CreateAdjustmentReasonParams'),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to create adjustment reason');
+      const { urlPath, init } = stdbBffCommandPost("create_adjustment_reason", {
+        params: stdbParamsToJson(params as object,
+          "CreateAdjustmentReasonParams",
+        ),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create adjustment reason")
     },
     onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: ['adjustment-reasons', orgKey] }),
-  });
+      void qc.invalidateQueries({ queryKey: ["adjustment-reasons", orgKey] }),
+  })
 }
 
 
@@ -446,62 +453,62 @@ export function useCreateInventoryClose(
   organizationId: bigint,
   companyId: bigint,
 ) {
-  const qc = useQueryClient();
+  const qc = useQueryClient()
   return useMutation<void, Error, CreateInventoryCloseParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = stdbBffCommandPost('create_inventory_close', {
+      const { urlPath, init } = stdbBffCommandPost("create_inventory_close", {
         companyId: companyId,
         params: stdbParamsToJson(
           params as object,
-          'CreateInventoryCloseParams',
+          "CreateInventoryCloseParams",
         ),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to create inventory close');
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to create inventory close")
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  });
+  })
 }
 
 export function useRunInventoryClose(
   organizationId: bigint,
   companyId: bigint,
 ) {
-  const qc = useQueryClient();
+  const qc = useQueryClient()
   return useMutation<
     void,
     Error,
     { closeId: ScalarId; params?: RunInventoryCloseParams }
   >({
     mutationFn: async ({ closeId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost('run_inventory_close', {
+      const { urlPath, init } = stdbBffCommandPost("run_inventory_close", {
         companyId: companyId,
         closeId: toScalarU64(closeId),
-        params: stdbParamsToJson(params ?? {}, 'RunInventoryCloseParams'),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to run inventory close');
+        params: stdbParamsToJson(params ?? {}, "RunInventoryCloseParams"),
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to run inventory close")
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  });
+  })
 }
 
 export function useReopenInventoryClose(
   organizationId: bigint,
   companyId: bigint,
 ) {
-  const qc = useQueryClient();
+  const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (closeId) => {
-      const { urlPath, init } = stdbBffCommandPost('reopen_inventory_close', {
+      const { urlPath, init } = stdbBffCommandPost("reopen_inventory_close", {
         companyId: companyId,
         closeId: toScalarU64(closeId),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to reopen inventory close');
+      })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to reopen inventory close")
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  });
+  })
 }
 
 export function useInventoryExceptionsShortAtp(
@@ -511,15 +518,15 @@ export function useInventoryExceptionsShortAtp(
 ) {
   return useQuery<InventoryException[]>({
     enabled,
-    queryKey: ['inventory-exceptions-short-atp', rqBigIntKey(organizationId)],
+    queryKey: ["inventory-exceptions-short-atp", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
-        '/api/query/inventory-exceptions-short-atp',
-        'Failed to fetch short ATP exceptions',
+        "/api/query/inventory-exceptions-short-atp",
+        "Failed to fetch short ATP exceptions",
       ),
     staleTime: 30_000,
     initialData: coalesceQueryInitialData(initialData),
-  });
+  })
 }
 
 /** Server-bounded: open expired-lot exceptions. */
@@ -531,17 +538,17 @@ export function useInventoryExceptionsExpiredLots(
   return useQuery<InventoryException[]>({
     enabled,
     queryKey: [
-      'inventory-exceptions-expired-lots',
+      "inventory-exceptions-expired-lots",
       rqBigIntKey(organizationId),
     ],
     queryFn: () =>
       fetchQueryList(
-        '/api/query/inventory-exceptions-expired-lots',
-        'Failed to fetch expired lot exceptions',
+        "/api/query/inventory-exceptions-expired-lots",
+        "Failed to fetch expired lot exceptions",
       ),
     staleTime: 30_000,
     initialData: coalesceQueryInitialData(initialData),
-  });
+  })
 }
 
 /** Server-bounded: open QC-fail exceptions. */
@@ -552,57 +559,58 @@ export function useInventoryExceptionsOpenQc(
 ) {
   return useQuery<InventoryException[]>({
     enabled,
-    queryKey: ['inventory-exceptions-open-qc', rqBigIntKey(organizationId)],
+    queryKey: ["inventory-exceptions-open-qc", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
-        '/api/query/inventory-exceptions-open-qc',
-        'Failed to fetch open QC exceptions',
+        "/api/query/inventory-exceptions-open-qc",
+        "Failed to fetch open QC exceptions",
       ),
     staleTime: 30_000,
     initialData: coalesceQueryInitialData(initialData),
-  });
+  })
 }
 
 export function useRefreshInventoryExceptions(
   organizationId: bigint,
   companyId: bigint,
 ) {
-  const qc = useQueryClient();
+  const qc = useQueryClient()
   return useMutation<void, Error, RefreshInventoryExceptionsParams | undefined>({
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost(
-        'refresh_inventory_exceptions',
+          "refresh_inventory_exceptions",
         {
           companyId: companyId,
           params: stdbParamsToJson(
             params ?? { upsertOnly: false },
-            'RefreshInventoryExceptionsParams',
-          ),
-        },
-      );
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to refresh inventory exceptions');
-    },
+              "RefreshInventoryExceptionsParams",
+            ),
+          },
+        )
+        const r = await apiFetch(urlPath, init)
+        if (!r.ok) throw new Error("Failed to refresh inventory exceptions")
+      },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  });
+  },
+  )
 }
 
 export function useResolveInventoryException(
   organizationId: bigint,
   companyId: bigint,
 ) {
-  const qc = useQueryClient();
+  const qc = useQueryClient()
   return useMutation<void, Error, ScalarId>({
     mutationFn: async (exceptionId) => {
       const { urlPath, init } = stdbBffCommandPost(
-        'resolve_inventory_exception',
+        "resolve_inventory_exception",
         { companyId: companyId, exceptionId: toScalarU64(exceptionId) },
-      );
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to resolve inventory exception');
+      )
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error("Failed to resolve inventory exception")
     },
     onSuccess: () => invalidateInventoryQueries(qc, organizationId),
-  });
+  })
 }
 
 export function useInventoryValuations(
@@ -612,14 +620,13 @@ export function useInventoryValuations(
 ) {
   return useQuery<InventoryValuation[]>({
     enabled,
-    queryKey: ['inventory-valuations', rqBigIntKey(organizationId)],
+    queryKey: ["inventory-valuations", rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(
-        '/api/query/inventory-valuations',
-        'Failed to fetch inventory valuations',
+        "/api/query/inventory-valuations",
+        "Failed to fetch inventory valuations",
       ),
     staleTime: 30_000,
     initialData: coalesceQueryInitialData(initialData),
-  });
+  })
 }
-

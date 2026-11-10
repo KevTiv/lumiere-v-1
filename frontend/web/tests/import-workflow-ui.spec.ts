@@ -1,11 +1,31 @@
 import { expect, test, type Page } from "@playwright/test"
 import type { ImportProposal } from "../lib/import-workflow"
 
-async function mockWorkflow(page: Page, loseExecutionReply = false) {
+async function mockWorkflow(page: Page,
+  {
+    openingBalances = false,
+    loseExecutionReply = false,
+    loseRollbackReply = false,
+  }: {
+    openingBalances?: boolean
+    loseExecutionReply?: boolean
+    loseRollbackReply?: boolean
+  } = {},
+) {
   const task = "a".repeat(32)
   const digest = "b".repeat(64)
   let proposal: ImportProposal | null = null
   const actions: string[] = []
+  const openingFacts = {
+    debit: "12000",
+    credit: "12000",
+    debit_account_id: "8",
+    credit_account_id: "9",
+    currency_id: "2",
+    observation_kind: "opening_balance",
+    document_reference: "OB-001",
+    description: "Opening pair",
+  }
   await page.route("**/api/query/**", (route) => {
     const path = new URL(route.request().url()).pathname
     const data = path.endsWith("/account-accounts")
@@ -71,9 +91,16 @@ async function mockWorkflow(page: Page, loseExecutionReply = false) {
             amount: "12000",
             date: "2024-03-01",
             observation_kind: "expense",
+            ...(openingBalances ? openingFacts : {}),
           },
           confirmedFields:
-            number === 1 ? ["amount", "date", "observation_kind"] : [],
+            number === 1 ? ["amount", "date",
+                  ...Object.keys(
+                    openingBalances
+                      ? openingFacts
+                      : { observation_kind: "expense" },
+                  ),
+                ] : [],
           reason: null,
           reviewedBy: null,
           reviewedAt: null,
@@ -101,6 +128,16 @@ async function mockWorkflow(page: Page, loseExecutionReply = false) {
                 sourceValue: "2024-03-01",
                 required: true,
               },
+              ...(openingBalances
+                ? Object.entries(openingFacts).map(([key, sourceValue]) => ({
+                    key,
+                    label: key,
+                    kind:
+                      key === "debit" || key === "credit" ? "decimal" : "text",
+                    sourceValue,
+                    required: true,
+                  }))
+                : []),
             ],
             proposed: {},
           },
@@ -138,6 +175,11 @@ async function mockWorkflow(page: Page, loseExecutionReply = false) {
     expect(body.companyId).toBe(9001)
     if (url.pathname.endsWith("/proposals")) {
       actions.push("prepare")
+      if (openingBalances) {
+        expect(body.openingBalances).toBe(true)
+        expect(body.amountField).toBe("debit")
+        expect(body.postingDate).toBe("2024-03-01")
+      }
       expect(body.rows).toEqual([
         { itemId: "1", expectedRevision: 2 },
         { itemId: "2", expectedRevision: 2 },
@@ -147,7 +189,9 @@ async function mockWorkflow(page: Page, loseExecutionReply = false) {
         requestKey: body.requestKey,
         revision: 1,
         digest,
-        kind: "historical_expense_journals",
+        kind: openingBalances
+          ? "opening_balances"
+          : "historical_expense_journals",
         status: "prepared",
         createdAt: "2026-11-07T00:00:00Z",
         approvedAt: null,
@@ -194,7 +238,8 @@ async function mockWorkflow(page: Page, loseExecutionReply = false) {
           amountField: body.amountField,
           dateField: body.dateField,
           descriptionField: null,
-          postingDate: null,
+          postingDate: openingBalances ? body.postingDate : null,
+          ...(openingBalances ? { openingBalances: true } : {}),
           reason: body.reason,
         },
         execution: {
@@ -247,6 +292,15 @@ async function mockWorkflow(page: Page, loseExecutionReply = false) {
           },
         }
         if (loseExecutionReply) return route.abort("failed")
+      } else if (url.pathname.endsWith("/rollback")) {
+        actions.push("rollback")
+        proposal = {
+          ...proposal!,
+          status: "rolled_back",
+          execution: { ...proposal!.execution, phase: "rolled_back" },
+          result: null,
+        }
+        if (loseRollbackReply) return route.abort("failed")
       }
     }
     return route.fulfill({ json: proposal })
@@ -254,11 +308,25 @@ async function mockWorkflow(page: Page, loseExecutionReply = false) {
   return actions
 }
 
-async function prepare(page: Page) {
+async function prepare(page: Page, openingBalances = false) {
   await page.goto("/import-task-execution")
+  if (openingBalances) {
+    await page
+      .getByRole("combobox", { name: "Draft type", exact: true })
+      .click()
+    await page
+      .getByRole("option", {
+        name: "Paired opening-balance drafts",
+        exact: true,
+      })
+      .click()
+    await page.getByLabel("Cutover date", { exact: true }).fill("2024-03-01")
+  }
   for (const [label, option] of [
     ["Journal", "HIST · Historical adjustments"],
-    ["Expense debit account", "610 · Electricity expense"],
+    [
+      openingBalances ? "Debit account" : "Expense debit account", "610 · Electricity expense",
+    ],
     ["Credit account", "299 · Historical clearing"],
   ]) {
     await page.getByRole("combobox", { name: label, exact: true }).click()
@@ -323,7 +391,7 @@ test("source confirmation, approval and verified native completion remain distin
 test("a lost execution reply recovers the saved verified result without a second dispatch", async ({
   page,
 }) => {
-  const actions = await mockWorkflow(page, true)
+  const actions = await mockWorkflow(page, { loseExecutionReply: true })
   await prepare(page)
   await page
     .getByRole("button", { name: "Approve this exact preview", exact: true })
@@ -335,4 +403,34 @@ test("a lost execution reply recovers the saved verified result without a second
   await page.reload()
   await expect(page.getByText("Verified in ERP", { exact: true })).toBeVisible()
   expect(actions).toEqual(["prepare", "approve", "execute"])
+})
+
+test("a paired opening-balance group can be removed through its exact saved proposal", async ({
+  page,
+}) => {
+  const actions = await mockWorkflow(page, {
+    openingBalances: true,
+    loseRollbackReply: true,
+  })
+  await prepare(page, true)
+  await page
+    .getByRole("button", { name: "Approve this exact preview", exact: true })
+    .click()
+  await page
+    .getByRole("button", { name: "Create approved draft entries", exact: true })
+    .click()
+  await expect(page.getByText("Verified in ERP", { exact: true })).toBeVisible()
+  await page
+    .getByRole("button", { name: "Remove imported drafts", exact: true })
+    .click()
+  await expect(page.getByRole("alertdialog")).toBeVisible()
+  expect(actions).toEqual(["prepare", "approve", "execute"])
+  await page.getByRole("button", { name: "Remove drafts", exact: true }).click()
+  await expect(page.getByText("Drafts removed", { exact: true })).toBeVisible()
+  await expect(
+    page.getByText("Open created journal entries", { exact: true }),
+  ).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByText("Drafts removed", { exact: true })).toBeVisible()
+  expect(actions).toEqual(["prepare", "approve", "execute", "rollback"])
 })

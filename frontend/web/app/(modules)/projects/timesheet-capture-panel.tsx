@@ -1,78 +1,146 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { Button } from "@lumiere/ui"
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
+import { useTranslation } from "@lumiere/i18n"
+import { Button } from "@lumiere/ui/components/button"
+import { CaptureSyncBadge } from "../../../components/capture/capture-sync-badge"
 import {
-  discardTimesheetCapture,
   getOrCreateTimesheetCaptureDeviceId,
-  listQueuedTimesheetCaptures,
-  requeueTimesheetCapture,
+  listTimesheetCaptures,
+  writeTimesheetCapture,
 } from "@/lib/timesheet-capture-outbox"
+import type { CaptureOwner } from "@/lib/capture-sync-state"
 
-/** Offline / delayed-sync timesheet outbox with conflict retry UI (Wave E). */
-export function TimesheetCapturePanel({ organizationId }: { organizationId: number }) {
-  const deviceId = useMemo(() => getOrCreateTimesheetCaptureDeviceId(), [])
-  const [tick, setTick] = useState(0)
-  const queued = useMemo(
-    () => listQueuedTimesheetCaptures(organizationId, deviceId),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [organizationId, deviceId, tick],
-  )
+export function TimesheetCapturePanel({ organizationId,
+  owner,
+  syncingId,
+  onReview,
+}: { organizationId: number
+  owner: CaptureOwner
+  syncingId: string | null
+  onReview: () => void
+}) {
+  const { t } = useTranslation()
+  const [deviceId, setDeviceId] = useState<string | null>(null)
+  const [error, setError] = useState(false)
+  const [dismissed, setDismissed] = useState<string[]>([])
+  useEffect(() => {
+    try {
+      setDeviceId(getOrCreateTimesheetCaptureDeviceId())
+    } catch {
+      // The create action reports unavailable recovery storage before dispatch.
+    }
+  }, [])
 
-  if (queued.length === 0) {
-    return (
-      <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground" data-testid="timesheet-capture-empty">
-        No queued offline timesheets. Failed log attempts appear here for retry.
-      </div>
-    )
-  }
+  const attempts = deviceId
+    ? listTimesheetCaptures(organizationId, deviceId, owner).filter(
+        (item) => !dismissed.includes(item.clientRequestId),
+      )
+    : []
+  if (!attempts.length) return null
 
   return (
-    <div className="space-y-3" data-testid="timesheet-capture-panel">
-      <h3 className="text-sm font-medium">Timesheet sync queue</h3>
-      <ul className="space-y-2">
-        {queued.map((item) => (
-          <li
-            key={item.clientRequestId}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
-            data-testid={`timesheet-capture-item-${item.syncState}`}
-          >
-            <div>
-              <div className="font-medium">
-                {item.payload.projectId} / {item.payload.taskId} — {item.payload.unitAmount}h
+    <section
+      aria-labelledby="timesheet-capture-title"
+      className="space-y-2 rounded-lg border p-3 text-sm"
+      data-testid="timesheet-capture-panel"
+    >
+      <h2 id="timesheet-capture-title" className="font-medium">
+        {t("captureSync.timesheetTitle", {
+          defaultValue: "Timesheet recovery",
+        })}
+      </h2>
+      <ul className="divide-y">
+        {attempts.map((item) => {
+          const syncing = item.clientRequestId === syncingId
+          const failed = item.syncState === "failed"
+          return (
+            <li
+              key={item.clientRequestId}
+              className="flex flex-wrap items-start justify-between gap-2 py-2"
+            >
+              <div className="min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">
+                    {t("captureSync.timesheetEntry", {
+                      defaultValue:
+                        "{{date}} · {{hours}} h · Project {{project}}",
+                      date: item.payload.date,
+                      hours: item.payload.unitAmount,
+                      project: item.payload.projectId,
+                    })}
+                  </span>
+                  <CaptureSyncBadge
+                    state={syncing ? "syncing" : failed ? "failed" : "conflict"}
+                  />
+                </div>
+                {!syncing ? (
+                  <p className="text-muted-foreground">
+                    {failed
+                      ? t("captureSync.timesheetRejected", {
+                          defaultValue:
+                            "The server rejected this entry. Correct the details in the form before trying again.",
+                        })
+                      : t("captureSync.timesheetReview", {
+                          defaultValue:
+                            "Check Timesheets for this entry before submitting it again.",
+                        })}
+                  </p>
+                ) : null}
               </div>
-              <div className="text-muted-foreground">
-                {item.syncState}
-                {item.lastError ? `: ${item.lastError}` : ""}
+              {!syncing ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {!failed ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      render={<Link href={projectTimesheetsHref(item.payload.projectId)} />}
+                      nativeButton={false}
+                      onClick={onReview}
+                    >
+                      {t("captureSync.openTimesheets", {
+                        defaultValue: "Open Timesheets",
+                      })}
+                    </Button>
+                  ) : null}
+                  <Button
+                type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (!deviceId) return
+                      try {
+                        writeTimesheetCapture(organizationId, deviceId, item, {
+                          remove: true,
+                        })
+                        setDismissed((ids) => [...ids, item.clientRequestId])
+                        setError(false)
+                      } catch {
+                        setError(true)
+                      }
+                    }}
+                  >
+                    {failed
+                      ? t("captureSync.dismiss", { defaultValue: "Dismiss" })
+                      : t("captureSync.markReviewed", {
+                          defaultValue: "Mark reviewed",
+                        })}
+                  </Button>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  requeueTimesheetCapture(organizationId, deviceId, item.clientRequestId)
-                  setTick((n) => n + 1)
-                }}
-              >
-                Retry
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  discardTimesheetCapture(organizationId, deviceId, item.clientRequestId)
-                  setTick((n) => n + 1)
-                }}
-              >
-                Discard
-              </Button>
-            </div>
-          </li>
-        ))}
+              ) : null}
+            </li>
+        )
+        })}
       </ul>
-    </div>
+      {error ? (
+        <p role="alert">
+          {t("captureSync.storageUnavailable", {
+            defaultValue: "Recovery storage is unavailable on this device.",
+          })}
+        </p>
+      ) : null}
+    </section>
   )
 }

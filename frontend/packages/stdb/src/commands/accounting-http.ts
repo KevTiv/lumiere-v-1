@@ -1,5 +1,5 @@
-import { UpdateAccountMoveLineParams } from "@lumiere/contracts/generated/types";
-import type { ReducerCommandContractMeta } from "./types";
+import { UpdateAccountMoveLineParams } from "@lumiere/contracts/generated/types"
+import type { ReducerCommandContractMeta } from "./types"
 
 /**
  * Accounting mutations via Next.js BFF `POST /api/operations/:operation`.
@@ -102,6 +102,7 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "process_intercompany_transaction",
   "recognize_amortization_line",
   "reconcile_account_bank_statement_line",
+  "settle_bank_line_with_payment_transaction",
   "reconcile_payment_with_invoice",
   "allocate_payment_transaction",
   "archive_payment_account",
@@ -154,9 +155,9 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "validate_consolidation",
   "void_payment_transaction",
   "waive_tax_deadline",
-] as const;
+] as const
 
-export type AccountingBffReducerKey = (typeof ACCOUNTING_BFF_REDUCERS)[number];
+export type AccountingBffReducerKey = (typeof ACCOUNTING_BFF_REDUCERS)[number]
 
 const ACCOUNTING_HINT_OVERRIDES: Partial<
   Record<AccountingBffReducerKey, readonly string[]>
@@ -187,7 +188,10 @@ const ACCOUNTING_HINT_OVERRIDES: Partial<
     "tax-schedules",
     "tax-deadlines",
   ],
-  create_amortization_schedule: ["amortization-schedules", "amortization-lines"],
+  create_amortization_schedule: [
+    "amortization-schedules",
+    "amortization-lines",
+  ],
   create_bad_debt_write_off: ["account-moves", "account-move-lines"],
   create_budget_line: ["budgets", "budget-lines", "budget-posts"],
   create_credit_note_from_invoice: ["account-moves", "account-move-lines"],
@@ -198,10 +202,16 @@ const ACCOUNTING_HINT_OVERRIDES: Partial<
   ],
   create_payment_account: ["payment-accounts"],
   create_payment_fee: ["payment-fees", "payment-transactions"],
-  create_payment_term_line: ["account-payment-terms", "account-payment-term-lines"],
+  create_payment_term_line: [
+    "account-payment-terms",
+    "account-payment-term-lines",
+  ],
   create_payment_transaction: ["payment-transactions"],
   compute_depreciation_board: ["fixed-assets", "depreciation-lines"],
-  delete_payment_term_line: ["account-payment-terms", "account-payment-term-lines"],
+  delete_payment_term_line: [
+    "account-payment-terms",
+    "account-payment-term-lines",
+  ],
   delete_account_move_line: ["account-moves", "account-move-lines"],
   deprecate_account_account: ["account-accounts"],
   dispose_account_asset: ["fixed-assets", "depreciation-lines"],
@@ -212,7 +222,11 @@ const ACCOUNTING_HINT_OVERRIDES: Partial<
     "account-payments",
     "account-moves",
   ],
-  post_realized_fx_gain_loss: ["account-moves", "account-move-lines", "fx-revaluation-runs"],
+  post_realized_fx_gain_loss: [
+    "account-moves",
+    "account-move-lines",
+    "fx-revaluation-runs",
+  ],
   recognize_amortization_line: [
     "amortization-lines",
     "amortization-schedules",
@@ -231,8 +245,16 @@ const ACCOUNTING_HINT_OVERRIDES: Partial<
     "payment-transactions",
     "account-payments",
   ],
-  run_fx_revaluation: ["fx-revaluation-runs", "account-moves", "account-move-lines"],
-  run_fx_revaluation_batch: ["fx-revaluation-runs", "account-moves", "account-move-lines"],
+  run_fx_revaluation: [
+    "fx-revaluation-runs",
+    "account-moves",
+    "account-move-lines",
+  ],
+  run_fx_revaluation_batch: [
+    "fx-revaluation-runs",
+    "account-moves",
+    "account-move-lines",
+  ],
   unreconciled_account_bank_statement_line: [
     "bank-statements",
     "bank-statement-lines",
@@ -258,24 +280,30 @@ const ACCOUNTING_HINT_OVERRIDES: Partial<
   update_budget_line: ["budgets", "budget-lines", "budget-posts"],
   update_crossovered_budget: ["budgets", "budget-lines", "budget-posts"],
   update_payment_account: ["payment-accounts"],
-  update_payment_term_line: ["account-payment-terms", "account-payment-term-lines"],
+  update_payment_term_line: [
+    "account-payment-terms",
+    "account-payment-term-lines",
+  ],
   update_payment_transaction: ["payment-transactions"],
   upsert_partner_credit_control: ["partner-credit-controls"],
   void_payment_transaction: ["payment-transactions"],
-};
+}
 
-function accountingReducerHints(): Record<AccountingBffReducerKey, readonly string[]> {
-  const o = {} as Record<AccountingBffReducerKey, readonly string[]>;
+function accountingReducerHints(): Record<
+  AccountingBffReducerKey,
+  readonly string[]
+> {
+  const o = {} as Record<AccountingBffReducerKey, readonly string[]>
   for (const k of ACCOUNTING_BFF_REDUCERS) {
-    o[k] = ACCOUNTING_HINT_OVERRIDES[k] ?? [];
+    o[k] = ACCOUNTING_HINT_OVERRIDES[k] ?? []
   }
-  return o;
+  return o
 }
 
 export const ACCOUNTING_COMMAND_SUBSCRIPTION_HINTS: Record<
   AccountingBffReducerKey,
   readonly string[]
-> = accountingReducerHints();
+> = accountingReducerHints()
 
 export function accountingCommandContract(
   reducer: AccountingBffReducerKey,
@@ -283,14 +311,20 @@ export function accountingCommandContract(
   return {
     reducerName: reducer,
     description: `Accounting reducer ${reducer} (HTTP BFF).`,
-    requiredSubscriptionResources: ACCOUNTING_COMMAND_SUBSCRIPTION_HINTS[reducer],
+    requiredSubscriptionResources:
+      ACCOUNTING_COMMAND_SUBSCRIPTION_HINTS[reducer],
     affectedTables: [],
     expectations:
       "Authenticated api-server session with organization scope; args must match SpacetimeDB u64 JSON rules (see stringifyReducerCallBody).",
-  };
+  }
 }
 
 /** Enable economic correction only with the canonical extended parameter codec. */
 export function accountingBillCorrectionAvailable(): boolean {
-  return ["quantity", "priceUnit", "expectedQuantity", "expectedPriceUnit"].every((field) => Object.hasOwn(UpdateAccountMoveLineParams.elements, field));
+  return [
+    "quantity",
+    "priceUnit",
+    "expectedQuantity",
+    "expectedPriceUnit",
+  ].every((field) => Object.hasOwn(UpdateAccountMoveLineParams.elements, field))
 }

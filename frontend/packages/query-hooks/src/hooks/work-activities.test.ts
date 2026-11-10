@@ -61,6 +61,28 @@ test("completion preflight rejects stale, denied, missing, finished and rebound 
   }
   assert.throws(() => requireCurrentWorkActivity([], row), /Refresh/)
   assert.throws(() => requireCurrentWorkActivity([row, row], row), /Refresh/)
-  assert.throws(() => requireCurrentWorkActivity([{ ...row, updatedAt: "new" }], { ...row, updatedAt: "old" }), /changed/)
-  assert.equal(sameWorkActivity({ ...row, resModel: "sale_order", workModule: "sales" }, row), false)
+  assert.throws(
+    () =>
+      requireCurrentWorkActivity([{ ...row, updatedAt: "new" }], {
+        ...row,
+        updatedAt: "old",
+      }),
+    /changed/,
+  )
+  assert.throws(
+    () => requireCurrentWorkActivity([{ ...row, workIsAssigned: true }], row),
+    /changed/,
+  )
+  assert.throws(
+    () =>
+      requireCurrentWorkActivity([{ ...row, dateDeadline: "2026-11-01" }], row),
+    /changed/,
+  )
+  assert.equal(
+    sameWorkActivity(
+      { ...row, resModel: "sale_order", workModule: "sales" },
+      row,
+    ),
+    false,
+  )
 })

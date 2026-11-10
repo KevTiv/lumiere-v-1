@@ -1,9 +1,9 @@
 /** Pure client-side record search used by the command palette. */
+import { entityScalarText, getRowField } from "./entity-row-values"
 
 /** Lower-case, accent-free, whitespace-collapsed form used for every comparison. */
 export function normalizeSearchText(value: unknown): string {
-  if (value == null) return ""
-  return String(value)
+  return (entityScalarText(value) ?? "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
@@ -28,10 +28,11 @@ export function scoreSearchMatch(query: unknown, text: unknown): number {
 }
 
 /** Field of a row by camelCase key, falling back to its snake_case spelling. */
-export function readRowField(row: Record<string, unknown>, key: string): unknown {
-  if (row[key] != null) return row[key]
-  const snake = key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)
-  return row[snake]
+export function readRowField(
+  row: Record<string, unknown>,
+  key: string,
+): unknown {
+  return getRowField(row, key)
 }
 
 export interface RecordSearchHit<T> {
@@ -53,11 +54,14 @@ export function searchRecords<T>(
   const hits: (RecordSearchHit<T> & { index: number })[] = []
   rows.forEach((row, index) => {
     let score = MATCH_NONE
-    for (const field of getFields(row)) score = Math.max(score, scoreSearchMatch(query, field))
+    for (const field of getFields(row))
+      score = Math.max(score, scoreSearchMatch(query, field))
     if (score > MATCH_NONE) hits.push({ row, score, index })
   })
   hits.sort((a, b) => b.score - a.score || a.index - b.index)
-  return hits.slice(0, Math.max(0, limit)).map(({ row, score }) => ({ row, score }))
+  return hits
+    .slice(0, Math.max(0, limit))
+    .map(({ row, score }) => ({ row, score }))
 }
 
 /** Queries shorter than this do not touch any record table. */

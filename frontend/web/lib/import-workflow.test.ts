@@ -125,6 +125,82 @@ const input: PrepareImportProposal = {
   ],
 }
 
+test("opening-balance previews bind the explicit accounting treatment", async () => {
+  const paired: ImportProposal = {
+    ...proposalFixture(),
+    kind: "opening_balances",
+    configuration: {
+      ...configuration,
+      openingBalances: true,
+      amountField: "debit",
+      postingDate: "2024-01-01",
+    },
+  }
+  assert.equal(parseImportProposal(paired, 3).kind, "opening_balances")
+  assert.throws(
+    () => parseImportProposal({ ...paired, configuration }, 3),
+    /preview does not match/,
+  )
+  const pairedInput: PrepareImportProposal = {
+    ...input,
+    openingBalances: true,
+    amountField: "debit",
+    postingDate: "2024-01-01",
+  }
+  const attempt = await createImportProposalAttempt(scope, pairedInput)
+  assert.equal(attempt.input.openingBalances, true)
+  assert.notEqual(
+    attempt.requestKey,
+    (await createImportProposalAttempt(scope, input)).requestKey,
+  )
+})
+
+test("rollback stays bound to the approved proposal and only accepts terminal readback", async () => {
+  const verified = verifiedFixture()
+  const removed: ImportProposal = {
+    ...verified,
+    status: "rolled_back",
+    execution: { ...verified.execution, phase: "rolled_back" },
+    result: null,
+  }
+  const result = await transitionImportProposal(
+    async (url, init) => {
+      assert.match(url, /proposals\/10\/rollback$/)
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        companyId: 3,
+        expectedRevision: verified.revision,
+        expectedDigest: verified.digest,
+      })
+      return Response.json(removed)
+    },
+    scope,
+    verified,
+    "rollback",
+  )
+  assert.deepEqual(result, removed)
+  assert.throws(
+    () => parseImportProposal({ ...removed, result: verified.result }, 3),
+    /result is incomplete/,
+  )
+  assert.throws(
+    () =>
+      parseImportProposal(
+        { ...removed, execution: { ...removed.execution, lineJobId: null } },
+        3,
+      ),
+    /result is incomplete/,
+  )
+  await assert.rejects(
+    transitionImportProposal(
+      async () => Response.json(verified),
+      scope,
+      verified,
+      "rollback",
+    ),
+    /response does not match/,
+  )
+})
+
 test("fixed decimal preview keeps ready rows and explicit holds independently", () => {
   const proposal = parseImportProposal(proposalFixture(), 3)
   assert.equal(proposal.summary.totalDebit, "0.3")

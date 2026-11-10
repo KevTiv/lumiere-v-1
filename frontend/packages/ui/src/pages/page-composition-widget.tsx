@@ -42,6 +42,37 @@ export function PageCompositionWidgetBody({
   testId,
   preview,
 }: WidgetBodyProps) {
+  const content = (
+    <PageCompositionWidgetContent
+      item={item}
+      isLoading={isLoading}
+      testId={testId}
+      preview={preview}
+    />
+  )
+  if (!item?.scope?.length) return content
+
+  return (
+    <div className="flex h-full min-w-0 flex-col gap-2">
+      <div className="min-w-0 flex-1">{content}</div>
+      <dl className="flex flex-wrap gap-x-3 gap-y-1 text-xs leading-5 text-muted-foreground">
+        {item.scope.map(({ label, value }) => (
+          <div key={label} className="min-w-0 break-words">
+            <dt className="inline font-medium">{label} </dt>
+            <dd className="inline">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}
+
+function PageCompositionWidgetContent({
+  item,
+  isLoading,
+  testId,
+  preview,
+}: WidgetBodyProps) {
   const { t } = useTranslation()
   if (preview && item?.widget?.type === "custom") {
     return (

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import type { RecordResponsibility } from "../entity-views/record-page-overview"
 import type { DashboardSection } from "./dashboard-types"
 import type {
   EntityDetailConfig,
@@ -39,6 +40,8 @@ export interface EntityRecordSheetConfig {
   statusBadgeLabels?: Record<string, string>
   /** Overview tab field layout */
   detailConfig: EntityDetailConfig
+  /** An explicit responsibility based on the already loaded record and display labels. */
+  responsibility?: (record: EntityRow) => RecordResponsibility | undefined
   /** Optional contextual review content; the original detail config remains available. */
   overviewContent?: (record: EntityRow) => ReactNode
   wide?: boolean
@@ -76,6 +79,8 @@ export interface ModuleTab {
   entityConfig?: EntityViewConfig
   /** Optional 'New X' button that opens a FormModal */
   createForm?: FormConfig
+  /** Keeps a native create form draft within its domain scope. */
+  createDraftKey?: string
   /** Label for the create button, e.g. 'New Invoice' */
   createLabel?: string
   /** When set, create button is hidden unless checkPermission(resource, action) allows */
@@ -144,7 +149,7 @@ export interface ModuleConfig {
 export function moduleWorkBoardTabId(
   config: Pick<ModuleConfig, "workBoard">,
 ): string | undefined {
-  return config.workBoard ? config.workBoard.tabId ?? "work" : undefined
+  return config.workBoard ? (config.workBoard.tabId ?? "work") : undefined
 }
 
 export interface ModuleWorkspace {
@@ -166,7 +171,9 @@ export interface ModuleTabGroup {
   tabIds: readonly string[]
 }
 
-export type ModuleTabRowItem = { kind: "group"; label: string } | { kind: "tab"; tab: ModuleTab }
+export type ModuleTabRowItem =
+  | { kind: "group"; label: string }
+  | { kind: "tab"; tab: ModuleTab }
 
 /** Tab row in display order, with a group label before each group's tabs. */
 export function buildModuleTabRow(
@@ -175,13 +182,17 @@ export function buildModuleTabRow(
 ): ModuleTabRowItem[] {
   if (!groups?.length) return tabs.map((tab) => ({ kind: "tab", tab }))
   const groupOf = new Map<string, number>()
-  groups.forEach((group, index) => group.tabIds.forEach((id) => groupOf.set(id, index)))
+  groups.forEach((group, index) =>
+    group.tabIds.forEach((id) => groupOf.set(id, index)),
+  )
   const firstGrouped = tabs.findIndex((tab) => groupOf.has(tab.id))
   const leading = tabs.filter(
-    (tab, index) => !groupOf.has(tab.id) && (firstGrouped < 0 || index < firstGrouped),
+    (tab, index) =>
+      !groupOf.has(tab.id) && (firstGrouped < 0 || index < firstGrouped),
   )
   const trailing = tabs.filter(
-    (tab, index) => !groupOf.has(tab.id) && firstGrouped >= 0 && index > firstGrouped,
+    (tab, index) =>
+      !groupOf.has(tab.id) && firstGrouped >= 0 && index > firstGrouped,
   )
   const row: ModuleTabRowItem[] = leading.map((tab) => ({ kind: "tab", tab }))
   groups.forEach((group, index) => {
@@ -216,7 +227,9 @@ export function buildModuleNavigationAreas(
     members.forEach((id) => assigned.add(id))
     areas.push({ id: members[0]!, label: group.label, tabIds: members })
   }
-  const remaining = tabs.filter((tab) => !assigned.has(tab.id)).map((tab) => tab.id)
+  const remaining = tabs
+    .filter((tab) => !assigned.has(tab.id))
+    .map((tab) => tab.id)
   return remaining.length
     ? [{ id: remaining[0]!, label: overviewLabel, tabIds: remaining }, ...areas]
     : areas

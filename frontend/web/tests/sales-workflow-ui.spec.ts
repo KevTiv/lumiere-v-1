@@ -37,20 +37,57 @@ test('failed line reads do not offer sending or an empty quotation', async ({ pa
   await expect(page.getByTestId('sale-order-next-action')).toHaveCount(0);
 });
 
-for (const width of [390, 768, 1440]) test(`sales workspace stays within the viewport at ${width}px`, async ({ page }) => {
-  await page.setViewportSize({ width, height: 900 });
-  await expect(page.getByTestId('sale-order-next-action')).toBeVisible();
-  const box = await page.getByTestId('sale-order-next-action').boundingBox();
-  expect(box!.x).toBeGreaterThanOrEqual(0);
-  expect(box!.x + box!.width).toBeLessThanOrEqual(width);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
-  if (width === 1440 && process.env.SALES_WORKFLOW_REVIEW_DIR) {
-    const directory = process.env.SALES_WORKFLOW_REVIEW_DIR;
-    await page.evaluate(async () => { await document.fonts.ready; });
-    await page.getByTestId('sale-order-page').screenshot({ path: `${directory}/after.png` });
-    await page.goto('/sales-workflow?baseline=1');
-    await expect(page.getByTestId('sales-fixture')).toHaveAttribute('data-hydrated', 'true');
-    await page.evaluate(async () => { await document.fonts.ready; });
-    await page.getByTestId('sale-order-page').screenshot({ path: `${directory}/before.png` });
-  }
-});
+for (const width of [390, 768, 1440])
+  test(`sales workspace stays within the viewport at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 })
+    const overview = page.getByRole("region", { name: "Record overview" })
+    await expect(overview.getByText("Morgan Lee")).toBeVisible()
+    await expect(
+      overview.getByRole("group", { name: "Related records" }),
+    ).toContainText("Deliveries")
+    await expect(overview.getByTestId("sale-order-next-action")).toBeVisible()
+    const box = await page.getByTestId("sale-order-next-action").boundingBox()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(width)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(width)
+    if (width === 1440 && process.env.SALES_WORKFLOW_REVIEW_DIR) {
+      const directory = process.env.SALES_WORKFLOW_REVIEW_DIR
+      await page.evaluate(async () => {
+        await document.fonts.ready
+      })
+      await page
+        .getByTestId("sale-order-page")
+        .screenshot({ path: `${directory}/after.png` })
+      await page.goto("/sales-workflow?baseline=1")
+      await expect(page.getByTestId("sales-fixture")).toHaveAttribute(
+        "data-hydrated",
+        "true",
+      )
+      await page.evaluate(async () => {
+        await document.fonts.ready
+      })
+      await page
+        .getByTestId("sale-order-page")
+        .screenshot({ path: `${directory}/before.png` })
+    }
+  })
+
+test("record overview opens the existing evidence tab with keyboard focus", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 900 })
+  const evidence = page.getByRole("button", { name: "History & sources" })
+  await evidence.focus()
+  await page.keyboard.press("Enter")
+  const tab = page.getByRole("tab", { name: "History & sources" })
+  await expect(tab).toBeFocused()
+  await expect(tab).toHaveAttribute("aria-selected", "true")
+  await expect(
+    page.getByRole("tabpanel", { name: "History & sources" }),
+  ).toHaveText("Quotation created.")
+  await expect(page.getByTestId("sale-order-next-action")).toBeVisible()
+})

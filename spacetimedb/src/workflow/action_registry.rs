@@ -1072,7 +1072,7 @@ fn payment_transaction_snapshot(
         organization_id,
         company_id,
     )?;
-    let fields = vec![
+    let mut fields = vec![
         field("id", transaction.id),
         field("organization_id", transaction.organization_id),
         field("company_id", transaction.company_id),
@@ -1088,6 +1088,12 @@ fn payment_transaction_snapshot(
             option_u64(transaction.account_payment_id),
         ),
     ];
+    if let Some(source) = crate::accounting::payment_management::bank_transaction_material_snapshot(
+        ctx,
+        &transaction,
+    )? {
+        fields.push(field("bank_source", source));
+    }
     let amount = money_value(ctx, transaction.net_account_amount, transaction.currency_id)?;
     Ok(material(
         GuardedActionSubjectKind::PaymentTransaction,

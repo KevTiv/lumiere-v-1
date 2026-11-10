@@ -119,6 +119,52 @@ function type(text: string) {
 }
 
 describe("ErpCommandPalette records", () => {
+  it("uses safe wrapped labels and exact wrapped IDs without exposing object text", () => {
+    const id = "18446744073709551615"
+    data.rows.sale_order = [
+      {
+        id: { some: id },
+        name: { some: "SO-WIRE" },
+        partnerId: { some: "10" },
+      },
+    ]
+    data.rows.contact = [
+      {
+        id: { some: "10" },
+        displayName: { unexpected: "unsafe label" },
+        name: { some: "Zoé Acme" },
+      },
+    ]
+    openPalette()
+    type("acme")
+    const row = screen.getByTestId(
+      `erp-command-palette-record-sale_order-${id}`,
+    )
+    expect(row.textContent).toContain("SO-WIRE")
+    expect(row.textContent).toContain("Zoé Acme")
+    expect(screen.queryByText(/\[object Object\]/)).toBeNull()
+    fireEvent.click(row)
+    expect(push).toHaveBeenCalledWith(`/sales/orders/${id}`)
+  })
+
+  it("omits invalid record identities and does not search arbitrary object payloads", () => {
+    data.rows.sale_order = [
+      { id: 0, name: "Malformed order" },
+      { id: { invalid: "1" }, name: "Malformed order" },
+      { id: 3, name: { some: { value: "Malformed order" } } },
+      { id: Number.MAX_SAFE_INTEGER + 1, name: "Malformed order" },
+    ]
+    openPalette()
+    type("malformed")
+    expect(
+      screen.queryByTestId("erp-command-palette-records-sale_order"),
+    ).toBeNull()
+    type("object")
+    expect(
+      screen.queryByTestId("erp-command-palette-records-sale_order"),
+    ).toBeNull()
+  })
+
   it("offers an invoice workspace when the company has no invoice records", () => {
     data.rows = {}
     openPalette()

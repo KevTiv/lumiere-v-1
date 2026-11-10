@@ -29,8 +29,20 @@ export interface ChatImportTaskStatus {
   proposalCount: number
   proposals: Array<{
     id: string
-    status: "prepared" | "approved" | "executing" | "verified" | "blocked"
-    phase: "not_started" | "headers" | "lines" | "verification" | "complete"
+    status:
+      | "prepared"
+      | "approved"
+      | "executing"
+      | "verified"
+      | "blocked"
+      | "rolled_back"
+    phase:
+      | "not_started"
+      | "headers"
+      | "lines"
+      | "verification"
+      | "complete"
+      | "rolled_back"
     expectedRecords: number
     verifiedResult: {
       recordCount: number

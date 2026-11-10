@@ -1,46 +1,60 @@
 "use client"
 
 import { ModuleDataNotice } from "./module-data-notice"
-import { canUseModuleData, type ModuleDataState } from "../lib/module-data-state"
+import { canUseModuleData, type ModuleDataState,
+} from "../lib/module-data-state"
 
-import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode,
+} from "react"
 import { useErpSession } from "@lumiere/erp-session"
-import { buildEntitySelection, resolveAiEntityType } from "@lumiere/query-hooks/ai-ui-context"
+import { buildEntitySelection, resolveAiEntityType,
+} from "@lumiere/query-hooks/ai-ui-context"
 import {
   useErpAiSelectionReporter,
   useErpAiSelectionState,
 } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/tabs"
 import { Button } from "../components/button"
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/select"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from "../components/select"
 import { Label } from "../components/label"
 import { useTranslation } from "@lumiere/i18n"
 import { LayoutGrid, Plus, Table as TableIcon } from "lucide-react"
-import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
+import { useClearModuleUrlFilter, useModuleUrlFilters,
+} from "../lib/module-url-filters"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { DashboardGrid } from "./dashboard-grid"
-import { ModulePageComposition, PageCompositionActionTargetProvider, usePageCompositionActionSlot } from "./page-composition-host"
+import { ModulePageComposition, PageCompositionActionTargetProvider, usePageCompositionActionSlot,
+  type PageCompositionMountProps,
+} from "./page-composition-host"
 import { DashboardHeader, type TimeRangeValue } from "./dashboard-header"
 import { EntityView } from "../entity-views/entity-view"
 import { EntityRecordSheet } from "../entity-views/entity-record-sheet"
 import { FormModal } from "../forms/form-modal"
 import { RuntimeFormModal } from "../forms/runtime-form-modal"
-import { buildModuleNavigationAreas, type ModuleConfig, type ModuleTab } from "../lib/module-types"
+import { buildModuleNavigationAreas, type ModuleConfig, type ModuleTab,
+} from "../lib/module-types"
 import type { EntityBoardRuntimeContext } from "../lib/module-types"
-import type { EntityRow, EntitySurfacePermission } from "../lib/entity-view-types"
+import type { EntityRow, EntitySurfacePermission,
+} from "../lib/entity-view-types"
 import type { FormConfig, FormValues } from "../lib/form-types"
 import { getEntityRowKey } from "../lib/entity-row-utils"
 import { decideCreateGate, withTabCreateCta } from "../lib/list-empty-state"
 import { useRBAC } from "../lib/rbac-context"
 import { exportDashboardToPng } from "../lib/export-dashboard-png"
 import { KpiStrip } from "../components/kpi-strip"
-import { filterRowsByKpi, activeKpiTile, toggleKpiKey, type KpiTileDef } from "../lib/kpi-tiles"
+import { filterRowsByKpi, activeKpiTile, toggleKpiKey, type KpiTileDef,
+} from "../lib/kpi-tiles"
 import { WorkspaceNav } from "./workspace-nav"
-import { moduleTabHref, moduleWorkspaceNavigation } from "../lib/workspace-navigation"
+import { moduleTabHref, moduleWorkspaceNavigation,
+} from "../lib/workspace-navigation"
 import { HistoryPeriodSelect } from "../components/history-period-select"
-import { parseHistoryPeriod, resolveHistoryPeriod, serializeHistoryPeriod } from "@lumiere/erp-shared/history-period"
-import { configuredModuleHistoryField, filterModuleHistoryRows, removeModuleHistoryFilter, resolveModuleHistoryFilter } from "../lib/module-history-filter"
-import { useAssistantNativeForms, type AssistantNativeFormStatus } from "../components/assistant-native-form-provider"
+import { parseHistoryPeriod, resolveHistoryPeriod, serializeHistoryPeriod,
+} from "@lumiere/erp-shared/history-period"
+import { configuredModuleHistoryField, filterModuleHistoryRows, removeModuleHistoryFilter, resolveModuleHistoryFilter,
+} from "../lib/module-history-filter"
+import { useAssistantNativeForms, type AssistantNativeFormStatus,
+} from "../components/assistant-native-form-provider"
 import { cn } from "../lib/utils"
 
 /** When set, tab create forms use STDB-merged {@link RuntimeFormModal} instead of static-only FormModal. */
@@ -82,12 +96,16 @@ interface ModuleViewProps {
   /** Opt in to retaining an open create form and its source workspace across tab changes. */
   onOpenFormChange?: (tab: string | null) => void
   /** Route existing gated create controls to a domain-owned instance of FormModal. */
-  onOpenCreateForm?: (tabId: string, assistant?: { prompt?: string; scopeKey: string; activationRequestId?: string }) => void | boolean
+  onOpenCreateForm?: (tabId: string, assistant?: { prompt?: string
+      scopeKey: string
+      activationRequestId?: string },
+  ) => void | boolean
   /** Custom native editors (for example invoices) keep their existing domain owner. */
   assistantCreate?: {
     tabIds: readonly string[]
     blocked?: boolean
-    open: (tabId: string, prompt?: string, scopeKey?: string) => AssistantNativeFormStatus | "loading"
+    open: (tabId: string, prompt?: string, scopeKey?: string,
+    ) => AssistantNativeFormStatus | "loading"
   }
   /** Prevent a second assistant form from replacing a domain-owned editor. */
   assistantFormBlocked?: boolean
@@ -108,6 +126,11 @@ interface ModuleViewProps {
   dashboardContent?: ReactNode
   /** Rich overview components register their own individually editable blocks. */
   dashboardCompositionOwned?: boolean
+  /** Keep native dashboard work outside the personal widget layout. */
+  dashboardComposition?: Pick<
+    PageCompositionMountProps,
+    "startingLayouts" | "fixedWidgetIds"
+  > & { fixedContent: ReactNode }
   /**
    * Filters applied to the active entity tab. Defaults to the URL's `?filter=key:value` entries,
    * so chart drill-downs and record links work in every module without per-client wiring.
@@ -136,7 +159,9 @@ function liveSheetRecord(
 ): EntityRow | null {
   if (!selected || !rows || !rowKey || selected[rowKey] == null) return selected
   const key = String(selected[rowKey])
-  return rows.find((row) => row[rowKey] != null && String(row[rowKey]) === key) ?? selected
+  return (
+    rows.find((row) => row[rowKey] != null && String(row[rowKey]) === key) ?? selected
+  )
 }
 
 export function ModuleView({
@@ -163,6 +188,7 @@ export function ModuleView({
   historyTimeZone,
   dashboardContent,
   dashboardCompositionOwned = false,
+  dashboardComposition,
   urlFilters: urlFiltersProp,
   runtimeForms,
   kpiStrips,
@@ -173,7 +199,8 @@ export function ModuleView({
   const urlFilters = urlFiltersProp ?? routeFilters
   const { checkPermission, permissionsReady } = useRBAC()
   const createGate = (permission: EntitySurfacePermission | undefined) =>
-    decideCreateGate(permission, (p) => checkPermission(p.resource, p.action).allowed, permissionsReady !== false)
+    decideCreateGate(permission, (p) => checkPermission(p.resource, p.action).allowed, permissionsReady !== false,
+    )
   const { companyIds, activeCompanyId, activeCompanyReady } = useErpSession()
   const aiReporter = useErpAiSelectionReporter()
   const aiSelection = useErpAiSelectionState()
@@ -198,30 +225,37 @@ export function ModuleView({
   const activeEntityView = config.tabs.find((tab) => tab.id === activeTab)?.entityConfig?.view
   const historyColumns = activeEntityView?.mode === "table" ? activeEntityView.columns
     : activeEntityView?.mode === "table-or-board" ? activeEntityView.table.columns : []
-  const historyField = configuredModuleHistoryField(config.id, activeTab, historyColumns)
+  const historyField = configuredModuleHistoryField(config.id, activeTab, historyColumns,
+  )
   const historyFieldKey = historyField?.dateField
   const historyFilter = useMemo(
-    () => resolveModuleHistoryFilter(config.id, activeTab, rawHistoryPeriod, { timeZone: periodTimeZone, field: historyFieldKey ? { tabId: activeTab, dateField: historyFieldKey } : null }),
+    () => resolveModuleHistoryFilter(config.id, activeTab, rawHistoryPeriod, { timeZone: periodTimeZone, field: historyFieldKey ? { tabId: activeTab, dateField: historyFieldKey } : null,
+      }),
     [config.id, activeTab, rawHistoryPeriod, periodTimeZone, historyFieldKey],
   )
   const activeRows = data[activeTab]
-  const historyRows = useMemo(() => filterModuleHistoryRows(activeRows ?? [], historyFilter), [activeRows, historyFilter])
-  const entityRows = (tabId: string) => tabId === activeTab ? historyRows : data[tabId] ?? []
+  const historyRows = useMemo(() => filterModuleHistoryRows(activeRows ?? [], historyFilter), [activeRows, historyFilter],
+  )
+  const entityRows = (tabId: string) => tabId === activeTab ? historyRows : (data[tabId] ?? [])
   const clearHistoryFilter = () => {
     const query = removeModuleHistoryFilter(searchParams?.toString() ?? "")
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
   }
   const navigationAreas = config.tabNavigation === "areas"
-    ? buildModuleNavigationAreas(config.tabs, config.tabGroups, t("common.moduleNavigation.overview", { defaultValue: "Overview" })) : []
+    ? buildModuleNavigationAreas(config.tabs, config.tabGroups, t("common.moduleNavigation.overview", { defaultValue: "Overview" }),
+        ) : []
   const currentArea = navigationAreas.find((area) => area.tabIds.includes(activeTab)) ?? navigationAreas[0]
-  const tabAreas = Object.fromEntries(navigationAreas.flatMap((area) => area.tabIds.map((tabId) => [tabId, area.id])))
+  const tabAreas = Object.fromEntries(navigationAreas.flatMap((area) => area.tabIds.map((tabId) => [tabId, area.id]),
+    ),
+  )
   const visibleTabs = currentArea ? config.tabs.filter((tab) => currentArea.tabIds.includes(tab.id)) : config.tabs
   const prevActiveTabRef = useRef<string | null>(null)
   const setActiveTab = (v: string) => {
     onActiveTabChange?.(v)
     if (activeTabProp !== undefined) return
     setInternalTab(v)
-    const href = moduleTabHref(pathname, searchParams?.toString() ?? "", v, defaultTab)
+    const href = moduleTabHref(pathname, searchParams?.toString() ?? "", v, defaultTab,
+    )
     router.push(href, { scroll: false })
   }
   // Tabs with an alternate view open on it; the table choice is remembered per tab.
@@ -231,7 +265,8 @@ export function ModuleView({
     for (const tab of config.tabs) {
       if (!tab.entityAltView) continue
       try {
-        const stored = window.localStorage.getItem(`lumiere:module-alt-view:${config.id}:${tab.id}`)
+        const stored = window.localStorage.getItem(`lumiere:module-alt-view:${config.id}:${tab.id}`,
+        )
         if (stored === "alt" || stored === "table") restored[tab.id] = stored
       } catch {
         /* storage unavailable */
@@ -242,7 +277,8 @@ export function ModuleView({
   const chooseAltView = (tabId: string, choice: "alt" | "table") => {
     setAltViewChoice((prev) => ({ ...prev, [tabId]: choice }))
     try {
-      window.localStorage.setItem(`lumiere:module-alt-view:${config.id}:${tabId}`, choice)
+      window.localStorage.setItem(`lumiere:module-alt-view:${config.id}:${tabId}`, choice,
+      )
     } catch {
       /* not remembered */
     }
@@ -255,25 +291,31 @@ export function ModuleView({
   const tabListRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     // Deep links can land on a tab far along the scrollable tab row.
-    const trigger = tabListRef.current?.querySelector<HTMLElement>('[data-active], [aria-selected="true"]')
+    const trigger = tabListRef.current?.querySelector<HTMLElement>('[data-active], [aria-selected="true"]',
+    )
     trigger?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }, [activeTab])
   const workspaceNav = moduleWorkspaceNavigation(config, {
     overview: t("modules.workspaces.overview"), more: t("modules.workspaces.more"),
   })
   const [openForm, setOpenForm] = useState<string | null>(null)
-  const [assistantFormPrompt, setAssistantFormPrompt] = useState<{ tabId: string; text: string } | null>(null)
+  const [assistantFormPrompt, setAssistantFormPrompt] = useState<{ tabId: string
+    text: string } | null>(null)
   const [assistantEditorScope, setAssistantEditorScope] = useState<string | null>(null)
   const assistantForms = useAssistantNativeForms()
-  const [activationEditor, setActivationEditor] = useState<{ requestId: string; tabId: string } | null>(null)
-  const activationRecord = useRef<{ requestId: string; recordId: string } | null>(null)
+  const [activationEditor, setActivationEditor] = useState<{ requestId: string
+    tabId: string } | null>(null)
+  const activationRecord = useRef<{ requestId: string
+    recordId: string } | null>(null)
   const finishActivation = assistantForms?.finishActivation
   const abandonActivation = assistantForms?.abandonActivation
   const assistantScopeCurrent = !assistantEditorScope || assistantEditorScope === assistantForms?.scopeKey
-  const openCreateForm = (tabId: string, prompt?: string, scopeKey?: string, activationRequestId?: string) => {
+  const openCreateForm = (tabId: string, prompt?: string, scopeKey?: string, activationRequestId?: string,
+  ) => {
     if (onOpenCreateForm && !useRuntimeCreate) {
       const opened = scopeKey
-        ? onOpenCreateForm(tabId, { prompt, scopeKey, ...(activationRequestId ? { activationRequestId } : {}) })
+        ? onOpenCreateForm(tabId, { prompt, scopeKey, ...(activationRequestId ? { activationRequestId } : {}),
+          })
         : onOpenCreateForm(tabId)
       if (opened === false) return false
     } else setOpenForm(tabId)
@@ -291,7 +333,8 @@ export function ModuleView({
     const saved = activationRecord.current
     finishActivation?.(requestId, saved?.requestId === requestId
       ? { status: "saved", recordId: saved.recordId }
-      : { status: "cancelled" })
+      : { status: "cancelled" },
+    )
     setActivationEditor(null)
     activationRecord.current = null
   }
@@ -317,7 +360,8 @@ export function ModuleView({
 
   const handleDashboardExport = useCallback(async () => {
     if (!dashboardGridRef.current) return
-    await exportDashboardToPng(dashboardGridRef.current, `${config.title}-dashboard`)
+    await exportDashboardToPng(dashboardGridRef.current, `${config.title}-dashboard`,
+    )
   }, [config.title])
 
   useEffect(() => {
@@ -350,11 +394,13 @@ export function ModuleView({
     tab?.createPermission != null && checkPermission(tab.createPermission.resource, "read").allowed
   useEffect(() => {
     if (!activationEditor || !assistantScopeCurrent) return
-    const tab = config.tabs.find((candidate) => candidate.id === activationEditor.tabId)
+    const tab = config.tabs.find((candidate) => candidate.id === activationEditor.tabId,
+    )
     const denied = permissionsReady === false || createGate(tab?.createPermission) !== "allowed"
       || !activationReadAllowed(tab) || dataState?.[activationEditor.tabId]?.status === "denied"
     if (!denied && tabUsable(activationEditor.tabId)) return
-    finishActivation?.(activationEditor.requestId, { status: denied ? "denied" : "unavailable" })
+    finishActivation?.(activationEditor.requestId, { status: denied ? "denied" : "unavailable",
+    })
     setOpenForm(null)
     setActivationEditor(null)
     onAssistantFormScopeChange?.()
@@ -371,7 +417,8 @@ export function ModuleView({
     if (rawHistoryPeriod != null && !parseHistoryPeriod(rawHistoryPeriod)) return null
     if (dashboardTimeRange === undefined) return undefined
     try {
-      return resolveHistoryPeriod(dashboardTimeRange, { timeZone: periodTimeZone })
+      return resolveHistoryPeriod(dashboardTimeRange, { timeZone: periodTimeZone,
+      })
     } catch {
       return null
     }
@@ -383,7 +430,8 @@ export function ModuleView({
     setAssistantEditorScope(null)
     setActivationEditor(null)
     onAssistantFormScopeChange?.()
-  }, [assistantEditorScope, assistantForms?.scopeKey, onAssistantFormScopeChange])
+  }, [assistantEditorScope, assistantForms?.scopeKey, onAssistantFormScopeChange,
+  ])
   // Consume a shell-owned, scope-bound presentation request through the very same
   // create controls as the user. Never submit, replace an editor, or invent a form.
   useEffect(() => {
@@ -392,23 +440,31 @@ export function ModuleView({
     if (request.onActivationReturn && searchParams?.get("activationForm") !== request.requestId) return
     const settle = (status: AssistantNativeFormStatus) => assistantForms.settle(request.requestId, status)
     const tab = config.tabs.find((candidate) => candidate.id === request.tabId)
-    if (request.onActivationReturn && permissionsReady !== false && !activationReadAllowed(tab)) { settle("denied"); return }
+    if (request.onActivationReturn && permissionsReady !== false && !activationReadAllowed(tab)) { settle("denied")
+      return }
     if (request.tabId !== activeTab) return
-    if (!assistantForms.isCurrent(request.requestId)) { settle("unavailable"); return }
-    if (openForm || selectedRecord || assistantFormBlocked || assistantCreate?.blocked || isPending) { settle("busy"); return }
+    if (!assistantForms.isCurrent(request.requestId)) { settle("unavailable")
+      return }
+    if (openForm || selectedRecord || assistantFormBlocked || assistantCreate?.blocked || isPending) { settle("busy")
+      return }
     if (permissionsReady === false) return
     if (assistantCreate?.tabIds.includes(request.tabId)) {
-      const status = assistantCreate.open(request.tabId, request.prompt, request.scopeKey)
+      const status = assistantCreate.open(request.tabId, request.prompt, request.scopeKey,
+      )
       if (status === "opened") setAssistantEditorScope(request.scopeKey)
       if (status !== "loading") settle(status)
       return
     }
     const state = dataState?.[request.tabId]
     if (state?.status === "loading" || dataLoading?.[request.tabId]) return
-    if (state?.status === "denied") { settle("denied"); return }
-    if (!tab?.createForm || !tab.createPermission || !tabUsable(request.tabId) || (!onFormSubmit && !(!useRuntimeCreate && onOpenCreateForm))) { settle("unavailable"); return }
-    if (createGate(tab.createPermission) !== "allowed") { settle("denied"); return }
-    const opened = openCreateForm(tab.id, request.prompt, request.scopeKey, request.onActivationReturn ? request.requestId : undefined)
+    if (state?.status === "denied") { settle("denied")
+      return }
+    if (!tab?.createForm || !tab.createPermission || !tabUsable(request.tabId) || (!onFormSubmit && !(!useRuntimeCreate && onOpenCreateForm))) { settle("unavailable")
+      return }
+    if (createGate(tab.createPermission) !== "allowed") { settle("denied")
+      return }
+    const opened = openCreateForm(tab.id, request.prompt, request.scopeKey, request.onActivationReturn ? request.requestId : undefined,
+    )
     settle(opened ? "opened" : "unavailable")
   })
   const showDashboardTimeRange =
@@ -432,7 +488,9 @@ export function ModuleView({
             <Plus className="h-4 w-4" />
             {activeTabConfig.createLabel ?? "New"}
           </Button>
-        ) : activeTabUsable ? activeTabConfig?.primaryAction : undefined}
+        ) : activeTabUsable ? (
+            activeTabConfig?.primaryAction
+          ) : undefined}
         secondaryAction={compositionActionSlot}
         timeRange={showDashboardTimeRange ? dashboardTimeRange : undefined}
         onTimeRangeChange={showDashboardTimeRange ? onDashboardTimeRangeChange : undefined}
@@ -446,17 +504,20 @@ export function ModuleView({
           <>
             <div className="flex flex-wrap items-center gap-3" data-testid={`module-navigation-${config.id}`}>
               <Label htmlFor={`module-area-${config.id}`}>
-                {t("common.moduleNavigation.area", { defaultValue: "Task area" })}
+                {t("common.moduleNavigation.area", { defaultValue: "Task area",
+                  })}
               </Label>
               <Select value={currentArea.id} onValueChange={(id) => {
-                const area = navigationAreas.find((candidate) => candidate.id === id)
+                const area = navigationAreas.find((candidate) => candidate.id === id,
+                    )
                 if (area?.tabIds[0]) setActiveTab(area.tabIds[0])
               }}>
                 <SelectTrigger id={`module-area-${config.id}`} data-testid={`module-area-${config.id}`} data-tab-areas={JSON.stringify(tabAreas)} className="w-full sm:w-64">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent><SelectGroup>
-                  {navigationAreas.map((area) => <SelectItem key={area.id} value={area.id}>{area.label}</SelectItem>)}
+                  {navigationAreas.map((area) => (
+                        <SelectItem key={area.id} value={area.id}>{area.label}</SelectItem>))}
                 </SelectGroup></SelectContent>
               </Select>
             </div>
@@ -485,7 +546,8 @@ export function ModuleView({
             config={workspaceNav}
             activeTab={activeTab}
             onTabChange={setActiveTab}
-            hrefForTab={(tabId) => moduleTabHref(pathname, searchParams?.toString() ?? "", tabId, defaultTab)}
+            hrefForTab={(tabId) => moduleTabHref(pathname, searchParams?.toString() ?? "", tabId, defaultTab,
+                )}
           />
         )}
 
@@ -503,20 +565,40 @@ export function ModuleView({
             {dataState?.[tab.id]?.status !== "error" && dataState?.[tab.id]?.status !== "denied" && (<>
             {tab.type === "dashboard" && dashboardCompositionOwned && dashboardContent}
             {tab.type === "dashboard" && !dashboardCompositionOwned && (
-              <ModulePageComposition
+              <div
+                        ref={
+                          dashboardComposition ? dashboardGridRef : undefined
+                        }
+                        className={
+                          dashboardComposition ? "space-y-4" : "contents"
+                        }
+                      >
+                        {dashboardComposition?.fixedContent}
+                        <ModulePageComposition
                 moduleId={config.id}
                 pageId={tab.id}
                 title={`${config.title} · ${tab.label}`}
                 sections={dashboardContent == null ? tab.sections : undefined}
-                historyBounds={showDashboardTimeRange ? dashboardHistoryBounds : undefined}
+                          startingLayouts={
+                            dashboardComposition?.startingLayouts
+                          }
+                          fixedWidgetIds={dashboardComposition?.fixedWidgetIds}
+                          historyBounds={showDashboardTimeRange ? dashboardHistoryBounds : undefined
+                          }
+                          historyTimeZone={periodTimeZone}
                 isLoading={dataState?.[tab.id]?.status === "loading" || Object.values(dataLoading ?? {}).some(Boolean)}
               >
-                {dashboardContent ?? (tab.sections && <DashboardGrid
-                  ref={dashboardGridRef}
+                {dashboardContent ?? (tab.sections && (
+                              <DashboardGrid
+                  ref={
+                                  dashboardComposition
+                                    ? undefined
+                                    : dashboardGridRef}
                   sections={tab.sections}
                   isLoading={dataState?.[tab.id]?.status === "loading" || Object.values(dataLoading ?? {}).some(Boolean)}
-                />)}
-              </ModulePageComposition>
+                />))}
+                        </ModulePageComposition>
+                      </div>
             )}
             {tab.type === "custom" && tab.customContent}
 
@@ -528,7 +610,8 @@ export function ModuleView({
               >
                 {([
                   ["alt", tab.entityAltView.label, LayoutGrid],
-                  ["table", tab.entityAltView.tableLabel, TableIcon],
+                  ["table", tab.entityAltView.tableLabel, TableIcon,
+                              ],
                 ] as const).map(([choice, label, Icon]) => {
                   const pressed = (showAltView(tab) ? "alt" : "table") === choice
                   return (
@@ -562,12 +645,14 @@ export function ModuleView({
                       value: kpi.value,
                       hint: kpi.hint,
                       tone: kpi.tone,
-                      active: activeKpiTile(kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)?.key === kpi.key,
+                      active: activeKpiTile(kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null,
+                                  )?.key === kpi.key,
                       onSelect: kpi.matches
                         ? () =>
                             setKpiSelection((prev) => ({
                               ...prev,
-                              [tab.id]: toggleKpiKey(prev[tab.id] ?? null, kpi.key),
+                              [tab.id]: toggleKpiKey(prev[tab.id] ?? null, kpi.key,
+                                        ),
                             }))
                         : undefined,
                     }))}
@@ -579,13 +664,18 @@ export function ModuleView({
                       value={historyFilter.status === "active" ? historyFilter.period : "all"}
                       timeZone={historyFilter.status === "active" ? historyFilter.timeZone : "UTC"}
                       onChange={(period) => {
-                        const params = new URLSearchParams(searchParams?.toString())
-                        params.set("period", serializeHistoryPeriod(period))
-                        params.set("periodTimeZone", historyTimeZone ?? "UTC")
-                        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+                        const params = new URLSearchParams(searchParams?.toString(),
+                                  )
+                        params.set("period", serializeHistoryPeriod(period),
+                                  )
+                        params.set("periodTimeZone", historyTimeZone ?? "UTC",
+                                  )
+                        router.replace(`${pathname}?${params.toString()}`, { scroll: false },
+                                  )
                       }}
                     />
-                    <span className="text-xs text-muted-foreground">{historyColumns.find((column) => column.key === historyField.dateField)?.label ?? historyField.dateField}</span>
+                    <span className="text-xs text-muted-foreground">{historyColumns.find((column) => column.key === historyField.dateField,
+                                )?.label ?? historyField.dateField}</span>
                   </div>
                 )}
                 {activeTab === tab.id && historyFilter.status !== "inactive" && (
@@ -597,17 +687,23 @@ export function ModuleView({
                     <p>
                       {historyFilter.status === "invalid"
                         ? historyFilter.reason === "invalid-time-zone"
-                          ? t("common.historyPeriod.invalidTimeZone", { defaultValue: "This link has an invalid time zone. Clear it to view the records." })
-                          : t("common.historyPeriod.invalidLink", { defaultValue: "This link has an invalid date range. Clear it to view the records." })
+                          ? t("common.historyPeriod.invalidTimeZone", { defaultValue: "This link has an invalid time zone. Clear it to view the records.",
+                                          },
+                                        )
+                          : t("common.historyPeriod.invalidLink", { defaultValue: "This link has an invalid date range. Clear it to view the records.",
+                                        })
                         : historyFilter.period === "all"
-                          ? t("common.historyPeriod.filteredAll", { defaultValue: "Table date range: all dated records ({{timeZone}}).", timeZone: historyFilter.timeZone })
+                          ? t("common.historyPeriod.filteredAll", { defaultValue: "Table date range: all dated records ({{timeZone}}).", timeZone: historyFilter.timeZone,
+                                        })
                           : t("common.historyPeriod.filteredRange", {
                               defaultValue: "Table date range: {{from}} through {{through}} ({{timeZone}}).",
                               from: historyFilter.dates.from, through: historyFilter.dates.through, timeZone: historyFilter.timeZone,
-                            })}
+                            },
+                                        )}
                     </p>
                     <Button type="button" variant="ghost" size="sm" onClick={clearHistoryFilter}>
-                      {t("common.historyPeriod.clear", { defaultValue: "Clear date range" })}
+                      {t("common.historyPeriod.clear", { defaultValue: "Clear date range",
+                                  })}
                     </Button>
                   </div>
                 )}
@@ -622,21 +718,25 @@ export function ModuleView({
                             onClick: () => openCreateForm(tab.id),
                             // Not gated until permissions load, so the empty state never flashes read-only.
                             permission: createGate(tab.createPermission) === "loading" ? undefined : tab.createPermission,
-                          }),
+                          },
+                                    ),
                         }
                       : tab.entityConfig
                   }
                   externalFilter={
                     kpiStrips?.[tab.id]
                       ? {
-                          active: activeKpiTile(kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null) != null,
-                          onClear: () => setKpiSelection((prev) => ({ ...prev, [tab.id]: null })),
+                          active: activeKpiTile(kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null,
+                                      ) != null,
+                          onClear: () => setKpiSelection((prev) => ({ ...prev, [tab.id]: null,
+                                      })),
                         }
                       : undefined
                   }
                   data={
                     kpiStrips?.[tab.id]
-                      ? filterRowsByKpi(entityRows(tab.id), kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)
+                      ? filterRowsByKpi(entityRows(tab.id), kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null,
+                                  )
                       : entityRows(tab.id)
                   }
                   isLoading={dataState?.[tab.id]?.status === "loading" || dataLoading?.[tab.id]}
@@ -653,7 +753,8 @@ export function ModuleView({
                       : undefined
                   }
                   onRowClick={(row) => {
-                    const entityType = resolveAiEntityType(tab.entityConfig!)
+                    const entityType = resolveAiEntityType(tab.entityConfig!,
+                              )
                     if (entityType) {
                       aiReporter?.setSelection(
                         buildEntitySelection({
@@ -679,7 +780,8 @@ export function ModuleView({
                     open={selectedRecord != null}
                     onOpenChange={(open) => !open && setSelectedRecord(null)}
                     config={tab.recordSheet}
-                    record={liveSheetRecord(data[tab.id], selectedRecord, getEntityRowKey(tab.entityConfig!))}
+                    record={liveSheetRecord(data[tab.id], selectedRecord, getEntityRowKey(tab.entityConfig!),
+                              )}
                   />
                 )}
 
@@ -687,11 +789,13 @@ export function ModuleView({
                   (useRuntimeCreate && runtimeForms ? (
                     <RuntimeFormModal
                       open={openForm === tab.id && assistantScopeCurrent && (!assistantEditorScope || createGate(tab.createPermission) === "allowed")}
-                      draftKey={assistantEditorScope ? `${activationEditor ? "activation" : "assistant"}:${assistantEditorScope}` : undefined}
+                      draftKey={assistantEditorScope ? `${activationEditor ? "activation" : "assistant"}:${assistantEditorScope}` : tab.createDraftKey
+                                }
                       onOpenChange={(open) => !open && closeCreateForm()}
                       staticConfig={tab.createForm}
                       renderPreview={renderCreatePreview
-                        ? (values) => renderCreatePreview(tab.id, values, tab.createForm!)
+                        ? (values) => renderCreatePreview(tab.id, values, tab.createForm!,
+                                        )
                         : undefined}
                       moduleId={config.id}
                       formId={tab.createForm.id}
@@ -708,7 +812,8 @@ export function ModuleView({
                               formId: tab.createForm.id,
                               initialPrompt: assistantFormPrompt?.tabId === tab.id ? assistantFormPrompt.text : undefined,
                               entityType:
-                                resolveAiEntityType(tab.entityConfig) ?? tab.entityConfig.id,
+                                resolveAiEntityType(tab.entityConfig,
+                                          ) ?? tab.entityConfig.id,
                             }
                           : undefined
                       }
@@ -717,11 +822,13 @@ export function ModuleView({
                   ) : (
                     <FormModal
                       open={openForm === tab.id && assistantScopeCurrent && (!assistantEditorScope || createGate(tab.createPermission) === "allowed")}
-                      draftKey={assistantEditorScope ? `${activationEditor ? "activation" : "assistant"}:${assistantEditorScope}` : undefined}
+                      draftKey={assistantEditorScope ? `${activationEditor ? "activation" : "assistant"}:${assistantEditorScope}` : tab.createDraftKey
+                                }
                       onOpenChange={(open) => !open && closeCreateForm()}
                       config={tab.createForm}
                       renderPreview={renderCreatePreview
-                        ? (values) => renderCreatePreview(tab.id, values, tab.createForm!)
+                        ? (values) => renderCreatePreview(tab.id, values, tab.createForm!,
+                                        )
                         : undefined}
                       isPending={isPending}
                       showSubmitSuccessToast={showSubmitSuccessToast}
@@ -732,7 +839,8 @@ export function ModuleView({
                               formId: tab.createForm.id,
                               initialPrompt: assistantFormPrompt?.tabId === tab.id ? assistantFormPrompt.text : undefined,
                               entityType:
-                                resolveAiEntityType(tab.entityConfig) ?? tab.entityConfig.id,
+                                resolveAiEntityType(tab.entityConfig,
+                                          ) ?? tab.entityConfig.id,
                             }
                           : undefined
                       }
@@ -749,6 +857,7 @@ export function ModuleView({
                 placement="insights"
                 sections={tab.insightSections}
                 historyBounds={historyFilter.status === "active" ? historyFilter.bounds : historyFilter.status === "invalid" ? null : undefined}
+                        historyTimeZone={periodTimeZone}
               />
             )}
             </>)}

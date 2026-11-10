@@ -30,6 +30,12 @@ import {
 } from "@lumiere/query-hooks/hooks/work-board-model"
 import { workBoardStatuses } from "./work-board-config"
 import {
+  groupWorkflowWork,
+  recordFollowupHref,
+  workflowNextStep,
+} from "./workflow-work-queue"
+import { useRBAC } from "@lumiere/ui/lib/rbac-context"
+import {
   approvalActorOptions,
   approvalSelection,
   approvalResubmissionSelection,
@@ -89,6 +95,7 @@ export function WorkflowWorkContent({
   onTeamChange: (team: string | null) => void
 }) {
   const { t } = useTranslation()
+  const { checkPermission } = useRBAC()
   const taskTitle = (row: WorkTaskRow) => {
     if (row.workSourceTitle?.trim()) return row.workSourceTitle
     const subjectId = row.subjectId ?? row.subject_id
@@ -140,6 +147,12 @@ export function WorkflowWorkContent({
           ),
     [query.data, query.isError],
   )
+  const workGroups = useMemo(() => groupWorkflowWork(rows), [rows])
+  const ownership = (row: WorkTaskRow) => {
+    if (row.workAssignedToMe) return t("workBoard.mineBadge")
+    if (workStatus(row) === "Claimed") return t("workBoard.status.Claimed")
+    return t("workBoard.teamWork")
+  }
   const teams = useMemo(
     () =>
       Array.from(
@@ -485,6 +498,13 @@ export function WorkflowWorkContent({
         current.subjectId ?? current.subject_id,
       )
     : undefined
+  const followupHref =
+    current && checkPermission("activity", "create").allowed
+      ? recordFollowupHref(
+        current.subjectModel ?? current.subject_model,
+        current.subjectId ?? current.subject_id,
+      )
+    : undefined
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -615,10 +635,26 @@ export function WorkflowWorkContent({
                     <th className="p-3">{t("workBoard.scope")}</th>
                     <th className="p-3">{t("workBoard.statusLabel")}</th>
                     <th className="p-3">{t("workBoard.ownership")}</th>
+                  <th scope="col" className="p-3">
+                      {t("workBoard.nextStep.title")}
+                    </th>
                   </tr>
                 </thead>
-                <tbody>
-                  {rows.map((row) => (
+                {workGroups.map((group) => (
+                  <tbody key={group.id}>
+                    <tr className="border-b bg-muted/20">
+                      <th
+                        scope="rowgroup"
+                        colSpan={5}
+                        className="px-3 py-2 text-xs font-semibold"
+                      >
+                        {t(`workBoard.queue.${group.id}`)}{" "}
+                        <span className="font-normal text-muted-foreground">
+                          ({group.rows.length})
+                        </span>
+                      </th>
+                    </tr>
+                    {group.rows.map((row) => (
                     <tr key={String(row.id)} className="border-b last:border-0">
                       <td className="p-3">
                         <button
@@ -639,13 +675,14 @@ export function WorkflowWorkContent({
                         {t(`workBoard.status.${workStatus(row) ?? "Open"}`)}
                       </td>
                       <td className="p-3">
-                        {row.workAssignedToMe
-                          ? t("workBoard.mineBadge")
-                          : t("workBoard.teamWork")}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
+                        {ownership(row)}</td>
+                        <td className="p-3">
+                          {t(`workBoard.nextStep.${workflowNextStep(row)}`)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                ))}
               </table>
             </div>
           ) : null}
@@ -695,11 +732,19 @@ export function WorkflowWorkContent({
                 {t(`workBoard.status.${workStatus(current) ?? "Open"}`)}
               </Badge>
               {href && (
-                <p>
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
                   <Link className="text-sm font-medium underline" href={href}>
                     {t("workBoard.openRecord")}
                   </Link>
-                </p>
+                  {followupHref && (
+                    <Link
+                      className="text-sm font-medium underline"
+                      href={followupHref}
+                    >
+                      {t("workBoard.scheduleOnRecord")}
+                    </Link>
+                  )}
+                </div>
               )}
               {workStatus(current) !== "Cancelled" &&
                 approvalActorOptions(current).length > 0 && (

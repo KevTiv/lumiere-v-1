@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useRef } from "react"
 import { cn } from "../lib/utils"
 import { ExternalLink } from "lucide-react"
 import { Badge } from "../components/badge"
@@ -18,24 +19,25 @@ import { useTranslation } from "@lumiere/i18n"
 import { RecordChatter } from "../crm-components/crm-record-chatter"
 import { EntityDetail } from "./entity-detail"
 import { RecordAuditTab } from "./record-audit-tab"
+import { RecordPageOverview } from "./record-page-overview"
 import type { EntityRecordSheetConfig } from "../lib/module-types"
 import type { BadgeVariant } from "../lib/entity-view-types"
 import { commitRecordListFor } from "../lib/record-list-context"
-import { humanizeEnumValue, statusTone } from "../lib/entity-row-values"
+import {
+  entityEnumTag,
+  entityScalarText,
+  getRowField,
+  humanizeEnumValue,
+  statusTone,
+} from "../lib/entity-row-values"
+import { firstOwnedKey } from "@lumiere/erp-shared/row-values"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 
 interface EntityRecordSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   config: EntityRecordSheetConfig
   record: Record<string, unknown> | null
-}
-
-function resolveStatusValue(record: Record<string, unknown>, statusKey: string): string {
-  const value = record[statusKey]
-  if (value != null && typeof value === "object" && "tag" in value) {
-    return String((value as { tag: string }).tag)
-  }
-  return value != null ? String(value) : ""
 }
 
 export function EntityRecordSheet({
@@ -45,9 +47,24 @@ export function EntityRecordSheet({
   record,
 }: EntityRecordSheetProps) {
   const { t } = useTranslation()
-  const title = record ? String(record[config.titleKey] ?? "") : ""
+  const evidenceTrigger = useRef<HTMLButtonElement>(null)
+  const historyLabel = t("businessHistory.title", {
+    defaultValue: "History & sources",
+  })
+  const recordId = record
+    ? ((
+        parseStrictU64(firstOwnedKey(record, "id", "Id")) || undefined
+      )?.toString() ?? "")
+    : ""
+  const title = record
+    ? (entityScalarText(getRowField(record, config.titleKey)) ??
+      (recordId
+        ? `#${recordId}`
+        : t("common.entityView.record", { defaultValue: "Record" })))
+    : ""
   const statusRaw =
-    record && config.statusKey ? resolveStatusValue(record, config.statusKey) : ""
+    record && config.statusKey
+      ? (entityEnumTag(getRowField(record, config.statusKey)) ?? "") : ""
   const statusVariant: BadgeVariant =
     statusTone(statusRaw) ??
     (config.statusBadgeVariants?.[statusRaw] as BadgeVariant | undefined) ??
@@ -55,11 +72,10 @@ export function EntityRecordSheet({
   const statusLabel = config.statusBadgeLabels?.[statusRaw] ?? humanizeEnumValue(statusRaw)
   const { organizationId } = useErpSession()
   const discussionModel = config.discussion ? (config.discussion.resModel ?? config.auditTableName) : undefined
-  const recordId = record ? String(record.id ?? record.Id ?? "") : ""
-  const historyRecordId = record ? record.id ?? record.Id : undefined
-  const showDiscussion = Boolean(discussionModel && organizationId && /^\d+$/.test(recordId))
+  const showDiscussion = Boolean(discussionModel && organizationId && recordId)
   const openHref = record ? config.openHref?.(record) : undefined
-  const actions = record ? (typeof config.actions === "function" ? config.actions(record) : config.actions) : null
+  const actions = record ? typeof config.actions === "function" ? config.actions(record) : config.actions
+    : null
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -71,13 +87,17 @@ export function EntityRecordSheet({
             </SheetHeader>
 
             <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4">
-              {(config.statusKey || config.actions || openHref) && (
+              <RecordPageOverview
+                testIdPrefix="entity-record-sheet"
+                header={
+                  statusRaw || actions || openHref ? (
                 <div className="flex flex-wrap items-center gap-2">
                   {config.statusKey && statusRaw && (
                     <Badge variant={statusVariant} className="max-w-full whitespace-normal">{statusLabel}</Badge>
                   )}
                   {actions && (
-                    <div className={cn("flex min-w-0 flex-wrap gap-2 [&_button]:h-auto [&_button]:min-h-8 [&_button]:max-w-full [&_button]:whitespace-normal", typeof config.actions === "function" && "w-full")}>{actions}</div>
+                    <div className={cn("flex min-w-0 flex-wrap gap-2 [&_button]:h-auto [&_button]:min-h-8 [&_button]:max-w-full [&_button]:whitespace-normal", typeof config.actions === "function" && "w-full",
+                          )}>{actions}</div>
                   )}
                   {openHref && (
                     <Button
@@ -93,7 +113,21 @@ export function EntityRecordSheet({
                     </Button>
                   )}
                 </div>
-              )}
+              ) : null
+                }
+                responsibility={config.responsibility?.(record)}
+                evidence={
+                  config.auditTableName && recordId
+                    ? {
+                        label: historyLabel,
+                        open: () => {
+                          evidenceTrigger.current?.click()
+                          evidenceTrigger.current?.focus()
+                        },
+                      }
+                    : undefined
+                }
+              />
 
               <Tabs defaultValue="overview" className="min-w-0 flex flex-col">
                 <ContextTabsList aria-label="Record views">
@@ -113,11 +147,16 @@ export function EntityRecordSheet({
                       Discussion
                     </ContextTabsTrigger>
                   )}
-                  <ContextTabsTrigger value="audit">{t("businessHistory.title")}</ContextTabsTrigger>
+                  <ContextTabsTrigger ref={evidenceTrigger} value="audit">
+                    {historyLabel}</ContextTabsTrigger>
                 </ContextTabsList>
 
                 <TabsContent value="overview" className="mt-4">
-                  {config.overviewContent ? config.overviewContent(record) : <EntityDetail config={config.detailConfig} data={record} />}
+                  {config.overviewContent ? (
+                    config.overviewContent(record)
+                  ) : (
+                    <EntityDetail config={config.detailConfig} data={record} />
+                  )}
                 </TabsContent>
 
                 {config.customTabs?.map((tab) => (
@@ -142,8 +181,10 @@ export function EntityRecordSheet({
                   {config.auditTableName ? (
                     <RecordAuditTab
                       tableName={config.auditTableName}
-                      recordId={typeof historyRecordId === "string" || typeof historyRecordId === "number" || typeof historyRecordId === "bigint" ? historyRecordId : ""}
-                      companyId={typeof record.companyId === "string" || typeof record.companyId === "number" || typeof record.companyId === "bigint" ? record.companyId : typeof record.company_id === "string" || typeof record.company_id === "number" || typeof record.company_id === "bigint" ? record.company_id : undefined}
+                      recordId={recordId}
+                      companyId={
+                        parseStrictU64(getRowField(record, "companyId")) ??
+                        undefined}
                     />
                   ) : (
                     <p className="text-sm text-muted-foreground">

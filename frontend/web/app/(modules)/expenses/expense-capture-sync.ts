@@ -3,10 +3,11 @@ import type { CreateExpenseParams } from "@lumiere/stdb/types"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import type { DocumentBlobUploadResult } from "../../../lib/document-blob-upload"
-import type {
-  ExpenseCaptureOutboxItem,
-  ExpenseCapturePayload,
-  ExpenseCaptureReceipt,
+import {
+  isExpenseCaptureReadbackOnly,
+  type ExpenseCaptureOutboxItem,
+  type ExpenseCapturePayload,
+  type ExpenseCaptureReceipt,
 } from "../../../lib/expense-capture-outbox"
 
 export interface CaptureEffectRow {
@@ -166,7 +167,11 @@ function assertCapturePayload(
   item: ExpenseCaptureOutboxItem,
 ): void {
   const payload = item.payload
-  if (payload.policyExceptionReason) throw new CaptureReadbackError("unavailable", "The policy exception reason cannot be confirmed from the expense projection")
+  if (payload.policyExceptionReason)
+    throw new CaptureReadbackError(
+      "unavailable",
+      "The policy exception reason cannot be confirmed from the expense projection",
+    )
   const params = capturePayloadToParams(
     payload,
     BigInt(item.companyId!),
@@ -207,7 +212,9 @@ function assertCapturePayload(
       (payload.paymentMode ?? "OutOfPocket") ||
     !Array.isArray(taxes) ||
     taxes.length !== (params.taxIds?.length ?? 0) ||
-    taxes.some((tax, index) => parseStrictU64(tax) !== params.taxIds?.[index]) ||
+    taxes.some(
+      (tax, index) => parseStrictU64(tax) !== params.taxIds?.[index],
+    ) ||
     !captureOptionalId(field("productId", "product_id"), params.productId) ||
     !captureOptionalId(field("accountId", "account_id"), params.accountId) ||
     !captureOptionalId(
@@ -337,7 +344,9 @@ export function capturePayloadToParams(
     taxIds: (payload.taxIds ?? []).map(BigInt),
     productId: payload.productId ? BigInt(payload.productId) : undefined,
     accountId: payload.accountId ? BigInt(payload.accountId) : undefined,
-    analyticAccountId: payload.analyticAccountId ? BigInt(payload.analyticAccountId) : undefined,
+    analyticAccountId: payload.analyticAccountId
+      ? BigInt(payload.analyticAccountId)
+      : undefined,
     policyExceptionReason: payload.policyExceptionReason,
     attachmentIds,
     projectId: payload.projectId ? BigInt(payload.projectId) : undefined,
@@ -395,9 +404,16 @@ export async function syncExpenseCapture(
       "scope",
       "Select the company saved with this queued capture",
     )
-  if (item.formOrigin && (item.formOrigin.actorIdentity !== scope.actorIdentity
-    || item.formOrigin.organizationId !== String(scope.organizationId))) {
-    throw new CaptureReadbackError("scope", "Switch back to the signed-in identity saved with this expense request")
+  if (
+    (item.actorIdentity && item.actorIdentity !== scope.actorIdentity) ||
+    (item.formOrigin &&
+      (item.formOrigin.actorIdentity !== scope.actorIdentity ||
+        item.formOrigin.organizationId !== String(scope.organizationId)))
+  ) {
+    throw new CaptureReadbackError(
+      "scope",
+      "Switch back to the signed-in identity saved with this expense request",
+    )
   }
   let current = item
   const save = (next: ExpenseCaptureOutboxItem) => {
@@ -414,10 +430,10 @@ export async function syncExpenseCapture(
     current,
   )
   if (existing) return confirmed(existing)
-  if (current.syncState === "submitting" || current.syncState === "unknown") {
+  if (isExpenseCaptureReadbackOnly(current.syncState)) {
     save({
       ...current,
-      syncState: "unknown",
+      syncState: current.syncState === "conflict" ? "conflict" : "unknown",
       lastError:
         "The expense outcome is not confirmed. Check again before any further action.",
     })

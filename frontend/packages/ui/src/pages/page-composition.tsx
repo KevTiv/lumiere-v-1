@@ -48,7 +48,9 @@ import {
   pageLayoutsEqual,
   pageWidgetKey,
   pageWidgetWidthClasses,
+  resolvePageStartingLayout,
   type PageCompositionRequest,
+  type PageCompositionStartingLayout,
   type PageCompositionValue,
   type PageWidgetCatalogItem,
   type PageWidgetPlacement,
@@ -64,6 +66,7 @@ export interface PageCompositionProps {
   value: PageCompositionValue
   defaultValue: readonly PageWidgetPlacement[]
   catalog: readonly PageWidgetCatalogItem[]
+  startingLayouts?: readonly PageCompositionStartingLayout[]
   revision?: string | null
   onSave: (
     value: PageCompositionValue,
@@ -84,6 +87,7 @@ export interface PageCompositionProps {
   actionTarget?: HTMLElement | null
   insights?: boolean
   scopeNote?: string
+  persistenceNote?: string
   className?: string
   testId?: string
 }
@@ -93,6 +97,7 @@ export function PageComposition({
   value,
   defaultValue,
   catalog,
+  startingLayouts,
   revision = null,
   onSave,
   onCreateWidget,
@@ -106,6 +111,7 @@ export function PageComposition({
   actionTarget,
   insights = false,
   scopeNote,
+  persistenceNote,
   className,
   testId = "page-composition",
 }: PageCompositionProps) {
@@ -183,6 +189,14 @@ export function PageComposition({
   )
   const visibleValue = editing ? history.present : value
   const widgets = visibleValue ?? defaultValue
+  const starters = useMemo(
+    () =>
+      (startingLayouts ?? []).flatMap((starter) => {
+        const placements = resolvePageStartingLayout(starter, defaultValue)
+        return placements.length > 0 ? [{ ...starter, placements }] : []
+      }),
+    [startingLayouts, defaultValue],
+  )
   const atCapacity = widgets.length >= PERSONAL_PAGE_MAX_WIDGETS
   const capacityMessage = t("pageComposition.capacity", {
     defaultValue:
@@ -625,6 +639,51 @@ export function PageComposition({
                     "Drag widgets or use the move buttons. Choose a width, then select Done.",
                 })}
               </p>
+              {persistenceNote ? (
+                <p className="w-full text-xs text-muted-foreground">
+                  {persistenceNote}
+                </p>
+              ) : null}
+              {starters.length > 0 ? (
+                <fieldset
+                  className="w-full min-w-0 space-y-2 border-t pt-3"
+                  disabled={controlsDisabled}
+                >
+                  <legend className="float-left mb-2 w-full text-sm font-medium">
+                    {t("pageComposition.startingLayouts", {
+                      defaultValue: "Starting layouts",
+                    })}
+                  </legend>
+                  <p className="clear-both text-xs text-muted-foreground">
+                    {t("pageComposition.startingLayoutHint", {
+                      defaultValue:
+                        "Choose a starting layout to replace the widget draft. Undo restores the previous draft.",
+                    })}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {starters.map(({ id, label, placements }) => (
+                      <Button
+                        key={id}
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={pageLayoutsEqual(widgets, placements)}
+                        onClick={() => {
+                          change(placements)
+                          setAnnouncement(
+                            t("pageComposition.startingLayoutApplied", {
+                              defaultValue: "{{title}} applied to the draft.",
+                              title: label,
+                            }),
+                          )
+                        }}
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
             </>
           ) : (
             <div className="ml-auto">{launcher}</div>
