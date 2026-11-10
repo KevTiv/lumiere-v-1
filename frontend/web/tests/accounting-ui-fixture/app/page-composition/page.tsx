@@ -8,10 +8,12 @@ import type { DashboardSection } from "@lumiere/ui/lib/dashboard-types"
 import {
   createBuiltinWidgetCatalog,
   createDefaultPageLayout,
+  createPageContentSection,
   type PageCompositionRequest,
   type PageCompositionValue,
   type PageWidgetCatalogItem,
 } from "@lumiere/ui/lib/page-composition"
+import { usePageCompositionActionSlot } from "@lumiere/ui/pages/page-composition-host"
 import { DashboardGrid } from "../../../../../packages/ui/src/pages/dashboard-grid"
 import { PageComposition } from "../../../../../packages/ui/src/pages/page-composition"
 
@@ -88,6 +90,33 @@ const sections: DashboardSection[] = [
       },
     ],
   },
+  createPageContentSection({
+    id: "order-table",
+    title: "Sales orders",
+    content: (
+      <section aria-label="Sales orders">
+        <h2 className="mb-3 text-lg font-semibold">Sales orders</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="p-3">Order</th>
+                <th className="p-3">Customer</th>
+                <th className="p-3 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b">
+                <td className="p-3">SO-1042</td>
+                <td className="p-3">Sample customer</td>
+                <td className="p-3 text-right">€2,400</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    ),
+  }),
 ]
 
 const invoiceChart: PageWidgetCatalogItem = {
@@ -159,6 +188,7 @@ function readFixture(): FixtureSnapshot {
 }
 
 function Preview() {
+  const { target, slot } = usePageCompositionActionSlot()
   const [hydrated, setHydrated] = useState(false)
   const [snapshot, setSnapshot] = useState<FixtureSnapshot>({
     value: null,
@@ -203,6 +233,7 @@ function Preview() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {slot}
           <Button
             variant="outline"
             onClick={() =>
@@ -240,12 +271,16 @@ function Preview() {
       </p>
       {hydrated ? (
         <PageComposition
+          actionTarget={target}
           key={generation}
           value={snapshot.value}
           revision={snapshot.revision}
           defaultValue={createDefaultPageLayout(sections)}
           catalog={[
-            ...createBuiltinWidgetCatalog(sections),
+            ...createBuiltinWidgetCatalog(sections).map((item) => ({
+              ...item,
+              required: item.widgetId === "order-table",
+            })),
             invoiceChart,
             paymentChart,
             ...(created ? [createdChart] : []),

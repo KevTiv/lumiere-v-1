@@ -8,6 +8,7 @@ import {
   ArrowUp,
   GripVertical,
   LayoutDashboard,
+  Plus,
   Settings2,
   Trash2,
 } from "lucide-react"
@@ -150,6 +151,8 @@ interface SortableWidgetProps extends WidgetBodyProps {
   onResize: (width: PageWidgetWidth) => void
   onRemove: () => void
   onConfigure?: () => void
+  onAddBelow: () => void
+  canAdd: boolean
 }
 
 export function PageCompositionSortableWidget({
@@ -164,6 +167,8 @@ export function PageCompositionSortableWidget({
   onResize,
   onRemove,
   onConfigure,
+  onAddBelow,
+  canAdd,
 }: SortableWidgetProps) {
   const { t } = useTranslation()
   const {
@@ -218,6 +223,14 @@ export function PageCompositionSortableWidget({
         >
           <GripVertical aria-hidden="true" />
         </Button>
+        {item?.widget?.type === "custom" && !item.widget.title ? (
+          <span
+            className="min-w-0 flex-1 truncate text-sm font-medium"
+            title={title}
+          >
+            {title}
+          </span>
+        ) : null}
         <PageWidgetWidthSelect
           value={placement.width}
           onChange={onResize}
@@ -260,18 +273,20 @@ export function PageCompositionSortableWidget({
               <Settings2 aria-hidden="true" />
             </Button>
           ) : null}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="text-destructive hover:text-destructive"
-            aria-label={label("remove", "Remove {{title}}")}
-            title={label("remove", "Remove {{title}}")}
-            disabled={disabled}
-            onClick={onRemove}
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
+          {!item?.required && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="text-destructive hover:text-destructive"
+              aria-label={label("remove", "Remove {{title}}")}
+              title={label("remove", "Remove {{title}}")}
+              disabled={disabled}
+              onClick={onRemove}
+            >
+              <Trash2 aria-hidden="true" />
+            </Button>
+          )}
         </div>
       </div>
       <div className="min-w-0 flex-1" inert>
@@ -281,6 +296,18 @@ export function PageCompositionSortableWidget({
           testId={testId ? `${testId}-content` : undefined}
         />
       </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="self-start"
+        disabled={disabled || !canAdd}
+        onClick={onAddBelow}
+        aria-label={label("addBelowNamed", "Add widget below {{title}}")}
+      >
+        <Plus aria-hidden="true" />
+        {t("pageComposition.addBelow", { defaultValue: "Add widget below" })}
+      </Button>
     </div>
   )
 }

@@ -5127,5 +5127,9 @@
     "pinnedReview": "Consultation de la révision enregistrée {{revision}}. Les valeurs actuelles peuvent être différentes de cette révision.",
     "savedReviewLoading": "Chargement de la révision enregistrée…",
     "savedReviewUnavailable": "Cette révision enregistrée est indisponible. Les valeurs actuelles ne sont pas utilisées à sa place."
+  },
+  "pageComposition": {
+    "addBelow": "Ajouter un widget en dessous",
+    "addBelowNamed": "Ajouter un widget sous {{title}}"
   }
 }

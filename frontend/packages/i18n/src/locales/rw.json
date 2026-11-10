@@ -5127,5 +5127,9 @@
     "pinnedReview": "Urimo kureba verisiyo yabitswe {{revision}}. Amakuru y’ubu ashobora kuba atandukanye n’iyi verisiyo.",
     "savedReviewLoading": "Verisiyo yabitswe irimo gufungurwa…",
     "savedReviewUnavailable": "Iyi verisiyo yabitswe ntiboneka. Nta makuru y’ubu yasimbujwe ayayo."
+  },
+  "pageComposition": {
+    "addBelow": "Ongeraho widget hasi",
+    "addBelowNamed": "Ongeraho widget munsi ya {{title}}"
   }
 }
