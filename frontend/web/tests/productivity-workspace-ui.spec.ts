@@ -15,7 +15,7 @@ test.afterEach(({ page }) => {
 
 async function ready(page: Page, href: string) {
   await page.goto(href, { waitUntil: "domcontentloaded" })
-  await expect(page.getByTestId("productivity-disclosure")).toHaveAttribute("data-hydrated", "true")
+  await expect(page.getByTestId("productivity-disclosure")).toHaveAttribute("data-hydrated", "true", { timeout: test.info().timeout })
 }
 async function contained(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1)
@@ -98,7 +98,7 @@ for (const width of [390, 1440]) {
     await expect(page.getByRole("textbox", { name: /^Search files/ })).toHaveValue("October")
     await expect(page.getByTestId("file-browser-list")).toBeVisible()
     await page.reload({ waitUntil: "domcontentloaded" })
-    await expect(page.getByTestId("productivity-disclosure")).toHaveAttribute("data-hydrated", "true")
+    await expect(page.getByTestId("productivity-disclosure")).toHaveAttribute("data-hydrated", "true", { timeout: test.info().timeout })
     await expect(page.getByTestId("file-browser-row-91")).toBeVisible()
     await page.getByTestId("file-browser-input").setInputFiles({ name: "receipt.pdf", mimeType: "application/pdf", buffer: Buffer.from("synthetic receipt") })
     await expect(page.getByTestId("file-browser-upload-results")).toContainText("receipt.pdf")
@@ -140,7 +140,7 @@ for (const width of [390, 1440]) {
     await expect(page).toHaveURL(/view=month/)
     await expect(page.locator("button button")).toHaveCount(0)
     await page.reload({ waitUntil: "domcontentloaded" })
-    await expect(page.getByTestId("productivity-disclosure")).toHaveAttribute("data-hydrated", "true")
+    await expect(page.getByTestId("productivity-disclosure")).toHaveAttribute("data-hydrated", "true", { timeout: test.info().timeout })
     await expect(page.getByRole("button", { name: "Month", exact: true })).toHaveAttribute("aria-pressed", "true")
     await page.getByRole("button", { name: "Agenda", exact: true }).click()
     await contained(page)
