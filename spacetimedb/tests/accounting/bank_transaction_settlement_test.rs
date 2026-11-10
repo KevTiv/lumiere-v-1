@@ -20,15 +20,15 @@ use crate::accounting::payment_management::{
     CreatePaymentAccountParams, CreatePaymentTransactionParams, ReversePaymentTransactionParams,
 };
 use crate::accounting::payments::account_payment;
-use crate::test_harness::{ensure_test_superuser, OrgFixture};
+use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{
     BankStatementState, PartnerType, PaymentDirection, PaymentProviderCode, PaymentState,
     PaymentTransactionStatus, PeriodState,
 };
 
 use super::helpers::{
-    create_balanced_customer_invoice, create_balanced_customer_invoice_on_account,
-    seed_bank_journal, seed_distinctive_ar_account, seed_sibling_company,
+    create_balanced_customer_invoice_on_account, seed_bank_journal, seed_distinctive_ar_account,
+    seed_sibling_company,
 };
 
 pub fn test_posted_operational_bank_matches(ctx: &ReducerContext) -> Result<(), String> {
@@ -37,6 +37,20 @@ pub fn test_posted_operational_bank_matches(ctx: &ReducerContext) -> Result<(), 
     let org = fixture.organization_id;
     let company = fixture.company_id;
     let currency = fixture.currency_id;
+    let ar_account_id = *fixture
+        .chart_account_ids
+        .get(chart_keys::AR)
+        .ok_or("Harness missing AR account")?;
+    let create_invoice = |amount, reference: &str| {
+        create_balanced_customer_invoice_on_account(
+            ctx,
+            &fixture,
+            amount,
+            ar_account_id,
+            reference,
+            true,
+        )
+    };
     let (journal_id, _) = seed_bank_journal(ctx, &fixture)?;
     let sibling = seed_sibling_company(ctx, &fixture)?;
     let create_statement = |name: &str| -> Result<u64, String> {
@@ -166,7 +180,7 @@ pub fn test_posted_operational_bank_matches(ctx: &ReducerContext) -> Result<(), 
 
     for (bank, open, applied) in [(60.0, 100.0, 60.0), (100.0, 60.0, 60.0)] {
         let line_id = create_bank_line(bank, statement_id)?;
-        let invoice = create_balanced_customer_invoice(ctx, &fixture, open, true)?;
+        let invoice = create_invoice(open, &format!("bank-match-invoice-{line_id}"))?;
         let target = receivable(invoice)?;
         let transaction_id = create_transaction(line_id, bank, &format!("bank-match-{line_id}"))?;
         post_payment_transaction(ctx, org, transaction_id)?;
@@ -352,7 +366,7 @@ pub fn test_posted_operational_bank_matches(ctx: &ReducerContext) -> Result<(), 
         {
             return Err("one transaction matched multiple bank lines".to_string());
         }
-        let next_invoice = create_balanced_customer_invoice(ctx, &fixture, 80.0, true)?;
+        let next_invoice = create_invoice(80.0, &format!("bank-match-follow-up-{line_id}"))?;
         let next_item = receivable(next_invoice)?;
         let credit = bank - applied;
         if credit > 0.0 {

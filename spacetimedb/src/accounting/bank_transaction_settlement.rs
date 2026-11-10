@@ -594,7 +594,7 @@ pub fn settle_bank_line_with_payment_transaction(
     write_business_audit(
         ctx,
         organization_id,
-        ACTION,
+        "settle_bank_line_with_payment_transaction",
         AuditLogParams {
             company_id: Some(company_id),
             table_name: BANK_SOURCE,
