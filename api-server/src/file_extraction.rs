@@ -98,7 +98,6 @@ pub(crate) async fn inspect_xlsx_viewer(
     extracted.validate()?;
     Ok(extracted)
 }
-}
 
 async fn inspect_xlsx_with_script(
     bytes: &[u8],
@@ -113,7 +112,11 @@ async fn inspect_xlsx_with_script(
 fn worker_script() -> String {
     std::env::var("LUMIERE_WORKBOOK_EXTRACT_SCRIPT").unwrap_or_else(|_| {
         if cfg!(test) {
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../scripts/workbook-extract.py").into()
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../scripts/workbook-extract.py"
+            )
+            .into()
         } else {
             "/app/scripts/workbook-extract.py".into()
         }

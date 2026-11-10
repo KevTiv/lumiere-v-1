@@ -1,42 +1,42 @@
-"use client";
+"use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useTranslation } from "@lumiere/i18n";
-import { ChatDecisionCard } from "@lumiere/ui";
-import { FileIdentity } from "@lumiere/ui/components/file-identity";
-import { Button } from "@lumiere/ui/components/button";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { useTranslation } from "@lumiere/i18n"
+import { ChatDecisionCard } from "@lumiere/ui"
+import { FileIdentity } from "@lumiere/ui/components/file-identity"
+import { Button } from "@lumiere/ui/components/button"
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "@lumiere/ui/components/tabs";
+} from "@lumiere/ui/components/tabs"
 import {
   GuidedImportWizard,
   type GuidedImportContinuationBlock,
   type GuidedImportWizardHandle,
-} from "./guided-import-wizard";
-import { ImportReviewWorkspace } from "./import-review-workspace";
-import { ImportTaskExecutionPanel } from "./import-task-execution-panel";
+} from "./guided-import-wizard"
+import { ImportReviewWorkspace } from "./import-review-workspace"
+import { ImportTaskExecutionPanel } from "./import-task-execution-panel"
 import {
   ImportDestinationSupport,
   ImportTaskProgress,
-} from "./import-task-progress";
-import { importWorkflowKey, useImportWorkflow } from "./use-import-workflow";
+} from "./import-task-progress"
+import { importWorkflowKey, useImportWorkflow } from "./use-import-workflow"
 import {
   importTaskHref,
   isImportTaskView,
   type ImportTaskView,
-} from "./import-task-navigation";
+} from "./import-task-navigation"
 import {
   useSavedImportTask,
   type SavedImportScope,
-} from "./use-saved-import-task";
-import type { ReviewedImportSource } from "./import-review-model";
-import type { ChatImportTask } from "./chat-import-task";
-import { DocumentViewerDialog } from "../components/document-viewer-dialog";
-import { ImportPreparationPanel } from "./import-preparation-panel";
+} from "./use-saved-import-task"
+import type { ReviewedImportSource } from "./import-review-model"
+import type { ChatImportTask } from "./chat-import-task"
+import { DocumentViewerDialog } from "../components/document-viewer-dialog"
+import { ImportPreparationPanel } from "./import-preparation-panel"
 
 export function SavedImportWorkspace({
   scope,
@@ -49,51 +49,51 @@ export function SavedImportWorkspace({
   onTaskChange,
   onTaskFocus,
 }: {
-  scope: SavedImportScope;
-  taskId: string;
-  view: ImportTaskView;
-  initialReviewId?: string;
-  inspectionOnly?: boolean;
-  onNavigate: (view: ImportTaskView, reviewId?: string) => void;
-  onBack: () => void;
-  onTaskChange: (task: ChatImportTask) => void;
-  onTaskFocus?: (task: ChatImportTask) => void;
+  scope: SavedImportScope
+  taskId: string
+  view: ImportTaskView
+  initialReviewId?: string
+  inspectionOnly?: boolean
+  onNavigate: (view: ImportTaskView, reviewId?: string) => void
+  onBack: () => void
+  onTaskChange: (task: ChatImportTask) => void
+  onTaskFocus?: (task: ChatImportTask) => void
 }) {
-  const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const saved = useSavedImportTask(scope, taskId);
-  const task = saved.task;
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const saved = useSavedImportTask(scope, taskId)
+  const task = saved.task
   const workflowScope = {
     organizationId: scope.organizationId,
     companyId: scope.companyId,
     taskId,
-  };
-  const workflow = useImportWorkflow(scope.identity, workflowScope, !!task);
-  const workflowData = workflow.isError ? undefined : workflow.data;
+  }
+  const workflow = useImportWorkflow(scope.identity, workflowScope, !!task)
+  const workflowData = workflow.isError ? undefined : workflow.data
   useEffect(() => {
-    if (task) onTaskFocus?.(task);
-  }, [task, onTaskFocus]);
-  const [reviewId, setReviewId] = useState(initialReviewId);
+    if (task) onTaskFocus?.(task)
+  }, [task, onTaskFocus])
+  const [reviewId, setReviewId] = useState(initialReviewId)
   const [executionView, setExecutionView] = useState<"preview" | "results">(
     view === "results" ? "results" : "preview",
-  );
-  const [nativePreview, setNativePreview] = useState(false);
+  )
+  const [nativePreview, setNativePreview] = useState(false)
   const [sourcePreview, setSourcePreview] = useState<{
-    documentId: string;
-    versionId: string;
-  } | null>(null);
+    documentId: string
+    versionId: string
+  } | null>(null)
   const managedSource = task?.preparation?.files.find(
     (file) => file.managedSelection,
-  );
-  const managedSelection = managedSource?.managedSelection;
+  )
+  const managedSelection = managedSource?.managedSelection
   const [continuationBlock, setContinuationBlock] =
-    useState<GuidedImportContinuationBlock>(null);
-  const lastContinuationBlock = useRef<GuidedImportContinuationBlock>(null);
+    useState<GuidedImportContinuationBlock>(null)
+  const lastContinuationBlock = useRef<GuidedImportContinuationBlock>(null)
   const onContinuationBlockChange = useCallback(
     (next: GuidedImportContinuationBlock) => {
-      const previous = lastContinuationBlock.current;
-      lastContinuationBlock.current = next;
-      setContinuationBlock(next);
+      const previous = lastContinuationBlock.current
+      lastContinuationBlock.current = next
+      setContinuationBlock(next)
       if (previous !== null && next === null) {
         void queryClient.invalidateQueries({
           queryKey: importWorkflowKey(scope.identity, {
@@ -101,7 +101,7 @@ export function SavedImportWorkspace({
             companyId: scope.companyId,
             taskId,
           }),
-        });
+        })
       }
     },
     [
@@ -111,18 +111,18 @@ export function SavedImportWorkspace({
       scope.companyId,
       taskId,
     ],
-  );
-  const wizard = useRef<GuidedImportWizardHandle>(null);
-  const heading = useRef<HTMLHeadingElement>(null);
-  const reviews = task?.reviews;
+  )
+  const wizard = useRef<GuidedImportWizardHandle>(null)
+  const heading = useRef<HTMLHeadingElement>(null)
+  const reviews = task?.reviews
   const allowedReviewIds = useMemo(
     () => reviews?.map((review) => review.id) ?? [],
     [reviews],
-  );
+  )
   const selectedReviewId =
     reviewId && allowedReviewIds.includes(reviewId)
       ? reviewId
-      : allowedReviewIds[0];
+      : allowedReviewIds[0]
   const counts = useMemo(
     () =>
       (reviews ?? []).reduce(
@@ -135,14 +135,14 @@ export function SavedImportWorkspace({
         { total: 0, pending: 0, confirmed: 0, excluded: 0 },
       ),
     [reviews],
-  );
+  )
   const allowImport =
     !inspectionOnly &&
     task?.decision.status === "approved" &&
-    task.decision.selectedOptionId === "prepare_import";
+    task.decision.selectedOptionId === "prepare_import"
   useEffect(() => {
-    if (view === "preview" || view === "results") setExecutionView(view);
-  }, [view]);
+    if (view === "preview" || view === "results") setExecutionView(view)
+  }, [view])
 
   const navigate = (
     nextView: ImportTaskView,
@@ -150,18 +150,18 @@ export function SavedImportWorkspace({
     focus = false,
   ) => {
     if (nextView === "preview" || nextView === "results")
-      setExecutionView(nextView);
-    if (nextReviewId) setReviewId(nextReviewId);
-    onNavigate(nextView, nextReviewId);
-    if (focus) heading.current?.focus();
-  };
+      setExecutionView(nextView)
+    if (nextReviewId) setReviewId(nextReviewId)
+    onNavigate(nextView, nextReviewId)
+    if (focus) heading.current?.focus()
+  }
   const continueImport = async (source: ReviewedImportSource) => {
-    if (!allowImport) return;
+    if (!allowImport) return
     if (await wizard.current?.continueFromReview(source)) {
-      setNativePreview(true);
-      navigate("preview", selectedReviewId, true);
+      setNativePreview(true)
+      navigate("preview", selectedReviewId, true)
     }
-  };
+  }
 
   if (!task)
     return (
@@ -193,12 +193,12 @@ export function SavedImportWorkspace({
           </Button>
         ) : null}
       </section>
-    );
+    )
 
   const hasSavedExecution = !!(
     workflowData?.proposals.some((proposal) => proposal.approvedAt !== null) ||
     workflowData?.nativeResults.length
-  );
+  )
   const nextView: ImportTaskView =
     task.status === "awaiting_decision" || !reviews?.length
       ? "sources"
@@ -206,7 +206,7 @@ export function SavedImportWorkspace({
         ? "decisions"
         : hasSavedExecution
           ? "results"
-          : "preview";
+          : "preview"
   const nextLabel =
     nextView === "sources"
       ? t("settings.importTask.nextSources", {
@@ -222,7 +222,7 @@ export function SavedImportWorkspace({
             })
           : t("settings.importTask.nextPreview", {
               defaultValue: "Review ERP options",
-            });
+            })
 
   return (
     <section
@@ -276,8 +276,8 @@ export function SavedImportWorkspace({
             variant="outline"
             disabled={saved.busy}
             onClick={() => {
-              void saved.reload();
-              void workflow.refetch();
+              void saved.reload()
+              void workflow.refetch()
             }}
           >
             {t("common.refresh", { defaultValue: "Refresh" })}
@@ -312,7 +312,7 @@ export function SavedImportWorkspace({
             : view
         }
         onValueChange={(value) => {
-          if (isImportTaskView(value)) navigate(value);
+          if (isImportTaskView(value)) navigate(value)
         }}
       >
         <TabsList
@@ -378,7 +378,7 @@ export function SavedImportWorkspace({
                 documentId={sourcePreview.documentId}
                 versionId={sourcePreview.versionId}
                 onOpenChange={(open) => {
-                  if (!open) setSourcePreview(null);
+                  if (!open) setSourcePreview(null)
                 }}
               />
             )}
@@ -486,7 +486,7 @@ export function SavedImportWorkspace({
                 variant="outline"
                 disabled={saved.busy}
                 onClick={() => {
-                  void saved.retryDecision().catch(() => undefined);
+                  void saved.retryDecision().catch(() => undefined)
                 }}
               >
                 {t("aiChat.import.retryDecision", {
@@ -551,7 +551,7 @@ export function SavedImportWorkspace({
               variant="outline"
               disabled={saved.busy}
               onClick={() => {
-                void saved.resume().catch(() => undefined);
+                void saved.resume().catch(() => undefined)
               }}
             >
               {allowImport
@@ -583,17 +583,17 @@ export function SavedImportWorkspace({
               allowImport={allowImport}
               continuationBlock={continuationBlock}
               onContinue={(source) => {
-                void continueImport(source);
+                void continueImport(source)
               }}
               onSelectedIdChange={(id) => {
-                setReviewId(id);
-                onNavigate("decisions", id);
+                setReviewId(id)
+                onNavigate("decisions", id)
               }}
               onChanged={() => {
                 void queryClient.invalidateQueries({
                   queryKey: ["import-workflow-source"],
-                });
-                void saved.reload();
+                })
+                void saved.reload()
               }}
             />
           ) : (
@@ -616,10 +616,10 @@ export function SavedImportWorkspace({
                 view={executionView}
                 onReviewSource={(id) => {
                   if (allowedReviewIds.includes(id))
-                    navigate("decisions", id, true);
+                    navigate("decisions", id, true)
                 }}
                 onChanged={() => {
-                  void saved.reload();
+                  void saved.reload()
                 }}
               />
               <div
@@ -636,5 +636,5 @@ export function SavedImportWorkspace({
         </TabsContent>
       </Tabs>
     </section>
-  );
+  )
 }

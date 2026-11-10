@@ -1,34 +1,35 @@
-"use client";
+"use client"
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, ExternalLink, RefreshCw } from "lucide-react";
-import { useErpSession } from "@lumiere/erp-session";
-import { useTranslation } from "@lumiere/i18n";
-import { Button } from "@lumiere/ui/components/button";
-import { FileIdentity } from "@lumiere/ui/components/file-identity";
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Download, ExternalLink, RefreshCw } from "lucide-react"
+import { useErpSession } from "@lumiere/erp-session"
+import { useTranslation } from "@lumiere/i18n"
+import { Button } from "@lumiere/ui/components/button"
+import { FileIdentity } from "@lumiere/ui/components/file-identity"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@lumiere/ui/components/dialog";
+} from "@lumiere/ui/components/dialog"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@lumiere/ui/components/select";
+} from "@lumiere/ui/components/select"
 import {
   SpreadsheetGrid,
   type SpreadsheetSource,
   type SpreadsheetAction,
   type SpreadsheetSelection,
-} from "@lumiere/ui/documents/spreadsheet-grid";
-import { useRBAC } from "@lumiere/ui/lib/rbac-context";
-import { cn } from "@lumiere/ui/lib/utils";
-import { apiFetch } from "../lib/api-fetch";
+} from "@lumiere/ui/documents/spreadsheet-grid"
+import { columnLabel } from "@lumiere/ui/documents/spreadsheet-grid-model"
+import { useRBAC } from "@lumiere/ui/lib/rbac-context"
+import { cn } from "@lumiere/ui/lib/utils"
+import { apiFetch } from "../lib/api-fetch"
 import {
   DocumentCsvError,
   DocumentViewerError,
@@ -42,24 +43,24 @@ import {
   type DocumentViewerManifest,
   type DocumentViewerScope,
   type OfficeDocumentPreview,
-} from "../lib/document-viewer";
+} from "../lib/document-viewer"
 import {
   useDocumentSelectionActions,
   type DocumentSelection,
-} from "../lib/document-selection-actions";
+} from "../lib/document-selection-actions"
 import {
   DocumentWorkbookError,
   readDocumentWorkbook,
   type DocumentWorkbook,
-} from "../lib/document-workbook";
+} from "../lib/document-workbook"
 
 export type DocumentViewerDialogProps = {
-  organizationId: bigint;
-  documentId: string | null;
-  versionId?: string;
-  recordHref?: string;
-  onOpenChange(open: boolean): void;
-};
+  organizationId: bigint
+  documentId: string | null
+  versionId?: string
+  recordHref?: string
+  onOpenChange(open: boolean): void
+}
 
 /** One file viewer for Documents and ERP attachment entry points. */
 export function DocumentViewerDialog({
@@ -69,39 +70,39 @@ export function DocumentViewerDialog({
   recordHref,
   onOpenChange,
 }: DocumentViewerDialogProps) {
-  const session = useErpSession();
-  const { currentUser, checkPermission, permissionsReady } = useRBAC();
-  const { t } = useTranslation();
-  const [fullscreenTarget, setFullscreenTarget] = useState<string | null>(null);
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
-  const opening = useRef<{ target: string; scope: string } | null>(null);
-  const permissionRevision = useRef({ checkPermission, revision: 0 });
+  const session = useErpSession()
+  const { currentUser, checkPermission, permissionsReady } = useRBAC()
+  const { t } = useTranslation()
+  const [fullscreenTarget, setFullscreenTarget] = useState<string | null>(null)
+  const titleRef = useRef<HTMLHeadingElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+  const opening = useRef<{ target: string; scope: string } | null>(null)
+  const permissionRevision = useRef({ checkPermission, revision: 0 })
   if (permissionRevision.current.checkPermission !== checkPermission) {
     permissionRevision.current = {
       checkPermission,
       revision: permissionRevision.current.revision + 1,
-    };
+    }
   }
   const scopeKey = JSON.stringify([
     String(organizationId),
     session.organizationId,
     session.identity,
     session.activeCompanyId,
-  ]);
-  const target = JSON.stringify([documentId, versionId]);
-  const fullscreen = documentId !== null && fullscreenTarget === target;
-  if (documentId === null) opening.current = null;
+  ])
+  const target = JSON.stringify([documentId, versionId])
+  const fullscreen = documentId !== null && fullscreenTarget === target
+  if (documentId === null) opening.current = null
   else if (opening.current?.target !== target) {
     if (opening.current === null)
       returnFocusRef.current =
         typeof document !== "undefined" &&
         document.activeElement instanceof HTMLElement
           ? document.activeElement
-          : null;
-    opening.current = { target, scope: scopeKey };
+          : null
+    opening.current = { target, scope: scopeKey }
   }
-  const companyId = session.activeCompanyId;
+  const companyId = session.activeCompanyId
   const scopeReady =
     organizationId > 0n &&
     String(session.organizationId) === String(organizationId) &&
@@ -112,27 +113,25 @@ export function DocumentViewerDialog({
       (typeof companyId === "number" &&
         Number.isSafeInteger(companyId) &&
         companyId > 0 &&
-        session.companyIds?.includes(companyId) === true));
+        session.companyIds?.includes(companyId) === true))
   const permissionReady =
-    permissionsReady && currentUser?.id === session.identity;
-  const currentScope = opening.current?.scope === scopeKey;
+    permissionsReady && currentUser?.id === session.identity
+  const currentScope = opening.current?.scope === scopeKey
   const canRead =
-    scopeReady &&
-    permissionReady &&
-    checkPermission("document", "read").allowed;
-  const includeVersions = checkPermission("document_version", "read").allowed;
+    scopeReady && permissionReady && checkPermission("document", "read").allowed
+  const includeVersions = checkPermission("document_version", "read").allowed
 
   return (
     <Dialog
       open={documentId !== null}
       onOpenChange={(open, details) => {
         if (!open && fullscreen && details.reason === "escape-key") {
-          details.cancel();
-          setFullscreenTarget(null);
-          return;
+          details.cancel()
+          setFullscreenTarget(null)
+          return
         }
-        if (!open) setFullscreenTarget(null);
-        onOpenChange(open);
+        if (!open) setFullscreenTarget(null)
+        onOpenChange(open)
       }}
     >
       <DialogContent
@@ -183,8 +182,8 @@ export function DocumentViewerDialog({
             includeVersions={includeVersions}
             fullscreen={fullscreen}
             onSelectionComplete={() => {
-              setFullscreenTarget(null);
-              onOpenChange(false);
+              setFullscreenTarget(null)
+              onOpenChange(false)
             }}
             onFullscreenChange={(next) =>
               setFullscreenTarget(next ? target : null)
@@ -199,31 +198,31 @@ export function DocumentViewerDialog({
         ) : null}
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 type ViewerPreview =
   | Exclude<DocumentPreview, { kind: "csv" }>
   | { kind: "csv-source"; bytes: Uint8Array }
   | { kind: "spreadsheet"; workbook: DocumentWorkbook }
-  | { kind: "preview-error"; error: unknown };
+  | { kind: "preview-error"; error: unknown }
 
 type ViewerState =
   | { request: string; status: "loading" }
   | { request: string; status: "error"; error: unknown }
   | {
-      request: string;
-      status: "ready";
-      manifest: DocumentViewerManifest;
-      preview: ViewerPreview;
-      objectUrl?: string;
-    };
+      request: string
+      status: "ready"
+      manifest: DocumentViewerManifest
+      preview: ViewerPreview
+      objectUrl?: string
+    }
 
 type DownloadAttempt = {
-  controller: AbortController;
-  url?: string;
-  timer?: ReturnType<typeof setTimeout>;
-};
+  controller: AbortController
+  url?: string
+  timer?: ReturnType<typeof setTimeout>
+}
 
 function errorMessage(
   error: unknown,
@@ -234,49 +233,49 @@ function errorMessage(
       case "unsupported":
         return t("documents.spreadsheet.unsupported", {
           defaultValue: "This workbook format cannot be previewed.",
-        });
+        })
       case "unreadable":
         return t("documents.spreadsheet.unreadable", {
           defaultValue: "The workbook could not be read as a spreadsheet.",
-        });
+        })
       case "workerUnavailable":
         return t("documents.spreadsheet.unavailable", {
           defaultValue: "Spreadsheet preview is temporarily unavailable.",
-        });
+        })
       case "rangeTooLarge":
         return t("documents.spreadsheet.rangeTooLarge", {
           defaultValue: "This part of the workbook exceeds the preview limit.",
-        });
+        })
     }
   }
-  const code = error instanceof DocumentViewerError ? error.code : "request";
+  const code = error instanceof DocumentViewerError ? error.code : "request"
   switch (code) {
     case "denied":
       return t("documents.viewer.denied", {
         defaultValue: "You do not have access to this file.",
-      });
+      })
     case "unavailable":
       return t("documents.viewer.unavailable", {
         defaultValue:
           "This file or version is unavailable in your current access scope.",
-      });
+      })
     case "integrity":
       return t("documents.viewer.changed", {
         defaultValue:
           "The saved file details changed. Reload the preview before continuing.",
-      });
+      })
     case "tooLarge":
       return t("documents.viewer.tooLarge", {
         defaultValue: "This file exceeds the preview limit.",
-      });
+      })
     case "invalid":
       return t("documents.viewer.invalid", {
         defaultValue: "The file preview could not be verified.",
-      });
+      })
     default:
       return t("documents.viewer.failed", {
         defaultValue: "The file could not be loaded. Try again.",
-      });
+      })
   }
 }
 
@@ -286,7 +285,7 @@ function previewOnlyFailure(error: unknown) {
     (error.code === "invalid" ||
       error.code === "tooLarge" ||
       error.code === "request")
-  );
+  )
 }
 
 function DocumentViewerBody({
@@ -299,37 +298,37 @@ function DocumentViewerBody({
   onSelectionComplete,
   recordHref,
 }: {
-  scope: DocumentViewerScope;
-  documentId: string;
-  initialVersionId?: string;
-  includeVersions: boolean;
-  fullscreen: boolean;
-  onFullscreenChange(fullscreen: boolean): void;
-  onSelectionComplete(): void;
-  recordHref?: string;
+  scope: DocumentViewerScope
+  documentId: string
+  initialVersionId?: string
+  includeVersions: boolean
+  fullscreen: boolean
+  onFullscreenChange(fullscreen: boolean): void
+  onSelectionComplete(): void
+  recordHref?: string
 }) {
-  const selectionActions = useDocumentSelectionActions();
-  const { t } = useTranslation();
+  const selectionActions = useDocumentSelectionActions()
+  const { t } = useTranslation()
   const [selectedVersion, setSelectedVersion] = useState(
     initialVersionId ?? "current",
-  );
-  const [reload, setReload] = useState(0);
-  const [downloading, setDownloading] = useState(false);
+  )
+  const [reload, setReload] = useState(0)
+  const [downloading, setDownloading] = useState(false)
   const [state, setState] = useState<ViewerState>({
     request: "",
     status: "loading",
-  });
-  const download = useRef<DownloadAttempt | null>(null);
-  const request = `${selectedVersion}:${reload}`;
-  const requestRef = useRef(request);
-  requestRef.current = request;
+  })
+  const download = useRef<DownloadAttempt | null>(null)
+  const request = `${selectedVersion}:${reload}`
+  const requestRef = useRef(request)
+  requestRef.current = request
   const active =
-    state.request === request ? state : { request, status: "loading" as const };
+    state.request === request ? state : { request, status: "loading" as const }
 
   useEffect(() => {
-    const controller = new AbortController();
-    let objectUrl: string | undefined;
-    setState({ request, status: "loading" });
+    const controller = new AbortController()
+    let objectUrl: string | undefined
+    setState({ request, status: "loading" })
     const load = async () => {
       const manifest = await readDocumentViewerManifest({
         scope,
@@ -338,10 +337,10 @@ function DocumentViewerBody({
         includeVersions,
         fetcher: apiFetch,
         signal: controller.signal,
-      });
-      let preview: ViewerPreview = { kind: "unsupported" };
-      const mimeType = manifest.source.mimeType;
-      const kind = documentPreviewKind(mimeType);
+      })
+      let preview: ViewerPreview = { kind: "unsupported" }
+      const mimeType = manifest.source.mimeType
+      const kind = documentPreviewKind(mimeType)
       if (kind === "xlsx") {
         try {
           const workbook = await readDocumentWorkbook(
@@ -350,20 +349,20 @@ function DocumentViewerBody({
             apiFetch,
             controller.signal,
             selectedVersion === "current",
-          );
-          preview = { kind: "spreadsheet", workbook };
+          )
+          preview = { kind: "spreadsheet", workbook }
         } catch (error) {
-          if (!previewOnlyFailure(error)) throw error;
+          if (!previewOnlyFailure(error)) throw error
           try {
             preview = await readDocumentOfficePreview(
               manifest.source,
               scope,
               apiFetch,
               controller.signal,
-            );
+            )
           } catch (fallbackError) {
-            if (!previewOnlyFailure(fallbackError)) throw fallbackError;
-            preview = { kind: "preview-error", error };
+            if (!previewOnlyFailure(fallbackError)) throw fallbackError
+            preview = { kind: "preview-error", error }
           }
         }
       } else if (kind === "docx") {
@@ -372,36 +371,36 @@ function DocumentViewerBody({
           scope,
           apiFetch,
           controller.signal,
-        );
+        )
       } else if (kind !== "unsupported") {
         const file = await readDocumentViewerFile(
           manifest.source,
           apiFetch,
           controller.signal,
-        );
+        )
         if (kind === "csv") {
-          preview = { kind: "csv-source", bytes: file.bytes };
+          preview = { kind: "csv-source", bytes: file.bytes }
         } else {
-          const parsed = documentPreview(mimeType, file.bytes);
-          if (parsed.kind !== "csv") preview = parsed;
+          const parsed = documentPreview(mimeType, file.bytes)
+          if (parsed.kind !== "csv") preview = parsed
           if (
             !controller.signal.aborted &&
             (preview.kind === "image" || preview.kind === "pdf")
           )
-            objectUrl = URL.createObjectURL(file.blob);
+            objectUrl = URL.createObjectURL(file.blob)
         }
       }
       if (!controller.signal.aborted)
-        setState({ request, status: "ready", manifest, preview, objectUrl });
-    };
+        setState({ request, status: "ready", manifest, preview, objectUrl })
+    }
     void load().catch((error: unknown) => {
       if (!controller.signal.aborted)
-        setState({ request, status: "error", error });
-    });
+        setState({ request, status: "error", error })
+    })
     return () => {
-      controller.abort();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+      controller.abort()
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
   }, [
     scope.organizationId,
     scope.companyId,
@@ -410,40 +409,40 @@ function DocumentViewerBody({
     selectedVersion,
     reload,
     request,
-  ]);
+  ])
 
   useEffect(() => {
-    const refresh = () => setReload((value) => value + 1);
+    const refresh = () => setReload((value) => value + 1)
     const visibility = () => {
-      if (document.visibilityState === "visible") refresh();
-    };
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", visibility);
+      if (document.visibilityState === "visible") refresh()
+    }
+    window.addEventListener("focus", refresh)
+    document.addEventListener("visibilitychange", visibility)
     return () => {
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", visibility);
-    };
-  }, []);
+      window.removeEventListener("focus", refresh)
+      document.removeEventListener("visibilitychange", visibility)
+    }
+  }, [])
 
   useEffect(() => {
-    setDownloading(false);
+    setDownloading(false)
     return () => {
-      const attempt = download.current;
-      attempt?.controller.abort();
-      if (attempt?.url) URL.revokeObjectURL(attempt.url);
-      if (attempt?.timer) clearTimeout(attempt.timer);
-      download.current = null;
-    };
-  }, [request]);
+      const attempt = download.current
+      attempt?.controller.abort()
+      if (attempt?.url) URL.revokeObjectURL(attempt.url)
+      if (attempt?.timer) clearTimeout(attempt.timer)
+      download.current = null
+    }
+  }, [request])
 
   const downloadFile = async () => {
-    if (active.status !== "ready" || download.current) return;
-    const shown = active.manifest.source;
+    if (active.status !== "ready" || download.current) return
+    const shown = active.manifest.source
     const attempt: DownloadAttempt = {
       controller: new AbortController(),
-    };
-    download.current = attempt;
-    setDownloading(true);
+    }
+    download.current = attempt
+    setDownloading(true)
     try {
       const manifest = await readDocumentViewerManifest({
         scope,
@@ -452,8 +451,8 @@ function DocumentViewerBody({
         includeVersions,
         fetcher: apiFetch,
         signal: attempt.controller.signal,
-      });
-      const current = manifest.source;
+      })
+      const current = manifest.source
       if (
         current.url !== shown.url ||
         current.versionId !== shown.versionId ||
@@ -461,39 +460,39 @@ function DocumentViewerBody({
         current.size !== shown.size ||
         current.mimeType !== shown.mimeType
       )
-        throw new DocumentViewerError("integrity");
+        throw new DocumentViewerError("integrity")
       const file = await readDocumentViewerFile(
         current,
         apiFetch,
         attempt.controller.signal,
-      );
+      )
       if (attempt.controller.signal.aborted || requestRef.current !== request)
-        return;
-      attempt.url = URL.createObjectURL(file.blob);
-      const link = document.createElement("a");
-      link.href = attempt.url;
-      link.download = current.fileName;
-      document.body.append(link);
-      link.click();
-      link.remove();
+        return
+      attempt.url = URL.createObjectURL(file.blob)
+      const link = document.createElement("a")
+      link.href = attempt.url
+      link.download = current.fileName
+      document.body.append(link)
+      link.click()
+      link.remove()
       // Revoke after the browser has accepted the download; unmount also cleans up.
       attempt.timer = setTimeout(() => {
-        if (attempt.url) URL.revokeObjectURL(attempt.url);
-        if (download.current === attempt) download.current = null;
-      }, 1000);
+        if (attempt.url) URL.revokeObjectURL(attempt.url)
+        if (download.current === attempt) download.current = null
+      }, 1000)
     } catch (error) {
       if (
         !attempt.controller.signal.aborted &&
         requestRef.current === request
       ) {
-        if (active.objectUrl) URL.revokeObjectURL(active.objectUrl);
-        setState({ request, status: "error", error });
+        if (active.objectUrl) URL.revokeObjectURL(active.objectUrl)
+        setState({ request, status: "error", error })
       }
     } finally {
-      if (!attempt.controller.signal.aborted) setDownloading(false);
-      if (!attempt.url && download.current === attempt) download.current = null;
+      if (!attempt.controller.signal.aborted) setDownloading(false)
+      if (!attempt.url && download.current === attempt) download.current = null
     }
-  };
+  }
 
   return (
     <div
@@ -625,14 +624,14 @@ function DocumentViewerBody({
           fullscreen={fullscreen}
           onFullscreenChange={onFullscreenChange}
           onReadError={(error) => {
-            if (requestRef.current !== request) return;
+            if (requestRef.current !== request) return
             if (previewOnlyFailure(error)) {
               setState({
                 ...active,
                 preview: { kind: "preview-error", error },
-              });
+              })
             } else {
-              setState({ request, status: "error", error });
+              setState({ request, status: "error", error })
             }
           }}
           onSelectionAction={
@@ -648,34 +647,34 @@ function DocumentViewerBody({
                       parsing,
                     },
                     signal,
-                  );
+                  )
                   if (!signal.aborted && requestRef.current === request)
-                    onSelectionComplete();
+                    onSelectionComplete()
                 }
               : undefined
           }
         />
       )}
     </div>
-  );
+  )
 }
 
-const TEXT_PAGE_SIZE = 80_000;
+const TEXT_PAGE_SIZE = 80_000
 
 type ActivePreviewProps = {
-  preview: ViewerPreview;
-  objectUrl?: string;
-  source: DocumentViewerManifest["source"];
-  fullscreen: boolean;
-  onFullscreenChange(fullscreen: boolean): void;
-  onReadError(error: unknown): void;
+  preview: ViewerPreview
+  objectUrl?: string
+  source: DocumentViewerManifest["source"]
+  fullscreen: boolean
+  onFullscreenChange(fullscreen: boolean): void
+  onReadError(error: unknown): void
   onSelectionAction?(
     action: SpreadsheetAction,
     selection: SpreadsheetSelection,
     signal: AbortSignal,
     parsing?: DocumentSelection["parsing"],
-  ): Promise<void>;
-};
+  ): Promise<void>
+}
 
 function ActivePreview({
   preview,
@@ -683,8 +682,8 @@ function ActivePreview({
   source,
   ...grid
 }: ActivePreviewProps) {
-  const { t } = useTranslation();
-  const workbook = preview.kind === "spreadsheet" ? preview.workbook : null;
+  const { t } = useTranslation()
+  const workbook = preview.kind === "spreadsheet" ? preview.workbook : null
   const workbookSource = useMemo<SpreadsheetSource | null>(
     () =>
       workbook && {
@@ -694,7 +693,7 @@ function ActivePreview({
           workbook.search(sheetId, query, direction, after, signal),
       },
     [workbook],
-  );
+  )
 
   if (preview.kind === "preview-error") {
     return (
@@ -709,7 +708,7 @@ function ActivePreview({
           })}
         </p>
       </div>
-    );
+    )
   }
   if (workbookSource)
     return (
@@ -720,19 +719,19 @@ function ActivePreview({
           defaultValue: "Spreadsheet preview",
         })}
       />
-    );
+    )
   if (preview.kind === "csv-source")
     return (
       <CsvPreview {...grid} bytes={preview.bytes} mimeType={source.mimeType} />
-    );
-  if (preview.kind === "spreadsheet") return null;
+    )
+  if (preview.kind === "spreadsheet") return null
   return (
     <FilePreview
       preview={preview}
       objectUrl={objectUrl}
       fileName={source.fileName}
     />
-  );
+  )
 }
 
 function CsvPreview({
@@ -741,33 +740,33 @@ function CsvPreview({
   onSelectionAction,
   ...grid
 }: Omit<ActivePreviewProps, "preview" | "objectUrl" | "source"> & {
-  bytes: Uint8Array;
-  mimeType: string;
+  bytes: Uint8Array
+  mimeType: string
 }) {
-  const { t } = useTranslation();
+  const { t } = useTranslation()
   const [delimiter, setDelimiter] =
-    useState<NonNullable<DocumentCsvOptions["delimiter"]>>("auto");
+    useState<NonNullable<DocumentCsvOptions["delimiter"]>>("auto")
   const [encoding, setEncoding] =
-    useState<NonNullable<DocumentCsvOptions["encoding"]>>("auto");
-  const [headings, setHeadings] = useState(false);
-  const [showOptions, setShowOptions] = useState(false);
+    useState<NonNullable<DocumentCsvOptions["encoding"]>>("auto")
+  const [headings, setHeadings] = useState(false)
+  const [showOptions, setShowOptions] = useState(false)
   const parsed = useMemo(() => {
     try {
-      const preview = documentPreview(mimeType, bytes, { delimiter, encoding });
+      const preview = documentPreview(mimeType, bytes, { delimiter, encoding })
       return preview.kind === "csv"
         ? { preview }
-        : { error: new DocumentViewerError("invalid") };
+        : { error: new DocumentViewerError("invalid") }
     } catch (error) {
-      return { error };
+      return { error }
     }
-  }, [bytes, mimeType, delimiter, encoding]);
-  const preview = parsed.preview;
+  }, [bytes, mimeType, delimiter, encoding])
+  const preview = parsed.preview
   const sheetName = t("documents.spreadsheet.csvSheet", {
     defaultValue: "CSV records",
-  });
+  })
   const source = useMemo<SpreadsheetSource | null>(() => {
-    if (!preview) return null;
-    const { rows, columns } = preview;
+    if (!preview) return null
+    const { rows, columns } = preview
     return {
       sheets: [
         {
@@ -778,8 +777,8 @@ function CsvPreview({
         },
       ],
       async readRange(_sheet, rect, signal) {
-        signal.throwIfAborted();
-        const cells = [];
+        signal.throwIfAborted()
+        const cells = []
         for (
           let row = rect.rowStart;
           row < rect.rowStart + rect.rowCount;
@@ -790,49 +789,49 @@ function CsvPreview({
             column < rect.columnStart + rect.columnCount;
             column++
           ) {
-            const value = rows[row]?.[column];
+            const value = rows[row]?.[column]
             if (value !== undefined && value !== "")
-              cells.push({ row, column, displayValue: value, kind: "text" });
+              cells.push({ row, column, displayValue: value, kind: "text" })
           }
         }
-        return { cells };
+        return { cells }
       },
       async search(_sheet, query, after, direction, signal) {
-        signal.throwIfAborted();
-        const needle = query.toLowerCase();
-        const step = direction === "next" ? 1 : -1;
-        const size = rows.length * columns;
+        signal.throwIfAborted()
+        const needle = query.toLowerCase()
+        const step = direction === "next" ? 1 : -1
+        const size = rows.length * columns
         const cursor = after
           ? after.row * columns + after.column
           : direction === "next"
             ? -1
-            : size;
+            : size
         for (let offset = 1; offset <= size; offset++) {
-          const index = cursor + offset * step;
-          const wrapped = index < 0 || index >= size;
-          const position = (index + size) % size;
-          const row = Math.floor(position / columns);
-          const column = position % columns;
+          const index = cursor + offset * step
+          const wrapped = index < 0 || index >= size
+          const position = (index + size) % size
+          const row = Math.floor(position / columns)
+          const column = position % columns
           if (rows[row]?.[column]?.toLowerCase().includes(needle))
-            return { match: { row, column }, wrapped };
+            return { match: { row, column }, wrapped }
         }
-        return { match: null, wrapped: false };
+        return { match: null, wrapped: false }
       },
-    };
-  }, [preview, sheetName]);
+    }
+  }, [preview, sheetName])
 
   const optionsLabel = t("documents.spreadsheet.csvOptions", {
     defaultValue: "CSV options",
-  });
+  })
   const delimiterLabel = t("documents.spreadsheet.delimiter", {
     defaultValue: "Delimiter",
-  });
+  })
   const encodingLabel = t("documents.spreadsheet.encoding", {
     defaultValue: "Encoding",
-  });
+  })
   const automatic = t("documents.spreadsheet.automatic", {
     defaultValue: "Auto detect",
-  });
+  })
   const delimiters = [
     { value: "auto", label: automatic },
     {
@@ -849,14 +848,14 @@ function CsvPreview({
       value: "\t",
       label: t("documents.spreadsheet.tab", { defaultValue: "Tab" }),
     },
-  ] as const;
+  ] as const
   const encodings = [
     { value: "auto", label: automatic },
     { value: "utf-8", label: "UTF-8" },
     { value: "utf-16le", label: "UTF-16 LE" },
     { value: "utf-16be", label: "UTF-16 BE" },
     { value: "windows-1252", label: "Windows-1252" },
-  ] as const;
+  ] as const
   const settings = (
     <div
       role="group"
@@ -868,8 +867,8 @@ function CsvPreview({
         <Select
           value={delimiter}
           onValueChange={(value) => {
-            const match = delimiters.find((choice) => choice.value === value);
-            if (match) setDelimiter(match.value);
+            const match = delimiters.find((choice) => choice.value === value)
+            if (match) setDelimiter(match.value)
           }}
         >
           <SelectTrigger aria-label={delimiterLabel} className="h-8 max-w-36">
@@ -889,8 +888,8 @@ function CsvPreview({
         <Select
           value={encoding}
           onValueChange={(value) => {
-            const match = encodings.find((choice) => choice.value === value);
-            if (match) setEncoding(match.value);
+            const match = encodings.find((choice) => choice.value === value)
+            if (match) setEncoding(match.value)
           }}
         >
           <SelectTrigger aria-label={encodingLabel} className="h-8 max-w-36">
@@ -917,10 +916,10 @@ function CsvPreview({
         })}
       </label>
     </div>
-  );
+  )
   if (!preview || !source) {
     const diagnostic =
-      parsed.error instanceof DocumentCsvError ? parsed.error.diagnostic : null;
+      parsed.error instanceof DocumentCsvError ? parsed.error.diagnostic : null
     const message =
       diagnostic?.code === "unknownEncoding" ||
       diagnostic?.code === "invalidEncoding"
@@ -936,7 +935,7 @@ function CsvPreview({
               row: diagnostic.row,
               column: diagnostic.column,
             })
-          : errorMessage(parsed.error, t);
+          : errorMessage(parsed.error, t)
     return (
       <div className="space-y-3 rounded-md border bg-muted/20 p-3">
         <p role="alert" className="text-sm text-destructive">
@@ -944,11 +943,11 @@ function CsvPreview({
         </p>
         {settings}
       </div>
-    );
+    )
   }
   const ambiguous = preview.diagnostics.some(
     (item) => item.code === "ambiguousDelimiter",
-  );
+  )
   return (
     <SpreadsheetGrid
       key={JSON.stringify([delimiter, encoding])}
@@ -1001,7 +1000,7 @@ function CsvPreview({
         </>
       }
     />
-  );
+  )
 }
 
 function FilePreview({
@@ -1009,12 +1008,12 @@ function FilePreview({
   objectUrl,
   fileName,
 }: {
-  preview: Exclude<DocumentPreview, { kind: "csv" }>;
-  objectUrl?: string;
-  fileName: string;
+  preview: Exclude<DocumentPreview, { kind: "csv" }>
+  objectUrl?: string
+  fileName: string
 }) {
-  const { t } = useTranslation();
-  const [page, setPage] = useState(0);
+  const { t } = useTranslation()
+  const [page, setPage] = useState(0)
   if (preview.kind === "image")
     return (
       <div className="flex min-h-0 flex-1 items-start justify-center overflow-auto rounded-md border bg-muted/20 p-3">
@@ -1024,7 +1023,7 @@ function FilePreview({
           className="max-h-full max-w-full object-contain"
         />
       </div>
-    );
+    )
   if (preview.kind === "pdf")
     return (
       <object
@@ -1041,9 +1040,9 @@ function FilePreview({
           })}
         </p>
       </object>
-    );
-  if (preview.kind === "xlsx") return <WorkbookPreview preview={preview} />;
-  if (preview.kind === "docx") return <WordPreview preview={preview} />;
+    )
+  if (preview.kind === "xlsx") return <WorkbookPreview preview={preview} />
+  if (preview.kind === "docx") return <WordPreview preview={preview} />
   if (preview.kind === "unsupported")
     return (
       <p role="status">
@@ -1051,9 +1050,9 @@ function FilePreview({
           defaultValue: "A preview is not available for this format yet.",
         })}
       </p>
-    );
-  const pages = Math.max(1, Math.ceil(preview.text.length / TEXT_PAGE_SIZE));
-  const start = page * TEXT_PAGE_SIZE;
+    )
+  const pages = Math.max(1, Math.ceil(preview.text.length / TEXT_PAGE_SIZE))
+  const start = page * TEXT_PAGE_SIZE
   return (
     <>
       <div
@@ -1097,7 +1096,7 @@ function FilePreview({
         </div>
       </div>
     </>
-  );
+  )
 }
 
 function RecordsPreview({
@@ -1106,12 +1105,12 @@ function RecordsPreview({
   start = 0,
   label,
 }: {
-  rows: string[][];
-  columns: number;
-  start?: number;
-  label: string;
+  rows: string[][]
+  columns: number
+  start?: number
+  label: string
 }) {
-  const { t } = useTranslation();
+  const { t } = useTranslation()
   if (rows.length === 0)
     return (
       <p className="p-4 text-sm text-muted-foreground">
@@ -1119,7 +1118,7 @@ function RecordsPreview({
           defaultValue: "This file contains no records.",
         })}
       </p>
-    );
+    )
   return (
     <table
       className="w-full border-collapse text-left text-xs"
@@ -1162,19 +1161,19 @@ function RecordsPreview({
         ))}
       </tbody>
     </table>
-  );
+  )
 }
 
 function WorkbookPreview({
   preview,
 }: {
-  preview: Extract<OfficeDocumentPreview, { kind: "xlsx" }>;
+  preview: Extract<OfficeDocumentPreview, { kind: "xlsx" }>
 }) {
-  const { t } = useTranslation();
-  const [selection, setSelection] = useState("0");
-  const sheet = preview.sheets[Number(selection)];
-  if (!sheet) return null;
-  const label = t("documents.viewer.sheet", { defaultValue: "Worksheet" });
+  const { t } = useTranslation()
+  const [selection, setSelection] = useState("0")
+  const sheet = preview.sheets[Number(selection)]
+  if (!sheet) return null
+  const label = t("documents.viewer.sheet", { defaultValue: "Worksheet" })
   return (
     <>
       <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -1216,15 +1215,15 @@ function WorkbookPreview({
         </p>
       )}
     </>
-  );
+  )
 }
 
 function WordPreview({
   preview,
 }: {
-  preview: Extract<OfficeDocumentPreview, { kind: "docx" }>;
+  preview: Extract<OfficeDocumentPreview, { kind: "docx" }>
 }) {
-  const { t } = useTranslation();
+  const { t } = useTranslation()
   return (
     <>
       <div
@@ -1281,5 +1280,5 @@ function WordPreview({
             })}
       </p>
     </>
-  );
+  )
 }
