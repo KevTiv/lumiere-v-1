@@ -155,7 +155,7 @@ fn verify_response(
         bail!("spreadsheet evidence did not match the selection");
     }
     Ok(AuthorizedSelection {
-        digest: hex::encode(Sha256::digest(bytes)),
+        digest: format!("{:x}", Sha256::digest(bytes)),
         evidence,
     })
 }

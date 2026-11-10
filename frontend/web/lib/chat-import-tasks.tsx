@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { ChatDecisionCard } from "@lumiere/ui"
 import type { ChatDecisionAnswer } from "@lumiere/ui/lib/chat-decision-types"
+import { FileIdentity } from "@lumiere/ui/components/file-identity"
 import { Button } from "@lumiere/ui/components/button"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@lumiere/ui/components/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
 import { apiFetch } from "./api-fetch"
 import { ChatReconciliationPreview } from "./chat-reconciliation-preview"
 import { DataImportWorkspace } from "./data-import-workspace"
@@ -203,8 +204,18 @@ export function useChatImportTasks(args: {
           : task.decision.selectedOptionId === "inspect_only" ? t("aiChat.import.inspectionSaved", { defaultValue: "Files saved · inspection can be resumed" })
             : t("aiChat.import.saved", { defaultValue: "Files saved · preparation can be resumed" })}</p>
       <p className="text-xs text-muted-foreground">{t("aiChat.import.noRecords", { defaultValue: "Preparation creates no business records. Review the source before importing." })}</p>
-      <ul className="space-y-1">{task.files.map(file => <li key={file.ordinal} className="break-words">
-        <a className="underline" href={`/api/import-tasks/${task.requestId}/files/${file.ordinal}?companyId=${scope.companyId}`} download={file.fileName}>{file.fileName}</a>
+      <ul className="space-y-2">{task.files.map(file => <li key={file.ordinal} className="min-w-0 [overflow-wrap:anywhere]">
+        <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+          <FileIdentity fileName={file.fileName} size={file.size} className="flex-1 basis-36" />
+          <a
+            className="inline-flex min-h-8 shrink-0 items-center text-sm font-medium text-primary underline underline-offset-4"
+            href={`/api/import-tasks/${task.requestId}/files/${file.ordinal}?companyId=${scope.companyId}`}
+            download={file.fileName}
+            aria-label={t("settings.importTask.downloadNamed", { defaultValue: "Download {{fileName}}", fileName: file.fileName })}
+          >
+            {t("settings.importTask.download", { defaultValue: "Download" })}
+          </a>
+        </div>
         {file.previousMatch ? <div className="text-muted-foreground">
           <p>{file.previousMatch.kind === "identical"
             ? t("aiChat.import.identicalEarlierSource")
@@ -248,10 +259,14 @@ export function useChatImportTasks(args: {
       </div>)}
     </article>)}
     {selectedReview ? <Dialog open onOpenChange={open => { if (!open) { setReview(null); void reload() } }}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
+      <DialogContent size="document" className="flex min-h-0 flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
         <DialogTitle>{selectedReview.inspectionOnly ? t("aiChat.import.inspectionTitle", { defaultValue: "Inspect saved source files" }) : t("aiChat.import.reviewTitle", { defaultValue: "Review source and prepare import" })}</DialogTitle>
         <DialogDescription>{selectedReview.inspectionOnly ? t("aiChat.import.inspectionDescription", { defaultValue: "Review the source evidence. This action does not prepare business records." }) : t("aiChat.import.reviewDescription", { defaultValue: "Resolve uncertain values, then use the import preview to confirm the records to create." })}</DialogDescription>
-        <DataImportWorkspace organizationId={scope.organizationId} taskId={selectedReview.taskId} initialReviewId={selectedReview.id} initialView={selectedReview.view} inspectionOnly={selectedReview.inspectionOnly} syncUrl={false} onTaskFocus={focusTask} />
+        </DialogHeader>
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+          <DataImportWorkspace organizationId={scope.organizationId} taskId={selectedReview.taskId} initialReviewId={selectedReview.id} initialView={selectedReview.view} inspectionOnly={selectedReview.inspectionOnly} syncUrl={false} onTaskFocus={focusTask} />
+        </div>
       </DialogContent>
     </Dialog> : null}
   </div> : null

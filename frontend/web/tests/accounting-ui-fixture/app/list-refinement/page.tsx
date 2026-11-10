@@ -14,6 +14,8 @@ import { returnJourneyRows, returnJourneyScope } from "../../return-navigation-f
 import { Button } from "../../../../../packages/ui/src/components/button"
 import { BillsListView } from "../../../../../packages/ui/src/accounting-components/bills-list-view"
 import { InvoiceListView } from "../../../../../packages/ui/src/accounting-components/invoice-list-view"
+import { OwnerQueueScope } from "../../../../components/owner-queue-scope"
+import { isDraftVendorBill, isOwnerQueue, overduePostedInvoices } from "../../../../lib/owner-queues"
 import { workflowBills, workflowCurrencies, workflowInvoices } from "../../workflow-fixtures"
 
 const intakeBills = [
@@ -26,6 +28,12 @@ const intakeBills = [
 function ListRefinement() {
   const searchParams = useSearchParams()
   const returnJourney = searchParams.get("journey") === "return"
+  const ownerJourney = searchParams.get("journey") === "owner-queue"
+  const activeTab = searchParams.get("tab") ?? "invoices"
+  const queueParam = searchParams.get("ownerQueue")
+  const overdue = ownerJourney && isOwnerQueue("overdueInvoices", activeTab, queueParam)
+  const drafts = ownerJourney && isOwnerQueue("draftBills", activeTab, queueParam)
+  const invoices = returnJourney ? returnJourneyRows : overdue ? overduePostedInvoices(workflowInvoices) : workflowInvoices
   const routeFilters = useModuleUrlFilters()
   const clearRouteFilter = useClearModuleUrlFilter()
   const [previewRecord, setPreviewRecord] = useState<Record<string, unknown> | null>(null)
@@ -37,8 +45,11 @@ function ListRefinement() {
   return <DashboardWorkspace userProfile={{ name: "Synthetic Accountant" }} sidebar={<DashboardSidebar />} onOpenSearch={() => {}}>
     <p className="mb-4 text-xs text-muted-foreground" data-testid="list-refinement-disclosure" data-hydrated={hydrated}>Synthetic invoice list — no ERP backend operations</p>
     <h1 className="mb-4 text-2xl font-semibold">Accounting</h1>
-    {showBills ? <BillsListView
-      bills={intakeBills}
+    {(overdue || drafts) && <OwnerQueueScope queue={overdue ? "overdueInvoices" : "draftBills"} />}
+    {showBills || (ownerJourney && activeTab === "bills") ? <BillsListView
+      key={drafts ? "draft" : "all"}
+      bills={drafts ? workflowBills.filter(isDraftVendorBill) : ownerJourney ? workflowBills : intakeBills}
+      preferenceContext={drafts ? "draft" : undefined}
       currencyOptions={workflowCurrencies}
       worklistScope={returnJourneyScope}
       sourceState={{ status: "ready" }}
@@ -46,7 +57,9 @@ function ListRefinement() {
       onSelectBill={(bill) => setSelected(String(bill.id))}
       onCreateBill={() => setSelected("new bill draft requested")}
     /> : <InvoiceListView
-      invoices={returnJourney ? returnJourneyRows : workflowInvoices}
+      key={overdue ? "overdue" : "all"}
+      invoices={invoices}
+      preferenceContext={overdue ? "overdue" : undefined}
       currencyOptions={workflowCurrencies}
       worklistScope={returnJourneyScope}
       sourceState={{ status: "ready" }}

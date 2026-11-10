@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useErpSession } from '@lumiere/erp-session';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ExternalLink, Layers, Link2, PenLine } from 'lucide-react';
+import { Eye, Layers, MoreHorizontal, PenLine } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
 import {
   Button,
@@ -22,7 +22,6 @@ import {
   RecordPage,
   SmartButtons,
   useRBAC,
-  documentsTableConfig,
   setDocumentRetentionForm,
   uploadDocumentVersionForm,
   type FormConfig,
@@ -38,6 +37,16 @@ import {
   AlertDialogTitle,
 } from '@lumiere/ui/components/alert-dialog';
 import { Badge } from '@lumiere/ui/components/badge';
+import { FileIdentity } from '@lumiere/ui/components/file-identity';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@lumiere/ui/components/dropdown-menu';
+import { moduleQueryState } from '@lumiere/ui/lib/module-data-state';
+import { ModuleDataNotice } from '@lumiere/ui/pages/module-data-notice';
 import { formatTimestampLike } from '@lumiere/ui/lib/entity-row-values';
 import { Textarea } from '@lumiere/ui/components/textarea';
 import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
@@ -75,13 +84,13 @@ import { documentFolderRowsToSelectOptions } from '@/lib/form-lookup';
 import {
   activeLegalHold,
   externalRefRows,
-  formatFileSize,
   legalHoldReason,
   linkedRecordHref,
   moveDocumentParams,
   rowsForDocument,
   signatureRequestRows,
 } from '../document-record';
+import { documentAttachmentLabel, documentFileIdentity } from '../document-presentation';
 import { canRequestSignature, toSignatureRequestParams } from '../signature-request';
 import { documentBrowserReturnHref } from '../document-browser-navigation';
 
@@ -226,10 +235,13 @@ function DocumentPageLoaded({
   const session = useErpSession();
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
 
-  const { data: documents = [], isLoading } = useDocuments(orgId, initialDocuments as never);
-  const { data: deleted = [] } = useDeletedDocuments(orgId, initialDeleted as never);
+  const documentsQuery = useDocuments(orgId, initialDocuments as never);
+  const deletedQuery = useDeletedDocuments(orgId, initialDeleted as never);
+  const { data: documents = [], isLoading } = documentsQuery;
+  const { data: deleted = [] } = deletedQuery;
   const { data: folders = [] } = useDocumentFolders(orgId);
-  const { data: versions = [] } = useDocumentVersions(orgId, initialVersions as never);
+  const versionsQuery = useDocumentVersions(orgId, initialVersions as never);
+  const { data: versions = [] } = versionsQuery;
   const holdsQuery = useDocumentLegalHolds(orgId);
   const signaturesQuery = useDocumentSignatureRequests(orgId);
   const externalRefsQuery = useDocumentExternalRefs(orgId);
@@ -324,14 +336,17 @@ function DocumentPageLoaded({
   }, []);
 
   if (!document) {
-    if (isLoading) {
+    if (isLoading || deletedQuery.isLoading) {
       return (
         <div className="space-y-4" data-testid="document-page-loading">
           <Skeleton className="h-6 w-64" />
-          <Skeleton className="h-10 w-96" />
+          <Skeleton className="h-10 w-96 max-w-full" />
           <Skeleton className="h-64 w-full" />
         </div>
       );
+    }
+    if (documentsQuery.isError || deletedQuery.isError) {
+      return <ModuleDataNotice state={moduleQueryState(documentsQuery.isError ? documentsQuery : deletedQuery)} />;
     }
     return (
       <Empty data-testid="document-page-not-found">
@@ -354,22 +369,29 @@ function DocumentPageLoaded({
   const isDeleted = document.isDeleted === true;
   const isLocked = document.isLocked === true;
   const url = typeof document.url === 'string' && document.url ? document.url : undefined;
-  const label = String(document.name || document.fileName || `#${documentId}`);
+  const file = documentFileIdentity(document);
+  const label = file.title || file.fileName || `#${documentId}`;
   const linkedHref = linkedRecordHref(document);
-
-  const table = documentsTableConfig(t);
-  const columns = table.view.mode === 'table' ? table.view.columns : [];
+  const relatedLabel = documentAttachmentLabel(document, t);
+  const folderName = folders.find((folder) => String(folder.id) === String(document.folderId))?.name;
+  const locationLabel = document.folderId == null
+    ? t('documents.fileManagement.root', { defaultValue: 'Root folder' })
+    : folderName ?? t('documents.page.folderUnavailable', { defaultValue: 'Folder unavailable' });
   const detailConfig = {
     mode: 'detail' as const,
     sections: [
       {
         id: 'document',
         fields: [
-          ...columns.map(({ width: _width, ...field }) =>
-            field.key === 'fileSize' ? { ...field, render: (value: unknown) => formatFileSize(value) } : field,
-          ),
-          { key: 'resName', label: t('documents.documents.columns.resName', { defaultValue: 'Attached to' }) },
-          { key: 'description', type: 'markdown' as const, label: t('documents.documents.columns.description', { defaultValue: 'Description' }) },
+          { key: 'resName', label: t('documents.documents.columns.resName', { defaultValue: 'Attached to' }), render: () => linkedHref
+            ? <Link className="text-primary underline underline-offset-2" href={linkedHref}>{relatedLabel}</Link>
+            : relatedLabel },
+          { key: 'folderId', label: t('documents.page.folder', { defaultValue: 'Folder' }), render: () => locationLabel },
+          { key: 'createDate', label: t('documents.documents.columns.createDate'), type: 'date' as const },
+          { key: 'retentionDays', label: t('documents.documents.columns.retentionDays'), type: 'number' as const },
+          { key: 'fiscalKind', label: t('documents.documents.columns.fiscalKind') },
+          { key: 'residencyRegion', label: t('documents.documents.columns.residencyRegion') },
+          { key: 'description', width: 'full' as const, type: 'markdown' as const, label: t('documents.documents.columns.description', { defaultValue: 'Description' }) },
         ],
       },
     ],
@@ -378,9 +400,6 @@ function DocumentPageLoaded({
   const isHeld = Boolean(activeHold);
   const holdReason = activeHold && typeof activeHold.reason === 'string' ? activeHold.reason : undefined;
   const holdDate = activeHold?.heldAt ?? activeHold?.held_at;
-  const heldTitle = t('documents.page.heldHint', {
-    defaultValue: 'Not allowed while a legal hold is active. Release the hold first.',
-  });
 
   const releaseHold = async () => {
     if (!activeHold) return;
@@ -505,9 +524,14 @@ function DocumentPageLoaded({
           { label },
         ]}
         title={label}
-        subtitle={[String(document.fileName ?? ''), String(document.mimetype ?? ''), formatFileSize(document.fileSize)]
-          .filter((part) => part && part !== '—')
-          .join(' · ')}
+        subtitle={
+          <FileIdentity
+            {...file}
+            showTitle={false}
+            showFileName={file.fileName !== label}
+            status={!url ? t('documents.attachments.unavailable', { defaultValue: 'File unavailable' }) : undefined}
+          />
+        }
         badge={
           <span className="flex flex-wrap items-center gap-1.5">
             {isDeleted ? <Badge variant="destructive">{t('documents.page.deleted', { defaultValue: 'In recycle bin' })}</Badge> : null}
@@ -539,17 +563,6 @@ function DocumentPageLoaded({
                     },
                   ]
                 : []),
-              ...(linkedHref
-                ? [
-                    {
-                      id: 'linked',
-                      label: String(document.resName || t('documents.page.linkedRecord', { defaultValue: 'Attached record' })),
-                      count: 1,
-                      icon: <Link2 className="h-4 w-4" />,
-                      href: linkedHref,
-                    },
-                  ]
-                : []),
             ]}
           />
         }
@@ -561,8 +574,8 @@ function DocumentPageLoaded({
                 onClick={() => setPreview({})}
                 data-testid="document-action-open"
               >
-                <ExternalLink className="mr-1 h-4 w-4" />
-                {t('documents.page.openFile', { defaultValue: 'Open file' })}
+                <Eye className="mr-1 h-4 w-4" aria-hidden />
+                {t('documents.viewer.open', { defaultValue: 'Preview file' })}
               </Button>
             ) : null}
             {isDeleted ? (
@@ -577,73 +590,70 @@ function DocumentPageLoaded({
               </Button>
             ) : (
               <>
-                <Button variant="outline" size="sm" data-testid="document-action-edit" onClick={() => setFormAction('edit')}>
-                  {t('documents.page.edit', { defaultValue: 'Edit' })}
-                </Button>
                 <Button
                   variant="outline"
                   size="sm"
+                  disabled={!uploads.canVersion || uploads.pending}
                   data-testid="document-action-upload-version"
                   onClick={() => setFormAction('uploadVersion')}
                 >
                   {t('documents.page.uploadVersion', { defaultValue: 'Upload version' })}
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  data-testid={isLocked ? 'document-action-unlock' : 'document-action-lock'}
-                  onClick={() =>
-                    void run(isLocked ? 'Unlock' : 'Lock', () =>
-                      isLocked ? unlockDocument.mutateAsync(id) : lockDocument.mutateAsync(id),
-                    )
-                  }
-                >
-                  {isLocked
-                    ? t('documents.page.unlock', { defaultValue: 'Unlock' })
-                    : t('documents.page.lock', { defaultValue: 'Lock' })}
-                </Button>
-                <Button variant="outline" size="sm" data-testid="document-action-retention" onClick={() => setFormAction('setRetention')}>
-                  {t('documents.page.setRetention', { defaultValue: 'Set retention' })}
-                </Button>
-                <Button variant="outline" size="sm" data-testid="document-action-move" onClick={() => setFormAction('move')}>
-                  {t('documents.page.move', { defaultValue: 'Move to folder' })}
-                </Button>
-                {isHeld ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={releaseLegalHold.isPending}
-                    data-testid="document-action-release-hold"
-                    onClick={() => void releaseHold()}
-                  >
-                    {t('documents.page.releaseHold', { defaultValue: 'Release hold' })}
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" data-testid="document-action-legal-hold" onClick={() => setFormAction('legalHold')}>
-                    {t('documents.page.legalHold', { defaultValue: 'Legal hold' })}
-                  </Button>
-                )}
-                {canRequestSignature(document) && checkPermission('document', 'write').allowed ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    data-testid="document-action-request-signature"
-                    onClick={() => setFormAction('requestSignature')}
-                  >
-                    {t('documents.page.requestSignature', { defaultValue: 'Request signature' })}
-                  </Button>
-                ) : null}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy || isHeld}
-                  title={isHeld ? heldTitle : undefined}
-                  data-testid="document-action-delete"
-                  onClick={() => setConfirmDelete(true)}
-                >
-                  {t('documents.page.delete', { defaultValue: 'Delete' })}
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <MoreHorizontal className="size-4" aria-hidden />
+                      {t('documents.page.manage', { defaultValue: 'Manage' })}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="max-w-[calc(100vw-2rem)]">
+                    <DropdownMenuItem data-testid="document-action-edit" onSelect={() => setFormAction('edit')}>
+                      {t('documents.page.edit', { defaultValue: 'Edit details' })}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem data-testid="document-action-move" onSelect={() => setFormAction('move')}>
+                      {t('documents.page.move', { defaultValue: 'Move to folder' })}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={busy}
+                      data-testid={isLocked ? 'document-action-unlock' : 'document-action-lock'}
+                      onSelect={() => void run(isLocked ? 'Unlock' : 'Lock', () =>
+                        isLocked ? unlockDocument.mutateAsync(id) : lockDocument.mutateAsync(id),
+                      )}
+                    >
+                      {isLocked ? t('documents.page.unlock', { defaultValue: 'Unlock' }) : t('documents.page.lock', { defaultValue: 'Lock' })}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem data-testid="document-action-retention" onSelect={() => setFormAction('setRetention')}>
+                      {t('documents.page.setRetention', { defaultValue: 'Set retention' })}
+                    </DropdownMenuItem>
+                    {isHeld ? (
+                      <DropdownMenuItem
+                        disabled={releaseLegalHold.isPending}
+                        data-testid="document-action-release-hold"
+                        onSelect={() => void releaseHold()}
+                      >
+                        {t('documents.page.releaseHold', { defaultValue: 'Release hold' })}
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem data-testid="document-action-legal-hold" onSelect={() => setFormAction('legalHold')}>
+                        {t('documents.page.legalHold', { defaultValue: 'Legal hold' })}
+                      </DropdownMenuItem>
+                    )}
+                    {canRequestSignature(document) && checkPermission('document', 'write').allowed ? (
+                      <DropdownMenuItem data-testid="document-action-request-signature" onSelect={() => setFormAction('requestSignature')}>
+                        {t('documents.page.requestSignature', { defaultValue: 'Request signature' })}
+                      </DropdownMenuItem>
+                    ) : null}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      disabled={busy || isHeld}
+                      data-testid="document-action-delete"
+                      onSelect={() => setConfirmDelete(true)}
+                    >
+                      {t('documents.page.deleteAction', { defaultValue: 'Move to recycle bin' })}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             )}
           </>
@@ -659,10 +669,11 @@ function DocumentPageLoaded({
                 {isHeld ? (
                   <div className="rounded-md border p-3 text-sm" data-testid="document-legal-hold-row">
                     <p className="font-medium">{t('documents.page.legalHoldActive', { defaultValue: 'Legal hold' })}</p>
-                    {holdReason ? <p>{t('documents.page.holdReason', { defaultValue: 'Reason' })}: {holdReason}</p> : null}
+                    {holdReason ? <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{t('documents.page.holdReason', { defaultValue: 'Reason' })}: {holdReason}</p> : null}
                     {holdDate != null ? (
                       <p>{t('documents.page.holdDate', { defaultValue: 'Held since' })}: {formatHoldDate(holdDate)}</p>
                     ) : null}
+                    <p className="mt-2 text-muted-foreground">{t('documents.page.heldHint', { defaultValue: 'Release the legal hold before moving this file to the recycle bin.' })}</p>
                   </div>
                 ) : null}
                 <EntityDetail config={detailConfig} data={document} />
@@ -672,7 +683,11 @@ function DocumentPageLoaded({
           {
             id: 'versions',
             label: t('documents.page.versions', { defaultValue: 'Versions' }),
-            content: (
+            content: versionsQuery.isLoading
+              ? <p role="status" className="text-sm text-muted-foreground">{t('common.loading', { defaultValue: 'Loading…' })}</p>
+              : versionsQuery.isError
+                ? <ModuleDataNotice state={moduleQueryState(versionsQuery)} />
+                : (
               <EntityView
                 config={{
                   id: 'document-versions-table',
@@ -682,10 +697,16 @@ function DocumentPageLoaded({
                     rowKey: 'id',
                     columns: [
                       { key: 'versionNumber', label: '#', type: 'number', align: 'right' },
-                      { key: 'fileName', label: 'File name', render: (value: unknown, row: Row) => <button type="button" className="text-primary underline" onClick={() => setPreview({ versionId: String(row.id) })}>{String(value ?? '')}</button> },
-                      { key: 'fileSize', label: 'Size', align: 'right', render: (value: unknown) => formatFileSize(value) },
-                      { key: 'changesDescription', label: 'Changes' },
-                      { key: 'isCurrent', label: 'Current', type: 'boolean' },
+                      { key: 'fileName', label: t('documents.documents.columns.fileName'), layout: { min: 16, preferred: 23, grow: 2 }, render: (value: unknown, row: Row) => (
+                        <FileIdentity
+                          fileName={typeof value === 'string' ? value : undefined}
+                          mimetype={typeof row.mimetype === 'string' ? row.mimetype : undefined}
+                          size={row.fileSize}
+                          status={row.isCurrent === true ? t('documents.viewer.currentVersion', { defaultValue: 'Current version' }) : undefined}
+                          onOpen={() => setPreview({ versionId: String(row.id) })}
+                        />
+                      ) },
+                      { key: 'changesDescription', label: t('documents.page.versionChanges', { defaultValue: 'Changes' }), layout: { min: 12, preferred: 18, grow: 1, wrap: 3 } },
                       { key: 'createdAt', label: 'Created', type: 'date' },
                     ],
                     emptyMessage: t('documents.page.noVersions', { defaultValue: 'No versions yet' }),

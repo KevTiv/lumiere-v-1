@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Bounded XLSX-to-data worker. Never run without the mandatory Linux sandbox.
+"""Bounded Office-to-data worker. Never run without the mandatory Linux sandbox.
 
 Only stdin carries file bytes; stdout carries one JSON result. Import everything
 before installing seccomp: afterwards even opening a library or /etc file fails.
@@ -34,6 +34,14 @@ MAX_VIEWER_MERGES = 2_000
 MAX_VIEWER_ROWS = 1_048_576
 MAX_VIEWER_COLUMNS = 16_384
 MAX_VIEWER_OUTPUT = 10_000_000
+PREVIEW_POLICY_VERSION = "office-static-seccomp-v1"
+PREVIEW_SHEETS = 24
+PREVIEW_ROWS = 100
+PREVIEW_COLUMNS = 20
+PREVIEW_BLOCKS = 200
+PREVIEW_CELL_BYTES = 500
+PREVIEW_SHEET_TEXT_BYTES = 8_000
+PREVIEW_DOCUMENT_TEXT_BYTES = 100_000
 MAX_INPUT = 5_000_000
 MAX_ENTRY = 10_000_000
 MAX_EXPANDED = 25_000_000
@@ -49,6 +57,8 @@ MAX_XML_DEPTH = 64
 SHEET_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 RID_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+CONTENT_NS = "http://schemas.openxmlformats.org/package/2006/content-types"
+WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 
 
 class Rejected(ValueError):
@@ -176,7 +186,7 @@ def parse_xml(data: bytes) -> ET.Element:
     return root
 
 
-def unpack(data: bytes, *, viewer=False) -> tuple[dict[str, ET.Element], set[str]]:
+def unpack(data: bytes, *, viewer=False, word=False) -> tuple[dict[str, ET.Element], set[str]]:
     if viewer and data.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
         raise Rejected("workbook_password_protected_or_legacy_binary")
     if not data or len(data) > MAX_INPUT or not data.startswith(b"PK\x03\x04"):
@@ -191,6 +201,8 @@ def unpack(data: bytes, *, viewer=False) -> tuple[dict[str, ET.Element], set[str
         documents = {}
         for info in infos:
             name = info.filename
+            if info.orig_filename != name:
+                raise Rejected("zip_entry_path")
             lower = name.lower()
             if (not name or "\\" in name or name.startswith("/") or
                     any(part in ("", ".", "..") for part in name.rstrip("/").split("/")) or
@@ -208,7 +220,7 @@ def unpack(data: bytes, *, viewer=False) -> tuple[dict[str, ET.Element], set[str
             if any(part in lower for part in (
                 "vbaproject", "macrosheet", "dialogsheet", "externallink",
                 "embedding", "activex", "customui", "comment", "threadedcomment",
-                "connection", "querytable",
+                "connection", "querytable", "afchunk",
             )) or lower.endswith((".bin", ".exe", ".dll", ".vbs", ".js")):
                 raise Rejected("workbook_active_or_hidden_content")
             if info.is_dir():
@@ -240,21 +252,25 @@ def unpack(data: bytes, *, viewer=False) -> tuple[dict[str, ET.Element], set[str
                         raise Rejected("workbook_formula_requires_values_only_copy")
                     if kind in ("connection", "queryTable", "externalBook", "oleObject", "control", "webPr"):
                         raise Rejected("workbook_active_or_hidden_content")
+                    if word and kind in ("altChunk", "subDoc", "object", "instrText", "fldSimple", "fldChar"):
+                        raise Rejected("word_active_or_unsupported_content")
                 if lower == "[content_types].xml":
                     for node in root:
                         content_type = node.attrib.get("ContentType", "").lower()
                         if any(s in content_type for s in ("macro", "activex", "oleobject")):
                             raise Rejected("workbook_active_content_type")
                 if lower.endswith(".rels"):
-                    for node in root:
-                        target = node.attrib.get("Target", "")
+                    for node in root.iter():
+                        target = node.attrib.get("Target", "").strip()
                         kind = node.attrib.get("Type", "").lower()
-                        if node.attrib.get("TargetMode", "").lower() == "external" or re.match(r"(?:[a-z][a-z0-9+.-]*:|//)", target, re.I):
+                        if node.attrib.get("TargetMode", "").strip().lower() == "external" or re.match(r"(?:[a-z][a-z0-9+.-]*:|//)", target, re.I):
                             raise Rejected("workbook_external_relationship")
                         if any(s in kind for s in ("oleobject", "activex", "vba", "externallink", "connection", "querytable")):
                             raise Rejected("workbook_active_relationship")
                 if lower in ("xl/workbook.xml", "xl/_rels/workbook.xml.rels",
                              "xl/sharedstrings.xml", "xl/styles.xml") or lower.startswith("xl/worksheets/"):
+                    documents[name] = root
+                if name in ("[Content_Types].xml", "_rels/.rels", "word/document.xml"):
                     documents[name] = root
         archive.close()
         return documents, seen
@@ -300,8 +316,7 @@ def date_styles(styles: ET.Element | None) -> set[int]:
     return result
 
 
-def extract(data: bytes) -> dict[str, str]:
-    documents, seen = unpack(data)
+def workbook_parts(documents, seen, preview=False):
     required = ("[content_types].xml", "xl/workbook.xml", "xl/_rels/workbook.xml.rels")
     if not all(name in seen for name in required):
         raise Rejected("workbook_required_parts")
@@ -310,29 +325,64 @@ def extract(data: bytes) -> dict[str, str]:
     if workbook is None or relationships is None or workbook.tag != "{%s}workbook" % SHEET_NS:
         raise Rejected("workbook_structure")
     sheets = workbook.findall("{%s}sheets/{%s}sheet" % (SHEET_NS, SHEET_NS))
-    worksheet_names = [name for name in documents if re.fullmatch(r"xl/worksheets/[^/]+\.xml", name)]
-    if len(sheets) != 1 or len(worksheet_names) != 1 or sheets[0].attrib.get("state", "visible") != "visible":
+    worksheet_names = {name for name in documents if re.fullmatch(r"xl/worksheets/[^/]+\.xml", name)}
+    if not preview and (len(sheets) != 1 or len(worksheet_names) != 1 or
+                        sheets[0].attrib.get("state", "visible") != "visible"):
         raise Rejected("workbook_single_visible_sheet_required")
-    rel_id = sheets[0].attrib.get("{%s}id" % RID_NS)
-    refs = [node for node in relationships if node.attrib.get("Id") == rel_id]
-    if len(refs) != 1 or not refs[0].attrib.get("Type", "").endswith("/worksheet"):
-        raise Rejected("workbook_sheet_relationship")
-    target = refs[0].attrib.get("Target", "")
-    target = target[1:] if target.startswith("/") else "xl/" + target
-    if target != worksheet_names[0]:
-        raise Rejected("workbook_sheet_relationship")
-    sheet = documents[target]
-    if sheet.tag != "{%s}worksheet" % SHEET_NS:
-        raise Rejected("workbook_sheet_structure")
+    if preview and (not sheets or len(sheets) != len(worksheet_names) or
+                    any(sheet.attrib.get("state", "visible") != "visible" for sheet in sheets)):
+        raise Rejected("workbook_visible_sheets_required")
+    if preview and len(sheets) > PREVIEW_SHEETS:
+        raise Rejected("sheet_budget")
+    if preview:
+        if relationships.tag != "{%s}Relationships" % REL_NS:
+            raise Rejected("workbook_sheet_relationship")
+        types = documents.get("[Content_Types].xml")
+        overrides = [] if types is None else [
+            node.attrib.get("ContentType") for node in types
+            if node.tag == "{%s}Override" % CONTENT_NS and node.attrib.get("PartName") == "/xl/workbook.xml"
+        ]
+        if (types is None or types.tag != "{%s}Types" % CONTENT_NS or overrides != [
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"
+        ]):
+            raise Rejected("workbook_content_type")
+    sheet_parts = []
+    names = set()
+    for sheet in sheets:
+        rel_id = sheet.attrib.get("{%s}id" % RID_NS)
+        refs = [node for node in relationships if node.attrib.get("Id") == rel_id]
+        if len(refs) != 1 or not refs[0].attrib.get("Type", "").endswith("/worksheet"):
+            raise Rejected("workbook_sheet_relationship")
+        if preview and (not rel_id or refs[0].tag != "{%s}Relationship" % REL_NS or
+                        refs[0].attrib.get("Type") != RID_NS + "/worksheet"):
+            raise Rejected("workbook_sheet_relationship")
+        target = refs[0].attrib.get("Target", "")
+        target = target[1:] if target.startswith("/") else "xl/" + target
+        if target not in worksheet_names:
+            raise Rejected("workbook_sheet_relationship")
+        worksheet_names.remove(target)
+        name = sheet.attrib.get("name", "Sheet 1")
+        if len(name.encode("utf-8")) > 255 or (preview and not name.strip()):
+            raise Rejected("sheet_name_budget")
+        if preview and name.casefold() in names:
+            raise Rejected("workbook_duplicate_sheet_name")
+        names.add(name.casefold())
+        sheet_parts.append((name, documents[target]))
     strings_root = documents.get("xl/sharedStrings.xml")
     if strings_root is not None and strings_root.tag != "{%s}sst" % SHEET_NS:
         raise Rejected("workbook_string_structure")
-    strings = [] if strings_root is None else [bounded_text(node) for node in strings_root]
-    if len(strings) > MAX_CELLS:
+    if strings_root is not None and len(strings_root) > MAX_CELLS:
         raise Rejected("shared_strings_budget")
+    strings = [] if strings_root is None else [bounded_text(node) for node in strings_root]
     styles = date_styles(documents.get("xl/styles.xml"))
     properties = workbook.find("{%s}workbookPr" % SHEET_NS)
     dates1904 = properties is not None and properties.attrib.get("date1904") in ("1", "true")
+    return sheet_parts, strings, styles, dates1904
+
+
+def worksheet_values(sheet, strings, styles, dates1904, preview=False):
+    if sheet.tag != "{%s}worksheet" % SHEET_NS:
+        raise Rejected("workbook_sheet_structure")
     rows = {}
     coordinates = set()
     width = count = 0
@@ -343,7 +393,11 @@ def extract(data: bytes) -> dict[str, str]:
     for row_node in data_nodes[0]:
         if row_node.tag != "{%s}row" % SHEET_NS:
             raise Rejected("workbook_sheet_structure")
+        row_reference = row_node.attrib.get("r")
         for cell in row_node:
+            if preview and row_reference and cell.tag == "{%s}c" % SHEET_NS:
+                if not re.fullmatch(r"[A-Z]+" + re.escape(row_reference), cell.attrib.get("r", "")):
+                    raise Rejected("cell_coordinate")
             if cell.tag == "{%s}c" % SHEET_NS:
                 canonical_cells.add(cell)
     for node in sheet.iter():
@@ -408,6 +462,14 @@ def extract(data: bytes) -> dict[str, str]:
         width = max(width, column)
         if len(rows) * width > MAX_MATRIX:
             raise Rejected("matrix_budget")
+    return rows, width, count
+
+
+def extract(data: bytes) -> dict[str, str]:
+    documents, seen = unpack(data)
+    sheets, strings, styles, dates1904 = workbook_parts(documents, seen)
+    sheet_name, sheet = sheets[0]
+    rows, width, _ = worksheet_values(sheet, strings, styles, dates1904)
     matrix = [[columns.get(i, "") for i in range(width)] for _, columns in sorted(rows.items())]
     matrix = [row for row in matrix if any(cell.strip() for cell in row)]
     if not matrix or not matrix[0]:
@@ -418,9 +480,6 @@ def extract(data: bytes) -> dict[str, str]:
     csv_text = output.getvalue()
     if len(csv_text.encode("utf-8")) > MAX_CSV:
         raise Rejected("csv_output_budget")
-    sheet_name = sheets[0].attrib.get("name", "Sheet 1")
-    if len(sheet_name.encode("utf-8")) > 255:
-        raise Rejected("sheet_name_budget")
     return {"csvText": csv_text, "sheetName": sheet_name,
             "sourceSha256": hashlib.sha256(data).hexdigest(),
             "policyVersion": POLICY_VERSION}
@@ -726,6 +785,135 @@ def extract_viewer(data: bytes) -> dict:
                        "rowCount": rows, "columnCount": columns, "cells": cells, "merges": merges})
     return {"sheets": parsed, "dateSystem": "1904" if dates1904 else "1900",
             "sourceSha256": hashlib.sha256(data).hexdigest(), "policyVersion": VIEWER_POLICY_VERSION}
+class PreviewText:
+    def __init__(self, remaining):
+        self.remaining = remaining
+        self.truncated = False
+
+    def clip(self, value, maximum=PREVIEW_CELL_BYTES):
+        encoded = value.encode("utf-8")
+        length = min(maximum, self.remaining)
+        if len(encoded) > length:
+            self.truncated = True
+            encoded = encoded[:length]
+        self.remaining -= len(encoded)
+        return encoded.decode("utf-8", errors="ignore")
+
+
+def preview_workbook(data):
+    documents, seen = unpack(data)
+    parts, strings, styles, dates1904 = workbook_parts(documents, seen, preview=True)
+    sheets = []
+    total_cells = 0
+    for name, sheet in parts:
+        rows, width, count = worksheet_values(sheet, strings, styles, dates1904, preview=True)
+        total_cells += count
+        if total_cells > MAX_CELLS:
+            raise Rejected("cell_count_budget")
+        limit = PreviewText(PREVIEW_SHEET_TEXT_BYTES)
+        columns = min(width, PREVIEW_COLUMNS)
+        last_row = min(max(rows, default=0), PREVIEW_ROWS)
+        matrix = [
+            [limit.clip(rows.get(row, {}).get(column, "")) for column in range(columns)]
+            for row in range(1, last_row + 1)
+        ]
+        sheets.append({
+            "name": name, "columns": columns, "rows": matrix,
+            "truncated": limit.truncated or max(rows, default=0) > last_row or width > columns,
+        })
+    return {"kind": "xlsx", "sheets": sheets}
+
+
+def word_tag(name):
+    return "{%s}%s" % (WORD_NS, name)
+
+
+def paragraph_text(paragraph):
+    fragments = []
+    for container in paragraph:
+        # Hyperlinks contribute only their text. The package policy rejects
+        # external relationships, and no hyperlink destination is emitted.
+        runs = container if container.tag == word_tag("hyperlink") else [container]
+        for run in runs:
+            if run.tag != word_tag("r"):
+                continue
+            for element in run:
+                if element.tag == word_tag("t") and not len(element):
+                    fragments.append(element.text or "")
+                elif element.tag == word_tag("tab"):
+                    fragments.append("\t")
+                elif element.tag in (word_tag("br"), word_tag("cr")):
+                    fragments.append("\n")
+    return "".join(fragments)
+
+
+def preview_word(data):
+    documents, _ = unpack(data, word=True)
+    types = documents.get("[Content_Types].xml")
+    relationships = documents.get("_rels/.rels")
+    document = documents.get("word/document.xml")
+    if (types is None or types.tag != "{%s}Types" % CONTENT_NS or
+            relationships is None or relationships.tag != "{%s}Relationships" % REL_NS or
+            document is None or document.tag != word_tag("document")):
+        raise Rejected("word_required_parts")
+    overrides = [
+        node for node in types
+        if node.tag == "{%s}Override" % CONTENT_NS and node.attrib.get("PartName") == "/word/document.xml"
+    ]
+    main = [
+        node for node in relationships
+        if node.tag == "{%s}Relationship" % REL_NS and node.attrib.get("Type") == RID_NS + "/officeDocument"
+    ]
+    if (len(overrides) != 1 or overrides[0].attrib.get("ContentType") !=
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml" or
+            len(main) != 1 or main[0].attrib.get("Target") not in ("word/document.xml", "/word/document.xml")):
+        raise Rejected("word_document_relationship")
+    bodies = document.findall(word_tag("body"))
+    if len(bodies) != 1:
+        raise Rejected("word_document_structure")
+    limit = PreviewText(PREVIEW_DOCUMENT_TEXT_BYTES)
+    blocks = []
+    table_cells = 0
+    for node in bodies[0]:
+        if node.tag == word_tag("sectPr"):
+            continue
+        if len(blocks) >= PREVIEW_BLOCKS:
+            limit.truncated = True
+            break
+        if node.tag == word_tag("p"):
+            text = paragraph_text(node)
+            if text.strip():
+                blocks.append({"kind": "paragraph", "text": limit.clip(text, 4_000)})
+        elif node.tag == word_tag("tbl"):
+            rows = []
+            for row in node.findall(word_tag("tr")):
+                if len(rows) >= PREVIEW_ROWS or table_cells >= 2_000:
+                    limit.truncated = True
+                    break
+                cells = []
+                for cell in row.findall(word_tag("tc")):
+                    if len(cells) >= PREVIEW_COLUMNS or table_cells >= 2_000:
+                        limit.truncated = True
+                        break
+                    if cell.find(word_tag("tbl")) is not None:
+                        limit.truncated = True
+                    text = "\n".join(paragraph_text(part) for part in cell.findall(word_tag("p")))
+                    cells.append(limit.clip(text))
+                    table_cells += 1
+                if cells:
+                    rows.append(cells)
+            if rows:
+                blocks.append({"kind": "table", "rows": rows})
+        else:
+            limit.truncated = True
+    return {"kind": "docx", "blocks": blocks, "truncated": limit.truncated}
+
+
+def preview(data, kind):
+    content = preview_workbook(data) if kind == "xlsx" else preview_word(data)
+    return {"preview": content, "sourceSha256": hashlib.sha256(data).hexdigest(),
+            "sourceSize": len(data),
+            "policyVersion": PREVIEW_POLICY_VERSION}
 
 
 def probe() -> dict[str, bool]:
@@ -763,6 +951,8 @@ def main() -> int:
                 raise RuntimeError("isolation probe failed")
         elif sys.argv[1:] == ["--viewer"]:
             result = extract_viewer(sys.stdin.buffer.read(MAX_INPUT + 1))
+        elif sys.argv[1:] in (["--preview-xlsx"], ["--preview-docx"]):
+            result = preview(sys.stdin.buffer.read(MAX_INPUT + 1), sys.argv[1][10:])
         elif sys.argv[1:]:
             raise Rejected("invalid_protocol")
         else:

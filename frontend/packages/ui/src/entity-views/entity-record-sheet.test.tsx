@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 const session = vi.hoisted(() => ({ organizationId: 7 as number | undefined }))
@@ -29,6 +29,14 @@ function open(config: EntityRecordSheetConfig, record: Record<string, unknown> =
 }
 
 describe("EntityRecordSheet discussion", () => {
+  it("opens a product record at its heading before record actions", async () => {
+    const productName = "Workshop fastener set — " + "SKU".repeat(60)
+    open({ ...base, actions: <button>Update quantity</button> }, { id: 12, name: productName })
+    const heading = screen.getByRole("heading", { name: productName })
+    await waitFor(() => expect(document.activeElement).toBe(heading))
+    expect(screen.getByRole("dialog").style.width).toBe("56rem")
+    expect(screen.getByRole("button", { name: "Close" })).toBeTruthy()
+  })
   it("renders actions with the current record and refreshes them after a transition", () => {
     const config = { ...base, actions: (record: Record<string, unknown>) => <button>{record.state === "new" ? "Qualify lead" : "Convert lead"}</button> }
     const { rerender } = open(config, { id: 12, name: "Lead", state: "new" })

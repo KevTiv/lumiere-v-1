@@ -371,6 +371,12 @@ services:
         methods: [POST]
         regex_priority: 10
         strip_path: false
+      - name: web-ai-alpha-platform-profile
+        paths:
+          - '~/api/ai/harness/profile$'
+        methods: [GET, POST]
+        regex_priority: 10
+        strip_path: false
       - name: web-ai-alpha-surface-provisioning
         paths:
           - '~/api/ai/skills/provision-surfaces$'

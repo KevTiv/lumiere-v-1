@@ -28,7 +28,7 @@ function WorkspaceNavigationTrigger() {
 
 function MobileCompanySwitcher() {
   const { isMobile, openMobile } = useSidebar()
-  return isMobile && !openMobile ? <div className="max-w-32 min-w-0"><CompanySwitcher className="h-8 py-1" /></div> : null
+  return isMobile && !openMobile ? <div className="max-w-32 min-w-0"><CompanySwitcher className="h-8 max-w-full py-1" /></div> : null
 }
 
 export interface DashboardAccountProps {
@@ -111,11 +111,12 @@ function WorkspaceAccountMenu({ userProfile, onSignOut }: DashboardAccountProps)
 }
 
 /** Shared shell composition, inspired by Studio Admin's compact header and inset workspace. */
-export function DashboardWorkspace({ sidebar, children, overlays, notifications, onOpenSearch, forceCollapsed = false, userProfile, onSignOut }: {
+export function DashboardWorkspace({ sidebar, children, overlays, notifications, headerTools, onOpenSearch, forceCollapsed = false, userProfile, onSignOut }: {
   sidebar: ReactNode
   children: ReactNode
   overlays?: ReactNode
   notifications?: ReactNode
+  headerTools?: ReactNode
   onOpenSearch: () => void
   forceCollapsed?: boolean
 } & DashboardAccountProps) {
@@ -152,6 +153,7 @@ export function DashboardWorkspace({ sidebar, children, overlays, notifications,
                 </Button>
               </div>
               <div className="flex shrink-0 items-center gap-1">
+                {headerTools}
                 <WorkspaceAccountMenu userProfile={userProfile} onSignOut={onSignOut} />
                 {notifications}
               </div>

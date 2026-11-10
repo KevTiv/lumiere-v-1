@@ -47,6 +47,8 @@ import {
   useSubscriptions,
   type Subscription,
 } from '@lumiere/query-hooks/hooks/subscriptions';
+import { CurrencyFormatProvider } from '@lumiere/ui';
+import { entityScalarText } from '@lumiere/ui/lib/entity-row-values';
 import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useSubscriptionsModuleSubscription } from '@/lib/module-subscription-hooks';
@@ -183,7 +185,7 @@ function SubscriptionPageLoaded({
   }
 
   const state = subscriptionStateOf(subscription);
-  const label = String(subscription.code || '').trim() || `#${subscriptionId}`;
+  const label = entityScalarText(subscription.code) ?? `#${subscriptionId}`;
   const status = subscriptionStatusBar(subscription, t);
   const tableConfig = subscriptionsTableConfig(t);
   const columns = tableConfig.view.mode === 'table' ? tableConfig.view.columns : [];
@@ -191,7 +193,7 @@ function SubscriptionPageLoaded({
   const stateBadge = stateColumn
     ? {
         variant: (stateColumn.badgeVariants?.[state] ?? 'secondary') as 'default' | 'secondary' | 'outline' | 'destructive',
-        label: stateColumn.badgeLabels?.[state] ?? state,
+        label: stateColumn.badgeLabels?.[state] ?? t('subscriptions.workflow.statusUnavailable', { defaultValue: 'Status unavailable' }),
       }
     : { variant: 'secondary' as const, label: state };
   const detailConfig = {
@@ -252,6 +254,7 @@ function SubscriptionPageLoaded({
   const id = BigInt(subscriptionId);
 
   return (
+    <CurrencyFormatProvider currencies={currencies} rowCurrencyKey="currencyId">
     <RecordPage
       testIdPrefix="subscription"
       breadcrumbs={[
@@ -432,5 +435,6 @@ function SubscriptionPageLoaded({
         },
       ]}
     />
+    </CurrencyFormatProvider>
   );
 }

@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { FileUploadField } from "@lumiere/ui/components/file-upload-field"
 import { Button } from "@lumiere/ui/components/button"
 import { apiFetch } from "./api-fetch"
 import {
@@ -17,13 +18,16 @@ import type { ImportPreparation } from "./import-preparation"
 export function SavedImportTaskIntake({
   scope,
   onSaved,
+  available,
   preparation,
 }: {
   scope: SavedImportScope
   onSaved: (id: string) => void
+  available: boolean
   preparation?: ImportPreparation
 }) {
   const { t } = useTranslation()
+  const limitsId = useId()
   const taskScope = useMemo<ChatImportScope>(
     () => ({ ...scope, conversationKey: "imports-workspace" }),
     [scope],
@@ -69,13 +73,13 @@ export function SavedImportTaskIntake({
   }, [taskScope, current])
   useEffect(() => {
     mounted.current = true
-    void check()
+    if (available) void check()
     return () => {
       mounted.current = false
     }
-  }, [check])
+  }, [available, check])
   const upload = async (files: File[]) => {
-    if (!ready || !current() || running.current) return
+    if (!available || !ready || !current() || running.current) return
     running.current = true
     setBusy(true)
     setError(null)
@@ -105,7 +109,12 @@ export function SavedImportTaskIntake({
     }
   }
   return (
-    <section className="space-y-3 rounded-lg border p-4" aria-busy={busy}>
+    <section
+      id="start-import"
+      tabIndex={-1}
+      className="min-w-0 scroll-mt-6 space-y-3 rounded-lg border p-4"
+      aria-busy={busy}
+    >
       <h2 className="font-semibold">
         {t("settings.importTask.start", {
           defaultValue: "Start a saved import",
@@ -117,26 +126,19 @@ export function SavedImportTaskIntake({
             "Save your original CSV or Excel files, then choose inspection or import preparation. You can return to the same task from any device.",
         })}
       </p>
-      <label className="block space-y-2 text-sm">
-        <span className="font-medium">
-          {t("settings.importTask.chooseFiles", {
-            defaultValue: "Choose source files",
-          })}
-        </span>
-        <input
-          type="file"
-          multiple
-          accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          disabled={busy || !ready}
-          onChange={(event) => {
-            const files = Array.from(event.target.files ?? [])
-            event.target.value = ""
-            if (files.length) void upload(files)
-          }}
-          className="block w-full min-w-0 max-w-full text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-background file:px-3 file:py-2"
-        />
-      </label>
-      <p className="text-xs text-muted-foreground">
+      <FileUploadField
+        multiple
+        accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        disabled={!available || busy || !ready}
+        chooseLabel={t("settings.importTask.chooseFiles", {
+          defaultValue: "Upload source files",
+        })}
+        aria-describedby={limitsId}
+        onSelect={(files) => {
+          if (files.length) void upload(files)
+        }}
+      />
+      <p id={limitsId} className="text-sm text-muted-foreground">
         {t("settings.importTask.uploadLimits", {
           defaultValue:
             "Up to 20 files, 5 MB each and 20 MB combined. Original files stay attached to the saved task.",
@@ -166,7 +168,7 @@ export function SavedImportTaskIntake({
         <Button
           type="button"
           variant="outline"
-          disabled={busy}
+          disabled={!available || busy}
           onClick={() => void check()}
         >
           {t("aiChat.import.check", { defaultValue: "Check saved imports" })}

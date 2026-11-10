@@ -63,21 +63,21 @@ export function EntityRecordSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className={cn("w-full overflow-y-auto", config.wide ? "sm:max-w-[min(1280px,calc(100vw-1rem))]" : "sm:max-w-lg")}>
+      <SheetContent size={config.wide ? "review" : "record"} className="gap-0 overflow-hidden">
         {record && (
           <>
-            <SheetHeader>
+            <SheetHeader className="shrink-0 border-b">
               <SheetTitle>{title}</SheetTitle>
             </SheetHeader>
 
-            <div className="mt-2 space-y-4 px-4 pb-6">
+            <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4">
               {(config.statusKey || config.actions || openHref) && (
                 <div className="flex flex-wrap items-center gap-2">
                   {config.statusKey && statusRaw && (
-                    <Badge variant={statusVariant}>{statusLabel}</Badge>
+                    <Badge variant={statusVariant} className="max-w-full whitespace-normal">{statusLabel}</Badge>
                   )}
                   {actions && (
-                    <div className={cn("flex flex-wrap gap-2", typeof config.actions === "function" && "w-full")}>{actions}</div>
+                    <div className={cn("flex min-w-0 flex-wrap gap-2 [&_button]:h-auto [&_button]:min-h-8 [&_button]:max-w-full [&_button]:whitespace-normal", typeof config.actions === "function" && "w-full")}>{actions}</div>
                   )}
                   {openHref && (
                     <Button

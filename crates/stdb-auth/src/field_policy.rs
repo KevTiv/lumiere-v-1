@@ -2130,6 +2130,11 @@ mod tests {
             ),
             ("products", "Product", &["can_be_expensed"][..]),
             (
+                "scheduled-reports",
+                "ScheduledReport",
+                &["company_id", "next_run"][..],
+            ),
+            (
                 "account-taxes",
                 "AccountTax",
                 &["company_id", "active", "type_tax_use"][..],
@@ -2171,6 +2176,7 @@ mod tests {
                 ][..],
             ),
             ("products", &["can_be_expensed"][..]),
+            ("scheduled-reports", &["is_active", "next_run"][..]),
             ("account-taxes", &["active", "type_tax_use"][..]),
         ] {
             let mut access = field_access(&[&format!("{resource}:read")]);

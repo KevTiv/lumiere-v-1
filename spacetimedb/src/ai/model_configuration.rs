@@ -72,7 +72,7 @@ pub struct AiIntelligencePolicy {
     pub write_date: Timestamp,
 }
 
-#[derive(SpacetimeType, Clone, Debug)]
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub struct RegisterAiModelProfileParams {
     pub profile_key: String,
     pub profile_version: u32,
@@ -280,7 +280,9 @@ pub fn set_ai_intelligence_policy_active(
     Ok(())
 }
 
-fn validate_model_profile_params(params: &RegisterAiModelProfileParams) -> Result<(), String> {
+pub(crate) fn validate_model_profile_params(
+    params: &RegisterAiModelProfileParams,
+) -> Result<(), String> {
     if params.profile_key.trim().is_empty()
         || params.model.trim().is_empty()
         || params.provider.trim().is_empty()

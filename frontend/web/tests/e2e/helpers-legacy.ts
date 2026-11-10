@@ -171,23 +171,35 @@ export async function selectModuleTab(page: Page, moduleId: string, tabId: strin
 /** Assert the selected workspace's actual interaction surface. */
 export async function expectModuleTabSurface(page: Page, moduleId: string, tabId: string) {
   const moduleView = await currentModuleView(page, moduleId)
-  const panel = moduleView.getByTestId(`module-panel-${moduleId}-${tabId}`)
+  const panelId = `module-panel-${moduleId}-${tabId}`
+  const panel = moduleView.getByTestId(panelId)
   await expect(panel).toHaveCount(1)
-  const visiblePanels = moduleView.locator(`[data-testid^="module-panel-${moduleId}-"]:visible`)
-  // Nested charts and unrelated workspaces can have their own active panels.
-  await expect(visiblePanels).toHaveCount(1)
-  await expect(panel).toBeVisible()
   if (moduleId === "accounting" && tabId === "payment-operations") {
-    // Page composition makes this panel visible. The payment controller remains
-    // outside ModuleView so tab changes cannot discard an in-flight allocation.
-    await expect(panel.getByTestId("module-page-composition-accounting-payment-operations")).toBeVisible()
+    // Optional insights can collapse into a header action. The payment controller
+    // stays outside ModuleView to retain in-flight operations when tabs change.
+    await expect(
+      moduleView.getByTestId("module-tab-accounting-payment-operations"),
+    ).toHaveAttribute("aria-selected", "true")
+    await expect(
+      moduleView.locator(`[data-testid^="module-panel-accounting-"]:not([data-testid="${panelId}"]):visible`),
+    ).toHaveCount(0)
+    await expect(
+      panel.getByTestId("module-page-composition-accounting-payment-operations"),
+    ).toHaveCount(1)
+    const header = moduleView.locator('[data-ui="page-header"]')
+    await expect(header.getByRole("button", { name: "Customize insights", exact: true })).toBeVisible()
     const operations = page.getByRole("region", { name: "Payment operations", exact: true })
     await expect(moduleView.getByRole("region", { name: "Payment operations", exact: true })).toHaveCount(0)
     await expect(operations).toHaveCount(1)
     await expect(operations).toBeVisible()
     await expect(operations.getByText("Payment accounts", { exact: true })).toBeVisible()
     await expect(operations.getByText("Transactions & reconciliation", { exact: true })).toBeVisible()
+    return
   }
+  const visiblePanels = moduleView.locator(`[data-testid^="module-panel-${moduleId}-"]:visible`)
+  // Nested charts and unrelated workspaces can have their own active panels.
+  await expect(visiblePanels).toHaveCount(1)
+  await expect(panel).toBeVisible()
 }
 
 /** Open an entity tab’s create modal and wait for the form dialog. */
@@ -233,8 +245,7 @@ export function activeTabEntityTable(page: Page) {
 }
 
 /**
- * Row actions only render once a row is selected. Prefer its checkbox because
- * a row click can open a record without selecting it. Empty tables offer none.
+ * Row actions only render once a row is selected. Empty tables offer none.
  */
 export async function expectRowActionsOffered(page: Page, actionIds: readonly string[]) {
   const table = activeTabEntityTable(page)
@@ -250,21 +261,9 @@ export async function expectRowActionsOffered(page: Page, actionIds: readonly st
     }
   }
   if (!hasRow) return
-  const checkbox = firstRow.getByTestId(/^entity-select-row-/)
-  if (await checkbox.count()) {
-    if (await checkbox.getAttribute("aria-checked") !== "true") await checkbox.click()
-    await expect(checkbox).toBeChecked()
-  } else {
-    await firstRow.click()
-  }
+  await checkEntityRow(firstRow)
   for (const actionId of actionIds) {
     await expect(page.getByTestId(`entity-action-${actionId}`)).toBeVisible()
-  }
-  // A row click may also open the record sheet; close it so the page stays usable.
-  const dialog = page.getByRole("dialog")
-  if (await dialog.isVisible().catch(() => false)) {
-    await page.keyboard.press("Escape")
-    await expect(dialog).toBeHidden()
   }
 }
 
@@ -939,38 +938,43 @@ export async function installPostHogResetProbe(page: Page) {
   }
 }
 
-/** Click the entity table row whose text includes `text`. Enables selection actions. */
+function entityRowCheckbox(row: Locator) {
+  return row.getByTestId(/^entity-select-row-/)
+}
+
+async function checkEntityRow(row: Locator) {
+  // A click on a cell can disclose its text, open a link, or open the record.
+  const checkbox = entityRowCheckbox(row)
+  await expect(checkbox).toBeVisible()
+  await checkbox.setChecked(true)
+  await expect(checkbox).toBeChecked()
+}
+
+/** Select the entity table row whose text includes `text` for toolbar actions. */
 export async function selectEntityRowByText(page: Page, text: string | RegExp) {
   await dismissBlockingDialogs(page)
   const row = activeTabEntityTable(page).locator("tbody tr").filter({ hasText: text }).first()
   await expect(row).toBeVisible({ timeout: 30_000 })
-  if ((await row.getAttribute("data-state")) !== "selected") {
-    await row.click()
-  }
-  await dismissBlockingDialogs(page)
+  await checkEntityRow(row)
 }
 
-/** Click an entity table row by its `data-testid="entity-row-{id}"` key. */
+/** Select only the entity table row with the exact id for toolbar actions. */
 export async function selectEntityRowById(page: Page, id: number | string) {
   await dismissBlockingDialogs(page)
   const table = activeTabEntityTable(page)
   const row = table.getByTestId(`entity-row-${id}`)
   await expect(row).toBeVisible({ timeout: 30_000 })
 
-  // Selection toggles per row — clear other selections so single-select actions fire.
-  const otherSelected = table.locator('tbody tr[data-state="selected"]').filter({
-    hasNot: table.getByTestId(`entity-row-${id}`),
-  })
-  for (let i = 0; i < (await otherSelected.count()); i += 1) {
-    await otherSelected.first().click()
+  const selection = table.getByTestId("entity-selection-actions")
+  const soleSelection = selection.getByText("1 selected", { exact: true })
+  const clearSelection = selection.getByTestId("entity-selection-clear")
+  if (await clearSelection.isVisible() &&
+      !(await soleSelection.isVisible() && await entityRowCheckbox(row).isChecked())) {
+    // The notification stack can cover the button while a mutation settles.
+    await clearSelection.press("Enter", { timeout: 10_000 })
   }
-
-  // Entity tables default to toggle-on-click selection. Re-clicking an already-selected row
-  // deselects it — wait for STDB-driven re-renders, then only click when not selected.
-  if ((await row.getAttribute("data-state")) !== "selected") {
-    await row.click()
-  }
-  await dismissBlockingDialogs(page)
+  await checkEntityRow(row)
+  if (await selection.isVisible()) await expect(soleSelection).toBeVisible()
 }
 
 /** Wait until a selection-gated entity action is enabled (proves row context is applied). */

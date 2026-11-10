@@ -108,7 +108,21 @@ fn existing_surface<'a>(
         })
 }
 
-fn create_surface(organization_id: u64, skill_key: &str) -> Result<ReducerCall> {
+/// Read effective catalog without creating organization shadows of managed skills.
+pub(crate) async fn existing_generation_surfaces(
+    reader: &StdbClient,
+    organization_id: u64,
+) -> Result<Vec<ProvisionedSurface>> {
+    let catalog = read_catalog(reader, organization_id).await?;
+    Ok(GENERATION_SURFACES
+        .iter()
+        .filter_map(|key| {
+            existing_surface(&catalog, organization_id, key).map(|row| row.provisioned(false))
+        })
+        .collect())
+}
+
+pub(crate) fn create_surface(organization_id: u64, skill_key: &str) -> Result<ReducerCall> {
     let bundled = crate::skills::load_bundled_skill(skill_key)?
         .with_context(|| format!("bundled generation surface '{skill_key}' is missing"))?;
     ensure!(
@@ -274,6 +288,14 @@ mod tests {
         session_reads: usize,
         api_writes: Vec<Value>,
         redirect_url: String,
+        company_config: Option<Value>,
+        company_writes: Vec<Value>,
+        managed_profile_available: bool,
+        chat_agent_unavailable: bool,
+        managed_enrolled: bool,
+        enrollment_writes: Vec<Value>,
+        report_catalog: Option<Vec<Value>>,
+        system_catalog_reads: usize,
     }
 
     struct Fixture {
@@ -321,6 +343,7 @@ mod tests {
             post_provision_surfaces(
                 State(self.state().await),
                 Json(GatewayProvisionSurfacesRequest {
+                    company_id: None,
                     org_id: 9,
                     stdb_token: "workos-api-credential".into(),
                 }),
@@ -348,6 +371,63 @@ mod tests {
         assert_eq!(headers["authorization"], "Bearer administrator");
         let mut database = database.lock().unwrap();
         database.reads += 1;
+        if statement.contains("FROM ai_managed_enrollment ") {
+            assert!(statement.contains("organization_id = 9"));
+            let rows = if database.managed_enrolled {
+                vec![vec![json!(42), json!(true)]]
+            } else {
+                vec![]
+            };
+            return Json(
+                json!([{"schema":{"elements":[{"name":{"some":"agent_id"}},{"name":{"some":"is_enabled"}}]},"rows":rows}]),
+            )
+            .into_response();
+        }
+        if statement.contains("FROM company ") {
+            return Json(json!([{"schema":{"elements":[{"name":{"some":"id"}}]},"rows":[[7]]}]))
+                .into_response();
+        }
+        if statement.contains("FROM ai_agent ") {
+            if database.chat_agent_unavailable {
+                return Json(json!([{"schema":{"elements":[]},"rows":[]}])).into_response();
+            }
+            return Json(json!([{"schema":{"elements":[{"name":{"some":"id"}},{"name":{"some":"company_id"}},{"name":{"some":"allowed_actions"}}]},"rows":[[42,null,["chat"]]]}])).into_response();
+        }
+        if statement.starts_with("SELECT id, is_active FROM ai_skill ")
+            && statement.contains("skill_key = 'rag_generation'")
+        {
+            return Json(json!([{"schema":{"elements":[{"name":{"some":"id"}},{"name":{"some":"is_active"}}]},"rows":[[66,true]]}])).into_response();
+        }
+        if statement.contains("skill_key = 'report_analysis'") {
+            let rows = if statement.contains("organization_id = 0") {
+                database.system_catalog_reads += 1;
+                vec![vec![json!(55), json!(true)]]
+            } else {
+                assert!(statement.contains("organization_id = 9"));
+                database
+                    .report_catalog
+                    .clone()
+                    .unwrap_or_else(|| vec![json!([55, true])])
+                    .into_iter()
+                    .map(|row| row.as_array().unwrap().clone())
+                    .collect()
+            };
+            return Json(json!([{"schema":{"elements":[{"name":{"some":"id"}},{"name":{"some":"is_active"}}]},"rows":rows}])).into_response();
+        }
+        if statement.contains("FROM ai_skill_config ") {
+            assert!(statement.contains("organization_id = 9"));
+            assert!(statement.contains("company_id = 7"));
+            if statement.contains("skill_id = 66") {
+                return Json(json!([{"schema":{"elements":[{"name":{"some":"is_enabled"}},{"name":{"some":"config_json"}}]},"rows":[[true,"{\"defaultAgentId\":42,\"intelligencePolicyRef\":\"pilot@1\"}"]]}])).into_response();
+            }
+            assert!(statement.contains("skill_id = 55"));
+            let rows: Vec<_> = database
+                .company_config
+                .iter()
+                .map(|c| vec![c["is_enabled"].clone(), c["config_json"].clone()])
+                .collect();
+            return Json(json!([{"schema":{"elements":[{"name":{"some":"is_enabled"}},{"name":{"some":"config_json"}}]},"rows":rows}])).into_response();
+        }
         if statement.contains("FROM ai_intelligence_policy ") {
             assert!(statement.contains("organization_id = 9"));
             assert!(statement.contains("policy_key = 'pilot'"));
@@ -607,6 +687,35 @@ mod tests {
         }
     }
 
+    async fn api_company_defaults(
+        State(database): State<Arc<Mutex<Database>>>,
+        headers: HeaderMap,
+        Json(payload): Json<Value>,
+    ) -> Response {
+        assert_eq!(headers["authorization"], "Bearer workos-api-credential");
+        assert_eq!(headers[lumiere_auth_context::ORGANIZATION_HEADER], "9");
+        assert_eq!(
+            payload,
+            json!({"companyId":7,"agentId":42,"intelligencePolicyRef":"pilot@1"})
+        );
+        database.lock().unwrap().company_writes.push(payload);
+        Json(json!({"ok":true,"operationId":"erp.provision_ai_company_defaults","correlationId":"setup-1"})).into_response()
+    }
+
+    async fn api_enroll_defaults(
+        State(database): State<Arc<Mutex<Database>>>,
+        headers: HeaderMap,
+        Json(payload): Json<Value>,
+    ) -> Response {
+        assert_eq!(headers["authorization"], "Bearer workos-api-credential");
+        assert_eq!(headers[lumiere_auth_context::ORGANIZATION_HEADER], "9");
+        assert_eq!(payload, json!({"companyId":7}));
+        let mut db = database.lock().unwrap();
+        db.enrollment_writes.push(payload);
+        db.managed_enrolled = db.managed_profile_available;
+        Json(json!({"ok":true,"operationId":"erp.enroll_ai_company_defaults","correlationId":"enroll-1"})).into_response()
+    }
+
     async fn api_fixture(rows: Vec<Value>, behavior: Behavior) -> ApiFixture {
         let native = fixture(rows, behavior).await;
         native.database.lock().unwrap().redirect_url = format!(
@@ -618,12 +727,181 @@ mod tests {
         let app = Router::new()
             .route("/v1/session/field-access", get(api_session))
             .route("/v1/operations/erp.create_ai_skill", post(api_create))
+            .route(
+                "/v1/operations/erp.provision_ai_company_defaults",
+                post(api_company_defaults),
+            )
+            .route(
+                "/v1/operations/erp.enroll_ai_company_defaults",
+                post(api_enroll_defaults),
+            )
             .with_state(native.database.clone());
         let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
         ApiFixture {
             native,
             origin,
             server,
+        }
+    }
+
+    #[tokio::test]
+    async fn company_setup_reuses_only_enabled_approved_binding() {
+        use crate::routes::skills::{post_provision_surfaces, GatewayProvisionSurfacesRequest};
+        for (config, expected, writes) in [
+            (
+                Some(
+                    json!({"is_enabled":true,"config_json":"{\"defaultAgentId\":42,\"intelligencePolicyRef\":\"pilot@1\"}"}),
+                ),
+                "configured",
+                1,
+            ),
+            (
+                Some(
+                    json!({"is_enabled":false,"config_json":"{\"defaultAgentId\":42,\"intelligencePolicyRef\":\"pilot@1\"}"}),
+                ),
+                "profile_required",
+                0,
+            ),
+            (None, "profile_required", 0),
+        ] {
+            let fixture = api_fixture(Vec::new(), Behavior::Success).await;
+            fixture.native.database.lock().unwrap().company_config = config;
+            let result = post_provision_surfaces(
+                State(fixture.state().await),
+                Json(GatewayProvisionSurfacesRequest {
+                    org_id: 9,
+                    company_id: Some(7),
+                    stdb_token: "workos-api-credential".into(),
+                }),
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                serde_json::to_value(result.0).unwrap()["company_setup"]["status"],
+                expected
+            );
+            assert_eq!(
+                fixture.native.database.lock().unwrap().company_writes.len(),
+                writes
+            );
+        }
+        for (company_id, behavior) in [(0, Behavior::Success), (7, Behavior::SessionDenied)] {
+            let fixture = api_fixture(Vec::new(), behavior).await;
+            let result = post_provision_surfaces(
+                State(fixture.state().await),
+                Json(GatewayProvisionSurfacesRequest {
+                    org_id: 9,
+                    company_id: Some(company_id),
+                    stdb_token: "workos-api-credential".into(),
+                }),
+            )
+            .await;
+            assert!(result.is_err());
+            let db = fixture.native.database.lock().unwrap();
+            assert_eq!(db.reads, 0);
+            assert!(db.company_writes.is_empty());
+            assert!(db.api_writes.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn setup_enrolls_from_platform_without_tenant_profile_inputs() {
+        use crate::routes::skills::{post_provision_surfaces, GatewayProvisionSurfacesRequest};
+        let catalog = GENERATION_SURFACES
+            .iter()
+            .enumerate()
+            .map(|(i, key)| catalog_row(i as u64 + 100, 0, key, true))
+            .collect();
+        let fixture = api_fixture(catalog, Behavior::Success).await;
+        fixture
+            .native
+            .database
+            .lock()
+            .unwrap()
+            .managed_profile_available = true;
+        for _ in 0..2 {
+            let result = post_provision_surfaces(
+                State(fixture.state().await),
+                Json(GatewayProvisionSurfacesRequest {
+                    org_id: 9,
+                    company_id: Some(7),
+                    stdb_token: "workos-api-credential".into(),
+                }),
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                serde_json::to_value(result.0).unwrap()["company_setup"]["status"],
+                "configured"
+            );
+        }
+        fixture
+            .native
+            .database
+            .lock()
+            .unwrap()
+            .chat_agent_unavailable = true;
+        let result = post_provision_surfaces(
+            State(fixture.state().await),
+            Json(GatewayProvisionSurfacesRequest {
+                org_id: 9,
+                company_id: Some(7),
+                stdb_token: "workos-api-credential".into(),
+            }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(result.0).unwrap()["company_setup"]["status"],
+            "preserved"
+        );
+        let db = fixture.native.database.lock().unwrap();
+        assert_eq!(db.enrollment_writes, vec![json!({"companyId":7}); 3]);
+        assert!(db.company_writes.is_empty());
+        assert!(
+            db.api_writes.is_empty(),
+            "managed setup must never create organization catalog shadows"
+        );
+    }
+
+    #[tokio::test]
+    async fn report_binding_respects_system_fallback_and_inactive_local_shadow() {
+        use crate::routes::skills::{post_provision_surfaces, GatewayProvisionSurfacesRequest};
+        for (catalog, system_reads, expected) in [
+            (vec![], 1, "configured"),
+            (vec![json!([55, false])], 0, "profile_required"),
+            (
+                vec![json!([55, true]), json!([56, true])],
+                0,
+                "profile_required",
+            ),
+        ] {
+            let fixture = api_fixture(Vec::new(), Behavior::Success).await;
+            {
+                let mut db = fixture.native.database.lock().unwrap();
+                db.report_catalog = Some(catalog);
+                db.company_config = Some(
+                    json!({"is_enabled":true,"config_json":"{\"defaultAgentId\":42,\"intelligencePolicyRef\":\"pilot@1\"}"}),
+                );
+            }
+            let result = post_provision_surfaces(
+                State(fixture.state().await),
+                Json(GatewayProvisionSurfacesRequest {
+                    org_id: 9,
+                    company_id: Some(7),
+                    stdb_token: "workos-api-credential".into(),
+                }),
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                serde_json::to_value(result.0).unwrap()["company_setup"]["status"],
+                expected
+            );
+            assert_eq!(
+                fixture.native.database.lock().unwrap().system_catalog_reads,
+                system_reads
+            );
         }
     }
 
@@ -772,6 +1050,7 @@ mod tests {
         let denied = post_provision_surfaces(
             State(state.clone()),
             Json(GatewayProvisionSurfacesRequest {
+                company_id: None,
                 org_id: 9,
                 stdb_token: " \t ".into(),
             }),
@@ -788,6 +1067,7 @@ mod tests {
         let Json(result) = post_provision_surfaces(
             State(state),
             Json(GatewayProvisionSurfacesRequest {
+                company_id: None,
                 org_id: 9,
                 stdb_token: "workos-api-credential".into(),
             }),
@@ -866,6 +1146,7 @@ mod tests {
         let result = post_provision_surfaces(
             State(test_support::state(config).await),
             Json(GatewayProvisionSurfacesRequest {
+                company_id: None,
                 org_id: 9,
                 stdb_token: "workos-api-credential".into(),
             }),

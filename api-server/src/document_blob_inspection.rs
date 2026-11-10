@@ -4,6 +4,7 @@
 //! They are not an antivirus verdict and never promote document text to instructions.
 
 use super::*;
+use crate::file_extraction::{DOCX_MIME, OFFICE_PREVIEW_POLICY_VERSION, XLSX_MIME};
 
 const POLICY_VERSION: &str = "document-admission-v2";
 const MAX_TEXT_BYTES: usize = lumiere_file_inspection::MAX_CONTENT_BYTES;
@@ -15,9 +16,7 @@ pub(super) fn maximum_profile_bytes(content_type: &str) -> u64 {
             MAX_TEXT_BYTES as u64
         }
         "application/pdf" => MAX_PDF_BYTES as u64,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => {
-            crate::file_extraction::MAX_WORKBOOK_BYTES as u64
-        }
+        XLSX_MIME | DOCX_MIME => crate::file_extraction::MAX_WORKBOOK_BYTES as u64,
         "image/png" | "image/jpeg" | "image/webp" => 20 * 1024 * 1024,
         _ => 0,
     }
@@ -73,7 +72,8 @@ pub(super) fn validate_file_declaration(name: &str, content_type: &str) -> Resul
         "image/png" => extension == "png",
         "image/jpeg" => matches!(extension.as_str(), "jpg" | "jpeg"),
         "image/webp" => extension == "webp",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => extension == "xlsx",
+        XLSX_MIME => extension == "xlsx",
+        DOCX_MIME => extension == "docx",
         _ => false,
     };
     if !expected {
@@ -335,35 +335,47 @@ pub(super) async fn inspect_blob(
             inspect_pdf(bytes)?;
             ("bounded_pdf_structure", true)
         }
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => {
-            match crate::file_extraction::inspect_xlsx(bytes).await {
-                Ok(extracted) => {
-                    let inspected =
-                        lumiere_file_inspection::inspect_csv_records(&extracted.csv_text)
-                            .map_err(|error| invalid(&error.to_string()))?;
-                    dataset_sha256 = Some(inspected.dataset_sha256);
-                    content_policy_version = Some(format!(
-                        "{}:{}",
-                        extracted.policy_version, inspected.report.policy_version
+        XLSX_MIME => match crate::file_extraction::inspect_xlsx(bytes).await {
+            Ok(extracted) => {
+                if extracted.source_sha256 != hex::encode(Sha256::digest(bytes)) {
+                    return Err(ApiError::Conflict(
+                        "workbook inspection source identity mismatch".into(),
                     ));
-                    (
-                        "restricted_xlsx",
-                        inspected.report.ai_allowed
-                            && !lumiere_file_inspection::has_prompt_injection(
-                                &extracted.sheet_name,
-                            ),
-                    )
                 }
-                Err(ApiError::BadRequest(_)) => {
-                    // This profile is for the read-only viewer. It must never
-                    // create an import dataset or an AI-eligibility receipt.
-                    crate::file_extraction::inspect_xlsx_viewer(bytes).await?;
-                    content_policy_version =
-                        Some(crate::file_extraction::VIEWER_POLICY_VERSION.into());
-                    ("viewer_xlsx", false)
-                }
-                Err(error) => return Err(error),
+                let inspected = lumiere_file_inspection::inspect_csv_records(&extracted.csv_text)
+                    .map_err(|error| invalid(&error.to_string()))?;
+                dataset_sha256 = Some(inspected.dataset_sha256);
+                content_policy_version = Some(format!(
+                    "{}:{}",
+                    extracted.policy_version, inspected.report.policy_version
+                ));
+                (
+                    "restricted_xlsx",
+                    inspected.report.ai_allowed
+                        && !lumiere_file_inspection::has_prompt_injection(&extracted.sheet_name),
+                )
             }
+            Err(ApiError::BadRequest(_)) => {
+                match crate::file_extraction::inspect_xlsx_viewer(bytes).await {
+                    Ok(_) => {
+                        content_policy_version =
+                            Some(crate::file_extraction::VIEWER_POLICY_VERSION.into());
+                        ("viewer_xlsx", false)
+                    }
+                    Err(ApiError::BadRequest(_)) => {
+                        crate::file_extraction::inspect_office_preview(bytes, XLSX_MIME).await?;
+                        content_policy_version = Some(OFFICE_PREVIEW_POLICY_VERSION.into());
+                        ("office_preview_xlsx", false)
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+            Err(error) => return Err(error),
+        },
+        DOCX_MIME => {
+            crate::file_extraction::inspect_office_preview(bytes, DOCX_MIME).await?;
+            content_policy_version = Some(OFFICE_PREVIEW_POLICY_VERSION.into());
+            ("office_preview_docx", false)
         }
         _ => {
             return Err(invalid(
@@ -403,6 +415,8 @@ fn receipt_is_current(receipt: &BlobInspectionReceipt) -> bool {
                 | "bounded_pdf_structure"
                 | "restricted_xlsx"
                 | "viewer_xlsx"
+                | "office_preview_xlsx"
+                | "office_preview_docx"
         )
         && (receipt.profile != "bounded_text"
             || receipt.content_policy_version.as_deref()
@@ -415,6 +429,12 @@ fn receipt_is_current(receipt: &BlobInspectionReceipt) -> bool {
                 && receipt.dataset_sha256.is_none()
                 && receipt.content_policy_version.as_deref()
                     == Some(crate::file_extraction::VIEWER_POLICY_VERSION)))
+        && (!matches!(
+            receipt.profile.as_str(),
+            "office_preview_xlsx" | "office_preview_docx"
+        ) || (!receipt.ai_allowed
+            && receipt.dataset_sha256.is_none()
+            && receipt.content_policy_version.as_deref() == Some(OFFICE_PREVIEW_POLICY_VERSION)))
         && (receipt.profile != "restricted_xlsx"
             || receipt.content_policy_version.as_deref()
                 == Some(

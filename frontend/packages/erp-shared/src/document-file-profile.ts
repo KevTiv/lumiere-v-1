@@ -1,5 +1,9 @@
 export const DOCUMENT_FILE_ACCEPT =
-  ".csv,.txt,.text,.log,.md,.markdown,.json,.pdf,.png,.jpg,.jpeg,.webp,.xlsx"
+  ".csv,.txt,.text,.log,.md,.markdown,.json,.pdf,.png,.jpg,.jpeg,.webp,.xlsx,.docx"
+export const XLSX_DOCUMENT_MIME =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+export const DOCX_DOCUMENT_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 export const BILL_DOCUMENT_FILE_HINT =
   "Receipt or supplier document (PDF up to 16 MiB; PNG, JPEG or WebP up to 20 MiB)"
 export const BILL_DOCUMENT_IMAGE_HINT =
@@ -20,9 +24,10 @@ const PROFILE_BY_EXTENSION: Record<string, { type: string; maximum: number }> =
     jpeg: { type: "image/jpeg", maximum: 20 * 1024 * 1024 },
     webp: { type: "image/webp", maximum: 20 * 1024 * 1024 },
     xlsx: {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      type: XLSX_DOCUMENT_MIME,
       maximum: 5_000_000,
     },
+    docx: { type: DOCX_DOCUMENT_MIME, maximum: 5_000_000 },
   }
 
 /** Declaration preflight only; the server independently inspects the actual bytes. */
@@ -34,7 +39,7 @@ export function documentFileContentType(
   const profile = PROFILE_BY_EXTENSION[extension]
   if (!profile)
     throw new Error(
-      "Choose a supported CSV, text, JSON, PDF, PNG, JPEG, WebP or XLSX file.",
+      "Choose a supported CSV, text, JSON, PDF, PNG, JPEG, WebP, XLSX or DOCX file.",
     )
   const declared = file.type.toLowerCase()
   const matches =

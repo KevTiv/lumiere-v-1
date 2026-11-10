@@ -84,7 +84,8 @@ test("stock view leads with named identity and filters by exact location without
   };
   const result = warehouseTable(table, "stock", [{ id: 1n, name: "Shelf" }, { id: 2n, name: "Shelf" }], t);
   if (result.view.mode !== "table") assert.fail("Expected stock table");
-  assert.deepEqual(result.view.columns.slice(0, 5).map((column) => column.key), ["warehouseProductName", "warehouseProductCode", "warehouseLocationName", "warehouseUnitName", "quantity"]);
+  assert.deepEqual(result.view.columns.slice(0, 4).map((column) => column.key), ["warehouseProductName", "warehouseLocationName", "warehouseUnitName", "quantity"]);
+  assert.equal(result.view.columns.find((column) => column.key === "warehouseProductCode")?.defaultHidden, true);
   assert.equal(result.view.columns.find((column) => column.key === "warehouseCountedQuantity")?.label, "Counted");
   assert.deepEqual(result.view.filters?.[0]?.options, [{ value: "1", label: "Shelf" }, { value: "2", label: "Shelf" }]);
   assert.equal(result.view.actions?.[0]?.onClick, execute);
@@ -184,7 +185,7 @@ test("transfer tasks follow readable location routes, including returns, without
   const result = warehouseTransferRows(rows, locations);
   assert.deepEqual(result.map((row) => row.warehouseTransferTask), ["receive", "deliver", "internal", "receive", "deliver", "other", "unavailable", "unavailable"]);
   result.forEach((row, index) => {
-    const { warehouseTransferTask: _task, ...source } = row;
+    const { warehouseTransferTask: _task, warehouseLocationName: _location, warehouseDestinationName: _destination, ...source } = row;
     assert.deepEqual(source, rows[index]);
   });
   assert.equal("warehouseTransferTask" in rows[0]!, false);
@@ -193,16 +194,24 @@ test("transfer tasks follow readable location routes, including returns, without
 
 test("authorized receipt rows survive an unavailable optional location lookup without using cached task labels", () => {
   const receipt = { id: 24n, name: "IN-00024", state: "done", locationId: 1n, locationDestId: 2n };
-  const cachedLocations = [{ id: 1n, usage: "supplier" }, { id: 2n, usage: "internal" }];
+  const cachedLocations = [
+    { id: 1n, usage: "supplier", name: "Vendor dock" },
+    { id: 2n, usage: "internal", completeName: "Main / Receiving" },
+  ];
   for (const status of ["denied", "error", "partial", "loading"] as const) {
     const locations: ModuleDataState = { status };
     const states: Record<"transfers" | "locations", ModuleDataState> = warehouseDataStates({ transfers: ready, locations });
     assert.deepEqual(states.transfers, ready, status);
     assert.equal(states.locations, locations, status);
     const rows = warehouseTransferRows([receipt], cachedLocations, status);
-    assert.deepEqual(rows, [{ ...receipt, warehouseTransferTask: "unavailable" }], status);
+    assert.deepEqual(rows, [{
+      ...receipt, warehouseTransferTask: "unavailable", warehouseLocationName: null, warehouseDestinationName: null,
+    }], status);
   }
-  assert.equal(warehouseTransferRows([receipt], cachedLocations, "ready")[0]?.warehouseTransferTask, "receive");
+  const [authorized] = warehouseTransferRows([receipt], cachedLocations, "ready");
+  assert.equal(authorized?.warehouseTransferTask, "receive");
+  assert.equal(authorized?.warehouseLocationName, "Vendor dock");
+  assert.equal(authorized?.warehouseDestinationName, "Main / Receiving");
   assert.equal(warehouseDataStates({ transfers: ready }).transfers, ready);
   for (const status of ["denied", "error", "partial", "loading"] as const) {
     const transferState: ModuleDataState = { status };

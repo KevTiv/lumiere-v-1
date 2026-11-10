@@ -1,8 +1,31 @@
+import { createHash } from "node:crypto"
 import { reviewInvoiceAccountingChoices } from "./invoice-accounting-choices"
 import { expect, test, type Locator, type Page } from "@playwright/test"
 
 const image = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNQaPj/HwAFAgKfdqhGyQAAAABJRU5ErkJggg==", "base64")
 const apiRequests = new WeakMap<Page, string[]>()
+
+function selectedReceipt(modal: Locator, name: string) {
+  return modal.getByRole("button", { name: `Show original filename: ${name}`, exact: true })
+}
+
+async function expectExpenseSubmission(
+  page: Page,
+  receiptName: string,
+  fields: { name: string; totalAmount: string; quantity?: string },
+) {
+  const submission = page.getByTestId("authoring-refinement-expense-submission")
+  await expect.poll(async () => JSON.parse((await submission.textContent()) || "{}")).toMatchObject({
+    employeeId: "7",
+    pricelistId: "3",
+    ...fields,
+    receipt: {
+      name: receiptName,
+      type: "image/png",
+      sha256: createHash("sha256").update(image).digest("hex"),
+    },
+  })
+}
 
 async function choose(page: Page, trigger: Locator, label: string | RegExp) {
   await trigger.scrollIntoViewIfNeeded()
@@ -121,10 +144,16 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 720 
       await expect(amount).toHaveValue("19.73")
       await expect(employee).toContainText("Synthetic employee Jane Example")
       await expect(pricelist).toContainText("Travel expenses · Euro (EUR)")
-      expect(await receipt.evaluate((element) => (element as HTMLInputElement).files?.[0]?.name)).toBe("taxi-receipt.png")
+      await expect(selectedReceipt(modal, "taxi-receipt.png")).toBeVisible()
       await expectInViewport(page, save)
       await expect(page.getByTestId("authoring-refinement-attempts")).toContainText("1")
+      const fields = { name: "Taxi from customer visit", totalAmount: "19.73" }
+      await expectExpenseSubmission(page, "taxi-receipt.png", fields)
       await page.screenshot({ path: testInfo.outputPath(`expense-rejected-${viewport.width}.png`) })
+      // Submit again without picking a new file to prove the rejected form retained the bytes.
+      await save.click()
+      await expect(page.getByTestId("authoring-refinement-attempts")).toHaveText("Synthetic rejected save attempts: 2")
+      await expectExpenseSubmission(page, "taxi-receipt.png", fields)
     })
   })
 }
@@ -155,7 +184,17 @@ test.describe("expense type transitions", () => {
     await choose(page, kind, "Purchase")
     await expect(amount).toHaveValue("25.15")
     await expect(quantity).toHaveValue("2")
-    expect(await receipt.evaluate((element) => (element as HTMLInputElement).files?.[0]?.name)).toBe("travel-receipt.png")
+    await expect(selectedReceipt(modal, "travel-receipt.png")).toBeVisible()
+    await modal.getByTestId("form-field-name").fill("Travel expense")
+    await choose(page, modal.getByTestId("form-field-employeeId"), "Synthetic employee Jane Example")
+    await choose(page, modal.getByTestId("form-field-pricelistId"), "Travel expenses · Euro (EUR)")
+    await modal.getByTestId("form-submit-new-expense").click()
+    await expect(modal.getByRole("alert")).toContainText("Synthetic expense save rejected")
+    await expectExpenseSubmission(page, "travel-receipt.png", {
+      name: "Travel expense",
+      totalAmount: "25.15",
+      quantity: "2",
+    })
   })
 })
 

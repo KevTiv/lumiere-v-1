@@ -1,11 +1,15 @@
 "use client"
 
+import { createPageContentSection } from "@lumiere/ui/lib/page-composition"
+import { usePageCompositionActionSlot } from "@lumiere/ui/pages/page-composition-host"
+import { OperationalPageComposition } from "../../../components/operational-page-composition"
+
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { DashboardHeader, MissingOrganization, Button } from "@lumiere/ui"
+import { DashboardHeader, MissingOrganization, Button, useRBAC } from "@lumiere/ui"
 import { Textarea } from "@lumiere/ui/components/textarea"
 import {
   approvalRecordHref,
@@ -47,7 +51,10 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
   const { t } = useTranslation()
   const searchParams = useSearchParams()
   const { identity } = useErpSession()
+  const { checkPermission, permissionsReady } = useRBAC()
+  const canReviewRules = permissionsReady === true && checkPermission("module:workflows", "read").allowed
   const operatingCompanyId = useOperatingCompanyId(organizationId)
+  const { target: compositionTarget, slot: compositionSlot } = usePageCompositionActionSlot()
   const inboxQuery = useHumanTaskInbox(
     organizationId,
     operatingCompanyId,
@@ -81,18 +88,19 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
     [inboxQuery.data],
   )
 
-  const aiDraftCount = useMemo(
-    () => pendingTasks.filter(isAiDraftApprovalRequest).length,
-    [pendingTasks],
-  )
-
   const target = useMemo(
     () => approvalInboxTarget(searchParams.get("model"), searchParams.get("resId")),
     [searchParams],
   )
+  const recordFilterRequested = searchParams.has("model") || searchParams.has("resId")
   const visibleTasks = useMemo(
-    () => target ? pendingTasks.filter((row) => approvalTaskMatchesTarget(row, target)) : pendingTasks,
-    [pendingTasks, target],
+    () => target ? pendingTasks.filter((row) => approvalTaskMatchesTarget(row, target)) : recordFilterRequested ? [] : pendingTasks,
+    [pendingTasks, target, recordFilterRequested],
+  )
+
+  const aiDraftCount = useMemo(
+    () => visibleTasks.filter(isAiDraftApprovalRequest).length,
+    [visibleTasks],
   )
 
   const busy = claimTask.isPending || decideTask.isPending || commentTask.isPending
@@ -139,8 +147,9 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
   }
 
   const handleReject = async (row: HumanTaskRow) => {
-    if (!rejectReason.trim()) return
-    await handleDecide(row, "Reject", rejectReason.trim())
+    const reason = rejectReason.trim()
+    if ((row.requireCommentOnReject ?? row.require_comment_on_reject) && !reason) return
+    await handleDecide(row, "Reject", reason || undefined)
     setRejectingId(null)
     setRejectReason("")
   }
@@ -160,13 +169,16 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
   return (
     <div className="space-y-6" data-testid="module-view-approvals">
       <DashboardHeader
+        secondaryAction={compositionSlot}
         title={t("approvals.review.title", { defaultValue: "Approval inbox" })}
         description={t("approvals.inboxDescription", { defaultValue: "Review requests for the selected company. Open a record before you approve or reject it." })}
       />
 
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <span data-testid="approvals-inbox-count">
-          {inboxQuery.isError ? t("approvals.errors.countUnavailable", { defaultValue: "Task count unavailable" }) : inboxQuery.isPending ? t("approvals.loading", { defaultValue: "Loading approval tasks…" }) : `${pendingTasks.length} open task${pendingTasks.length === 1 ? "" : "s"}`}
+          {operatingCompanyId == null ? t("financeReview.selectCompany", { defaultValue: "Select a company" }) : inboxQuery.isError ? t("approvals.errors.countUnavailable", { defaultValue: "Task count unavailable" }) : inboxQuery.isPending ? t("approvals.loading", { defaultValue: "Loading approval tasks…" }) : recordFilterRequested
+            ? t("approvals.countFiltered", { defaultValue: "{{shown}} of {{total}} open tasks", shown: visibleTasks.length, total: pendingTasks.length })
+            : t("approvals.count", { defaultValue: "{{count}} open tasks", defaultValue_one: "{{count}} open task", count: pendingTasks.length })}
         </span>
         {!inboxQuery.isError && !inboxQuery.isPending && aiDraftCount > 0 ? (
           <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs">
@@ -175,9 +187,11 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
           </span>
         ) : null}
         {inboxQuery.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        <Link href="/workflows" className="text-primary hover:underline">
-          Workflow definitions
-        </Link>
+        {recordFilterRequested && (
+          <Link href="/approvals" className="text-primary underline-offset-4 hover:underline">
+            {t("approvals.review.clearRecordFilter", { defaultValue: "Show all requests" })}
+          </Link>
+        )}
       </div>
 
       {actionError ? <p role="alert" className="break-words text-sm text-destructive">{actionError}</p> : null}
@@ -201,8 +215,10 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
           data-testid="approvals-inbox-empty"
         >
           {target
-            ? `No open approval task matches ${target.model} #${target.resId}.`
-            : t("approvals.empty.noTasks", { defaultValue: "No requests are waiting for approval in this company. New requests appear here when a business action needs review." })}
+            ? t("approvals.empty.target", { defaultValue: "No open approval task matches this record." })
+            : recordFilterRequested
+              ? t("approvals.empty.invalidTarget", { defaultValue: "This request link does not identify a valid record. Show all requests to browse the company inbox." })
+              : t("approvals.empty.noTasks", { defaultValue: "No requests are waiting for approval in this company. New requests appear here when a business action needs review." })}
         </div>
       ) : (
         <div className="grid gap-4">
@@ -242,7 +258,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
-                    <h3 className="flex items-center gap-2 font-medium">
+                    <h2 className="flex flex-wrap items-center gap-2 font-medium">
                       {kindLabels[kind]} {resId > 0 ? `#${resId}` : ""}
                       {isAiDraft ? (
                         <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-normal">
@@ -250,12 +266,10 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                           AI draft
                         </span>
                       ) : null}
-                    </h3>
+                    </h2>
                     <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                      <span className="rounded border px-2 py-0.5 text-xs">{status}</span>
-                      <span className="rounded border px-2 py-0.5 text-xs">
-                        rev {humanTaskRevision(row)}
-                      </span>
+                      <span className="rounded border px-2 py-0.5 text-xs">{t(`workBoard.status.${status}`, { defaultValue: status })}</span>
+                      {!showActorSelection && <span>{t("approvals.review.actingAsSelf", { defaultValue: "Acting as yourself" })}</span>}
                     </p>
                   </div>
                   {recordHref ? (
@@ -299,8 +313,8 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                     </p>
                 <div className="flex flex-wrap gap-2">
                   {showActorSelection ? (
-                    <label className="flex items-center gap-2 text-sm">
-                      Acting as
+                    <label className="grid min-w-0 gap-1 text-sm">
+                      {t("workBoard.actingAs", { defaultValue: "Acting as" })}
                       <Select
                         value={String(selectedActor ?? "") || "__none__"}
                         onValueChange={(selectValue) => {
@@ -392,6 +406,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                 {commentingId === taskId ? (
                   <div className="space-y-3 border-t pt-4">
                     <Textarea
+                      aria-label={t("approvals.review.comment", { defaultValue: "Evidence comment" })}
                       placeholder="Add an evidence comment"
                       value={commentText}
                       onChange={(e) => setCommentText(e.target.value)}
@@ -412,6 +427,8 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                 {rejectingId === taskId ? (
                   <div className="space-y-3 border-t pt-4">
                     <Textarea
+                      aria-label={t("approvals.review.rejectReason", { defaultValue: "Reason for rejection" })}
+                      aria-required={requireComment}
                       placeholder={
                         requireComment
                           ? "Reason for rejection (required)"
@@ -441,15 +458,31 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
         </div>
       )}
 
-      <section className="space-y-2 rounded-lg border bg-card p-5">
-        <h3 className="font-medium">{t("approvals.policy.title", { defaultValue: "Approval rules" })}</h3>
+      {canReviewRules && <section className="space-y-2 border-t pt-4">
+        <h2 className="font-medium">{t("approvals.policy.title", { defaultValue: "Approval rules" })}</h2>
         <p className="text-sm text-muted-foreground">
           {t("approvals.policy.description", { defaultValue: "Approval rules determine which business actions need review." })}{" "}
           <Link href="/workflows" className="text-primary hover:underline">
             {t("approvals.policy.link", { defaultValue: "Manage approval rules" })}
           </Link>
         </p>
-      </section>
+      </section>}
+      <OperationalPageComposition
+        moduleId="approvals"
+        title={t("approvals.review.title", { defaultValue: "Approval inbox" })}
+        actionTarget={compositionTarget}
+        sections={[createPageContentSection({
+          id: "approval-inbox-counts",
+          title: t("approvals.review.inboxSummary", { defaultValue: "Approval inbox summary" }),
+          width: "1/2",
+          content: <div className="rounded-lg border p-4">
+            <h3 className="font-medium">{t("approvals.review.inboxSummary", { defaultValue: "Approval inbox summary" })}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{operatingCompanyId == null || inboxQuery.isPending || inboxQuery.isError
+              ? t("approvals.errors.countUnavailable", { defaultValue: "Task count unavailable" })
+              : t("approvals.companyTaskCount", { defaultValue: "{{open}} open and {{claimed}} claimed tasks in this company, across all source records.", open: pendingTasks.filter((row) => taskStatusTag(row) === "Open").length, claimed: pendingTasks.filter((row) => taskStatusTag(row) === "Claimed").length })}</p>
+          </div>,
+        })]}
+      />
     </div>
   )
 }

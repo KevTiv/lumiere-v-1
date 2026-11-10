@@ -1,19 +1,22 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { createLumiereApiClient, LumiereApiProvider } from "@lumiere/api-client"
-import { ErpSessionProvider } from "@lumiere/erp-session"
-import { I18nProvider } from "@lumiere/i18n"
-import { DocumentViewerDialog } from "../../../../components/document-viewer-dialog"
-import { ThemeProvider } from "../../../../../packages/ui/src/components/theme-provider"
+import { useEffect, useState } from "react";
+import {
+  createLumiereApiClient,
+  LumiereApiProvider,
+} from "@lumiere/api-client";
+import { ErpSessionProvider } from "@lumiere/erp-session";
+import { I18nProvider } from "@lumiere/i18n";
+import { DocumentViewerDialog } from "../../../../components/document-viewer-dialog";
+import { ThemeProvider } from "../../../../../packages/ui/src/components/theme-provider";
 import {
   FileBrowser,
   type FileBrowserState,
-} from "../../../../../packages/ui/src/documents/file-browser"
-import { RecordAttachmentsPanel } from "../../../../../packages/ui/src/documents/record-attachments-panel"
-import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
+} from "../../../../../packages/ui/src/documents/file-browser";
+import { RecordAttachmentsPanel } from "../../../../../packages/ui/src/documents/record-attachments-panel";
+import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context";
 
-const api = createLumiereApiClient({ baseUrl: "" })
+const api = createLumiereApiClient({ baseUrl: "" });
 const files = [
   {
     id: "1",
@@ -86,7 +89,54 @@ const files = [
     updatedAt: 1794096000000,
     modifiedBy: "Synthetic viewer",
   },
-]
+  {
+    id: "9",
+    name: "Supplier workbook",
+    fileName: "supplier.xlsx",
+    mimetype:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    size: 1024,
+    folderId: null,
+    updatedAt: 1794096000000,
+    modifiedBy: "Synthetic viewer",
+  },
+  {
+    id: "8",
+    name: "Supplier letter",
+    fileName: "supplier.docx",
+    mimetype:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    size: 1024,
+    folderId: null,
+    updatedAt: 1794096000000,
+    modifiedBy: "Synthetic viewer",
+  },
+];
+const sharedPrefix =
+  "Supplier reconciliation for the north distribution center ".repeat(4);
+files.push(
+  {
+    id: "5",
+    name: "Quarter-end evidence",
+    fileName: `${sharedPrefix} signed.PDF`,
+    mimetype: "application/pdf",
+    size: 1536,
+    folderId: null,
+    updatedAt: 1794096000000,
+    modifiedBy: "Synthetic viewer",
+  },
+  {
+    id: "6",
+    name: "Quarter-end evidence",
+    fileName: `${sharedPrefix} export.csv`,
+    mimetype: "text/csv",
+    size: 400,
+    folderId: null,
+    updatedAt: 1794096000000,
+    modifiedBy: "Synthetic viewer",
+  },
+);
+
 const actor = {
   id: "document-viewer-fixture",
   name: "Synthetic viewer",
@@ -96,18 +146,18 @@ const actor = {
   createdAt: "2026-11-08",
   updatedAt: "2026-11-08",
   isSuperuser: true,
-}
+};
 
 function ViewerFixture() {
-  const [hydrated, setHydrated] = useState(false)
-  const [documentId, setDocumentId] = useState<string | null>(null)
+  const [hydrated, setHydrated] = useState(false);
+  const [documentId, setDocumentId] = useState<string | null>(null);
   const [browser, setBrowser] = useState<FileBrowserState>({
     folderId: null,
     search: "",
     layout: "list",
     selectedFileId: null,
-  })
-  useEffect(() => setHydrated(true), [])
+  });
+  useEffect(() => setHydrated(true), []);
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-4">
       <p data-testid="document-viewer-disclosure" data-hydrated={hydrated}>
@@ -131,12 +181,13 @@ function ViewerFixture() {
           resId={41}
           documents={files.map((file) => ({
             ...file,
+            fileSize: file.size,
             resModel: "account_move",
             resId: 41,
           }))}
           onOpen={setDocumentId}
           onUpload={async () => {
-            throw new Error("Uploads are disabled in this fixture")
+            throw new Error("Uploads are disabled in this fixture");
           }}
           disabled
         />
@@ -145,11 +196,11 @@ function ViewerFixture() {
         organizationId={7n}
         documentId={documentId}
         onOpenChange={(open) => {
-          if (!open) setDocumentId(null)
+          if (!open) setDocumentId(null);
         }}
       />
     </main>
-  )
+  );
 }
 
 export default function Page() {
@@ -175,5 +226,5 @@ export default function Page() {
         </LumiereApiProvider>
       </ThemeProvider>
     </I18nProvider>
-  )
+  );
 }

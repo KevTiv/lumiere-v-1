@@ -353,6 +353,7 @@ fn schema_from_ir(ir: &Value) -> Result<LumiereSchemaManifest> {
     let raw_tables = ir["tables"]
         .as_array()
         .context("canonical raw tables must be an array")?;
+    let platform_control_tables = crate::cold_tier::platform_control_table_names(ir)?;
     let mut types = BTreeMap::new();
     for entry in ir["types"]
         .as_array()
@@ -376,6 +377,12 @@ fn schema_from_ir(ir: &Value) -> Result<LumiereSchemaManifest> {
         }
         if !names.insert(name) {
             bail!("duplicate canonical table {name}");
+        }
+        if platform_control_tables.contains(name) {
+            if projection.contains_key(name) {
+                bail!("platform control table {name} must not have a tenant projection");
+            }
+            continue;
         }
         let codec = projection
             .get(name)
@@ -505,7 +512,7 @@ fn schema_from_ir(ir: &Value) -> Result<LumiereSchemaManifest> {
             indexes,
         });
     }
-    if projection.len() != names.len() {
+    if projection.len() != tables.len() {
         bail!("canonical projection has unowned table entries");
     }
     tables.sort_by(|left, right| left.sql_name.cmp(&right.sql_name));
@@ -570,6 +577,29 @@ mod tests {
             .sql
             .contains("CREATE INDEX IF NOT EXISTS \"example_organization_id\""));
         assert!(!rendered.sql.contains("example_organization_id_name"));
+    }
+
+    #[test]
+    fn canonical_adapter_excludes_private_platform_control_tables() {
+        let mut ir = fixture();
+        ir["tables"].as_array_mut().unwrap().extend(
+            [
+                "ai_platform_default",
+                "ai_platform_template",
+                "ai_managed_enrollment",
+            ]
+            .map(|name| json!({"name": name, "table_access": {"Private": []}})),
+        );
+        let schema = schema_from_ir(&ir).expect("platform control tables are native only");
+        assert_eq!(schema.tables.len(), 1);
+        assert_eq!(schema.tables[0].sql_name, "example");
+
+        ir["persistence"]["postgresql"]["projection"]["tables"]["ai_managed_enrollment"] =
+            json!({});
+        let error = schema_from_ir(&ir).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("must not have a tenant projection"));
     }
 
     #[test]

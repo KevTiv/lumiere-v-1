@@ -1,6 +1,7 @@
 import { getStdbSession } from "@/lib/api-session"
 import { serverFetchQueryListState } from "@/lib/server-query"
 import { AiHarnessClient, CompanyDataError } from "./ai-harness-client"
+import { canManagePlatformAiProfile } from "@/lib/platform-ai-authority"
 
 export default async function AiHarnessPage() {
   const session = await getStdbSession()
@@ -17,6 +18,7 @@ export default async function AiHarnessPage() {
     <AiHarnessClient
       organizationId={BigInt(session.organizationId)}
       companies={companies.rows}
+      canManagePlatformProfile={canManagePlatformAiProfile(session)}
     />
   )
 }

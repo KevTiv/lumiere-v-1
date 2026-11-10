@@ -10,6 +10,7 @@ import type {
 import { getRowField, unwrapEntityValue } from "@lumiere/ui/lib/entity-row-values";
 import { mergeModuleStates, type ModuleDataState } from "@lumiere/ui/lib/module-data-state";
 import type { ModuleConfig } from "@lumiere/ui/lib/module-types";
+import { entityColumnLayouts as layout } from "@lumiere/ui/lib/entity-column-layouts";
 
 import { WAREHOUSE_TAB_IDS } from '../../../lib/inventory-workspace-navigation';
 export { WAREHOUSE_TAB_IDS } from '../../../lib/inventory-workspace-navigation';
@@ -82,6 +83,10 @@ function recordsById(rows: readonly EntityRow[]): Map<string, EntityRow> {
   return result;
 }
 
+function locationLabel(location: EntityRow | undefined): string | null {
+  return location ? label(getRowField(location, "completeName")) ?? label(location.name) : null;
+}
+
 /** Add display references only: never calculate stock, change units, or replace command IDs. */
 export function warehouseRows(
   rows: readonly EntityRow[],
@@ -92,10 +97,7 @@ export function warehouseRows(
   const productById = recordsById(products);
   const locationById = recordsById(locations);
   const unitById = recordsById(units);
-  const locationName = (id: string | null) => {
-    const location = id === null ? undefined : locationById.get(id);
-    return location ? label(getRowField(location, "completeName")) ?? label(location.name) : null;
-  };
+  const locationName = (id: string | null) => locationLabel(id === null ? undefined : locationById.get(id));
   return rows.map((row) => {
     const productId = rowKey(getRowField(row, "productId"));
     const product = productId === null ? undefined : productById.get(productId);
@@ -133,14 +135,15 @@ export function warehouseTransferRows(
   // A purchasing operator may read their receipts without location-master access.
   // The route classification is optional: never use denied or stale lookup data.
   const locationById = recordsById(locationStatus === "ready" ? locations : []);
-  const usage = (value: unknown): string | null => {
+  const findLocation = (value: unknown): EntityRow | undefined => {
     const id = rowKey(value);
-    const location = id === null ? undefined : locationById.get(id);
-    return location ? label(getRowField(location, "usage")) : null;
+    return id === null ? undefined : locationById.get(id);
   };
   return rows.map((row) => {
-    const source = usage(getRowField(row, "locationId"));
-    const destination = usage(getRowField(row, "locationDestId"));
+    const sourceLocation = findLocation(getRowField(row, "locationId"));
+    const destinationLocation = findLocation(getRowField(row, "locationDestId"));
+    const source = sourceLocation ? label(getRowField(sourceLocation, "usage")) : null;
+    const destination = destinationLocation ? label(getRowField(destinationLocation, "usage")) : null;
     let warehouseTransferTask: WarehouseTransferTask = "unavailable";
     if (source && destination) {
       if ((source === "supplier" || source === "customer") && destination === "internal") {
@@ -153,7 +156,12 @@ export function warehouseTransferRows(
         warehouseTransferTask = "other";
       }
     }
-    return { ...row, warehouseTransferTask };
+    return {
+      ...row,
+      warehouseTransferTask,
+      warehouseLocationName: locationLabel(sourceLocation),
+      warehouseDestinationName: locationLabel(destinationLocation),
+    };
   });
 }
 
@@ -189,7 +197,7 @@ export function warehouseTable(
       key,
       label: column.key === "productId" ? t("inventory.byRecord.product") : column.label,
       type: "text",
-      width: "min-w-36",
+      layout: column.key === "productId" ? layout.identity : layout.location,
       inlineEdit: undefined,
       render: (value) => label(value) ?? unavailable,
     };
@@ -201,10 +209,9 @@ export function warehouseTable(
     const counted = columns.find((column) => column.key === "inventoryQuantity");
     columns = [
       ...(product ? [product] : []),
-      { key: "warehouseProductCode", label: t("inventory.products.columns.defaultCode"), width: "min-w-24" },
       ...(location ? [location] : []),
-      { key: "warehouseUnitName", label: t("inventory.byRecord.uom"), render: (value) => label(value) ?? unavailable },
-      { key: "quantity", label: t("inventory.stockOnHand.columns.inventoryQuantity"), type: "number", align: "right", sortable: true },
+      { key: "warehouseUnitName", label: t("inventory.byRecord.uom"), layout: layout.unit, render: (value) => label(value) ?? unavailable },
+      { key: "quantity", label: t("inventory.stockOnHand.columns.inventoryQuantity"), layout: layout.quantity, type: "number", align: "right", sortable: true },
       ...columns.filter((column) => !["warehouseProductName", "warehouseLocationName", "inventoryQuantity", "quantity"].includes(column.key)),
       ...(counted ? [{
         ...counted,
@@ -212,23 +219,33 @@ export function warehouseTable(
         label: t("inventory.warehouseWorkspace.counted", { defaultValue: "Counted" }),
         render: (value: unknown) => value == null ? unavailable : String(unwrapEntityValue(value)),
       }] : []),
+      { key: "warehouseProductCode", label: t("inventory.products.columns.defaultCode"), layout: layout.reference, defaultHidden: true },
     ];
   } else if (tabId === "stock-moves") {
-    columns = [...columns, { key: "warehouseUnitName", label: t("inventory.byRecord.uom"), render: (value) => label(value) ?? unavailable }];
+    const first = ["warehouseProductName", "warehouseLocationName", "warehouseDestinationName"];
+    columns = [
+      ...first.flatMap((key) => columns.filter((column) => column.key === key)),
+      { key: "warehouseUnitName", label: t("inventory.byRecord.uom"), layout: layout.unit, render: (value) => label(value) ?? unavailable },
+      ...columns.filter((column) => !first.includes(column.key)),
+    ];
   } else if (tabId === "transfers") {
     columns = [
-      ...columns,
+      ...columns.filter((column) => column.key === "name" || column.key === "state"),
       {
         key: "warehouseTransferTask",
         label: t("inventory.warehouseWorkspace.transferTask", { defaultValue: "Task" }),
         type: "text",
+        layout: layout.status,
         render: (value) => transferTasks.find((task) => task.value === value)?.label ?? unavailable,
       },
+      referenceColumn({ key: "locationId", label: t("inventory.forms.newTransfer.fields.locationId") }),
+      referenceColumn({ key: "locationDestId", label: t("inventory.forms.newTransfer.fields.locationDestId") }),
+      ...columns.filter((column) => !["name", "state", "warehouseLocationName", "warehouseDestinationName"].includes(column.key)),
     ];
   }
-  const namedReferences = view.columns.some((column) => column.key in REFERENCE_COLUMNS);
+  const namedReferences = tabId === "transfers" || view.columns.some((column) => column.key in REFERENCE_COLUMNS);
   const locationOptions = [...recordsById(locations)].flatMap(([value, location]) => {
-    const name = label(getRowField(location, "completeName")) ?? label(location.name);
+    const name = locationLabel(location);
     return name ? [{ value, label: name }] : [];
   });
   return {

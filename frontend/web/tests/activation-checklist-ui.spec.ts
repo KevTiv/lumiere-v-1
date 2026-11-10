@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test"
 
-test("ready onboarding can be reopened and missing setup stays expanded", async ({ page }) => {
+test("readiness alone keeps onboarding open and a verified outcome can be reopened", async ({ page }) => {
   await page.route("**/api/query/companies", route => route.fulfill({ json: { data: [
     { id: "2", organizationId: "1", currencyId: "4", fiscalYearEndMonth: 12, fiscalYearEndDay: 31 },
     { id: "3", organizationId: "1", currencyId: "4", fiscalYearEndMonth: 6, fiscalYearEndDay: 30 },
@@ -8,13 +8,25 @@ test("ready onboarding can be reopened and missing setup stays expanded", async 
   await page.route("**/api/query/contacts", route => route.fulfill({ json: { data: [
     { id: "9", organizationId: "1", companyId: "2", isCustomer: true },
   ] } }))
+  let savedCompany = "3"
+  await page.route("**/api/authoritative/contacts/9?companyId=2", route => route.fulfill({ json: { data:
+    { id: "9", organizationId: "1", companyId: savedCompany },
+  } }))
+  await page.addInitScript(() => {
+    localStorage.setItem("lumiere:activation:first-outcome:v1:fixture-actor:1:2", JSON.stringify({ task: "contact", recordId: "9" }))
+  })
   await page.goto("/activation")
   const panel = page.getByTestId("activation-checklist")
   await expect(panel.locator('[data-check="contact"]')).toHaveAttribute("data-state", "ready")
   await page.getByRole("button", { name: "Compact completed setup", exact: true }).click()
+  await expect(panel).toBeVisible()
+  await expect(panel).toContainText("The saved record could not be verified in this company")
+  savedCompany = "2"
+  await panel.getByRole("button", { name: "Refresh checks", exact: true }).click()
   await expect(panel).toBeHidden()
   await page.locator("summary").filter({ hasText: "Review setup and first tasks" }).click()
   await expect(panel).toBeVisible()
+  await expect(panel.getByRole("link", { name: "Open saved record" })).toHaveAttribute("href", "/crm?tab=contacts&filter=id%3A9")
   await page.getByRole("button", { name: "Company 3", exact: true }).click()
   await expect(panel).toBeVisible()
   await expect(panel.locator('[data-check="contact"]')).toHaveAttribute("data-state", "missing")

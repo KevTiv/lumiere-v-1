@@ -1,3 +1,4 @@
+import { entityColumnLayouts } from "./entity-column-layouts"
 import type { TFunction } from "i18next"
 import type { EntityViewConfig } from "./entity-view-types"
 
@@ -36,11 +37,11 @@ export const financialReportsTableConfig = (t: TFunction): EntityViewConfig => (
       },
     ],
     columns: [
-      { key: "name", label: t("reports.financialReports.columns.name"), width: "min-w-48" },
+      { key: "name", label: t("reports.financialReports.columns.name"), layout: entityColumnLayouts.identity },
       { key: "dateFrom", label: t("reports.financialReports.columns.dateFrom"), type: "date" },
       { key: "dateTo", label: t("reports.financialReports.columns.dateTo"), type: "date" },
       { key: "state", label: t("reports.financialReports.columns.state"), type: "badge", ...reportStateBadges(t) },
-      { key: "showZeroLines", label: t("reports.financialReports.columns.showZeroLines"), type: "boolean" },
+      { key: "showZeroLines", defaultHidden: true, label: t("reports.financialReports.columns.showZeroLines"), type: "boolean" },
       { key: "generatedAt", label: t("reports.financialReports.columns.generatedAt"), type: "date" },
     ],
     emptyMessage: t("reports.financialReports.emptyMessage"),
@@ -59,8 +60,8 @@ export const trialBalancesTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("reports.trialBalance.searchPlaceholder"),
     searchKeys: ["accountCode", "accountName"],
     columns: [
-      { key: "accountCode", label: t("reports.trialBalance.columns.accountCode"), width: "min-w-20" },
-      { key: "accountName", label: t("reports.trialBalance.columns.accountName"), width: "min-w-48" },
+      { key: "accountCode", label: t("reports.trialBalance.columns.accountCode"), layout: entityColumnLayouts.reference },
+      { key: "accountName", label: t("reports.trialBalance.columns.accountName"), layout: entityColumnLayouts.identity },
       { key: "openingDebit", label: t("reports.trialBalance.columns.openingDebit"), type: "currency", align: "right" },
       { key: "openingCredit", label: t("reports.trialBalance.columns.openingCredit"), type: "currency", align: "right" },
       { key: "periodDebit", label: t("reports.trialBalance.columns.periodDebit"), type: "currency", align: "right" },
@@ -85,7 +86,7 @@ export const vatReportsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchKeys: ["name"],
     rowSelectionToggleOnClick: true,
     columns: [
-      { key: "name", label: t("reports.vat.columns.name"), width: "min-w-48" },
+      { key: "name", label: t("reports.vat.columns.name"), layout: entityColumnLayouts.identity },
       {
         key: "state",
         label: t("reports.vat.columns.state"),
@@ -127,7 +128,7 @@ export const reportTemplatesTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("reports.reportTemplates.searchPlaceholder"),
     searchKeys: ["name", "model"],
     columns: [
-      { key: "name", label: t("reports.reportTemplates.columns.name"), width: "min-w-40" },
+      { key: "name", label: t("reports.reportTemplates.columns.name"), layout: entityColumnLayouts.identity },
       { key: "model", label: t("reports.reportTemplates.columns.model") },
       { key: "reportType", label: t("reports.reportTemplates.columns.reportType") },
       { key: "orientation", label: t("reports.reportTemplates.columns.orientation") },
@@ -149,7 +150,7 @@ export const scheduledReportsTableConfig = (t: TFunction): EntityViewConfig => (
     searchPlaceholder: t("reports.scheduledReports.searchPlaceholder"),
     searchKeys: ["name"],
     columns: [
-      { key: "name", label: t("reports.scheduledReports.columns.name"), width: "min-w-40" },
+      { key: "name", label: t("reports.scheduledReports.columns.name"), layout: entityColumnLayouts.identity },
       { key: "reportTemplateId", label: t("reports.scheduledReports.columns.templateId") },
       { key: "frequency", label: t("reports.scheduledReports.columns.frequency") },
       { key: "nextRun", label: t("reports.scheduledReports.columns.nextRun"), type: "datetime" },
@@ -172,7 +173,7 @@ export const analyticsMetricsTableConfig = (t: TFunction): EntityViewConfig => (
     searchPlaceholder: t("reports.analyticsMetrics.searchPlaceholder"),
     searchKeys: ["name", "category"],
     columns: [
-      { key: "name", label: t("reports.analyticsMetrics.columns.name"), width: "min-w-40" },
+      { key: "name", label: t("reports.analyticsMetrics.columns.name"), layout: entityColumnLayouts.identity },
       { key: "category", label: t("reports.analyticsMetrics.columns.category") },
       { key: "metricType", label: t("reports.analyticsMetrics.columns.metricType") },
       { key: "model", label: t("reports.analyticsMetrics.columns.model") },
@@ -195,8 +196,8 @@ export const dashboardsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchPlaceholder: t("reports.dashboards.searchPlaceholder"),
     searchKeys: ["name", "description"],
     columns: [
-      { key: "name", label: t("reports.dashboards.columns.name"), width: "min-w-48" },
-      { key: "description", type: "markdown", label: t("reports.dashboards.columns.description"), width: "min-w-48" },
+      { key: "name", label: t("reports.dashboards.columns.name"), layout: entityColumnLayouts.identity },
+      { key: "description", type: "markdown", label: t("reports.dashboards.columns.description"), layout: entityColumnLayouts.description },
       { key: "isDefault", label: t("reports.dashboards.columns.isDefault"), type: "boolean" },
       { key: "isShared", label: t("reports.dashboards.columns.isShared"), type: "boolean" },
       { key: "createDate", label: t("reports.dashboards.columns.createDate"), type: "date" },
@@ -216,8 +217,8 @@ export const dashboardWidgetsTableConfig = (t: TFunction): EntityViewConfig => (
     searchPlaceholder: t("reports.dashboardWidgets.searchPlaceholder"),
     searchKeys: ["name", "model"],
     columns: [
-      { key: "name", label: t("reports.dashboardWidgets.columns.name"), width: "min-w-40" },
-      { key: "model", label: t("reports.dashboardWidgets.columns.model"), width: "min-w-36" },
+      { key: "name", label: t("reports.dashboardWidgets.columns.name"), layout: entityColumnLayouts.identity },
+      { key: "model", label: t("reports.dashboardWidgets.columns.model"), layout: entityColumnLayouts.identity },
       { key: "width", label: t("reports.dashboardWidgets.columns.width"), type: "number", align: "right" },
       { key: "height", label: t("reports.dashboardWidgets.columns.height"), type: "number", align: "right" },
       { key: "isActive", label: t("reports.dashboardWidgets.columns.isActive"), type: "boolean" },

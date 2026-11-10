@@ -66,7 +66,7 @@ export const importCapabilitySchema = z.object({
   requiredFacts: z.array(z.string()),
   readiness: z.enum(["task_execution", "native_preview", "evidence_only"]),
   blockingReason: z.string().nullable(),
-  destination: z.string().regex(/^\/(?!\/)/),
+  destination: z.string().regex(/^\/(?!\/)[^\\\s]*$/),
 })
 
 const proposalSchema = z.object({

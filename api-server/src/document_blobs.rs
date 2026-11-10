@@ -33,8 +33,8 @@ use crate::web_session::{require_org, resolve_session, OrgSession};
 #[path = "document_blob_access.rs"]
 mod generated_access;
 use generated_access::{
-    branding_blob_is_visible, document_blob_is_visible, expense_receipt_blob_is_visible,
-    DocumentBlobScope,
+    branding_blob_is_visible, document_blob_is_visible, document_version_blob_is_visible,
+    expense_receipt_blob_is_visible, DocumentBlobScope,
 };
 
 #[path = "document_blob_policy.rs"]
@@ -162,8 +162,21 @@ struct ObjectPath {
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct BlobDownloadQuery {
     sha256: Option<String>,
+    preview: Option<bool>,
+    document_id: Option<u64>,
+    version_id: Option<u64>,
+    company_id: Option<u64>,
+}
+
+#[derive(Clone, Copy)]
+enum BlobReadSelection {
+    Any,
+    Document(u64),
+    Current(u64),
+    Version { document_id: u64, version_id: u64 },
 }
 
 pub fn blob_router() -> Router<Arc<AppState>> {
@@ -534,7 +547,7 @@ pub(crate) async fn read_authorized_review_receipt(
     }
     require_blob_company(state, session, meta.company_id).await?;
     let url = managed_blob_url(org, object_key)?;
-    require_blob_read(state, session, &meta, &url, None, None).await?;
+    require_blob_read(state, session, &meta, &url, None, BlobReadSelection::Any).await?;
     let bytes = storage::read(store, &bin_path, MAX_UPLOAD_BYTES)
         .await?
         .ok_or_else(|| ApiError::NotFound("receipt bytes not found".into()))?;
@@ -581,7 +594,15 @@ pub(crate) async fn read_authorized_document_blob(
         return Err(ApiError::NotFound("document blob not found".into()));
     }
     require_blob_company(state, session, meta.company_id).await?;
-    require_blob_read(state, session, &meta, object_url, None, Some(document_id)).await?;
+    require_blob_read(
+        state,
+        session,
+        &meta,
+        object_url,
+        None,
+        BlobReadSelection::Document(document_id),
+    )
+    .await?;
     let bytes = storage::read(store, &bin_path, MAX_UPLOAD_BYTES)
         .await?
         .ok_or_else(|| ApiError::NotFound("blob bytes not found".into()))?;
@@ -1465,9 +1486,48 @@ async fn download(
     if !meta.completed || meta.organization_id != org_id || meta.object_key != object_key {
         return Err(ApiError::NotFound("completed blob not found".into()));
     }
+    let preview = query.preview.unwrap_or(false);
+    let selection = if preview {
+        if query.sha256.is_none() || query.company_id == Some(0) || query.version_id == Some(0) {
+            return Err(ApiError::BadRequest(
+                "Office preview requires a pinned file version".into(),
+            ));
+        }
+        let document_id = query
+            .document_id
+            .filter(|id| *id > 0)
+            .ok_or_else(|| ApiError::BadRequest("Office preview requires a document ID".into()))?;
+        if meta.purpose != BlobPurpose::Document
+            || meta
+                .company_id
+                .is_some_and(|company| query.company_id != Some(company))
+        {
+            return Err(ApiError::NotFound("document blob not found".into()));
+        }
+        if meta.company_id.is_none() {
+            require_blob_company(&state, &session, query.company_id).await?;
+        }
+        match query.version_id {
+            Some(version_id) => BlobReadSelection::Version {
+                document_id,
+                version_id,
+            },
+            None => BlobReadSelection::Current(document_id),
+        }
+    } else {
+        BlobReadSelection::Any
+    };
     require_blob_company(&state, &session, meta.company_id).await?;
     let url = format!("/api/documents/blobs/object/{org_id}/{residency}/{object_id}");
-    require_blob_read(&state, &session, &meta, &url, query.sha256.as_deref(), None).await?;
+    require_blob_read(
+        &state,
+        &session,
+        &meta,
+        &url,
+        query.sha256.as_deref(),
+        selection,
+    )
+    .await?;
     let max_bytes = if meta.purpose == BlobPurpose::Branding {
         2 * 1024 * 1024
     } else {
@@ -1491,26 +1551,54 @@ async fn download(
         validate_branding_raster(&meta.content_type, &bytes)?;
     }
 
-    let mut response = bytes.into_response();
+    let mut response = if preview {
+        let extracted =
+            crate::file_extraction::inspect_office_preview(&bytes, &meta.content_type).await?;
+        // Parsing can outlive a version change or an access revocation.
+        let refreshed = resolve_session(&state, &headers, &cookies)
+            .await?
+            .ok_or(ApiError::Unauthorized)?;
+        if require_org(&refreshed)? != org_id || refreshed.identity_hex != session.identity_hex {
+            return Err(ApiError::Forbidden("document preview scope changed".into()));
+        }
+        require_blob_company(&state, &refreshed, meta.company_id).await?;
+        if meta.company_id.is_none() {
+            require_blob_company(&state, &refreshed, query.company_id).await?;
+        }
+        require_blob_read(
+            &state,
+            &refreshed,
+            &meta,
+            &url,
+            query.sha256.as_deref(),
+            selection,
+        )
+        .await?;
+        Json(extracted).into_response()
+    } else {
+        let mut response = bytes.into_response();
+        let headers_mut = response.headers_mut();
+        headers_mut.insert(
+            header::CONTENT_TYPE,
+            header::HeaderValue::from_str(&meta.content_type)
+                .unwrap_or_else(|_| header::HeaderValue::from_static("application/octet-stream")),
+        );
+        headers_mut.insert(
+            header::CONTENT_DISPOSITION,
+            header::HeaderValue::from_str(&format!(
+                "{}; filename=\"{}\"",
+                if meta.purpose == BlobPurpose::Branding {
+                    "inline"
+                } else {
+                    "attachment"
+                },
+                meta.file_name.replace('"', "")
+            ))
+            .unwrap_or_else(|_| header::HeaderValue::from_static("attachment")),
+        );
+        response
+    };
     let headers_mut = response.headers_mut();
-    headers_mut.insert(
-        header::CONTENT_TYPE,
-        header::HeaderValue::from_str(&meta.content_type)
-            .unwrap_or_else(|_| header::HeaderValue::from_static("application/octet-stream")),
-    );
-    headers_mut.insert(
-        header::CONTENT_DISPOSITION,
-        header::HeaderValue::from_str(&format!(
-            "{}; filename=\"{}\"",
-            if meta.purpose == BlobPurpose::Branding {
-                "inline"
-            } else {
-                "attachment"
-            },
-            meta.file_name.replace('"', "")
-        ))
-        .unwrap_or_else(|_| header::HeaderValue::from_static("attachment")),
-    );
     headers_mut.insert(
         header::CACHE_CONTROL,
         header::HeaderValue::from_static("private, no-store"),
@@ -1534,7 +1622,7 @@ async fn require_blob_read(
     meta: &BlobMeta,
     url: &str,
     pinned_checksum: Option<&str>,
-    document_id: Option<u64>,
+    selection: BlobReadSelection,
 ) -> Result<(), ApiError> {
     let trusted = TrustedOperationContext::for_resource_read(state, session)?;
     let access = Some(trusted.field_access());
@@ -1573,23 +1661,31 @@ async fn require_blob_read(
                 ));
             }
             let mut documents = query("documents").await?;
+            let document_id = match selection {
+                BlobReadSelection::Any => None,
+                BlobReadSelection::Document(id) | BlobReadSelection::Current(id) => Some(id),
+                BlobReadSelection::Version { document_id, .. } => Some(document_id),
+            };
             if let Some(document_id) = document_id {
-                // Ingestion is bound to its exact source record. Another owned
-                // record for the same bytes cannot authorize a different source.
                 documents.retain(|row| {
                     crate::query_exec::row_u64(row, "id", "id").ok().flatten() == Some(document_id)
                 });
             }
-            if document_blob_is_visible(&scope, access, &documents, &[]) {
-                true
+            let current = !matches!(selection, BlobReadSelection::Version { .. })
+                && document_blob_is_visible(&scope, access, &documents, &[]);
+            if current || matches!(selection, BlobReadSelection::Current(_)) {
+                current
+            } else if stdb_auth::has_resource_read_permission(access, "document-versions") {
+                let mut versions = query("document-versions").await?;
+                if let BlobReadSelection::Version { version_id, .. } = selection {
+                    versions.retain(|row| {
+                        crate::query_exec::row_u64(row, "id", "id").ok().flatten()
+                            == Some(version_id)
+                    });
+                }
+                document_version_blob_is_visible(&scope, access, &documents, &versions)
             } else {
-                let versions =
-                    if stdb_auth::has_resource_read_permission(access, "document-versions") {
-                        query("document-versions").await?
-                    } else {
-                        Vec::new()
-                    };
-                document_blob_is_visible(&scope, access, &documents, &versions)
+                false
             }
         }
         BlobPurpose::ExpenseReceipt => {

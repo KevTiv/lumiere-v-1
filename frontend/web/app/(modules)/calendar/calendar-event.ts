@@ -1,6 +1,9 @@
 import { variantTag } from '@lumiere/erp-workflows';
 import { calendarEventFormRange, localCalendarDate } from '../../../lib/calendar-event-range';
 import { zonedCalendarInput } from "@lumiere/erp-shared/calendar-timezone";
+import { parseStrictU64 } from '@lumiere/erp-shared/u64';
+import { stbTimestampMicros } from '@lumiere/erp-shared/stb-timestamp';
+import { unwrapSome } from '@lumiere/erp-shared/form-coercion';
 import type { CalendarEvent } from '@lumiere/ui/lib/calendar-types';
 
 type Row = Record<string, unknown>;
@@ -11,32 +14,57 @@ export function calendarEventCreationDefaults(day: string): { start: string; sto
   return localCalendarDate(day) ? { start: `${day}T09:00`, stop: `${day}T10:00` } : undefined;
 }
 
-/** Where a calendar event's page lives. */
-export function calendarEventHref(event: Row): string | undefined {
-  return event.id == null ? undefined : `/calendar/events/${String(event.id)}`;
+/** Where a calendar event's page lives. Return context is limited to the workspace. */
+export function calendarEventHref(event: Row, returnTo?: string): string | undefined {
+  const id = parseStrictU64(event.id);
+  if (!id) return undefined;
+  const href = `/calendar/events/${id}`;
+  return returnTo ? `${href}?returnTo=${encodeURIComponent(calendarReturnHref(returnTo))}` : href;
 }
 
-/** Microseconds since the epoch of a timestamp cell (`{ microsSinceUnixEpoch }`, micros or a bigint). */
+export function eventText(value: unknown): string | undefined {
+  const text = unwrapSome(value);
+  return typeof text === 'string' && text.trim() ? text : undefined;
+}
+
+function exactEventMicros(value: unknown): bigint | null {
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'number' && Number.isSafeInteger(value)) return BigInt(value);
+  if (typeof value === 'string' && /^-?\d+$/.test(value)) return BigInt(value);
+  return stbTimestampMicros(value);
+}
+
+/** Microseconds since the epoch, for the existing edit and duplicate form defaults. */
 export function eventMicros(value: unknown): number {
-  const raw =
-    value && typeof value === 'object' && 'microsSinceUnixEpoch' in value
-      ? (value as { microsSinceUnixEpoch: unknown }).microsSinceUnixEpoch
-      : value;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : 0;
+  return Number(exactEventMicros(value) ?? 0n);
 }
 
-/** Shared event table/detail display in the active calendar timezone. */
+function eventDate(value: unknown): Date | null {
+  const micros = exactEventMicros(value);
+  if (micros == null) return null;
+  const date = new Date(Number(micros) / 1000);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+/** Shared event list/detail display in the active calendar timezone. */
 export function eventTimestampLabel(value: unknown, locale?: string, timeZone?: string): string {
-  const raw = value && typeof value === 'object' && 'microsSinceUnixEpoch' in value ? value.microsSinceUnixEpoch : value;
-  if (raw == null || raw === '' || !Number.isFinite(Number(raw))) return '—';
-  const date = new Date(Number(raw) / 1000);
-  return Number.isFinite(date.getTime()) ? date.toLocaleString(locale, { timeZone }) : '—';
+  return eventDate(value)?.toLocaleString(locale, { timeZone }) ?? '—';
+}
+
+/** All-day stop is an exclusive boundary; show the actual last occupied day. */
+export function eventBoundaryLabel(event: Row, boundary: 'start' | 'stop', locale?: string, timeZone?: string): string {
+  if (event.allday !== true) return eventTimestampLabel(event[boundary], locale, timeZone);
+  const date = eventDate(event[boundary]);
+  if (!date) return '—';
+  const start = eventDate(event.start);
+  const display = boundary === 'stop' && start && date > start ? new Date(date.getTime() - 1) : date;
+  return display.toLocaleDateString(locale, { timeZone });
 }
 
 /** `datetime-local` text of a timestamp cell, for form defaults. */
 export function eventInputValue(value: unknown, timeZone?: string): string {
-  const date = new Date(eventMicros(value) / 1000);
+  const date = eventDate(value);
+  if (!date) return '';
   if (timeZone) return zonedCalendarInput(date, timeZone);
   // datetime-local is read back as local time by the form mapper. Using UTC here
   // changes the saved instant when the browser timezone is not UTC.
@@ -45,43 +73,37 @@ export function eventInputValue(value: unknown, timeZone?: string): string {
 }
 
 /** Authorized event projection for the calendar; invalid ranges are not epoch-zero events. */
-export function calendarEventForView(event: {
-  id?: unknown; name?: unknown; start?: unknown; stop?: unknown;
-  description?: unknown; allday?: unknown; state?: unknown;
-  privacy?: unknown; location?: unknown;
-}): CalendarEvent | null {
-  if (event.id == null || event.start == null || event.stop == null) return null;
-  const timestampIsValid = (value: unknown) => {
-    const micros = value && typeof value === 'object' && 'microsSinceUnixEpoch' in value ? value.microsSinceUnixEpoch : value;
-    return micros != null && micros !== '' && Number.isFinite(Number(micros));
-  };
-  if (!timestampIsValid(event.start) || !timestampIsValid(event.stop)) return null;
-  const startTime = new Date(eventMicros(event.start) / 1000);
-  const endTime = new Date(eventMicros(event.stop) / 1000);
-  if (!Number.isFinite(startTime.getTime()) || !Number.isFinite(endTime.getTime()) || endTime < startTime) return null;
+export function calendarEventForView(event: Row, contacts: readonly Row[] = []): CalendarEvent | null {
+  const id = parseStrictU64(event.id);
+  const startTime = eventDate(event.start);
+  const endTime = eventDate(event.stop);
+  if (!id || !startTime || !endTime || endTime < startTime) return null;
   const state = eventStateTag(event);
   const privacy = variantTag(event.privacy).toLowerCase();
   return {
-    id: String(event.id),
-    title: String(event.name ?? ''),
-    description: event.description ? String(event.description) : undefined,
+    id: String(id),
+    title: eventText(event.name) ?? `#${id}`,
+    description: eventText(event.description),
     startTime,
     endTime,
     allDay: event.allday === true,
     type: 'meeting',
     status: state === 'cancelled' || state === 'cancel' ? 'cancelled' : state === 'confirmed' ? 'confirmed' : state === 'completed' ? 'completed' : 'scheduled',
     createdBy: '',
-    attendees: [],
-    location: event.location ? String(event.location) : undefined,
+    attendees: eventAttendees(event, contacts).map(({ label }) => label),
+    location: eventText(event.location),
     // Confidential rows must never be advertised as public.
     visibility: privacy === 'private' || privacy === 'confidential' ? 'private' : 'public',
   };
 }
 
 /** A return link is always local to this workspace and never an arbitrary URL. */
-export function calendarReturnHref(value: string | null): string {
+export function calendarReturnHref(value: string | null, clearSelection = false): string {
   if (!value || !/^\/calendar(?:\?|$)/.test(value) || /[\r\n\\]/.test(value)) return '/calendar?tab=calendar';
-  return value;
+  if (!clearSelection) return value;
+  const params = new URLSearchParams(value.split('?')[1] ?? '');
+  params.delete('calendarEvent');
+  return params.size ? `/calendar?${params}` : '/calendar';
 }
 
 /**
@@ -146,11 +168,12 @@ export function eventStateParams(state: 'confirmed' | 'cancelled'): Row {
 export function eventAttendees(event: Row, contacts: ReadonlyArray<Row>): Array<{ id: string; label: string }> {
   const raw = event.partner_ids ?? event.partnerIds;
   if (!Array.isArray(raw)) return [];
-  const names = new Map(contacts.map((c) => [String(c.id), String(c.display_name ?? c.displayName ?? c.name ?? '').trim()]));
-  return raw.map((value) => {
-    const id = String(value);
-    return { id, label: names.get(id) || `#${id}` };
-  });
+  const names = new Map(contacts.map((contact) => [
+    String(parseStrictU64(contact.id) ?? ''),
+    (eventText(contact.display_name) ?? eventText(contact.displayName) ?? eventText(contact.name))?.trim(),
+  ]));
+  const ids = new Set(raw.map(parseStrictU64).filter((id): id is bigint => id != null && id > 0n));
+  return [...ids].map((id) => ({ id: String(id), label: names.get(String(id)) || `#${id}` }));
 }
 
 /**

@@ -30,7 +30,6 @@ import {
   Command,
   PanelRight,
   PanelRightClose,
-  Paperclip,
   Files,
   Layers3,
   SlidersHorizontal,
@@ -41,6 +40,9 @@ import { defaultAtCommands } from "@/lib/ai-chat-types"
 import { AiActionDraftCard } from "./ai-action-draft-card"
 import { AiNativeActionCard } from "./ai-native-action-card"
 import { Dialog, DialogContent, DialogTitle } from "../components/dialog"
+import { FileIdentity } from "../components/file-identity"
+import { FileUploadField } from "../components/file-upload-field"
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "../components/popover"
 import { AssistantGuideCard } from "./assistant-guide-viewer"
 import { ImportTaskStatusCard } from "./import-task-status-card"
 import type { ChatImportTaskStatus } from "../lib/import-task-status"
@@ -208,7 +210,6 @@ export function AIChatPanel({
   const fileImportAttempt = useRef<{ scope: string; token: object } | null>(null)
   const [draggingFiles, setDraggingFiles] = useState(false)
   const fileDragDepth = useRef(0)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const fileImportBusy = fileImport.scope === fileScope && fileImport.busy
   const fileImportError = fileImport.scope === fileScope ? fileImport.error : undefined
   useEffect(() => {
@@ -275,8 +276,7 @@ export function AIChatPanel({
   const showSkills = openTools === "skills" || slash !== null
   const showFiles = openTools === "files" && slash === null
   const moduleLabel = contextOptions?.find(option => option.value === selectedContext)?.label ?? contextOptions?.[0]?.label
-  const canShowContext = !docked && !modal
-  const showContext = canShowContext && contextVisible
+  const showContext = !docked && !modal && contextVisible
   const matchingSkills = slash ? matchingChatSkills(skills, slash.query) : skills
   const focusedSkillId = matchingSkills.some(skill => skill.id === activeSkillId) ? activeSkillId : matchingSkills[0]?.id
 
@@ -689,6 +689,31 @@ export function AIChatPanel({
 
   if (!open) return null
 
+  const contextTitle = t("aiChat.workspace.context")
+  const contextDetails = (
+    <>
+      <section className="space-y-2 border-b px-4 py-3">
+        <h4 className="text-xs font-medium text-muted-foreground">{t("aiChat.workspace.modules")}</h4>
+        <p className="text-sm font-medium [overflow-wrap:anywhere]">{moduleLabel ?? context?.activeView ?? t("aiChat.workspace.noModule", { defaultValue: "No active module" })}</p>
+        {selectionSummary ? <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{selectionSummary}</p> : null}
+      </section>
+      {config?.enableFileUpload ? (
+        <section className="space-y-2 border-b px-4 py-3">
+          <h4 className="text-xs font-medium text-muted-foreground">{t("aiChat.workspace.files")}</h4>
+          <ChatFileNames names={importFileNames} />
+        </section>
+      ) : null}
+      <section className="space-y-2 px-4 py-3">
+        <h4 className="text-xs font-medium text-muted-foreground">{t("aiChat.deck.selected")}</h4>
+        {selectedSkills.length ? (
+          <ul className="space-y-1 text-sm">
+            {selectedSkills.map(skill => <li key={skill.id} className="[overflow-wrap:anywhere]">{skill.label}</li>)}
+          </ul>
+        ) : <p className="text-sm text-muted-foreground">{t("aiChat.workspace.noSkills")}</p>}
+      </section>
+    </>
+  )
+
   const panel = (
     <section
       data-testid="erp-ai-chat-panel"
@@ -722,7 +747,7 @@ export function AIChatPanel({
         "relative z-50 flex min-h-0 min-w-0 flex-col overflow-hidden bg-background text-foreground",
         docked
           ? "fixed inset-0 h-dvh w-full lg:relative lg:inset-auto lg:h-full lg:w-[360px] lg:shrink-0 lg:bg-transparent xl:w-[380px] 2xl:w-[420px]"
-          : "fixed inset-0 h-dvh w-screen",
+          : modal ? "h-full w-full" : "fixed inset-0 h-dvh w-full",
       )}
     >
       {draggingFiles ? <div className="pointer-events-none absolute inset-2 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-background/95 p-6 text-center text-sm" role="status">{t("aiChat.import.dropFiles", { defaultValue: "Drop CSV or XLSX files to attach them" })}</div> : null}
@@ -736,12 +761,23 @@ export function AIChatPanel({
           </div>
         </div>
         <div className="flex min-w-0 items-center gap-1.5">
-          {canShowContext ? (
+          {!docked && !modal ? (
             <Button variant="ghost" size="icon" className="hidden size-9 lg:inline-flex"
-              aria-label={t("aiChat.workspace.context")} aria-expanded={showContext} aria-controls={contextId}
+              aria-label={contextTitle} aria-expanded={showContext} aria-controls={contextId}
               onClick={() => setContextVisible(visible => !visible)}>
               <SlidersHorizontal className="size-4" aria-hidden="true" />
             </Button>
+          ) : null}
+          {!modal ? (
+            <Popover>
+              <PopoverTrigger render={<Button variant="ghost" size="icon" className={cn("size-9", !docked && "lg:hidden")} />} aria-label={contextTitle}>
+                <SlidersHorizontal className="size-4" aria-hidden="true" />
+              </PopoverTrigger>
+              <PopoverContent align="end" className="max-h-[70dvh] w-72 max-w-[calc(100vw-2rem)] overflow-auto p-0">
+                <PopoverTitle className="border-b px-4 py-3">{contextTitle}</PopoverTitle>
+                {contextDetails}
+              </PopoverContent>
+            </Popover>
           ) : null}
           {onDockToggle ? (
             <Button variant="ghost" size="icon" onClick={onDockToggle} className="size-9 shrink-0" title={docked ? "Open full workspace" : "Dock beside ERP"} aria-label={docked ? "Open full workspace" : "Dock beside ERP"}>
@@ -1064,7 +1100,7 @@ export function AIChatPanel({
             </div>
           )}
         <div className="mx-auto w-full max-w-[820px] px-4">
-          <div id={skillsId} hidden={!showSkills}>
+          <div id={skillsId} hidden={!showSkills} className="max-h-[30dvh] overflow-y-auto">
             <ActionSkillList className="mb-3" items={skills.map(skill => ({ ...skill, icon: iconMap[skill.icon ?? ""] ?? <Sparkles className="size-4" /> }))}
               selectedIds={selectedSkillIds} activeId={focusedSkillId} matchingIds={slash ? matchingSkills.map(skill => skill.id) : undefined}
               disabled={isLoading} onToggle={toggleSkill} onRemove={id => { setSelectedSkillIds(current => current.filter(value => value !== id)); inputRef.current?.focus() }}
@@ -1076,16 +1112,18 @@ export function AIChatPanel({
             ) : null}
           </div>
           {config?.enableFileUpload ? (
-            <div id={filesId} hidden={!showFiles} className="mb-3 space-y-2 rounded-lg border bg-card p-3">
+            <div id={filesId} hidden={!showFiles} className="mb-3 max-h-[30dvh] space-y-2 overflow-y-auto rounded-lg border bg-card p-3">
               <ChatFileNames names={importFileNames} />
-              <input ref={fileInputRef} type="file" multiple accept=".csv,.xlsx" hidden data-testid="erp-ai-chat-file-input"
-                disabled={!fileImportEnabled || fileImportBusy} aria-label={t("aiChat.import.chooseFiles", { defaultValue: "Choose import files" })}
-                onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void handleImportFiles(files) }} />
-              <Button type="button" variant="outline" size="sm" data-testid="erp-ai-chat-attach"
-                disabled={!fileImportEnabled || fileImportBusy} onClick={() => fileInputRef.current?.click()}>
-                <Paperclip className="size-4" aria-hidden="true" />
-                {t("aiChat.workspace.addFiles")}
-              </Button>
+              <FileUploadField
+                multiple
+                accept=".csv,.xlsx"
+                data-testid="erp-ai-chat-file-input"
+                chooseTestId="erp-ai-chat-attach"
+                disabled={!fileImportEnabled || fileImportBusy}
+                aria-label={t("aiChat.import.chooseFiles", { defaultValue: "Choose import files" })}
+                chooseLabel={t("aiChat.workspace.addFiles")}
+                onSelect={(files) => void handleImportFiles(files)}
+              />
             </div>
           ) : null}
           {fileImportError ? <p role="alert" className="mx-auto mb-2 max-w-[790px] break-words text-sm text-destructive">{fileImportError}</p> : null}
@@ -1158,7 +1196,7 @@ export function AIChatPanel({
                 <SelectTrigger
                   data-testid="erp-ai-chat-context"
                   className="h-9 max-w-[10rem] border-transparent bg-transparent text-xs"
-                  aria-label={"Assistant context"}
+                  aria-label={t("aiChat.workspace.contextSelect", { defaultValue: "Assistant context" })}
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -1209,44 +1247,28 @@ export function AIChatPanel({
         </div>
         </div>
       </div>
-      {canShowContext ? (
-        <aside id={contextId} aria-label={t("aiChat.workspace.context")}
-          className={cn("hidden w-72 shrink-0 overflow-y-auto border-l border-border bg-muted/30 xl:w-80", showContext && "lg:block")}>
-          <h3 className="border-b px-5 py-4 text-sm font-semibold">{t("aiChat.workspace.context")}</h3>
-          {moduleLabel || context?.activeView ? (
-            <section className="space-y-2 border-b px-5 py-4">
-              <h4 className="text-xs font-medium text-muted-foreground">{t("aiChat.workspace.modules")}</h4>
-              <p className="text-sm font-medium">{moduleLabel ?? context?.activeView}</p>
-              {selectionSummary ? <p className="break-words text-xs text-muted-foreground">{selectionSummary}</p> : null}
-            </section>
-          ) : null}
-          {config?.enableFileUpload ? (
-            <section className="space-y-2 border-b px-5 py-4">
-              <h4 className="text-xs font-medium text-muted-foreground">{t("aiChat.workspace.files")}</h4>
-              <ChatFileNames names={importFileNames} />
-            </section>
-          ) : null}
-          <section className="space-y-2 px-5 py-4">
-            <h4 className="text-xs font-medium text-muted-foreground">{t("aiChat.deck.selected")}</h4>
-            {selectedSkills.length ? (
-              <ul className="space-y-1 text-xs">
-                {selectedSkills.map(skill => <li key={skill.id}>{skill.label}</li>)}
-              </ul>
-            ) : <p className="text-xs text-muted-foreground">{t("aiChat.workspace.noSkills")}</p>}
-          </section>
+      {!docked && !modal ? (
+        <aside
+          id={contextId}
+          aria-label={contextTitle}
+          className={cn("hidden w-72 shrink-0 overflow-y-auto border-l border-border bg-muted/30 xl:w-80", showContext && "lg:block")}
+        >
+          <h3 className="border-b px-4 py-3 text-sm font-semibold">{contextTitle}</h3>
+          {contextDetails}
         </aside>
       ) : null}
       </div>
     </section>
   )
-  return modal ? <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}><DialogContent showCloseButton={false} className="left-0 top-0 h-dvh max-h-none w-screen max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none p-0 ring-0 sm:max-w-none"><DialogTitle className="sr-only">{config?.title || t("aiChat.title")}</DialogTitle>{panel}</DialogContent></Dialog> : panel
+  // Error help covers the viewport while leaving the original editor mounted.
+  return modal ? <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}><DialogContent showCloseButton={false} className="left-0 top-0 h-dvh max-h-none w-full max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none p-0 ring-0 sm:max-w-none"><DialogTitle className="sr-only">{config?.title || t("aiChat.title")}</DialogTitle>{panel}</DialogContent></Dialog> : panel
 }
 
 function ChatFileNames({ names }: { names?: readonly string[] }) {
   const { t } = useTranslation()
   return names?.length ? (
     <ul className="max-h-32 space-y-1 overflow-y-auto text-xs">
-      {names.map((name, index) => <li className="break-words" key={index}>{name}</li>)}
+      {names.map((name, index) => <li className="min-w-0" key={index}><FileIdentity fileName={name} /></li>)}
     </ul>
   ) : <p className="text-xs text-muted-foreground">{t("aiChat.workspace.noFiles")}</p>
 }

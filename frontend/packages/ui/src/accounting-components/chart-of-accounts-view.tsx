@@ -370,7 +370,7 @@ export function ChartOfAccountsView({
 
       {/* Create Account Dialog */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent>
+        <DialogContent size="form">
           <DialogHeader><DialogTitle>{t("accounting.forms.newAccount.createTitle")}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">

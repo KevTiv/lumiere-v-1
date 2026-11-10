@@ -13,7 +13,7 @@
     "./personal-page-layout": "./src/personal-page-layout.ts"
   },
   "dependencies": {
-    "@lumiere/contracts": "file:../../vendor/lumiere-contracts-0.3.171.tgz",
+    "@lumiere/contracts": "file:../../vendor/lumiere-contracts-0.3.178.tgz",
     "ajv": "8.18.0"
   },
   "scripts": {

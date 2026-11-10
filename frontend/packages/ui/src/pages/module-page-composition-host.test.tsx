@@ -13,7 +13,11 @@ import {
   ModulePageCompositionProvider,
   useModulePageComposition,
 } from "../../../../web/lib/module-page-composition";
-import { ModulePageComposition } from "./page-composition-host";
+import {
+  ModulePageComposition,
+  usePageCompositionActionSlot,
+} from "./page-composition-host";
+import { DashboardHeader } from "./dashboard-header";
 import type { DashboardSection, DashboardWidget } from "../lib/dashboard-types";
 import type {
   PersonalPageLayoutResponse,
@@ -77,7 +81,7 @@ vi.mock("@/hooks/use-stored-dashboard-data-sources", () => ({
 }));
 vi.mock("./dashboard-widget-renderer", () => ({
   DashboardWidgetRenderer: ({ widget }: { widget: DashboardWidget }) => (
-    <h3>{widget.title}</h3>
+    <h3 data-testid="fixture-rendered-widget">{widget.title}</h3>
   ),
 }));
 vi.mock("@/app/(modules)/reports/query-builder", () => ({
@@ -169,7 +173,52 @@ function App({ client }: { client: QueryClient }) {
   );
 }
 
-function mount() {
+function Collection({ invalidDate = false }: { invalidDate?: boolean }) {
+  const { target, slot } = usePageCompositionActionSlot();
+  return (
+    <>
+      <DashboardHeader
+        title="Sales orders"
+        primaryAction={<button>New order</button>}
+        secondaryAction={slot}
+      />
+      <ModulePageComposition
+        moduleId="sales"
+        pageId="dashboard"
+        title="Sales orders"
+        placement="insights"
+        actionTarget={target}
+        sections={sections}
+        historyBounds={invalidDate ? null : undefined}
+      >
+        <section aria-label="Sales order list">Current orders</section>
+      </ModulePageComposition>
+    </>
+  );
+}
+
+function Disclosure() {
+  const { target, slot } = usePageCompositionActionSlot();
+  return (
+    <>
+      <DashboardHeader title="Reports" secondaryAction={slot} />
+      <details data-testid="overview-disclosure">
+        <summary>Report overview</summary>
+        <ModulePageComposition
+          moduleId="sales"
+          pageId="dashboard"
+          title="Report overview"
+          sections={sections}
+          actionTarget={target}
+        >
+          <p>Overview content</p>
+        </ModulePageComposition>
+      </details>
+    </>
+  );
+}
+
+function mount(collection?: { invalidDate?: boolean; disclosure?: boolean }) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0 },
@@ -177,7 +226,27 @@ function mount() {
     },
   });
   clients.push(client);
-  return { ...render(<App client={client} />), client };
+  return {
+    ...render(
+      collection ? (
+        <QueryClientProvider client={client}>
+          <ModulePageCompositionProvider>
+            {collection.disclosure ? (
+              <>
+                <Assistant />
+                <Disclosure />
+              </>
+            ) : (
+              <Collection {...collection} />
+            )}
+          </ModulePageCompositionProvider>
+        </QueryClientProvider>
+      ) : (
+        <App client={client} />
+      ),
+    ),
+    client,
+  };
 }
 
 function click(name: string) {
@@ -246,6 +315,89 @@ afterEach(() => {
 });
 
 describe("module page production host", () => {
+  it("keeps collection work fixed and places its empty insights editor in the title actions", async () => {
+    mount({});
+    const header = screen.getByRole("banner");
+    const collection = screen.getByRole("region", { name: "Sales order list" });
+    const launcher = await within(header).findByRole("button", {
+      name: "Customize insights",
+    });
+    expect(
+      within(header).getByRole("button", { name: "New order" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Page insights" })).toBeNull();
+    fireEvent.click(launcher);
+    const insights = screen.getByRole("region", { name: "Page insights" });
+    expect(
+      collection.compareDocumentPosition(insights) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Sales order list" })).toBe(
+      collection,
+    );
+    expect(screen.queryByText("Revenue")).toBeNull();
+    click("Add widget");
+    expect(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: /^Revenue/,
+      }),
+    ).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("dialog"), {
+      key: "Escape",
+      code: "Escape",
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    click("Cancel");
+    expect(document.activeElement).toBe(
+      within(header).getByRole("button", { name: "Customize insights" }),
+    );
+    expect(screen.queryByRole("region", { name: "Page insights" })).toBeNull();
+    expect(writes).toHaveLength(0);
+  });
+
+  it("reveals collapsed dashboard content for header and assistant editing requests", async () => {
+    mount({ disclosure: true });
+    await ready();
+    const details = screen.getByTestId<HTMLDetailsElement>(
+      "overview-disclosure",
+    );
+    expect(details.open).toBe(false);
+    click("Edit page");
+    expect(details.open).toBe(true);
+    expect(document.activeElement).toBe(screen.getByTestId("page-composition"));
+    click("Cancel");
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Edit page" }),
+    );
+    details.open = false;
+    click("Add from chat");
+    await screen.findByRole("button", { name: "Done" });
+    expect(details.open).toBe(true);
+    expect(writes).toHaveLength(0);
+  });
+
+  it("keeps the previous saved insight without widening its invalid date selection", async () => {
+    pages.set("1", {
+      companyId: "1",
+      moduleId: "sales",
+      pageId: "dashboard",
+      revision: "2",
+      layout: {
+        schemaVersion: 1,
+        moduleId: "sales",
+        pageId: "dashboard",
+        widgets: [
+          { id: "existing", source: "saved", widgetId: "42", width: 6 },
+        ],
+      },
+    });
+    mount({ invalidDate: true });
+    await screen.findByText(/Choose a valid page date range/);
+    expect(screen.getByText("Current orders")).toBeTruthy();
+    expect(screen.queryByTestId("fixture-rendered-widget")).toBeNull();
+    expect(writes).toHaveLength(0);
+  });
+
   it("offers only active widget definitions with a verified current or shared company scope", async () => {
     const base = fixture.rows[0];
     fixture.rows.push(

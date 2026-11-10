@@ -2,7 +2,7 @@
 
 ## Delivery scope
 
-Documents and ERP attachments share the same modal viewer for CSV, PDF, supported images, and literal text. It uses the existing Documents records and immutable versions. The viewer checks the current organization, company, actor, permissions, exact version, and checksum before delivery. Opening a preview does not discard the Documents browser location. Changing the workspace or losing access clears the preview; an outdated response cannot replace the newly selected version.
+Documents and ERP attachments share the same modal viewer for CSV, PDF, supported images, literal text, and inspected XLSX and DOCX. It uses the existing Documents records and immutable versions. The viewer checks the current organization, company, actor, permissions, exact version, and checksum before delivery. Opening a preview does not discard the Documents browser location. Changing the workspace or losing access clears the preview; an outdated response cannot replace the newly selected version.
 
 CSV previews preserve report-shaped rows, including irregular headers, rather than applying the flat-column import contract. Text is displayed literally, not executed as HTML. Preview reads and displayed rows are bounded. Image/PDF object URLs are revoked on replacement and close. Downloads perform a fresh authorization check and retain the server's inspection policy.
 
@@ -12,7 +12,7 @@ Folders support create, edit/rename, move, explicit move to root, trash, and res
 
 Authorized HTTP projections serve document, folder, and version collections. These resources do not accept an unfiltered SQL subscription snapshot that could reinsert rows hidden by ancestor permissions or trash. Visible workspaces refresh them through HTTP every 15 seconds and immediately on window focus; background polling is disabled. Byte delivery and mutations still check current authority on every request. Folder counts reflect only currently visible files. Generated reducer/operation contracts must be published and pinned through the repository's normal contract workflow before this branch is released.
 
-Multi-sheet Excel and DOCX rendering remain the next phase through the inspected server processing path. This change does not enable a browser office parser or activate a storage cutover.
+Office previews use the same checksum-pinned byte delivery path as other managed files. The server checks the selected document and version before and after parsing. The isolated worker returns literal data for up to 24 visible worksheets, with up to 100 rows and 20 columns per worksheet. DOCX previews show body paragraphs and simple tables, up to 200 blocks. The viewer indicates when it clips content. The package limit is 5 MB. Active features, external relationships, hidden sheets and dimensions, and workbook formulas require a supported static copy. Multi-sheet XLSX and DOCX are retained for manual use. The existing values-only single-sheet XLSX import and AI checks still apply.
 
 ## Storage migration preparation
 

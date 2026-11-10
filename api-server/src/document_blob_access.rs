@@ -55,6 +55,25 @@ pub(super) fn document_blob_is_visible(
     documents: &[Value],
     versions: &[Value],
 ) -> bool {
+    document_blob_matches(scope, access, documents, versions, true)
+}
+
+pub(super) fn document_version_blob_is_visible(
+    scope: &DocumentBlobScope<'_>,
+    access: Option<&FieldAccessContext>,
+    documents: &[Value],
+    versions: &[Value],
+) -> bool {
+    document_blob_matches(scope, access, documents, versions, false)
+}
+
+fn document_blob_matches(
+    scope: &DocumentBlobScope<'_>,
+    access: Option<&FieldAccessContext>,
+    documents: &[Value],
+    versions: &[Value],
+    allow_current: bool,
+) -> bool {
     let Some(access) = access else {
         return false;
     };
@@ -100,9 +119,10 @@ pub(super) fn document_blob_is_visible(
         row.get("url").and_then(Value::as_str) == Some(scope.url)
             && row.get("checksum").and_then(Value::as_str) == Some(scope.checksum)
     };
-    if documents
-        .iter()
-        .any(|row| visible_document(row) && matches_blob(row))
+    if allow_current
+        && documents
+            .iter()
+            .any(|row| visible_document(row) && matches_blob(row))
     {
         return true;
     }

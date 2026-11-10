@@ -1,5 +1,8 @@
 "use client"
 
+import { usePageCompositionActionSlot } from "@lumiere/ui/pages/page-composition-host"
+import { OperationalPageComposition } from "../../../components/operational-page-composition"
+
 import { useMemo, type ReactNode } from "react"
 import Link from "next/link"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
@@ -111,6 +114,8 @@ export function DistributorClient() {
     }
   }
 
+  const { target: compositionTarget, slot: compositionSlot } = usePageCompositionActionSlot()
+
   return (
     <main
       className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6"
@@ -119,6 +124,7 @@ export function DistributorClient() {
     >
       <DashboardHeader
         title="Distributor"
+        secondaryAction={compositionSlot}
         description="Cash, credit, order-to-cash and stock control for distribution companies"
       />
       <Card>
@@ -161,6 +167,7 @@ export function DistributorClient() {
             <TablePager {...exceptionsPager} />
         </CardContent>
       </Card> : null}
+      <OperationalPageComposition moduleId="distributor" title={"Distributor"} actionTarget={compositionTarget} />
     </main>
   )
 }

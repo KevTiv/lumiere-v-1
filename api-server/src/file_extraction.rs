@@ -2,7 +2,7 @@
 
 use std::{process::Stdio, time::Duration};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -15,6 +15,12 @@ use crate::error::ApiError;
 pub(crate) const VIEWER_POLICY_VERSION: &str = "xlsx-viewer-seccomp-v1";
 pub(crate) const XLSX_POLICY_VERSION: &str = "xlsx-static-seccomp-v1";
 pub(crate) const MAX_WORKBOOK_BYTES: usize = 5_000_000;
+pub(crate) const OFFICE_PREVIEW_POLICY_VERSION: &str = "office-static-seccomp-v1";
+pub(crate) const XLSX_MIME: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+pub(crate) const DOCX_MIME: &str =
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const MAX_PREVIEW_OUTPUT_BYTES: u64 = 2_000_000;
 const MAX_OUTPUT_BYTES: u64 = 12_500_000;
 const WORKER_TIMEOUT: Duration = Duration::from_secs(8);
 static EXTRACTION_SLOTS: Semaphore = Semaphore::const_new(2);
@@ -26,6 +32,43 @@ pub(crate) struct ExtractedWorkbook {
     pub sheet_name: String,
     pub source_sha256: String,
     pub policy_version: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(crate) struct ExtractedOfficePreview {
+    preview: OfficePreview,
+    source_sha256: String,
+    source_size: usize,
+    policy_version: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "kind", deny_unknown_fields)]
+enum OfficePreview {
+    #[serde(rename = "xlsx")]
+    Workbook { sheets: Vec<PreviewSheet> },
+    #[serde(rename = "docx")]
+    Word {
+        blocks: Vec<WordBlock>,
+        truncated: bool,
+    },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct PreviewSheet {
+    name: String,
+    columns: usize,
+    rows: Vec<Vec<String>>,
+    truncated: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase", deny_unknown_fields)]
+enum WordBlock {
+    Paragraph { text: String },
+    Table { rows: Vec<Vec<String>> },
 }
 
 #[derive(Deserialize)]
@@ -43,7 +86,7 @@ pub(crate) async fn inspect_xlsx(bytes: &[u8]) -> Result<ExtractedWorkbook, ApiE
 pub(crate) async fn inspect_xlsx_viewer(
     bytes: &[u8],
 ) -> Result<crate::spreadsheet::ExtractedSpreadsheet, ApiError> {
-    let output = run_worker(bytes, &worker_script(), &["--viewer"]).await?;
+    let output = run_worker(bytes, &worker_script(), Some("--viewer"), MAX_OUTPUT_BYTES).await?;
     let extracted: crate::spreadsheet::ExtractedSpreadsheet = decode_result(&output)?;
     if extracted.policy_version != VIEWER_POLICY_VERSION
         || extracted.source_sha256 != hex::encode(Sha256::digest(bytes))
@@ -55,28 +98,93 @@ pub(crate) async fn inspect_xlsx_viewer(
     extracted.validate()?;
     Ok(extracted)
 }
-
-fn worker_script() -> String {
-    std::env::var("LUMIERE_WORKBOOK_EXTRACT_SCRIPT").unwrap_or_else(|_| {
-        if cfg!(test) {
-            concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../scripts/workbook-extract.py"
-            )
-            .into()
-        } else {
-            "/app/scripts/workbook-extract.py".into()
-        }
-    })
 }
 
 async fn inspect_xlsx_with_script(
     bytes: &[u8],
     script: &str,
 ) -> Result<ExtractedWorkbook, ApiError> {
-    let output = run_worker(bytes, script, &[]).await?;
+    let output = run_worker(bytes, script, None, MAX_OUTPUT_BYTES).await?;
     let extracted: ExtractedWorkbook = decode_result(&output)?;
     validate_result(&extracted, bytes)?;
+    Ok(extracted)
+}
+
+fn worker_script() -> String {
+    std::env::var("LUMIERE_WORKBOOK_EXTRACT_SCRIPT").unwrap_or_else(|_| {
+        if cfg!(test) {
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../scripts/workbook-extract.py").into()
+        } else {
+            "/app/scripts/workbook-extract.py".into()
+        }
+    })
+}
+
+/// Extract display-only data from authorized immutable bytes.
+pub(crate) async fn inspect_office_preview(
+    bytes: &[u8],
+    content_type: &str,
+) -> Result<ExtractedOfficePreview, ApiError> {
+    inspect_office_preview_with_script(bytes, content_type, &worker_script()).await
+}
+
+async fn inspect_office_preview_with_script(
+    bytes: &[u8],
+    content_type: &str,
+    script: &str,
+) -> Result<ExtractedOfficePreview, ApiError> {
+    let mode = match content_type {
+        XLSX_MIME => "--preview-xlsx",
+        DOCX_MIME => "--preview-docx",
+        _ => {
+            return Err(ApiError::Unprocessable(
+                "Office preview is unavailable for this type".into(),
+            ))
+        }
+    };
+    let output = run_worker(bytes, script, Some(mode), MAX_PREVIEW_OUTPUT_BYTES).await?;
+    let extracted: ExtractedOfficePreview = serde_json::from_slice(&output).map_err(|_| {
+        ApiError::Unavailable("Office inspection returned an invalid result".into())
+    })?;
+    let shape_matches = match (&extracted.preview, content_type) {
+        (OfficePreview::Workbook { sheets }, XLSX_MIME) => {
+            !sheets.is_empty()
+                && sheets.len() <= 24
+                && sheets.iter().all(|sheet| {
+                    !sheet.name.trim().is_empty()
+                        && sheet.name.len() <= 255
+                        && sheet.columns <= 20
+                        && sheet.rows.len() <= 100
+                        && sheet.rows.iter().all(|row| {
+                            row.len() == sheet.columns && row.iter().all(|cell| cell.len() <= 500)
+                        })
+                })
+        }
+        (OfficePreview::Word { blocks, .. }, DOCX_MIME) => {
+            blocks.len() <= 200
+                && blocks.iter().all(|block| match block {
+                    WordBlock::Paragraph { text } => text.len() <= 4_000,
+                    WordBlock::Table { rows } => {
+                        rows.len() <= 100
+                            && rows.iter().all(|row| {
+                                !row.is_empty()
+                                    && row.len() <= 20
+                                    && row.iter().all(|cell| cell.len() <= 500)
+                            })
+                    }
+                })
+        }
+        _ => false,
+    };
+    if !shape_matches
+        || extracted.policy_version != OFFICE_PREVIEW_POLICY_VERSION
+        || extracted.source_size != bytes.len()
+        || extracted.source_sha256 != format!("{:x}", Sha256::digest(bytes))
+    {
+        return Err(ApiError::Unavailable(
+            "Office inspection identity or shape mismatch".into(),
+        ));
+    }
     Ok(extracted)
 }
 
@@ -85,7 +193,12 @@ fn decode_result<T: serde::de::DeserializeOwned>(output: &[u8]) -> Result<T, Api
         .map_err(|_| ApiError::Unavailable("workbook inspection returned an invalid result".into()))
 }
 
-async fn run_worker(bytes: &[u8], script: &str, args: &[&str]) -> Result<Vec<u8>, ApiError> {
+async fn run_worker(
+    bytes: &[u8],
+    script: &str,
+    mode: Option<&str>,
+    max_output_bytes: u64,
+) -> Result<Vec<u8>, ApiError> {
     if bytes.is_empty() || bytes.len() > MAX_WORKBOOK_BYTES {
         return Err(ApiError::BadRequest(
             "workbook exceeds the 5 MB input limit".into(),
@@ -101,7 +214,7 @@ async fn run_worker(bytes: &[u8], script: &str, args: &[&str]) -> Result<Vec<u8>
     }
     let mut child = Command::new("/usr/bin/python3")
         .args(["-I", "-S", script])
-        .args(args)
+        .args(mode)
         .env_clear()
         .current_dir("/")
         .stdin(Stdio::piped())
@@ -137,10 +250,10 @@ async fn run_worker(bytes: &[u8], script: &str, args: &[&str]) -> Result<Vec<u8>
         let receive = async {
             let mut value = Vec::new();
             output
-                .take(MAX_OUTPUT_BYTES + 1)
+                .take(max_output_bytes + 1)
                 .read_to_end(&mut value)
                 .await?;
-            if value.len() as u64 > MAX_OUTPUT_BYTES {
+            if value.len() as u64 > max_output_bytes {
                 return Err(std::io::Error::other("worker output limit"));
             }
             Ok::<_, std::io::Error>(value)
@@ -227,6 +340,28 @@ mod tests {
                 .is_err()
         );
         assert!(inspect_xlsx_with_script(b"not a workbook", script)
+            .await
+            .is_err());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn office_preview_is_bound_to_its_original_format_and_bytes() {
+        let bytes = include_bytes!("../tests/fixtures/values-only.xlsx");
+        let script = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../scripts/workbook-extract.py"
+        );
+        let result = inspect_office_preview_with_script(bytes, XLSX_MIME, script)
+            .await
+            .unwrap();
+        assert_eq!(result.source_size, bytes.len());
+        assert_eq!(result.source_sha256, format!("{:x}", Sha256::digest(bytes)));
+        let OfficePreview::Workbook { sheets } = result.preview else {
+            panic!("expected worksheet preview");
+        };
+        assert_eq!(sheets[0].rows[1], ["Acme"]);
+        assert!(inspect_office_preview_with_script(bytes, DOCX_MIME, script)
             .await
             .is_err());
     }

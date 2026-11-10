@@ -13,7 +13,6 @@ vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; chil
 vi.mock("@lumiere/erp-session", () => ({ useErpSession: () => controls.session }));
 vi.mock("@lumiere/ui/lib/rbac-context", () => ({ useRBAC: () => ({ permissionsReady: controls.ready, checkPermission: () => ({ allowed: controls.allowed }) }) }));
 vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }));
-vi.mock("@lumiere/ui/components/button", () => ({ Button: ({ children, onClick }: { children: ReactNode; onClick?: () => void }) => <button onClick={onClick}>{children}</button> }));
 vi.mock("@lumiere/ui/components/sheet", () => ({
   Sheet: ({ open, onOpenChange, children }: { open: boolean; onOpenChange: (value: boolean) => void; children: ReactNode }) => open ? <section><button onClick={() => onOpenChange(false)}>Close drawer</button>{children}</section> : null,
   SheetContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -37,13 +36,17 @@ beforeEach(() => {
 
 describe("module activity scope and navigation", () => {
   it("opens and closes activity through the URL while retaining workspace filters", () => {
+    controls.search = "tab=products&filter=name%3ABreast";
     const view = render(<ModuleActivity />);
-    expect(screen.getByText("Activity for products")).toBeTruthy();
-    fireEvent.click(screen.getByText("Activity", { selector: "button" }));
+    expect(screen.queryByText("Activity for products")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Activity" }));
     expect(controls.push).toHaveBeenCalledWith("/products?tab=products&filter=name%3ABreast&history=activity", { scroll: false });
+    controls.search = "tab=products&filter=name%3ABreast&history=activity";
+    view.rerender(<ModuleActivity />);
+    expect(screen.getByText("Activity for products")).toBeTruthy();
     fireEvent.click(screen.getByText("Close drawer"));
     expect(controls.replace).toHaveBeenCalledWith("/products?tab=products&filter=name%3ABreast", { scroll: false });
-    controls.search = "tab=products";
+    controls.search = "tab=products&filter=name%3ABreast";
     view.rerender(<ModuleActivity />);
     expect(screen.queryByText("Activity for products")).toBeNull();
   });

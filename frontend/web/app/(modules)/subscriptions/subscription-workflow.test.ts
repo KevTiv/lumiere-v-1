@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { eligibleSubscriptionOrders, eligibleSubscriptionPlans, inSubscriptionScope, subscriptionInvoices, invoiceOutstanding, nextSubscriptionAction } from './subscription-workflow';
+import { eligibleSubscriptionOrders, eligibleSubscriptionPlans, inSubscriptionScope, subscriptionInvoices, invoiceOutstanding, nextSubscriptionAction, subscriptionQueueHref } from './subscription-workflow';
 import { subscriptionLifecycle } from './subscription-lifecycle';
 import { completeRenewalAttempt, readRenewalAttempt, retainRenewalAttempt, renewalScope } from './subscription-renewal-attempt';
 
@@ -129,4 +129,14 @@ test('corrupt or unavailable renewal checkpoints fail closed before a new attemp
   assert.throws(() => retainRenewalAttempt(scope, { idempotencyKey: 'another', intervals: 2, notes: '' }, 'submitting', storage));
   assert.equal(writes, 0);
   assert.throws(() => readRenewalAttempt(scope, { ...storage, getItem: () => { throw new Error('Storage blocked'); } }), /Storage blocked/);
+});
+
+
+test('queue handoffs open the scoped contract and preserve an exact large ID', () => {
+  const ids = new Set([subscription.id]);
+  assert.equal(subscriptionQueueHref(run, scope, ids, 'billing'), '/subscriptions/9007199254740993?tab=billing');
+  assert.equal(subscriptionQueueHref(run, scope, ids, 'overview'), '/subscriptions/9007199254740993');
+  assert.equal(subscriptionQueueHref({ ...run, companyId: 9n }, scope, ids, 'billing'), undefined);
+  assert.equal(subscriptionQueueHref({ ...run, subscriptionId: null }, scope, ids, 'billing'), undefined);
+  assert.equal(subscriptionQueueHref(run, scope, new Set(), 'billing'), undefined);
 });

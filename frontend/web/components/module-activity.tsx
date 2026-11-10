@@ -33,13 +33,13 @@ export function ModuleActivity() {
     if (next) router.push(href, { scroll: false })
     else router.replace(href, { scroll: false })
   }
-  return <div className="flex justify-end px-4 pt-2">
-    <Button variant="ghost" size="sm" onClick={() => navigate(true)} data-testid="module-history-open">
-      <History className="h-4 w-4" />
-      {t("businessHistory.activity", { defaultValue: "Activity" })}
+  const title = t("businessHistory.activity", { defaultValue: "Activity" })
+  return <>
+    <Button variant="ghost" size="icon" onClick={() => navigate(true)} aria-label={title} title={title} data-testid="module-history-open">
+      <History aria-hidden="true" className="size-4" />
     </Button>
     <Sheet open={open} onOpenChange={navigate}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-3xl">
+      <SheetContent size="record">
         <SheetHeader>
           <SheetTitle>{t("businessHistory.activity", { defaultValue: "Activity" })}</SheetTitle>
           <SheetDescription>{t("businessHistory.activityDescription", { defaultValue: "Inspect recorded changes and follow their business records." })}</SheetDescription>
@@ -62,7 +62,7 @@ export function ModuleActivity() {
       </SheetContent>
     </Sheet>
     <Sheet open={open && selected?.scopeKey === scopeKey} onOpenChange={(next) => { if (!next) setSelected(null) }}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-3xl">
+      <SheetContent size="record">
         <SheetHeader>
           <SheetTitle>{t("businessHistory.title", { defaultValue: "History & sources" })}</SheetTitle>
           <SheetDescription>{t("businessHistory.activityDescription", { defaultValue: "Inspect recorded changes and follow their business records." })}</SheetDescription>
@@ -72,5 +72,5 @@ export function ModuleActivity() {
         </div> : null}
       </SheetContent>
     </Sheet>
-  </div>
+  </>
 }

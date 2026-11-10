@@ -23,12 +23,18 @@ class ContractIrPinTest(unittest.TestCase):
         projection_extra=False,
         projection_primary_key="id",
         operations=None,
+        extra_tables=None,
+        extra_policy_tables=None,
+        extra_projection=None,
+        extra_archive=None,
     ):
         temp = tempfile.TemporaryDirectory()
         root = Path(temp.name) / "ir"
         root.mkdir()
         ir_path = root / "lumiere-contract-ir-v2.json"
         tables = [{"name": f"table_{index:03d}"} for index in range(458)]
+        tables.extend(extra_policy_tables or [])
+        tables.sort(key=lambda table: table["name"])
         commit_stream = {
             "contract_version": "ir-v2",
             "envelope_table": "organization_commit",
@@ -79,6 +85,9 @@ class ContractIrPinTest(unittest.TestCase):
             }
             for table in tables
         }
+        if extra_projection:
+            projection_tables[extra_projection] = projection_tables["table_000"]
+            projection_tables = dict(sorted(projection_tables.items()))
         if projection_extra:
             projection_tables["unexpected"] = projection_tables["table_000"]
         persistence = {
@@ -91,7 +100,7 @@ class ContractIrPinTest(unittest.TestCase):
                 "projection_finalization": "spacetimedb_reducer",
             },
             "storage": {
-                "coverage": {"classified": 458, "total": 458, "unclassified": 0},
+                "coverage": {"classified": len(tables), "total": len(tables), "unclassified": 0},
                 "policies": [
                     {
                         "table": table["name"],
@@ -117,6 +126,11 @@ class ContractIrPinTest(unittest.TestCase):
                 },
             },
         }
+        if extra_archive:
+            persistence["postgresql"]["archive"]["candidates"].append({"table": extra_archive})
+            persistence["postgresql"]["codec"]["tables"][extra_archive] = {}
+        tables.extend(extra_tables or [])
+        tables.sort(key=lambda table: table["name"])
         semantic = {
             "operations": operations or [],
             "resources": [],
@@ -171,6 +185,94 @@ class ContractIrPinTest(unittest.TestCase):
         self.addCleanup(temp.cleanup)
         result = self._run(ir_path, pin_path)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_private_platform_controls_are_not_tenant_storage(self):
+        for access in ({"Private": []}, "Private"):
+            with self.subTest(access=access):
+                controls = [
+                    {"name": name, "table_access": access}
+                    for name in (
+                        "ai_platform_default", "ai_platform_template", "ai_managed_enrollment"
+                    )
+                ]
+                temp, ir_path, pin_path = self._fixture(extra_tables=controls)
+                self.addCleanup(temp.cleanup)
+                result = self._run(ir_path, pin_path)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_platform_controls_must_remain_private(self):
+        for name in ("ai_platform_default", "ai_platform_template", "ai_managed_enrollment"):
+            for access in ({"Public": []}, "Public", None, {"Private": [1]}):
+                with self.subTest(name=name, access=access):
+                    temp, ir_path, pin_path = self._fixture(
+                        extra_tables=[{"name": name, "table_access": access}]
+                    )
+                    self.addCleanup(temp.cleanup)
+                    result = self._run(ir_path, pin_path)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("must remain private", result.stderr)
+
+    def test_private_unreviewed_and_organization_tables_still_require_storage(self):
+        for name in ("unknown_global", "ai_agent"):
+            with self.subTest(name=name):
+                temp, ir_path, pin_path = self._fixture(
+                    extra_tables=[{"name": name, "table_access": {"Private": []}}]
+                )
+                self.addCleanup(temp.cleanup)
+                result = self._run(ir_path, pin_path)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("must cover every tenant IR table", result.stderr)
+
+    def test_platform_controls_cannot_be_added_to_tenant_storage(self):
+        for name in ("ai_platform_default", "ai_platform_template", "ai_managed_enrollment"):
+            with self.subTest(name=name):
+                temp, ir_path, pin_path = self._fixture(
+                    extra_policy_tables=[{"name": name, "table_access": {"Private": []}}]
+                )
+                self.addCleanup(temp.cleanup)
+                result = self._run(ir_path, pin_path)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("must not have tenant storage policies", result.stderr)
+
+    def test_platform_controls_cannot_enter_projection_or_archive(self):
+        for name in ("ai_platform_default", "ai_platform_template", "ai_managed_enrollment"):
+            for argument, message in (
+                ("extra_projection", "exactly cover storage-policy tables"),
+                ("extra_archive", "outside the storage-policy census"),
+            ):
+                with self.subTest(name=name, manifest=argument):
+                    temp, ir_path, pin_path = self._fixture(**{argument: name})
+                    self.addCleanup(temp.cleanup)
+                    result = self._run(ir_path, pin_path)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(message, result.stderr)
+
+    def test_real_pinned_ir_with_private_platform_controls(self):
+        pinned = ROOT / "vendor/lumiere-contracts/ir/lumiere-contract-ir-v2.json"
+        ir = json.loads(pinned.read_text())
+        names = {table["name"] for table in ir["tables"]}
+        for name in ("ai_platform_default", "ai_platform_template", "ai_managed_enrollment"):
+            if name not in names:
+                ir["tables"].append({"name": name, "table_access": {"Private": []}})
+        ir["tables"].sort(key=lambda table: table["name"])
+        semantic = {
+            key: ir[key] for key in ("operations", "resources", "tables", "types", "persistence")
+        }
+        ir["schema_hash"] = "sha256:" + hashlib.sha256(
+            json.dumps(semantic, ensure_ascii=False, separators=(",", ":")).encode()
+        ).hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / pinned.name
+            raw = json.dumps(ir, ensure_ascii=False).encode()
+            path.write_bytes(raw)
+            path.with_suffix(path.suffix + ".sha256").write_text(
+                f"{hashlib.sha256(raw).hexdigest()}  {path.name}\n"
+            )
+            result = subprocess.run(
+                [sys.executable, str(VERIFIER), str(path)],
+                capture_output=True, text=True, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_pin_rejects_unknown_fields(self):
         temp, ir_path, pin_path = self._fixture({"unexpected": True})

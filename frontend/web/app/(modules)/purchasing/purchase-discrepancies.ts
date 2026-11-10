@@ -1,8 +1,9 @@
 import { moduleTabHref } from "@lumiere/erp-shared/record-links"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
-import { purchaseOrderLinks, type CrossRecordLinks } from "@lumiere/query-hooks/hooks/cross-record-links"
+import { purchaseOrderBillLinks, purchaseOrderReceiptLinks, type CrossRecordLinks } from "@lumiere/query-hooks/hooks/cross-record-links"
 import type { OrderToCashScope } from "@lumiere/query-hooks/hooks/order-to-cash"
 import type { PurchaseHandoffProjection } from "@lumiere/query-hooks/hooks/purchase-order-handoffs"
+import { moduleQueryState, type ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 import { purchaseMatchRecovery } from "./purchase-match-recovery"
 
 export interface PurchaseDiscrepancyRow extends PurchaseHandoffProjection {
@@ -108,9 +109,22 @@ export function purchaseDiscrepancies(
   return { partial, overBilled, unresolved }
 }
 
+type HandoffQuery<Row> = Parameters<typeof moduleQueryState>[0] & { data?: readonly Row[] }
+
+export function purchaseHandoffSectionData<Row>(
+  query: HandoffQuery<Row>,
+  buildLinks: (rows: readonly Row[]) => CrossRecordLinks,
+): { state: ModuleDataState; result?: CrossRecordLinks } {
+  const state = moduleQueryState(query)
+  if (state.status === "partial") return { state: { status: "error", onRetry: state.onRetry } }
+  if (state.status !== "ready") return { state }
+  if (!query.data) return { state: { status: "loading" } }
+  return { state, result: buildLinks(query.data) }
+}
+
 /** These links are explicitly order-level; line quantity totals never infer a bill or receipt. */
-export function purchaseDiscrepancyHandoffs(parent: PurchaseDiscrepancyRow, scope: OrderToCashScope,
-  pickings: readonly PurchaseHandoffProjection[], moves: readonly PurchaseHandoffProjection[]): CrossRecordLinks {
+export function purchaseDiscrepancyReceipts(parent: PurchaseDiscrepancyRow, scope: OrderToCashScope,
+  pickings: readonly PurchaseHandoffProjection[]): CrossRecordLinks {
   const id = parseStrictU64(parent.id)
   if (!id || !inScope(parent, scope)) return { status: "unavailable", links: [], reason: "Purchase order is outside the current scope" }
   const related = pickings.filter((row) => inScope(row, scope) && parseStrictU64(row.purchaseId ?? row.purchase_id) === id)
@@ -118,6 +132,19 @@ export function purchaseDiscrepancyHandoffs(parent: PurchaseDiscrepancyRow, scop
     return { status: "unavailable", links: [], reason: "The receipt type could not be verified" }
   }
   const incoming = related.filter((row) => tag(row.pickingCode ?? row.picking_code) === "incoming")
+  return purchaseOrderReceiptLinks(parent, scope, incoming)
+}
+
+export function purchaseDiscrepancyBills(parent: PurchaseDiscrepancyRow, scope: OrderToCashScope,
+  moves: readonly PurchaseHandoffProjection[]): CrossRecordLinks {
   const bills = moves.filter((row) => tag(row.moveType ?? row.move_type) === "ininvoice")
-  return purchaseOrderLinks(parent, scope, incoming, bills)
+  return purchaseOrderBillLinks(parent, scope, bills)
+}
+
+export function purchaseDiscrepancyHandoffs(parent: PurchaseDiscrepancyRow, scope: OrderToCashScope,
+  pickings: readonly PurchaseHandoffProjection[], moves: readonly PurchaseHandoffProjection[]): CrossRecordLinks {
+  const receipts = purchaseDiscrepancyReceipts(parent, scope, pickings)
+  if (receipts.status !== "ready") return receipts
+  const bills = purchaseDiscrepancyBills(parent, scope, moves)
+  return bills.status === "ready" ? { status: "ready", links: [...receipts.links, ...bills.links] } : bills
 }

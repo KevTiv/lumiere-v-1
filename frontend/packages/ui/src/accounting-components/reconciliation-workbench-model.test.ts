@@ -119,6 +119,35 @@ describe("reconciliation review projection", () => {
     three.moveLines = [three.moveLines[0]!, { ...three.moveLines[1]!, balance: 400.001, debit: 400.001, amountResidual: 400.001 }]
     expect(reconciliationSelection(projectReconciliation(three), ["40", "41"]).request).not.toBeNull()
   })
+  it("identifies a short or excess payment by magnitude for receipts and disbursements", () => {
+    for (const direction of [1, -1]) {
+      const source = reconciliationFixture()
+      if (direction < 0) {
+        source.moves = source.moves.map((row) => ({ ...row, moveType: "InInvoice" }))
+        source.accounts = source.accounts.map((row) => ({ ...row, internalType: "Payable" }))
+        source.moveLines = source.moveLines.map((row) => ({ ...row, debit: 0, credit: row.debit, balance: -Number(row.balance), amountResidual: -Number(row.amountResidual) }))
+      }
+      for (const [bankAmount, issue] of [[999.99, "short_payment"], [1000.01, "excess_payment"]] as const) {
+        source.bankLines = [{ ...source.line!, amount: bankAmount * direction }]
+        expect(reconciliationSelection(projectReconciliation(source), ["40", "41"])).toMatchObject({ issue, request: null })
+      }
+    }
+  })
+  it("exposes FX references only from current scoped records and keeps them out of exact settlement", () => {
+    const source = reconciliationFixture()
+    source.currencies = [...source.currencies, { id: 8n, code: "USD", decimalPlaces: 2, roundingFactor: 0.01 }]
+    source.bankLines = [{ ...source.line!, foreignCurrencyId: 8n }]
+    expect(projectReconciliation(source)).toMatchObject({ status: "blocked", currencyException: { context: { statementId: "2", lineId: "10", companyId: "4" }, foreignCurrencies: ["USD"] } })
+    expect(projectReconciliation({ ...source, companyId: 9n })).not.toHaveProperty("currencyException")
+    expect(projectReconciliation({ ...source, state: { status: "denied" } })).not.toHaveProperty("currencyException")
+    expect(projectReconciliation({ ...source, bankLines: [{ ...source.bankLines[0]!, paymentIds: [88n] }] })).not.toHaveProperty("currencyException")
+    source.bankLines = [source.line!]
+    source.moveLines = [source.moveLines[0]!, { ...source.moveLines[1]!, id: 42n, moveId: 20n, currencyId: 8n }, { ...source.moveLines[1]!, currencyId: 8n, companyId: 9n }]
+    const projection = projectReconciliation(source)
+    expect(projection).toMatchObject({ status: "ready", candidates: [{ id: "40" }], foreignItems: [{ id: "42", moveId: "20" }] })
+    expect(reconciliationSelection(projection, ["40"])).toMatchObject({ issue: "foreign_document", request: null })
+    expect(reconciliationSelection(projection, ["42"])).toMatchObject({ issue: "foreign_document", request: null })
+  })
   it("preserves exact u64 IDs and rejects lossy or invalid identifiers", () => {
     expect(reconciliationId("18446744073709551615")).toBe("18446744073709551615")
     for (const id of [Number.MAX_SAFE_INTEGER + 1, "18446744073709551616", "01", "0", "-1", "1.5", null]) expect(reconciliationId(id)).toBeNull()
@@ -130,10 +159,14 @@ describe("settlement selection boundaries", () => {
     const mixed = reconciliationFixture()
     mixed.moves = mixed.moves.map((row, index) => ({ ...row, partnerId: BigInt(50 + index) }))
     mixed.moveLines = mixed.moveLines.map((row, index) => ({ ...row, partnerId: BigInt(50 + index) }))
-    expect(reconciliationSelection(projectReconciliation(mixed), ["40", "41"]).request).toBeNull()
+    expect(reconciliationSelection(projectReconciliation(mixed), ["40", "41"])).toMatchObject({ issue: "mixed_partners", request: null })
     const split = reconciliationFixture()
     split.moveLines = [...split.moveLines, { ...split.moveLines[0]!, id: 42n, balance: 100, debit: 100, amountResidual: 100 }]
-    expect(reconciliationSelection(projectReconciliation(split), ["40", "41"]).request).toBeNull()
+    expect(reconciliationSelection(projectReconciliation(split), ["40", "41"])).toMatchObject({ issue: "incomplete_document", request: null })
+    const accounts = reconciliationFixture()
+    accounts.accounts = [...accounts.accounts, { ...accounts.accounts[0]!, id: 31n }]
+    accounts.moveLines = [accounts.moveLines[0]!, { ...accounts.moveLines[1]!, accountId: 31n }]
+    expect(reconciliationSelection(projectReconciliation(accounts), ["40", "41"])).toMatchObject({ issue: "mixed_accounts", request: null })
   })
   it("preserves a last-cent residual after earlier binary subtraction", () => {
     const source = reconciliationFixture()

@@ -1,4 +1,7 @@
 'use client';
+import { CurrencyFormatProvider } from '@lumiere/ui';
+import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
+import { entityScalarText } from '@lumiere/ui/lib/entity-row-values';
 
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -76,6 +79,7 @@ function ExpenseReportPageLoaded({
 }: ExpenseReportPageClientProps & { organizationId: number }) {
   useExpensesModuleSubscription();
   const { t } = useTranslation();
+  const { data: currencies = [] } = useCurrencies();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -155,7 +159,7 @@ function ExpenseReportPageLoaded({
 
   const id = BigInt(sheetId);
   const state = expenseVariantTag(sheet.state);
-  const label = String(sheet.name || '').trim() || `#${sheetId}`;
+  const label = entityScalarText(sheet.name) ?? `#${sheetId}`;
   const status = expenseReportStatusBar(sheet, t);
   const moves = reportMoveIds(sheet);
 
@@ -179,7 +183,7 @@ function ExpenseReportPageLoaded({
   const lineColumns = lineTable.view.mode === 'table' ? lineTable.view.columns : [];
 
   return (
-    <>
+    <CurrencyFormatProvider currencies={currencies} rowCurrencyKey="currencyId">
       <RecordPage
         testIdPrefix="expense-report"
         breadcrumbs={[
@@ -353,6 +357,6 @@ function ExpenseReportPageLoaded({
       {decision.error && <p role="alert" className="text-sm text-destructive">{decision.error}</p>}
       {decision.modal}
 
-    </>
+    </CurrencyFormatProvider>
   );
 }

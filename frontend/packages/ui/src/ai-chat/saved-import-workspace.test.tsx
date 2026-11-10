@@ -10,12 +10,14 @@ import { useState } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import type { ChatImportTask } from "../../../../web/lib/chat-import-task"
 import type { ImportTaskView } from "../../../../web/lib/import-task-navigation"
+import type { ImportWorkflow } from "../../../../web/lib/import-workflow"
 
 const controls = vi.hoisted(() => ({
   task: null as ChatImportTask | null,
   mounts: 0,
   unmounts: 0,
   reload: vi.fn(),
+  fetch: vi.fn(),
   back: vi.fn(),
   reviewProps: null as {
     allowImport?: boolean
@@ -25,9 +27,12 @@ const controls = vi.hoisted(() => ({
 vi.mock("@lumiere/i18n", () => ({
   useTranslation: () => ({
     t: (key: string, options?: { defaultValue?: string }) =>
-      options?.defaultValue ?? key,
+      (options?.defaultValue ?? key).replace(/\{\{(\w+)\}\}/g, (_, field) =>
+        String((options as Record<string, unknown> | undefined)?.[field] ?? ""),
+      ),
   }),
 }))
+vi.mock("../../../../web/lib/api-fetch", () => ({ apiFetch: controls.fetch }))
 vi.mock("@lumiere/ui", () => ({
   ChatDecisionCard: () => <p>Purpose decision</p>,
 }))
@@ -84,7 +89,9 @@ vi.mock("../../../../web/lib/guided-import-wizard", async () => {
   const { forwardRef, useImperativeHandle } = await import("react")
   return {
     GuidedImportWizard: forwardRef((_props, ref) => {
-      useImperativeHandle(ref, () => ({ continueFromReview: async () => true }))
+      useImperativeHandle(ref, () => ({
+        continueFromReview: async () => true,
+      }))
       return <p>Native draft</p>
     }),
   }
@@ -92,6 +99,54 @@ vi.mock("../../../../web/lib/guided-import-wizard", async () => {
 import { SavedImportWorkspace } from "../../../../web/lib/saved-import-workspace"
 
 const requestId = "a".repeat(32)
+function workflow(): ImportWorkflow {
+  return {
+    version: 1,
+    requestId,
+    organizationId: "7",
+    companyId: "3",
+    capabilities: [
+      {
+        key: "historical_expense_journals",
+        module: "accounting",
+        label: "Historical expense journals",
+        targetEntities: ["account_move", "account_move_line"],
+        requiredFacts: [
+          "confirmed expense classification",
+          "confirmed positive amount",
+        ],
+        readiness: "task_execution",
+        blockingReason: null,
+        destination: "/accounting",
+      },
+      {
+        key: "products",
+        module: "products",
+        label: "Product master records",
+        targetEntities: ["product"],
+        requiredFacts: ["name", "unit"],
+        readiness: "native_preview",
+        blockingReason: null,
+        destination: "/products",
+      },
+      {
+        key: "sales_history",
+        module: "sales",
+        label: "Historical sales",
+        targetEntities: ["sale_order"],
+        requiredFacts: [],
+        readiness: "evidence_only",
+        blockingReason:
+          "Saved source evidence for sales requires native review.",
+        destination: "/sales",
+      },
+    ],
+    proposals: [],
+    nativeResults: [],
+    nativeResultsMore: false,
+  }
+}
+
 function prepared(): ChatImportTask {
   return {
     requestId,
@@ -157,6 +212,8 @@ beforeEach(() => {
   controls.mounts = 0
   controls.unmounts = 0
   controls.reload.mockReset()
+  controls.fetch.mockReset()
+  controls.fetch.mockImplementation(async () => Response.json(workflow()))
   controls.back.mockReset()
 })
 afterEach(() => {
@@ -191,11 +248,7 @@ it("one execution owner and its draft survive Sources, Decisions, Preview and Re
   ).toBe("retained draft")
   expect(controls.mounts).toBe(1)
   expect(controls.unmounts).toBe(0)
-  expect(
-    screen.getByText(
-      "Confirmed source facts are ready for review. ERP creation and verified results are tracked separately.",
-    ),
-  ).toBeTruthy()
+  expect(screen.getByText("2 confirmed review rows")).toBeTruthy()
   fireEvent.click(screen.getByRole("button", { name: "Back to saved imports" }))
   expect(controls.back).toHaveBeenCalledOnce()
 })
@@ -216,4 +269,33 @@ it("inspection tasks expose decisions without mounting execution or native impor
   await waitFor(() => expect(controls.reviewProps?.allowImport).toBe(false))
   expect(controls.mounts).toBe(0)
   expect(screen.queryByText("Native draft")).toBeNull()
+})
+
+it("shows destination support and required facts before source review starts", async () => {
+  const task = prepared()
+  controls.task = {
+    ...task,
+    status: "awaiting_decision",
+    reviews: [],
+    decision: {
+      ...task.decision,
+      status: "pending",
+      selectedOptionId: null,
+      decisionId: null,
+    },
+  }
+  render(<Harness client={new QueryClient()} />)
+  expect(await screen.findByText("Product master records")).toBeTruthy()
+  expect(screen.getByText("Required facts · name, unit")).toBeTruthy()
+  expect(screen.getByText("Native preview available")).toBeTruthy()
+  expect(screen.getByText("Draft creation with approval")).toBeTruthy()
+  fireEvent.click(screen.getByText("Evidence-only destinations"))
+  expect(
+    screen.getByText("Saved source evidence for sales requires native review."),
+  ).toBeTruthy()
+  expect(
+    screen
+      .getByRole("tab", { name: "ERP preview" })
+      .getAttribute("aria-disabled"),
+  ).toBe("true")
 })

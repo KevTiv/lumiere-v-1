@@ -33,6 +33,35 @@ def workbook(sheet=None, extra=None, workbook_xml=None, duplicate=False,
     return output.getvalue()
 
 
+WORD = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+PKG = "http://schemas.openxmlformats.org/package/2006/relationships"
+
+
+def two_sheets(first=None, second=None, state="visible"):
+    return workbook(
+        sheet=first,
+        workbook_xml=f'<workbook xmlns="{NS}" xmlns:r="{RID}"><sheets><sheet name="Dépenses" r:id="rId1"/><sheet name="Totals" r:id="rId2" state="{state}"/></sheets></workbook>',
+        extra={
+            "xl/_rels/workbook.xml.rels": f'<Relationships xmlns="{PKG}"><Relationship Id="rId1" Type="{RID}/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="{RID}/worksheet" Target="/xl/worksheets/sheet2.xml"/></Relationships>',
+            "xl/worksheets/sheet2.xml": second or f'<worksheet xmlns="{NS}"><sheetData><row r="3"><c r="B3" t="inlineStr"><is><t>&lt;script&gt;</t></is></c></row></sheetData></worksheet>',
+        },
+    )
+
+
+def word_document(content, extra=None):
+    parts = {
+        "[Content_Types].xml": '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
+        "_rels/.rels": f'<Relationships xmlns="{PKG}"><Relationship Id="rId1" Type="{RID}/officeDocument" Target="word/document.xml"/></Relationships>',
+        "word/document.xml": f'<w:document xmlns:w="{WORD}"><w:body>{content}</w:body></w:document>',
+    }
+    parts.update(extra or {})
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as archive:
+        for name, data in parts.items():
+            archive.writestr(name, data)
+    return output.getvalue()
+
+
 def run_worker(data=b"", args=(), pass_fds=()):
     result = subprocess.run(
         ["/usr/bin/python3", "-I", "-S", str(WORKER), *args],
@@ -220,6 +249,57 @@ class WorkbookExtractionTests(unittest.TestCase):
         self.assert_rejected(workbook(duplicate), "cell_coordinate")
         long = f'<worksheet xmlns="{NS}"><sheetData><row><c r="A1" t="inlineStr"><is><t>{"x" * 4001}</t></is></c></row></sheetData></worksheet>'
         self.assert_rejected(workbook(long), "cell_budget")
+
+    def test_multisheet_preview_keeps_coordinates_and_literal_multilingual_text(self):
+        first = f'<worksheet xmlns="{NS}"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>{"😀" * 126}</t></is></c></row><row r="105"><c r="A105"><v>5</v></c></row></sheetData></worksheet>'
+        data = two_sheets(first)
+        self.assert_rejected(data, "workbook_single_visible_sheet_required")
+        status, result = run_worker(data, ("--preview-xlsx",))
+        self.assertEqual(status, 0, result)
+        self.assertEqual(result["sourceSha256"], hashlib.sha256(data).hexdigest())
+        self.assertEqual(result["sourceSize"], len(data))
+        self.assertEqual(result["policyVersion"], "office-static-seccomp-v1")
+        first, second = result["preview"]["sheets"]
+        self.assertEqual(first["name"], "Dépenses")
+        self.assertEqual(first["rows"][0], ["😀" * 125])
+        self.assertEqual(len(first["rows"]), 100)
+        self.assertTrue(first["truncated"])
+        self.assertEqual(second, {
+            "name": "Totals", "columns": 2,
+            "rows": [["", ""], ["", ""], ["", "<script>"]], "truncated": False,
+        })
+
+    def test_preview_applies_policy_beyond_visible_rows_and_to_all_sheets(self):
+        second = f'<worksheet xmlns="{NS}"><sheetData><row r="105"><c r="A105"><f>1+1</f><v>2</v></c></row></sheetData></worksheet>'
+        for data, reason in (
+            (two_sheets(second=second), "workbook_formula_requires_values_only_copy"),
+            (two_sheets(state="hidden"), "workbook_visible_sheets_required"),
+        ):
+            self.assertEqual(run_worker(data, ("--preview-xlsx",)), (65, {"error": reason}))
+
+    def test_docx_preview_preserves_paragraphs_and_ordered_literal_table_cells(self):
+        paragraph = '<w:p><w:r><w:t>&lt;img&gt; Dépenses</w:t><w:tab/><w:t>2026</w:t></w:r></w:p>'
+        table = '<w:tbl><w:tr><w:tc><w:p><w:r><w:t>Rent</w:t></w:r></w:p><w:p><w:r><w:t>Oct.</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>1200</w:t></w:r></w:p></w:tc></w:tr></w:tbl>'
+        status, result = run_worker(word_document(paragraph + table + paragraph), ("--preview-docx",))
+        self.assertEqual(status, 0, result)
+        self.assertEqual(result["preview"], {
+            "kind": "docx", "truncated": False,
+            "blocks": [
+                {"kind": "paragraph", "text": "<img> Dépenses\t2026"},
+                {"kind": "table", "rows": [["Rent\nOct.", "1200"]]},
+                {"kind": "paragraph", "text": "<img> Dépenses\t2026"},
+            ],
+        })
+
+    def test_docx_preview_rejects_active_packages_and_wrong_document_identity(self):
+        for data, reason in (
+            (workbook(), "word_required_parts"),
+            (word_document('<w:p><w:fldSimple w:instr="INCLUDETEXT"/></w:p>'), "word_active_or_unsupported_content"),
+            (word_document("", {"word/vbaProject.bin": "payload"}), "workbook_active_or_hidden_content"),
+            (word_document("", {"word/_rels/document.xml.rels": f'<Relationships xmlns="{PKG}"><Relationship TargetMode="External" Target="https://example.invalid"/></Relationships>'}), "workbook_external_relationship"),
+            (word_document("", {"word/styles.xml": '<!DOCTYPE d [<!ENTITY x SYSTEM "file:///etc/passwd">]><d>&x;</d>'}), "xml_entities"),
+        ):
+            self.assertEqual(run_worker(data, ("--preview-docx",)), (65, {"error": reason}))
 
     def test_bad_signature_and_missing_parts_reject(self):
         self.assert_rejected(b"not a workbook", "workbook_size_or_signature")

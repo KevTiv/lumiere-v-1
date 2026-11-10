@@ -24,6 +24,12 @@
     "validation": {
       "invalidEmail": "Aderesi ya email ntiyemewe"
     },
+    "form": {
+      "file": {
+        "choose": "Hitamo file",
+        "chooseMultiple": "Hitamo file"
+      }
+    },
     "paramsMapper": {
       "invalidConsolidationAccount": "Ntibyashobotse gutegura amakuru ya account yo guhuriza hamwe ibaruramari. Genzura imyanya ikenewe.",
       "invalidTrialBalanceEntry": "Ntibyashobotse gutegura amakuru y’umurongo w’igereranya ry’imibare ya account. Genzura imyanya ikenewe.",

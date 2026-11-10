@@ -14,15 +14,18 @@ import { LowStockPanel } from "./low-stock-panel"
 import { RedActionDraftPanel } from "./red-action-draft-panel"
 import { EvidenceReviewerPanel } from "./evidence-reviewer-panel"
 import { RunLifecyclePanel } from "./run-lifecycle-panel"
+import { PlatformAiProfilePanel } from "./platform-ai-profile-panel"
 
 interface AiHarnessClientProps {
   organizationId: bigint
   companies: Record<string, unknown>[]
+  canManagePlatformProfile?: boolean
 }
 
 export function AiHarnessClient({
   organizationId,
   companies,
+  canManagePlatformProfile = false,
 }: AiHarnessClientProps) {
   const { t } = useTranslation()
   const searchParams = useSearchParams()
@@ -33,6 +36,7 @@ export function AiHarnessClient({
     ? { companyId: savedCompanyId, runId: savedRunId } : undefined
   const [tab, setTab] = useState(() => {
     const requested = searchParams.get("tab")
+    if (requested === "ai-profile" && canManagePlatformProfile) return requested
     if (["finance-reviews", "report-analysis", "report-composer", "low-stock", "red-action-drafts", "evidence-reviewer", "run-lifecycle"].includes(requested ?? "")) return requested!
     return searchParams.has("runId") ? "evidence-reviewer" : "report-composer"
   })
@@ -42,6 +46,7 @@ export function AiHarnessClient({
     <DashboardHeader title={t("aiHarness.title")} description={t("aiHarness.description")} />
     <Tabs value={tab} onValueChange={setTab} className="flex flex-col gap-6">
       <TabsList scrollable>
+        {canManagePlatformProfile ? <TabsTrigger value="ai-profile">{t("aiHarness.platformProfile.tab")}</TabsTrigger> : null}
         <TabsTrigger value="finance-reviews">{t("aiHarness.finance.title")}</TabsTrigger>
         <TabsTrigger value="report-analysis">{t("aiHarness.reportAnalysis.title")}</TabsTrigger>
         <TabsTrigger value="report-composer">
@@ -60,6 +65,8 @@ export function AiHarnessClient({
           {t("aiHarness.tabs.runLifecycle")}
         </TabsTrigger>
       </TabsList>
+
+      {canManagePlatformProfile ? <TabsContent value="ai-profile"><PlatformAiProfilePanel organizationId={organizationId} /></TabsContent> : null}
 
       <TabsContent value="finance-reviews">
         <FinanceReviewPanel organizationId={organizationId} companies={companies} savedRun={savedRun} />
