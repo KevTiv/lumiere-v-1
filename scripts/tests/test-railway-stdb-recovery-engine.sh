@@ -19,6 +19,8 @@ bucket_container="$test_name-s3"
 backup_network="$test_name-backup-network"
 bucket_name="lumiere-backups"
 bucket_endpoint="http://s3.test:9000"
+# Public ECR mirror of MinIO RELEASE.2025-09-07T16-13-09Z, pinned for the synthetic drill.
+bucket_image="public.ecr.aws/y9w4h2u9/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e"
 pinned_image="local/lumiere-stdb-recovery@$image_id"
 module_revision="$(printf '%040d' 1)"
 host="http://127.0.0.1:3000"
@@ -59,7 +61,7 @@ docker run --detach --name "$bucket_container" --network "$backup_network" \
   --network-alias s3.test --network-alias "$bucket_name.s3.test" \
   --env MINIO_DOMAIN=s3.test --env MINIO_ROOT_USER=fixture-access \
   --env MINIO_ROOT_PASSWORD=fixture-secret \
-  quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data >/dev/null
+  "$bucket_image" server /data >/dev/null
 docker run --rm --network "$backup_network" "${bucket_env[@]}" \
   --entrypoint /bin/sh "$image_id" -ceu '
     for attempt in $(seq 1 30); do
