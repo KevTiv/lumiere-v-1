@@ -144,16 +144,29 @@ async function moveSnapshot(page: Page, moveId: number) {
 async function openSheetAction(
   page: Page,
   sheetId: number,
-  actionId: string,
+  actionId: "submit" | "approve" | "post" | "reimburse",
 ) {
-  await gotoModule(page, "/expenses", "expenses")
-  await selectModuleTab(page, "expenses", "expense-sheets")
-  // Expense reports open on row click; only their checkbox selects the report
-  // and exposes the bulk workflow actions.
-  await page.getByTestId(`entity-select-row-${sheetId}`).check()
-  const action = page.getByTestId(`entity-action-${actionId}`)
+  await gotoModule(page, `/expenses/reports/${sheetId}`)
+  const action = page.getByTestId(`expense-report-${actionId}`)
   await expect(action).toBeVisible()
   return action
+}
+
+async function openExpenseCreateForm(
+  page: Page,
+  tabId: "expenses" | "expense-sheets",
+) {
+  await selectModuleTab(page, "expenses", tabId)
+  const opener = page.getByTestId(`module-create-expenses-${tabId}`)
+  const formId = tabId === "expenses" ? "new-expense" : "new-expense-sheet"
+  const dialog = page.getByTestId(`form-modal-${formId}`)
+  // The first click can land while the workspace is still hydrating.
+  // Retrying the opener is safe because it only opens the form.
+  await expect(async () => {
+    if (!(await dialog.isVisible())) await opener.click({ timeout: 5_000 })
+    await expect(dialog).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 15_000 })
+  return dialog
 }
 
 test.describe(
@@ -186,9 +199,8 @@ test.describe(
 
       // Create the report through the operator form so lookup and company scope
       // are exercised before the lifecycle actions begin.
-      await selectModuleTab(page, "expenses", "expense-sheets")
-      await page.getByTestId("module-create-expenses-expense-sheets").click()
-      await fillField(page, "name", sheetName)
+      const sheetForm = await openExpenseCreateForm(page, "expense-sheets")
+      await fillField(sheetForm, "name", sheetName)
       await chooseFirstEnabledOption(page, "pricelistId")
       await chooseFirstEnabledOption(page, "employeeId")
       const [sheetCreated] = await Promise.all([
@@ -209,9 +221,8 @@ test.describe(
 
       // Upload real bytes through presign -> object store -> complete, then let
       // the expense form register and attach the resulting receipt row.
-      await selectModuleTab(page, "expenses", "expenses")
-      await page.getByTestId("module-create-expenses-expenses").click()
-      await fillField(page, "name", expenseName)
+      const expenseForm = await openExpenseCreateForm(page, "expenses")
+      await fillField(expenseForm, "name", expenseName)
       await fillField(page, "totalAmount", expenseAmount.toFixed(2))
       await fillField(page, "date", isoDate(-test.info().retry))
       await chooseFirstEnabledOption(page, "pricelistId")
@@ -287,7 +298,7 @@ test.describe(
       const submitAction = await openSheetAction(
         page,
         sheetId,
-        "submit-sheets",
+        "submit",
       )
       await submitAction.click()
       const submitConfirmation = page.getByTestId("expense-report-confirm")
@@ -397,7 +408,7 @@ test.describe(
         const approveAction = await openSheetAction(
           financePage,
           sheetId,
-          "approve-sheets",
+          "approve",
         )
         await approveAction.click()
         const approveConfirmation = financePage.getByTestId("expense-report-confirm")
@@ -449,7 +460,7 @@ test.describe(
         "payable",
       )
 
-      const postAction = await openSheetAction(page, sheetId, "post-sheets")
+      const postAction = await openSheetAction(page, sheetId, "post")
       await postAction.click()
       await expect(
         page.getByTestId("form-modal-post-expense-report"),
@@ -503,7 +514,7 @@ test.describe(
       const reimburseAction = await openSheetAction(
         page,
         sheetId,
-        "reimburse-sheets",
+        "reimburse",
       )
       await reimburseAction.click()
       await expect(
