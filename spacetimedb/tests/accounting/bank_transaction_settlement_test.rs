@@ -173,7 +173,12 @@ pub fn test_posted_operational_bank_matches(ctx: &ReducerContext) -> Result<(), 
             .payment_transaction()
             .payment_transaction_by_company()
             .filter(&company)
-            .find(|row| row.external_reference.as_deref() == Some(reference))
+            .find(|row| {
+                row.payment_account_id == account.id
+                    && row.source_entity_id == Some(line_id)
+                    && row.external_reference.as_deref() == Some(reference)
+                    && row.status == PaymentTransactionStatus::Draft
+            })
             .map(|row| row.id)
             .ok_or_else(|| "operational payment transaction missing".to_string())
     };
