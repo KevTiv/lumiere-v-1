@@ -429,7 +429,8 @@ function ScopedModulePageHost({
     [resolution.widgets],
   );
   const builtinCatalog = useMemo(() => {
-    if (sections) return createBuiltinWidgetCatalog(sections);
+    const sectionCatalog = sections ? createBuiltinWidgetCatalog(sections) : [];
+    if (placement !== "content" && sections) return sectionCatalog;
     if (placement === "insights" || !children) return [];
     const widget: CustomWidget = {
       id: "module-content",
@@ -446,22 +447,26 @@ function ScopedModulePageHost({
         widgetId: widget.id,
         title,
         defaultWidth: 12 as const,
+        required: placement === "content",
         widget,
       },
+      ...sectionCatalog,
     ];
   }, [sections, children, title, placement]);
   const defaultValue = useMemo(
     () =>
       placement === "insights"
         ? []
-        : sections
+        : sections && placement !== "content"
           ? createDefaultPageLayout(sections)
-          : builtinCatalog.map((item) => ({
-              id: `builtin:${item.widgetId}`,
-              source: item.source,
-              widgetId: item.widgetId,
-              width: item.defaultWidth ?? 12,
-            })),
+          : builtinCatalog
+              .filter((item) => placement !== "content" || item.required)
+              .map((item) => ({
+                id: `builtin:${item.widgetId}`,
+                source: item.source,
+                widgetId: item.widgetId,
+                width: item.defaultWidth ?? 12,
+              })),
     [sections, builtinCatalog, placement],
   );
   const savedCatalog = useMemo<PageWidgetCatalogItem[]>(
@@ -681,7 +686,7 @@ function ScopedModulePageHost({
           insights={insights}
           scopeNote={
             savedWidgetScopeNote ??
-            (insights
+            (placement !== "dashboard"
               ? t("pageComposition.insightScope", {
                   defaultValue:
                     "Widgets use the operating company and their own filters. A date range applies to each widget’s configured date field.",

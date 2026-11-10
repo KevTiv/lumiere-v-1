@@ -81,6 +81,44 @@ class Section:
 
 
 @dataclass(frozen=True)
+class ManagedSelection:
+    sheet_name: str
+    first_row: int
+    last_row: int
+    first_column: int
+    last_column: int
+    encoding: str | None
+    header_row: int | None
+
+    def includes_row(self, row: int) -> bool:
+        return row == self.header_row or self.first_row <= row <= self.last_row
+
+
+def parse_managed_selection(value: Any) -> ManagedSelection:
+    required = {"documentId", "versionId", "current", "sheetName", "firstRow", "lastRow", "firstColumn", "lastColumn"}
+    row = object_keys(value, required | {"encoding", "headerRow"}, required, "Document selection")
+    for key in ("documentId", "versionId"):
+        if not isinstance(row[key], str) or not re.fullmatch(r"[1-9][0-9]{0,19}", row[key]):
+            raise PreparationError("The managed document and version identities are required.")
+    if type(row["current"]) is not bool:
+        raise PreparationError("The managed document version selector is invalid.")
+    sheet = bounded_text(row["sheetName"], 255, "Worksheet name")
+    first_row = positive_int(row["firstRow"], 1_048_576, "First selected row")
+    last_row = positive_int(row["lastRow"], 1_048_576, "Last selected row")
+    first_column = positive_int(row["firstColumn"], 200, "First selected column")
+    last_column = positive_int(row["lastColumn"], 200, "Last selected column")
+    encoding = row.get("encoding")
+    header = positive_int(row["headerRow"], first_row, "Selected header row") if "headerRow" in row else None
+    if encoding is not None and (not isinstance(encoding, str)
+                                 or encoding not in {"utf-8", "utf-16le", "utf-16be", "windows-1252"}):
+        raise PreparationError("Choose a supported CSV encoding.")
+    if (first_row > last_row or first_column > last_column
+            or (last_row - first_row + 1) * (last_column - first_column + 1) > 5000):
+        raise PreparationError("Choose up to 5,000 cells in an ordered document selection.")
+    return ManagedSelection(sheet, first_row, last_row, first_column, last_column, encoding, header)
+
+
+@dataclass(frozen=True)
 class FilePreparation:
     file_name: str
     source_sha256: str
@@ -90,6 +128,7 @@ class FilePreparation:
     date_order: str
     sections: tuple[Section, ...]
     expected_layout_sha256: str | None = None
+    managed_selection: ManagedSelection | None = None
 
 
 def parse_section(value: Any) -> Section:
@@ -179,7 +218,7 @@ def parse_preparation(value: Any) -> dict[str, FilePreparation]:
     result = {}
     for value in files:
         row = object_keys(value, {"fileName", "sourceSha256", "delimiter", "decimalSeparator",
-                                 "groupingSeparator", "dateOrder", "sections", "expectedLayoutSha256"},
+                                 "groupingSeparator", "dateOrder", "sections", "expectedLayoutSha256", "managedSelection"},
                           {"fileName", "sourceSha256"}, "File preparation")
         name = bounded_text(row["fileName"], 300, "Prepared filename")
         digest = row["sourceSha256"]
@@ -213,7 +252,10 @@ def parse_preparation(value: Any) -> dict[str, FilePreparation]:
                 columns_overlap = max(section.first_column, previous.first_column) <= min(section.last_column, previous.last_column)
                 if rows_overlap and columns_overlap:
                     raise PreparationError("Source sections cannot reuse the same source cells.")
-        result[name] = FilePreparation(name, digest, delimiter, decimal, grouping, order, sections, layout)
+        selection = parse_managed_selection(row["managedSelection"]) if "managedSelection" in row else None
+        if selection and (recipe or layout or sections):
+            raise PreparationError("A document selection cannot be combined with reusable preparation rules.")
+        result[name] = FilePreparation(name, digest, delimiter, decimal, grouping, order, sections, layout, selection)
     return result
 
 

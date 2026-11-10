@@ -24,6 +24,8 @@ export interface PageWidgetCatalogItem {
   widget?: DashboardWidget
   unavailableReason?: string
   configurable?: boolean
+  /** Native work remains available when older layouts contain only added widgets. */
+  required?: boolean
   exportProvenance?: ReportExportSourceProvenance
 }
 
@@ -186,6 +188,37 @@ export function movePageWidget(
   if (!moved) return widgets
   result.splice(to, 0, moved)
   return result
+}
+
+/** Preserve saved order and IDs while restoring newly registered native work. */
+export function includeRequiredPageWidgets(
+  widgets: readonly PageWidgetPlacement[],
+  defaults: readonly PageWidgetPlacement[],
+  catalog: readonly PageWidgetCatalogItem[],
+): readonly PageWidgetPlacement[] {
+  const present = new Set(widgets.map(pageWidgetKey))
+  const required = new Set(
+    catalog.filter((item) => item.required).map(pageWidgetKey),
+  )
+  const missing = defaults.filter(
+    (widget) =>
+      required.has(pageWidgetKey(widget)) &&
+      !present.has(pageWidgetKey(widget)),
+  )
+  return missing.length ? [...missing, ...widgets] : widgets
+}
+
+export function insertPageWidget(
+  widgets: readonly PageWidgetPlacement[],
+  placement: PageWidgetPlacement,
+  afterId?: string,
+): readonly PageWidgetPlacement[] {
+  const index = afterId
+    ? widgets.findIndex((widget) => widget.id === afterId)
+    : -1
+  const next = [...widgets]
+  next.splice(index < 0 ? next.length : index + 1, 0, placement)
+  return next
 }
 
 export interface PageCompositionHistory {

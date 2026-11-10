@@ -13,6 +13,7 @@ function fixture(
     token?: string
     access?: Partial<FieldAccessContext>
     upstreamStatus?: number
+    companyAllowed?: boolean
   } = {},
 ) {
   const calls: { path: string; payload: unknown }[] = []
@@ -35,6 +36,11 @@ function fixture(
     "next/server": { NextResponse: { json: Response.json.bind(Response) } },
     "@/lib/session-permissions": { sessionAllowsPermission },
     "../../_lib/route-helpers": {
+      parseJsonBody: async (request: Request) => ({ ok: true, body: await request.json() }),
+      validateCompanyScope: async (_session: unknown, companyId: number) =>
+        companyId === 42 && options.companyAllowed !== false
+          ? null
+          : Response.json({ error: "Company does not belong to this organization" }, { status: 403 }),
       requireAiRouteContext: async () =>
         options.authenticated === false
           ? {
@@ -138,4 +144,21 @@ test("gateway rejection is returned without retrying or selecting a different cr
     assert.equal((await f.submit()).status, status)
     assert.equal(f.calls.length, 1)
   }
+})
+
+test("company setup forwards only validated scope, never client agent or policy choices", async () => {
+  const f = fixture()
+  assert.equal((await f.submit({ companyId: 42, agentId: 999, intelligencePolicyRef: "forged" })).status, 200)
+  assert.deepEqual(f.calls, [{
+    path: "/v1/skills/provision-surfaces",
+    payload: { org_id: 7, stdb_token: "actor-token", company_id: 42 },
+  }])
+  for (const companyId of [0, -1, 1.5, "42", null, Number.MAX_SAFE_INTEGER + 1]) {
+    const invalid = fixture()
+    assert.equal((await invalid.submit({ companyId })).status, 400)
+    assert.equal(invalid.calls.length, 0)
+  }
+  const denied = fixture({ companyAllowed: false })
+  assert.equal((await denied.submit({ companyId: 42 })).status, 403)
+  assert.equal(denied.calls.length, 0)
 })

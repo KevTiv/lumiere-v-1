@@ -133,6 +133,7 @@ export interface AIChatConfig {
   onRefreshActionDraft?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload>
   /** User asserts they're relying on a cited passage as evidence (AIH-13/14). */
   onCiteSource?: (args: { messageId: string; source: ChatMessageSourceRef }) => Promise<void>
+  onOpenDocumentSource?: (source: ChatMessageSourceRef) => void
   /** Opens a prepared preview or reauthorizes a saved guide in the host workspace. */
   onOpenGuide?: (request: OpenGuideRequest) => void | Promise<void>
   guideLibraryHref?: string

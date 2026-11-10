@@ -12,7 +12,7 @@ import { InvoiceDocument, readInvoiceDocumentContent, resolveDraftInvoiceDocumen
 import { ThemeProvider, useTheme } from "../../../../../packages/ui/src/components/theme-provider"
 import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
 import { Button } from "../../../../../packages/ui/src/components/button"
-import { syntheticLogoUrl } from "../../personalization-fixture"
+import { syntheticLogoUrl } from "../../../invoice-personalization-fixture"
 
 const orgVersion: InvoiceProfileVersion = { id: "1", organizationId: "7", companyId: null, name: "Synthetic organization defaults", values: { notice: "Organization notice", terms: "Organization terms", footer: "Organization footer", email: "billing@example.test" } }
 const initialVersions: Record<string, InvoiceProfileVersion> = {

@@ -1,11 +1,52 @@
 {
+  "aiHarness": {
+    "platformProfile": {
+      "tab": "Profil IA",
+      "title": "Profil IA de la plateforme",
+      "description": "Choisissez une fois les modèles et la politique d’utilisation. Les organisations éligibles reçoivent automatiquement leur agent et leurs compétences par défaut. Les données et les autorisations restent cloisonnées.",
+      "loading": "Chargement du profil IA…",
+      "unavailable": "Le profil IA est indisponible.",
+      "retry": "Réessayer",
+      "invalid": "Vérifiez les paramètres du profil IA.",
+      "active": "Profil actuel : {{key}}, version {{version}}",
+      "empty": "Aucun profil par défaut n’est publié. Configurez et publiez un profil pour préparer automatiquement les organisations.",
+      "chooseProvider": "Choisir un fournisseur",
+      "limits": "Limites par organisation",
+      "budgetHint": "Le budget mensuel est partagé entre les sociétés de chaque organisation. Le budget et les tarifs sont en micro-unités : 1 000 000 équivaut à une unité de la devise choisie.",
+      "publishHint": "La publication crée une version immuable et la définit par défaut pour les nouvelles inscriptions. Les inscriptions existantes, les paramètres personnalisés et les fonctions désactivées sont conservés.",
+      "saved": "Profil par défaut publié. Les nouvelles organisations éligibles peuvent en hériter automatiquement.",
+      "publish": "Publier comme profil par défaut",
+      "publishing": "Publication…",
+      "modelHint": "Utilisez des versions précises compatibles avec les appels d’outils et les réponses structurées. Les deux modèles doivent utiliser le même fournisseur. Les identifiants sont gérés sur le serveur.",
+      "roles": {
+        "generation_profile": "Modèle de génération",
+        "review_profile": "Modèle de vérification indépendant"
+      },
+      "fields": {
+        "template_key": "Clé du profil",
+        "template_version": "Nouvelle version",
+        "currency": "Code de devise",
+        "provider": "Fournisseur",
+        "model": "Identifiant exact du modèle",
+        "max_tokens": "Limite de tokens en sortie",
+        "context_window": "Fenêtre de contexte (tokens)",
+        "timeout_ms": "Délai de réponse (ms)",
+        "max_concurrency": "Requêtes simultanées",
+        "input_cost_per_1k_microunits": "Prix d’entrée par 1 000 tokens (micro-unités)",
+        "output_cost_per_1k_microunits": "Prix de sortie par 1 000 tokens (micro-unités)",
+        "monthly_limit_units": "Budget mensuel (micro-unités)",
+        "rate_limit_per_minute": "Requêtes par minute",
+        "max_enrolled_organizations": "Nombre maximal d’organisations financées"
+      }
+    }
+  },
   "aiSkills": {
     "setup": {
       "title": "Configuration des fonctions d’IA",
       "action": "Configurer les fonctions d’IA",
       "settingUp": "Configuration…",
-      "description": "Enregistrez les compétences manquantes pour les réponses du chat, les suggestions de formulaire et les brouillons d’action. Les paramètres et versions publiées existants sont conservés.",
-      "prerequisites": "Cette étape prépare les définitions des compétences. Les contrôles du fournisseur, de la société, du budget et des versions publiées restent nécessaires lors de l’utilisation de l’IA.",
+      "description": "Appliquez le profil IA de la société aux réponses du chat, aux suggestions de formulaire et aux brouillons d’action. Les réglages personnalisés et les fonctions désactivées sont conservés.",
+      "prerequisites": "Utilise le profil existant de la société ou le profil par défaut de la plateforme. Les contrôles du fournisseur, du budget et des versions restent applicables.",
       "permissionRequired": "L’autorisation de créer des compétences est nécessaire pour lancer la configuration.",
       "checked": "Définitions des compétences vérifiées.",
       "skills": {
@@ -17,6 +58,12 @@
         "created": "Ajoutée",
         "existing": "Déjà enregistrée",
         "inactive": "Inactive (inchangée)"
+      },
+      "companyRequired": "Sélectionnez une société avant de configurer les fonctions d’IA.",
+      "companyStatus": {
+        "configured": "Configuration IA par défaut appliquée. Les réglages personnalisés et les fonctions désactivées ont été conservés.",
+        "profile_required": "Aucun profil IA éligible n’est disponible. Demandez à l’administrateur de publier un profil par défaut, puis réessayez.",
+        "preserved": "Paramètres IA existants conservés. Les réglages personnalisés ou désactivés déterminent toujours la disponibilité."
       }
     }
   },
@@ -5080,5 +5127,9 @@
     "pinnedReview": "Consultation de la révision enregistrée {{revision}}. Les valeurs actuelles peuvent être différentes de cette révision.",
     "savedReviewLoading": "Chargement de la révision enregistrée…",
     "savedReviewUnavailable": "Cette révision enregistrée est indisponible. Les valeurs actuelles ne sont pas utilisées à sa place."
+  },
+  "pageComposition": {
+    "addBelow": "Ajouter un widget en dessous",
+    "addBelowNamed": "Ajouter un widget sous {{title}}"
   }
 }

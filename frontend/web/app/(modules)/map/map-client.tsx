@@ -448,39 +448,41 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
-      <CanvasWorkspace
-        className="flex-1"
-        controlsLabel={t("map.controls", { defaultValue: "Map controls" })}
-        controlsTitle={t("map.summary")}
-        controls={controls}
-        toolbar={
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <MapPin className="size-4 shrink-0 text-muted-foreground" />
-              <h1 className="text-sm font-semibold [overflow-wrap:anywhere]">{t("map.title")}</h1>
+      <OperationalPageComposition moduleId="map" title={t("map.title")} actionTarget={compositionTarget}>
+        <CanvasWorkspace
+          className="h-[calc(100dvh-12rem)] min-h-96"
+          controlsLabel={t("map.controls", { defaultValue: "Map controls" })}
+          controlsTitle={t("map.summary")}
+          controls={controls}
+          toolbar={
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <MapPin className="size-4 shrink-0 text-muted-foreground" />
+                <h1 className="text-sm font-semibold [overflow-wrap:anywhere]">{t("map.title")}</h1>
+              </div>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                {compositionSlot}
+                <MapLayerLegend
+                  layers={defaultMapLayers}
+                  visibleLayers={visibleLayers}
+                  onToggle={toggleLayer}
+                />
+              </div>
             </div>
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              {compositionSlot}
-              <MapLayerLegend
-                layers={defaultMapLayers}
-                visibleLayers={visibleLayers}
-                onToggle={toggleLayer}
-              />
-            </div>
+          }
+        >
+          <div className="relative min-h-0 min-w-0 flex-1" data-testid="map-view">
+            <MapView
+              pins={livePins}
+              layers={defaultMapLayers}
+              visibleLayers={visibleLayers}
+              defaultCenter={MAP_CENTER}
+              defaultZoom={2}
+              className="h-full w-full"
+            />
           </div>
-        }
-      >
-        <div className="relative min-h-0 min-w-0 flex-1" data-testid="map-view">
-          <MapView
-            pins={livePins}
-            layers={defaultMapLayers}
-            visibleLayers={visibleLayers}
-            defaultCenter={MAP_CENTER}
-            defaultZoom={2}
-            className="h-full w-full"
-          />
-        </div>
-      </CanvasWorkspace>
+        </CanvasWorkspace>
+      </OperationalPageComposition>
       {fleetAction && fleetFormConfig ? (
         <FormModal
           open
@@ -491,7 +493,6 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
           onSubmit={handleFleetSubmit}
         />
       ) : null}
-      <OperationalPageComposition moduleId="map" title={t("map.title")} actionTarget={compositionTarget} />
     </div>
   )
 }

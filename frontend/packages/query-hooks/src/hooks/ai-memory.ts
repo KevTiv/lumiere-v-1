@@ -290,6 +290,21 @@ export function useAppendAiChatMessage(organizationId: number, companyId: number
 }
 
 /** RAG over company-scoped embedding collection (validated server-side). */
+export type AiSpreadsheetSelectionReference = {
+  documentId: string
+  versionId: string
+  current: boolean
+  checksum: string
+  sheetName: string
+  firstRow: number
+  lastRow: number
+  firstColumn: number
+  lastColumn: number
+  delimiter?: "," | ";" | "\t" | "|"
+  encoding?: string
+  headerRow?: number
+}
+
 export function useAiMemoryRag() {
   return useMutation({
     mutationFn: async (args: {
@@ -301,6 +316,7 @@ export function useAiMemoryRag() {
       ui_context?: AiUiContext
       guide_refs?: AiGuideReference[]
       import_task_refs?: AiImportTaskReference[]
+      spreadsheet_selection?: AiSpreadsheetSelectionReference
     }) => {
       const r = await apiFetch("/api/ai/rag", {
         method: "POST",
@@ -314,6 +330,7 @@ export function useAiMemoryRag() {
           ...(args.ui_context ? { ui_context: args.ui_context } : {}),
           ...(args.guide_refs?.length ? { guide_refs: args.guide_refs } : {}),
           ...(args.import_task_refs?.length ? { import_task_refs: args.import_task_refs } : {}),
+          ...(args.spreadsheet_selection ? { spreadsheet_selection: args.spreadsheet_selection } : {}),
         }),
       })
       if (!r.ok) throw await httpResponseError(r)

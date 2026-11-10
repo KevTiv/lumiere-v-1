@@ -1,5 +1,6 @@
 {
   "post": [
+    "/api/ai/harness/profile",
     "/api/ai/rag",
     "/api/ai/rag/stream",
     "/api/ai/forms/suggest",
@@ -34,6 +35,7 @@
     "/api/ai/knowledge/skill-promotions/42/review"
   ],
   "get": [
+    "/api/ai/harness/profile",
     "/api/ai/skills/certifications",
     "/api/ai/skills/certifications/42",
     "/api/ai/knowledge/skill-promotions/company/42"

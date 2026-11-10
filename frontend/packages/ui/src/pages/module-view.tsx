@@ -518,238 +518,242 @@ export function ModuleView({
                 />)}
               </ModulePageComposition>
             )}
-            {tab.type === "custom" && tab.customContent}
-
-            {tab.type === "entity" && tab.entityConfig && tab.entityAltView && (
-              <div
-                className="flex w-fit items-center rounded-lg border border-border p-1"
-                role="group"
-                aria-label={`${tab.entityAltView.label} / ${tab.entityAltView.tableLabel}`}
-              >
-                {([
-                  ["alt", tab.entityAltView.label, LayoutGrid],
-                  ["table", tab.entityAltView.tableLabel, TableIcon],
-                ] as const).map(([choice, label, Icon]) => {
-                  const pressed = (showAltView(tab) ? "alt" : "table") === choice
-                  return (
-                    <Button
-                      key={choice}
-                      variant={pressed ? "secondary" : "ghost"}
-                      size="sm"
-                      className="h-7 gap-1.5 px-2"
-                      aria-pressed={pressed}
-                      onClick={() => chooseAltView(tab.id, choice)}
-                      data-testid={`module-view-${choice}-${tab.id}`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {label}
-                    </Button>
-                  )
-                })}
-              </div>
-            )}
-
-            {tab.type === "entity" && tab.entityConfig && showAltView(tab) && tab.entityAltView?.content}
-
-            {tab.type === "entity" && tab.entityConfig && !showAltView(tab) && (
-              <div className="space-y-3">
-                {kpiStrips?.[tab.id] ? (
-                  <KpiStrip
-                    loading={kpiStrips[tab.id]!.loading}
-                    tiles={kpiStrips[tab.id]!.tiles.map((kpi) => ({
-                      key: kpi.key,
-                      label: kpi.label,
-                      value: kpi.value,
-                      hint: kpi.hint,
-                      tone: kpi.tone,
-                      active: activeKpiTile(kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)?.key === kpi.key,
-                      onSelect: kpi.matches
-                        ? () =>
-                            setKpiSelection((prev) => ({
-                              ...prev,
-                              [tab.id]: toggleKpiKey(prev[tab.id] ?? null, kpi.key),
-                            }))
-                        : undefined,
-                    }))}
-                  />
-                ) : null}
-                {activeTab === tab.id && historyField && (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <HistoryPeriodSelect
-                      value={historyFilter.status === "active" ? historyFilter.period : "all"}
-                      timeZone={historyFilter.status === "active" ? historyFilter.timeZone : "UTC"}
-                      onChange={(period) => {
-                        const params = new URLSearchParams(searchParams?.toString())
-                        params.set("period", serializeHistoryPeriod(period))
-                        params.set("periodTimeZone", historyTimeZone ?? "UTC")
-                        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-                      }}
-                    />
-                    <span className="text-xs text-muted-foreground">{historyColumns.find((column) => column.key === historyField.dateField)?.label ?? historyField.dateField}</span>
-                  </div>
-                )}
-                {activeTab === tab.id && historyFilter.status !== "inactive" && (
-                  <div
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
-                    role={historyFilter.status === "invalid" ? "alert" : "status"}
-                    data-testid="module-history-filter"
-                  >
-                    <p>
-                      {historyFilter.status === "invalid"
-                        ? historyFilter.reason === "invalid-time-zone"
-                          ? t("common.historyPeriod.invalidTimeZone", { defaultValue: "This link has an invalid time zone. Clear it to view the records." })
-                          : t("common.historyPeriod.invalidLink", { defaultValue: "This link has an invalid date range. Clear it to view the records." })
-                        : historyFilter.period === "all"
-                          ? t("common.historyPeriod.filteredAll", { defaultValue: "Table date range: all dated records ({{timeZone}}).", timeZone: historyFilter.timeZone })
-                          : t("common.historyPeriod.filteredRange", {
-                              defaultValue: "Table date range: {{from}} through {{through}} ({{timeZone}}).",
-                              from: historyFilter.dates.from, through: historyFilter.dates.through, timeZone: historyFilter.timeZone,
-                            })}
-                    </p>
-                    <Button type="button" variant="ghost" size="sm" onClick={clearHistoryFilter}>
-                      {t("common.historyPeriod.clear", { defaultValue: "Clear date range" })}
-                    </Button>
-                  </div>
-                )}
-                <EntityView
-                  useCard={false}
-                  config={
-                    tab.createForm
-                      ? {
-                          ...tab.entityConfig,
-                          view: withTabCreateCta(tab.entityConfig.view, {
-                            label: tab.createLabel ?? "New",
-                            onClick: () => openCreateForm(tab.id),
-                            // Not gated until permissions load, so the empty state never flashes read-only.
-                            permission: createGate(tab.createPermission) === "loading" ? undefined : tab.createPermission,
-                          }),
-                        }
-                      : tab.entityConfig
-                  }
-                  externalFilter={
-                    kpiStrips?.[tab.id]
-                      ? {
-                          active: activeKpiTile(kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null) != null,
-                          onClear: () => setKpiSelection((prev) => ({ ...prev, [tab.id]: null })),
-                        }
-                      : undefined
-                  }
-                  data={
-                    kpiStrips?.[tab.id]
-                      ? filterRowsByKpi(entityRows(tab.id), kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)
-                      : entityRows(tab.id)
-                  }
-                  isLoading={dataState?.[tab.id]?.status === "loading" || dataLoading?.[tab.id]}
-                  initialFilters={activeTab === tab.id ? urlFilters : undefined}
-                  onInitialFilterClear={clearRouteFilter}
-                  boardColumns={entityBoardContext?.[tab.id]?.columns}
-                  onBoardMove={entityBoardContext?.[tab.id]?.onMove}
-                  boardFilterItem={entityBoardContext?.[tab.id]?.filterItem}
-                  aiFocusRowKey={
-                    aiSelection.selection?.activeTab === tab.id &&
-                    aiSelection.selection.entityId &&
-                    resolveAiEntityType(tab.entityConfig) === aiSelection.selection.entityType
-                      ? aiSelection.selection.entityId
-                      : undefined
-                  }
-                  onRowClick={(row) => {
-                    const entityType = resolveAiEntityType(tab.entityConfig!)
-                    if (entityType) {
-                      aiReporter?.setSelection(
-                        buildEntitySelection({
-                          activeTab: tab.id,
-                          entityType,
-                          row,
-                          rowKey: getEntityRowKey(tab.entityConfig!),
-                        }),
-                      )
-                    }
-                    if (tab.recordSheet) {
-                      setSelectedRecord(row)
-                    } else {
-                      // A row has one record presentation owner. Opening the
-                      // legacy dialog as well creates competing modal roots.
-                      onRowClick?.(tab.id, row)
-                    }
-                  }}
-                />
-
-                {tab.recordSheet && (
-                  <EntityRecordSheet
-                    open={selectedRecord != null}
-                    onOpenChange={(open) => !open && setSelectedRecord(null)}
-                    config={tab.recordSheet}
-                    record={liveSheetRecord(data[tab.id], selectedRecord, getEntityRowKey(tab.entityConfig!))}
-                  />
-                )}
-
-                {tab.createForm &&
-                  (useRuntimeCreate && runtimeForms ? (
-                    <RuntimeFormModal
-                      open={openForm === tab.id && assistantScopeCurrent && (!assistantEditorScope || createGate(tab.createPermission) === "allowed")}
-                      draftKey={assistantEditorScope ? `${activationEditor ? "activation" : "assistant"}:${assistantEditorScope}` : undefined}
-                      onOpenChange={(open) => !open && closeCreateForm()}
-                      staticConfig={tab.createForm}
-                      renderPreview={renderCreatePreview
-                        ? (values) => renderCreatePreview(tab.id, values, tab.createForm!)
-                        : undefined}
-                      moduleId={config.id}
-                      formId={tab.createForm.id}
-                      organizationId={runtimeForms.organizationId}
-                      roleId={runtimeForms.roleId}
-                      userId={runtimeForms.userId}
-                      isPending={isPending}
-                      showSubmitSuccessToast={showSubmitSuccessToast}
-                      preferStdbVisibility
-          aiAssist={
-                        defaultCompanyId && tab.entityConfig
-                          ? {
-                              companyId: defaultCompanyId,
-                              formId: tab.createForm.id,
-                              initialPrompt: assistantFormPrompt?.tabId === tab.id ? assistantFormPrompt.text : undefined,
-                              entityType:
-                                resolveAiEntityType(tab.entityConfig) ?? tab.entityConfig.id,
-                            }
-                          : undefined
-                      }
-                      onSubmit={(formData) => submitCreateForm(tab, formData)}
-                    />
-                  ) : (
-                    <FormModal
-                      open={openForm === tab.id && assistantScopeCurrent && (!assistantEditorScope || createGate(tab.createPermission) === "allowed")}
-                      draftKey={assistantEditorScope ? `${activationEditor ? "activation" : "assistant"}:${assistantEditorScope}` : undefined}
-                      onOpenChange={(open) => !open && closeCreateForm()}
-                      config={tab.createForm}
-                      renderPreview={renderCreatePreview
-                        ? (values) => renderCreatePreview(tab.id, values, tab.createForm!)
-                        : undefined}
-                      isPending={isPending}
-                      showSubmitSuccessToast={showSubmitSuccessToast}
-                      aiAssist={
-                        defaultCompanyId && tab.entityConfig
-                          ? {
-                              companyId: defaultCompanyId,
-                              formId: tab.createForm.id,
-                              initialPrompt: assistantFormPrompt?.tabId === tab.id ? assistantFormPrompt.text : undefined,
-                              entityType:
-                                resolveAiEntityType(tab.entityConfig) ?? tab.entityConfig.id,
-                            }
-                          : undefined
-                      }
-                      onSubmit={(formData) => submitCreateForm(tab, formData)}
-                    />
-                  ))}
-              </div>
-            )}
-            {tab.type !== "dashboard" && activeTab === tab.id && (
+            {tab.type !== "dashboard" && (
               <ModulePageComposition
                 moduleId={config.id}
                 pageId={tab.id}
-                title={`${config.title} · ${tab.label}`}
-                placement="insights"
+                title={tab.label}
+                placement="content"
                 sections={tab.insightSections}
+                active={activeTab === tab.id}
                 historyBounds={historyFilter.status === "active" ? historyFilter.bounds : historyFilter.status === "invalid" ? null : undefined}
-              />
+              >
+                <div className="min-w-0 space-y-4">
+                  {tab.type === "custom" && tab.customContent}
+
+                  {tab.type === "entity" && tab.entityConfig && tab.entityAltView && (
+                    <div
+                      className="flex w-fit items-center rounded-lg border border-border p-1"
+                      role="group"
+                      aria-label={`${tab.entityAltView.label} / ${tab.entityAltView.tableLabel}`}
+                    >
+                      {([
+                        ["alt", tab.entityAltView.label, LayoutGrid],
+                        ["table", tab.entityAltView.tableLabel, TableIcon],
+                      ] as const).map(([choice, label, Icon]) => {
+                        const pressed = (showAltView(tab) ? "alt" : "table") === choice
+                        return (
+                          <Button
+                            key={choice}
+                            variant={pressed ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-7 gap-1.5 px-2"
+                            aria-pressed={pressed}
+                            onClick={() => chooseAltView(tab.id, choice)}
+                            data-testid={`module-view-${choice}-${tab.id}`}
+                          >
+                            <Icon className="h-4 w-4" />
+                            {label}
+                          </Button>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {tab.type === "entity" && tab.entityConfig && showAltView(tab) && tab.entityAltView?.content}
+
+                  {tab.type === "entity" && tab.entityConfig && !showAltView(tab) && (
+                    <div className="space-y-3">
+                      {kpiStrips?.[tab.id] ? (
+                        <KpiStrip
+                          loading={kpiStrips[tab.id]!.loading}
+                          tiles={kpiStrips[tab.id]!.tiles.map((kpi) => ({
+                            key: kpi.key,
+                            label: kpi.label,
+                            value: kpi.value,
+                            hint: kpi.hint,
+                            tone: kpi.tone,
+                            active: activeKpiTile(kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)?.key === kpi.key,
+                            onSelect: kpi.matches
+                              ? () =>
+                                  setKpiSelection((prev) => ({
+                                    ...prev,
+                                    [tab.id]: toggleKpiKey(prev[tab.id] ?? null, kpi.key),
+                                  }))
+                              : undefined,
+                          }))}
+                        />
+                      ) : null}
+                      {activeTab === tab.id && historyField && (
+                        <div className="flex flex-wrap items-center gap-3">
+                          <HistoryPeriodSelect
+                            value={historyFilter.status === "active" ? historyFilter.period : "all"}
+                            timeZone={historyFilter.status === "active" ? historyFilter.timeZone : "UTC"}
+                            onChange={(period) => {
+                              const params = new URLSearchParams(searchParams?.toString())
+                              params.set("period", serializeHistoryPeriod(period))
+                              params.set("periodTimeZone", historyTimeZone ?? "UTC")
+                              router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+                            }}
+                          />
+                          <span className="text-xs text-muted-foreground">{historyColumns.find((column) => column.key === historyField.dateField)?.label ?? historyField.dateField}</span>
+                        </div>
+                      )}
+                      {activeTab === tab.id && historyFilter.status !== "inactive" && (
+                        <div
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+                          role={historyFilter.status === "invalid" ? "alert" : "status"}
+                          data-testid="module-history-filter"
+                        >
+                          <p>
+                            {historyFilter.status === "invalid"
+                              ? historyFilter.reason === "invalid-time-zone"
+                                ? t("common.historyPeriod.invalidTimeZone", { defaultValue: "This link has an invalid time zone. Clear it to view the records." })
+                                : t("common.historyPeriod.invalidLink", { defaultValue: "This link has an invalid date range. Clear it to view the records." })
+                              : historyFilter.period === "all"
+                                ? t("common.historyPeriod.filteredAll", { defaultValue: "Table date range: all dated records ({{timeZone}}).", timeZone: historyFilter.timeZone })
+                                : t("common.historyPeriod.filteredRange", {
+                                    defaultValue: "Table date range: {{from}} through {{through}} ({{timeZone}}).",
+                                    from: historyFilter.dates.from, through: historyFilter.dates.through, timeZone: historyFilter.timeZone,
+                                  })}
+                          </p>
+                          <Button type="button" variant="ghost" size="sm" onClick={clearHistoryFilter}>
+                            {t("common.historyPeriod.clear", { defaultValue: "Clear date range" })}
+                          </Button>
+                        </div>
+                      )}
+                      <EntityView
+                        useCard={false}
+                        config={
+                          tab.createForm
+                            ? {
+                                ...tab.entityConfig,
+                                view: withTabCreateCta(tab.entityConfig.view, {
+                                  label: tab.createLabel ?? "New",
+                                  onClick: () => openCreateForm(tab.id),
+                                  // Not gated until permissions load, so the empty state never flashes read-only.
+                                  permission: createGate(tab.createPermission) === "loading" ? undefined : tab.createPermission,
+                                }),
+                              }
+                            : tab.entityConfig
+                        }
+                        externalFilter={
+                          kpiStrips?.[tab.id]
+                            ? {
+                                active: activeKpiTile(kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null) != null,
+                                onClear: () => setKpiSelection((prev) => ({ ...prev, [tab.id]: null })),
+                              }
+                            : undefined
+                        }
+                        data={
+                          kpiStrips?.[tab.id]
+                            ? filterRowsByKpi(entityRows(tab.id), kpiStrips[tab.id]!.tiles, kpiSelection[tab.id] ?? null)
+                            : entityRows(tab.id)
+                        }
+                        isLoading={dataState?.[tab.id]?.status === "loading" || dataLoading?.[tab.id]}
+                        initialFilters={activeTab === tab.id ? urlFilters : undefined}
+                        onInitialFilterClear={clearRouteFilter}
+                        boardColumns={entityBoardContext?.[tab.id]?.columns}
+                        onBoardMove={entityBoardContext?.[tab.id]?.onMove}
+                        boardFilterItem={entityBoardContext?.[tab.id]?.filterItem}
+                        aiFocusRowKey={
+                          aiSelection.selection?.activeTab === tab.id &&
+                          aiSelection.selection.entityId &&
+                          resolveAiEntityType(tab.entityConfig) === aiSelection.selection.entityType
+                            ? aiSelection.selection.entityId
+                            : undefined
+                        }
+                        onRowClick={(row) => {
+                          const entityType = resolveAiEntityType(tab.entityConfig!)
+                          if (entityType) {
+                            aiReporter?.setSelection(
+                              buildEntitySelection({
+                                activeTab: tab.id,
+                                entityType,
+                                row,
+                                rowKey: getEntityRowKey(tab.entityConfig!),
+                              }),
+                            )
+                          }
+                          if (tab.recordSheet) {
+                            setSelectedRecord(row)
+                          } else {
+                            // A row has one record presentation owner. Opening the
+                            // legacy dialog as well creates competing modal roots.
+                            onRowClick?.(tab.id, row)
+                          }
+                        }}
+                      />
+
+                      {tab.recordSheet && (
+                        <EntityRecordSheet
+                          open={selectedRecord != null}
+                          onOpenChange={(open) => !open && setSelectedRecord(null)}
+                          config={tab.recordSheet}
+                          record={liveSheetRecord(data[tab.id], selectedRecord, getEntityRowKey(tab.entityConfig!))}
+                        />
+                      )}
+
+                      {tab.createForm &&
+                        (useRuntimeCreate && runtimeForms ? (
+                          <RuntimeFormModal
+                            open={openForm === tab.id && assistantScopeCurrent && (!assistantEditorScope || createGate(tab.createPermission) === "allowed")}
+                            draftKey={assistantEditorScope ? `${activationEditor ? "activation" : "assistant"}:${assistantEditorScope}` : undefined}
+                            onOpenChange={(open) => !open && closeCreateForm()}
+                            staticConfig={tab.createForm}
+                            renderPreview={renderCreatePreview
+                              ? (values) => renderCreatePreview(tab.id, values, tab.createForm!)
+                              : undefined}
+                            moduleId={config.id}
+                            formId={tab.createForm.id}
+                            organizationId={runtimeForms.organizationId}
+                            roleId={runtimeForms.roleId}
+                            userId={runtimeForms.userId}
+                            isPending={isPending}
+                            showSubmitSuccessToast={showSubmitSuccessToast}
+                            preferStdbVisibility
+                aiAssist={
+                              defaultCompanyId && tab.entityConfig
+                                ? {
+                                    companyId: defaultCompanyId,
+                                    formId: tab.createForm.id,
+                                    initialPrompt: assistantFormPrompt?.tabId === tab.id ? assistantFormPrompt.text : undefined,
+                                    entityType:
+                                      resolveAiEntityType(tab.entityConfig) ?? tab.entityConfig.id,
+                                  }
+                                : undefined
+                            }
+                            onSubmit={(formData) => submitCreateForm(tab, formData)}
+                          />
+                        ) : (
+                          <FormModal
+                            open={openForm === tab.id && assistantScopeCurrent && (!assistantEditorScope || createGate(tab.createPermission) === "allowed")}
+                            draftKey={assistantEditorScope ? `${activationEditor ? "activation" : "assistant"}:${assistantEditorScope}` : undefined}
+                            onOpenChange={(open) => !open && closeCreateForm()}
+                            config={tab.createForm}
+                            renderPreview={renderCreatePreview
+                              ? (values) => renderCreatePreview(tab.id, values, tab.createForm!)
+                              : undefined}
+                            isPending={isPending}
+                            showSubmitSuccessToast={showSubmitSuccessToast}
+                            aiAssist={
+                              defaultCompanyId && tab.entityConfig
+                                ? {
+                                    companyId: defaultCompanyId,
+                                    formId: tab.createForm.id,
+                                    initialPrompt: assistantFormPrompt?.tabId === tab.id ? assistantFormPrompt.text : undefined,
+                                    entityType:
+                                      resolveAiEntityType(tab.entityConfig) ?? tab.entityConfig.id,
+                                  }
+                                : undefined
+                            }
+                            onSubmit={(formData) => submitCreateForm(tab, formData)}
+                          />
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </ModulePageComposition>
             )}
             </>)}
           </TabsContent>

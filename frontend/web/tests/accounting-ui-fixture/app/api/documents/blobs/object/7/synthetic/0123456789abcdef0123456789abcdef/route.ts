@@ -1,4 +1,4 @@
-import { syntheticLogoBase64, syntheticLogoHash } from "../../../../../../../../personalization-fixture"
+import { syntheticLogoBase64, syntheticLogoHash } from "../../../../../../../../../invoice-personalization-fixture"
 
 /** Isolated fixture asset only: no object storage, ERP API, or auth route is used. */
 export function GET(request: Request) {

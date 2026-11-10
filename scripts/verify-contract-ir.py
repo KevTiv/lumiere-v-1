@@ -12,6 +12,14 @@ from typing import Any
 
 
 SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
+# Keep this closed list aligned with cold_tier::platform_control_table_names.
+# These private platform authorities (including historical sponsorship grants)
+# must never enter tenant projection or restore, even when they carry org IDs.
+PLATFORM_CONTROL_TABLES = frozenset({
+    "ai_platform_default",
+    "ai_platform_template",
+    "ai_managed_enrollment",
+})
 GIT_OBJECT_ID = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 
 
@@ -105,6 +113,12 @@ def main() -> None:
         if isinstance(name, str)
     }
     table_names = {item["name"] for item in ir["tables"]}
+    for table in ir["tables"]:
+        if table["name"] in PLATFORM_CONTROL_TABLES and table.get("table_access") not in (
+            {"Private": []}, "Private"
+        ):
+            fail(f"platform control table {table['name']} must remain private")
+    tenant_table_names = table_names - PLATFORM_CONTROL_TABLES
     resource_names = {item["name"] for item in ir["resources"]}
     operation_ids: set[str] = set()
     operation_names: set[str] = set()
@@ -356,8 +370,10 @@ def main() -> None:
             or len(policies) != len(policy_tables)
         ):
             fail("persistence storage coverage must exactly cover its table census")
-        if not table_names <= policy_tables:
-            fail("persistence storage policies must cover every IR table")
+        if policy_tables & PLATFORM_CONTROL_TABLES:
+            fail("platform control tables must not have tenant storage policies")
+        if not tenant_table_names <= policy_tables:
+            fail("persistence storage policies must cover every tenant IR table")
         postgresql = persistence.get("postgresql")
         archive = postgresql.get("archive") if isinstance(postgresql, dict) else None
         codec = postgresql.get("codec") if isinstance(postgresql, dict) else None

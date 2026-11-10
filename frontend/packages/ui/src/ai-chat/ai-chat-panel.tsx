@@ -75,7 +75,7 @@ interface AIChatPanelProps {
   /** A stable shell mount for the dock and its narrow dialog presentation. */
   workspaceHost?: HTMLElement | null
   /** Guide dialogs use the panel's focus stack when the panel itself is modal. */
-  guideOverlay?: React.ReactNode
+  overlayContent?: React.ReactNode
   contextOptions?: readonly { value: string; label: string; group: string }[]
   selectedContext?: string
   onContextChange?: (value: string) => void
@@ -170,7 +170,7 @@ export function AIChatPanel({
   docked: requestedDocked = false,
   onDockToggle,
   workspaceHost,
-  guideOverlay,
+  overlayContent,
   contextOptions,
   selectedContext,
   onContextChange,
@@ -939,7 +939,12 @@ export function AIChatPanel({
                                   >
                                     {badgeLabel}
                                   </span>
-                                  {src.href ? (
+                                  {src.source_kind === "managed_document_selection" && config?.onOpenDocumentSource ? (
+                                    <button type="button" className="text-start text-primary underline-offset-2 hover:underline"
+                                      onClick={() => config.onOpenDocumentSource?.(src)}>
+                                      {citationLabel}
+                                    </button>
+                                  ) : src.href ? (
                                     <a
                                       href={src.href}
                                       className="text-primary hover:underline underline-offset-2"
@@ -1274,7 +1279,7 @@ export function AIChatPanel({
         </aside>
       ) : null}
       </div>
-      {guideOverlay}
+      {overlayContent}
     </section>
   )
   // Error help covers the viewport while leaving the original editor mounted.

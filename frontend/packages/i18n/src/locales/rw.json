@@ -1,11 +1,52 @@
 {
+  "aiHarness": {
+    "platformProfile": {
+      "tab": "Igenamiterere rya AI",
+      "title": "Igenamiterere rya AI rya sisitemu",
+      "description": "Hitamo rimwe modeli n’amategeko yo gukoresha AI. Amashyirahamwe yemerewe ahabwa umukozi wa AI n’ubushobozi busanzwe mu buryo bwikora. Amakuru n’uburenganzira bikomeza gutandukanywa.",
+      "loading": "Igenamiterere rya AI ririmo gufungurwa…",
+      "unavailable": "Igenamiterere rya AI ntiryabonetse.",
+      "retry": "Ongera ugerageze",
+      "invalid": "Genzura igenamiterere rya AI.",
+      "active": "Igenamiterere risanzwe: {{key}}, verisiyo {{version}}",
+      "empty": "Nta genamiterere risanzwe ryatangajwe. Tegura kandi utangaze igenamiterere kugira ngo amashyirahamwe ategurwe mu buryo bwikora.",
+      "chooseProvider": "Hitamo utanga AI",
+      "limits": "Imipaka y’ishyirahamwe",
+      "budgetHint": "Ingengo y’imari ya buri kwezi isangirwa na sosiyete zose z’ishyirahamwe. Ingengo y’imari n’ibiciro biri mu duce duto tw’ifaranga: 1.000.000 tungana n’ifaranga rimwe ryatoranyijwe.",
+      "publishHint": "Gutangaza bikora verisiyo idahinduka ikaba isanzwe ku mashyirahamwe mashya. Ibyari byateguwe, igenamiterere ryihariye n’ibikorwa byahagaritswe biragumaho.",
+      "saved": "Igenamiterere risanzwe ryatangajwe. Amashyirahamwe mashya yemerewe ashobora kurihabwa mu buryo bwikora.",
+      "publish": "Tangaza igenamiterere risanzwe",
+      "publishing": "Biratangazwa…",
+      "modelHint": "Koresha verisiyo nyayo za modeli zishobora guhamagara ibikoresho no gutanga ibisubizo bifite imiterere yagenwe. Modeli zombi zigomba gukoresha utanga AI umwe. Amakuru yo kwinjira abikwa kuri seriveri.",
+      "roles": {
+        "generation_profile": "Modeli itanga ibisubizo",
+        "review_profile": "Modeli yigenga igenzura ibisubizo"
+      },
+      "fields": {
+        "template_key": "Urufunguzo rw’igenamiterere",
+        "template_version": "Verisiyo nshya",
+        "currency": "Kode y’ifaranga",
+        "provider": "Utanga AI",
+        "model": "Izina nyaryo rya modeli",
+        "max_tokens": "Umubare ntarengwa wa tokens zisohoka",
+        "context_window": "Uburebure bw’amakuru (tokens)",
+        "timeout_ms": "Igihe ntarengwa (ms)",
+        "max_concurrency": "Ibyifuzo icyarimwe",
+        "input_cost_per_1k_microunits": "Igiciro cya tokens 1.000 zinjira (uduce tw’ifaranga)",
+        "output_cost_per_1k_microunits": "Igiciro cya tokens 1.000 zisohoka (uduce tw’ifaranga)",
+        "monthly_limit_units": "Ingengo y’imari y’ukwezi (uduce tw’ifaranga)",
+        "rate_limit_per_minute": "Ibyifuzo ku munota",
+        "max_enrolled_organizations": "Amashyirahamwe menshi ashobora guterwa inkunga"
+      }
+    }
+  },
   "aiSkills": {
     "setup": {
       "title": "Gutegura ibikorwa bya AI",
       "action": "Tegura ibikorwa bya AI",
       "settingUp": "Birategurwa…",
-      "description": "Andikisha ubushobozi bubura bwo gusubiza mu biganiro, gutanga inama zo kuzuza amafishi no gutegura ibikorwa. Igenamiterere na verisiyo zisanzwe biragumaho.",
-      "prerequisites": "Ibi bitegura ibisobanuro by’ubushobozi. Igenzura ry’utanga AI, sosiyete, ingengo y’imari na verisiyo ikora rikomeza gukurikizwa mu gukoresha AI.",
+      "description": "Koresha igenamiterere rya AI rya sosiyete mu bisubizo by’ibiganiro, inama zo kuzuza amafishi no mu mishinga y’ibikorwa. Igenamiterere ryihariye n’ibikorwa byahagaritswe biragumaho.",
+      "prerequisites": "Hakoreshwa igenamiterere rya sosiyete risanzwe cyangwa irya sisitemu. Igenzura ry’utanga AI, ingengo y’imari na verisiyo rikomeza gukurikizwa.",
       "permissionRequired": "Ukeneye uburenganzira bwo kwandika ubushobozi bwa AI kugira ngo ubitegure.",
       "checked": "Ibisobanuro by’ubushobozi byagenzuwe.",
       "skills": {
@@ -17,6 +58,12 @@
         "created": "Byongeweho",
         "existing": "Byari byaranditswe",
         "inactive": "Ntibikora (ntibyahinduwe)"
+      },
+      "companyRequired": "Hitamo sosiyete mbere yo gutegura ibikorwa bya AI.",
+      "companyStatus": {
+        "configured": "Igenamiterere risanzwe rya AI ryashyizweho. Igenamiterere ryihariye n’ibikorwa byahagaritswe byagumishijweho.",
+        "profile_required": "Nta genamiterere rya AI ryemewe riboneka. Saba umuyobozi wa sisitemu gutangaza irikoreshwa risanzwe, hanyuma wongere ugerageze.",
+        "preserved": "Igenamiterere rya AI ryari risanzwe ryagumishijweho. Igenamiterere ryihariye cyangwa ryahagaritswe rikomeza kugena ibikora."
       }
     }
   },
@@ -5080,5 +5127,9 @@
     "pinnedReview": "Urimo kureba verisiyo yabitswe {{revision}}. Amakuru y’ubu ashobora kuba atandukanye n’iyi verisiyo.",
     "savedReviewLoading": "Verisiyo yabitswe irimo gufungurwa…",
     "savedReviewUnavailable": "Iyi verisiyo yabitswe ntiboneka. Nta makuru y’ubu yasimbujwe ayayo."
+  },
+  "pageComposition": {
+    "addBelow": "Ongeraho widget hasi",
+    "addBelowNamed": "Ongeraho widget munsi ya {{title}}"
   }
 }

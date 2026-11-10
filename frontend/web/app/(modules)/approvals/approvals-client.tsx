@@ -173,300 +173,6 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
         title={t("approvals.review.title", { defaultValue: "Approval inbox" })}
         description={t("approvals.inboxDescription", { defaultValue: "Review requests for the selected company. Open a record before you approve or reject it." })}
       />
-
-      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-        <span data-testid="approvals-inbox-count">
-          {operatingCompanyId == null ? t("financeReview.selectCompany", { defaultValue: "Select a company" }) : inboxQuery.isError ? t("approvals.errors.countUnavailable", { defaultValue: "Task count unavailable" }) : inboxQuery.isPending ? t("approvals.loading", { defaultValue: "Loading approval tasks…" }) : recordFilterRequested
-            ? t("approvals.countFiltered", { defaultValue: "{{shown}} of {{total}} open tasks", shown: visibleTasks.length, total: pendingTasks.length })
-            : t("approvals.count", { defaultValue: "{{count}} open tasks", defaultValue_one: "{{count}} open task", count: pendingTasks.length })}
-        </span>
-        {!inboxQuery.isError && !inboxQuery.isPending && aiDraftCount > 0 ? (
-          <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs">
-            <Sparkles className="h-3.5 w-3.5" />
-            {aiDraftCount} AI draft{aiDraftCount === 1 ? "" : "s"}
-          </span>
-        ) : null}
-        {inboxQuery.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        {recordFilterRequested && (
-          <Link href="/approvals" className="text-primary underline-offset-4 hover:underline">
-            {t("approvals.review.clearRecordFilter", { defaultValue: "Show all requests" })}
-          </Link>
-        )}
-      </div>
-
-      {actionError ? <p role="alert" className="break-words text-sm text-destructive">{actionError}</p> : null}
-      {operatingCompanyId == null ? (
-        <div
-          className="rounded-lg border bg-card p-6 text-sm text-muted-foreground"
-          data-testid="approvals-inbox-no-company"
-        >
-          Select an operating company to load your authorized task inbox.
-        </div>
-      ) : inboxQuery.isError ? (
-        <div role="alert" className="flex flex-col gap-3 rounded-lg border bg-card p-6 text-sm" data-testid="approvals-inbox-error">
-          <p>{t("approvals.errors.loadFailed", { defaultValue: "Approval tasks could not be loaded. Retry before making a decision." })}</p>
-          <Button variant="outline" className="self-start" disabled={inboxQuery.isFetching || busy} onClick={() => { void inboxQuery.refetch() }}>{t("common.retry", { defaultValue: "Retry" })}</Button>
-        </div>
-      ) : inboxQuery.isPending ? (
-        <p role="status">{t("approvals.loading", { defaultValue: "Loading approval tasks…" })}</p>
-      ) : visibleTasks.length === 0 ? (
-        <div
-          className="rounded-lg border bg-card p-6 text-sm text-muted-foreground"
-          data-testid="approvals-inbox-empty"
-        >
-          {target
-            ? t("approvals.empty.target", { defaultValue: "No open approval task matches this record." })
-            : recordFilterRequested
-              ? t("approvals.empty.invalidTarget", { defaultValue: "This request link does not identify a valid record. Show all requests to browse the company inbox." })
-              : t("approvals.empty.noTasks", { defaultValue: "No requests are waiting for approval in this company. New requests appear here when a business action needs review." })}
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {visibleTasks.map((row) => {
-            const taskId = humanTaskId(row)
-            const model = humanTaskSubjectModel(row) ?? ""
-            const resId = humanTaskSubjectId(row) ?? 0
-            const recordHref = approvalRecordHref(model, resId)
-            const isAiDraft = isAiDraftApprovalRequest(row)
-            const status = taskStatusTag(row)
-            const requireComment =
-              row.requireCommentOnReject ?? row.require_comment_on_reject ?? false
-            const requestedActor = Object.hasOwn(actingForByTask, taskId)
-              ? actingForByTask[taskId]
-              : undefined
-            const selectedActor = resolveApprovalActor(row, requestedActor)
-            const actorOptions = approvalActorOptions(row)
-            const needsActorSelection = selectedActor == null
-            const showActorSelection = row.directlyEligible !== true || actorOptions.length > 0
-            const kind = approvalSubjectKind(model)
-            const requestedEffect = approvalRequestedEffect(row)
-            const kindLabels = {
-              purchaseOrder: t("approvals.review.kinds.purchaseOrder", { defaultValue: "Purchase order" }),
-              salesOrder: t("approvals.review.kinds.salesOrder", { defaultValue: "Sales order" }),
-              accountingDocument: t("approvals.review.kinds.accountingDocument", { defaultValue: "Accounting document" }),
-              payment: t("approvals.review.kinds.payment", { defaultValue: "Payment" }),
-              expenseReport: t("approvals.review.kinds.expenseReport", { defaultValue: "Expense report" }),
-              aiDraft: t("approvals.review.kinds.aiDraft", { defaultValue: "AI draft" }),
-              record: t("approvals.review.kinds.record", { defaultValue: "Business record" }),
-            }
-
-            return (
-              <div
-                key={`${identity}:${operatingCompanyId}:${taskId}:${humanTaskRevision(row)}`}
-                className="space-y-4 rounded-lg border bg-card p-5"
-                data-testid={`approval-card-${taskId}`}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <h2 className="flex flex-wrap items-center gap-2 font-medium">
-                      {kindLabels[kind]} {resId > 0 ? `#${resId}` : ""}
-                      {isAiDraft ? (
-                        <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-normal">
-                          <Sparkles className="h-3 w-3" />
-                          AI draft
-                        </span>
-                      ) : null}
-                    </h2>
-                    <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                      <span className="rounded border px-2 py-0.5 text-xs">{t(`workBoard.status.${status}`, { defaultValue: status })}</span>
-                      {!showActorSelection && <span>{t("approvals.review.actingAsSelf", { defaultValue: "Acting as yourself" })}</span>}
-                    </p>
-                  </div>
-                  {recordHref ? (
-                    <Link
-                      href={recordHref}
-                      className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                    >
-                      Open record
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </Link>
-                  ) : null}
-                </div>
-
-                <ApprovalSourceDetails organizationId={organizationId} companyId={humanTaskCompanyId(row)} model={model} subjectId={String(resId)} />
-                <p className="text-sm font-medium">{requestedEffect
-                  ? t("approvals.review.requestedEffect", { defaultValue: "Requested effect: {{effect}}", effect: requestedEffect })
-                  : t("approvals.review.effectNotExposed", { defaultValue: "The exact requested effect is not exposed here. Review the request in its source workspace before approving; approval can execute a business action." })}</p>
-
-                <details className="group rounded-lg border p-3">
-                  <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-primary" data-testid={`approval-review-${taskId}`}>
-                    {t("approvals.review.open", { defaultValue: "Review assignment" })}
-                  </summary>
-                  <div className="space-y-4 border-t pt-4">
-                    <details className="text-xs text-muted-foreground">
-                      <summary className="cursor-pointer py-2">{t("approvals.review.provenance", { defaultValue: "Review provenance" })}</summary>
-                      <dl className="grid gap-2 break-words sm:grid-cols-2">
-                        <div><dt>{t("approvals.review.taskRevision", { defaultValue: "Task revision" })}</dt><dd>{humanTaskRevision(row)}</dd></div>
-                        <div><dt>{t("approvals.review.workflowRevision", { defaultValue: "Workflow revision" })}</dt><dd>{row.instanceRevision ?? row.instance_revision ?? "—"}</dd></div>
-                        <div className="sm:col-span-2"><dt>{t("approvals.review.sourceRevision", { defaultValue: "Reviewed source revision" })}</dt><dd className="break-all font-mono">{row.subjectRevisionHash ?? row.subject_revision_hash ?? "—"}</dd></div>
-                      </dl>
-                    </details>
-                    <p className="text-sm text-muted-foreground">
-                      {recordHref
-                        ? t("approvals.review.sourceHint", { defaultValue: "Open the source record to check its current details before deciding. A decision may execute the business action requested by this workflow." })
-                        : t("approvals.review.sourceUnavailable", { defaultValue: "A source record link is unavailable for this request. Review the request in its owning workspace before deciding." })}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {status === "Open"
-                        ? t("approvals.review.openHint", { defaultValue: "This assignment is open. Claim it before deciding if the workflow requires a claimant." })
-                        : t("approvals.review.claimedHint", { defaultValue: "This assignment has been claimed. Check the source record and your selected acting principal before deciding." })}
-                    </p>
-                <div className="flex flex-wrap gap-2">
-                  {showActorSelection ? (
-                    <label className="grid min-w-0 gap-1 text-sm">
-                      {t("workBoard.actingAs", { defaultValue: "Acting as" })}
-                      <Select
-                        value={String(selectedActor ?? "") || "__none__"}
-                        onValueChange={(selectValue) => {
-                          const nextValue = selectValue === "__none__" ? "" : selectValue
-                          setActingForByTask((current) => ({
-                            ...current,
-                            [taskId]: nextValue,
-                          }))
-                        }}
-                        disabled={busy}
-                      >
-                        <SelectTrigger
-                          className="rounded border bg-background px-2 py-1"
-                          data-testid={`approval-acting-for-${taskId}`}
-                          aria-label={"Acting as"}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {row.directlyEligible === true ? <SelectItem value={"__none__"}>Myself</SelectItem> : null}
-                          {row.directlyEligible !== true && needsActorSelection ? (
-                            <SelectItem value={"__none__"}>Select an eligible principal</SelectItem>
-                          ) : null}
-                          {actorOptions.map((option) => (
-                            <SelectItem key={option.identityHex} value={String(option.identityHex)}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </label>
-                  ) : null}
-                  {status === "Open" ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      data-testid={`approval-claim-${taskId}`}
-                      onClick={() => void runAction(() => handleClaim(row))}
-                      disabled={busy || needsActorSelection}
-                    >
-                      <Hand className="mr-1.5 h-4 w-4" />
-                      Claim
-                    </Button>
-                  ) : null}
-                  <Button
-                    size="sm"
-                    data-testid={`approval-approve-${taskId}`}
-                    onClick={() => void runAction(() => handleDecide(row, "Approve"))}
-                    disabled={busy || needsActorSelection}
-                  >
-                    <CheckCircle2 className="mr-1.5 h-4 w-4" />
-                    Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    data-testid={`approval-reject-${taskId}`}
-                    onClick={() => {
-                      setRejectingId(rejectingId === taskId ? null : taskId)
-                      setCommentingId(null)
-                      setRejectReason("")
-                    }}
-                    disabled={busy || needsActorSelection}
-                  >
-                    <XCircle className="mr-1.5 h-4 w-4" />
-                    Reject
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    data-testid={`approval-comment-${taskId}`}
-                    onClick={() => {
-                      setCommentingId(commentingId === taskId ? null : taskId)
-                      setRejectingId(null)
-                      setCommentText("")
-                    }}
-                    disabled={busy}
-                  >
-                    Comment
-                  </Button>
-                </div>
-
-                {needsActorSelection ? (
-                  <p className="text-xs text-muted-foreground" role="status">
-                    Select a currently eligible principal before claiming or deciding this task.
-                  </p>
-                ) : null}
-
-                {commentingId === taskId ? (
-                  <div className="space-y-3 border-t pt-4">
-                    <Textarea
-                      aria-label={t("approvals.review.comment", { defaultValue: "Evidence comment" })}
-                      placeholder="Add an evidence comment"
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      rows={3}
-                      data-testid={`approval-comment-text-${taskId}`}
-                    />
-                    <Button
-                      size="sm"
-                      disabled={!commentText.trim() || busy}
-                      data-testid={`approval-comment-confirm-${taskId}`}
-                      onClick={() => void runAction(() => handleComment(row))}
-                    >
-                      Save comment
-                    </Button>
-                  </div>
-                ) : null}
-
-                {rejectingId === taskId ? (
-                  <div className="space-y-3 border-t pt-4">
-                    <Textarea
-                      aria-label={t("approvals.review.rejectReason", { defaultValue: "Reason for rejection" })}
-                      aria-required={requireComment}
-                      placeholder={
-                        requireComment
-                          ? "Reason for rejection (required)"
-                          : "Optional comment"
-                      }
-                      value={rejectReason}
-                      onChange={(e) => setRejectReason(e.target.value)}
-                      rows={3}
-                      data-testid={`approval-reject-reason-${taskId}`}
-                    />
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      disabled={(requireComment && !rejectReason.trim()) || busy}
-                      data-testid={`approval-reject-confirm-${taskId}`}
-                      onClick={() => void runAction(() => handleReject(row))}
-                    >
-                      Confirm rejection
-                    </Button>
-                  </div>
-                ) : null}
-                  </div>
-                </details>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {canReviewRules && <section className="space-y-2 border-t pt-4">
-        <h2 className="font-medium">{t("approvals.policy.title", { defaultValue: "Approval rules" })}</h2>
-        <p className="text-sm text-muted-foreground">
-          {t("approvals.policy.description", { defaultValue: "Approval rules determine which business actions need review." })}{" "}
-          <Link href="/workflows" className="text-primary hover:underline">
-            {t("approvals.policy.link", { defaultValue: "Manage approval rules" })}
-          </Link>
-        </p>
-      </section>}
       <OperationalPageComposition
         moduleId="approvals"
         title={t("approvals.review.title", { defaultValue: "Approval inbox" })}
@@ -482,7 +188,304 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
               : t("approvals.companyTaskCount", { defaultValue: "{{open}} open and {{claimed}} claimed tasks in this company, across all source records.", open: pendingTasks.filter((row) => taskStatusTag(row) === "Open").length, claimed: pendingTasks.filter((row) => taskStatusTag(row) === "Claimed").length })}</p>
           </div>,
         })]}
-      />
+      >
+        <div className="min-w-0 space-y-6">
+
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <span data-testid="approvals-inbox-count">
+              {operatingCompanyId == null ? t("financeReview.selectCompany", { defaultValue: "Select a company" }) : inboxQuery.isError ? t("approvals.errors.countUnavailable", { defaultValue: "Task count unavailable" }) : inboxQuery.isPending ? t("approvals.loading", { defaultValue: "Loading approval tasks…" }) : recordFilterRequested
+                ? t("approvals.countFiltered", { defaultValue: "{{shown}} of {{total}} open tasks", shown: visibleTasks.length, total: pendingTasks.length })
+                : t("approvals.count", { defaultValue: "{{count}} open tasks", defaultValue_one: "{{count}} open task", count: pendingTasks.length })}
+            </span>
+            {!inboxQuery.isError && !inboxQuery.isPending && aiDraftCount > 0 ? (
+              <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs">
+                <Sparkles className="h-3.5 w-3.5" />
+                {aiDraftCount} AI draft{aiDraftCount === 1 ? "" : "s"}
+              </span>
+            ) : null}
+            {inboxQuery.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {recordFilterRequested && (
+              <Link href="/approvals" className="text-primary underline-offset-4 hover:underline">
+                {t("approvals.review.clearRecordFilter", { defaultValue: "Show all requests" })}
+              </Link>
+            )}
+          </div>
+
+          {actionError ? <p role="alert" className="break-words text-sm text-destructive">{actionError}</p> : null}
+          {operatingCompanyId == null ? (
+            <div
+              className="rounded-lg border bg-card p-6 text-sm text-muted-foreground"
+              data-testid="approvals-inbox-no-company"
+            >
+              Select an operating company to load your authorized task inbox.
+            </div>
+          ) : inboxQuery.isError ? (
+            <div role="alert" className="flex flex-col gap-3 rounded-lg border bg-card p-6 text-sm" data-testid="approvals-inbox-error">
+              <p>{t("approvals.errors.loadFailed", { defaultValue: "Approval tasks could not be loaded. Retry before making a decision." })}</p>
+              <Button variant="outline" className="self-start" disabled={inboxQuery.isFetching || busy} onClick={() => { void inboxQuery.refetch() }}>{t("common.retry", { defaultValue: "Retry" })}</Button>
+            </div>
+          ) : inboxQuery.isPending ? (
+            <p role="status">{t("approvals.loading", { defaultValue: "Loading approval tasks…" })}</p>
+          ) : visibleTasks.length === 0 ? (
+            <div
+              className="rounded-lg border bg-card p-6 text-sm text-muted-foreground"
+              data-testid="approvals-inbox-empty"
+            >
+              {target
+                ? t("approvals.empty.target", { defaultValue: "No open approval task matches this record." })
+                : recordFilterRequested
+                  ? t("approvals.empty.invalidTarget", { defaultValue: "This request link does not identify a valid record. Show all requests to browse the company inbox." })
+                  : t("approvals.empty.noTasks", { defaultValue: "No requests are waiting for approval in this company. New requests appear here when a business action needs review." })}
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {visibleTasks.map((row) => {
+                const taskId = humanTaskId(row)
+                const model = humanTaskSubjectModel(row) ?? ""
+                const resId = humanTaskSubjectId(row) ?? 0
+                const recordHref = approvalRecordHref(model, resId)
+                const isAiDraft = isAiDraftApprovalRequest(row)
+                const status = taskStatusTag(row)
+                const requireComment =
+                  row.requireCommentOnReject ?? row.require_comment_on_reject ?? false
+                const requestedActor = Object.hasOwn(actingForByTask, taskId)
+                  ? actingForByTask[taskId]
+                  : undefined
+                const selectedActor = resolveApprovalActor(row, requestedActor)
+                const actorOptions = approvalActorOptions(row)
+                const needsActorSelection = selectedActor == null
+                const showActorSelection = row.directlyEligible !== true || actorOptions.length > 0
+                const kind = approvalSubjectKind(model)
+                const requestedEffect = approvalRequestedEffect(row)
+                const kindLabels = {
+                  purchaseOrder: t("approvals.review.kinds.purchaseOrder", { defaultValue: "Purchase order" }),
+                  salesOrder: t("approvals.review.kinds.salesOrder", { defaultValue: "Sales order" }),
+                  accountingDocument: t("approvals.review.kinds.accountingDocument", { defaultValue: "Accounting document" }),
+                  payment: t("approvals.review.kinds.payment", { defaultValue: "Payment" }),
+                  expenseReport: t("approvals.review.kinds.expenseReport", { defaultValue: "Expense report" }),
+                  aiDraft: t("approvals.review.kinds.aiDraft", { defaultValue: "AI draft" }),
+                  record: t("approvals.review.kinds.record", { defaultValue: "Business record" }),
+                }
+
+                return (
+                  <div
+                    key={`${identity}:${operatingCompanyId}:${taskId}:${humanTaskRevision(row)}`}
+                    className="space-y-4 rounded-lg border bg-card p-5"
+                    data-testid={`approval-card-${taskId}`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <h2 className="flex flex-wrap items-center gap-2 font-medium">
+                          {kindLabels[kind]} {resId > 0 ? `#${resId}` : ""}
+                          {isAiDraft ? (
+                            <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-normal">
+                              <Sparkles className="h-3 w-3" />
+                              AI draft
+                            </span>
+                          ) : null}
+                        </h2>
+                        <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                          <span className="rounded border px-2 py-0.5 text-xs">{t(`workBoard.status.${status}`, { defaultValue: status })}</span>
+                          {!showActorSelection && <span>{t("approvals.review.actingAsSelf", { defaultValue: "Acting as yourself" })}</span>}
+                        </p>
+                      </div>
+                      {recordHref ? (
+                        <Link
+                          href={recordHref}
+                          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                        >
+                          Open record
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Link>
+                      ) : null}
+                    </div>
+
+                    <ApprovalSourceDetails organizationId={organizationId} companyId={humanTaskCompanyId(row)} model={model} subjectId={String(resId)} />
+                    <p className="text-sm font-medium">{requestedEffect
+                      ? t("approvals.review.requestedEffect", { defaultValue: "Requested effect: {{effect}}", effect: requestedEffect })
+                      : t("approvals.review.effectNotExposed", { defaultValue: "The exact requested effect is not exposed here. Review the request in its source workspace before approving; approval can execute a business action." })}</p>
+
+                    <details className="group rounded-lg border p-3">
+                      <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-primary" data-testid={`approval-review-${taskId}`}>
+                        {t("approvals.review.open", { defaultValue: "Review assignment" })}
+                      </summary>
+                      <div className="space-y-4 border-t pt-4">
+                        <details className="text-xs text-muted-foreground">
+                          <summary className="cursor-pointer py-2">{t("approvals.review.provenance", { defaultValue: "Review provenance" })}</summary>
+                          <dl className="grid gap-2 break-words sm:grid-cols-2">
+                            <div><dt>{t("approvals.review.taskRevision", { defaultValue: "Task revision" })}</dt><dd>{humanTaskRevision(row)}</dd></div>
+                            <div><dt>{t("approvals.review.workflowRevision", { defaultValue: "Workflow revision" })}</dt><dd>{row.instanceRevision ?? row.instance_revision ?? "—"}</dd></div>
+                            <div className="sm:col-span-2"><dt>{t("approvals.review.sourceRevision", { defaultValue: "Reviewed source revision" })}</dt><dd className="break-all font-mono">{row.subjectRevisionHash ?? row.subject_revision_hash ?? "—"}</dd></div>
+                          </dl>
+                        </details>
+                        <p className="text-sm text-muted-foreground">
+                          {recordHref
+                            ? t("approvals.review.sourceHint", { defaultValue: "Open the source record to check its current details before deciding. A decision may execute the business action requested by this workflow." })
+                            : t("approvals.review.sourceUnavailable", { defaultValue: "A source record link is unavailable for this request. Review the request in its owning workspace before deciding." })}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {status === "Open"
+                            ? t("approvals.review.openHint", { defaultValue: "This assignment is open. Claim it before deciding if the workflow requires a claimant." })
+                            : t("approvals.review.claimedHint", { defaultValue: "This assignment has been claimed. Check the source record and your selected acting principal before deciding." })}
+                        </p>
+                    <div className="flex flex-wrap gap-2">
+                      {showActorSelection ? (
+                        <label className="grid min-w-0 gap-1 text-sm">
+                          {t("workBoard.actingAs", { defaultValue: "Acting as" })}
+                          <Select
+                            value={String(selectedActor ?? "") || "__none__"}
+                            onValueChange={(selectValue) => {
+                              const nextValue = selectValue === "__none__" ? "" : selectValue
+                              setActingForByTask((current) => ({
+                                ...current,
+                                [taskId]: nextValue,
+                              }))
+                            }}
+                            disabled={busy}
+                          >
+                            <SelectTrigger
+                              className="rounded border bg-background px-2 py-1"
+                              data-testid={`approval-acting-for-${taskId}`}
+                              aria-label={"Acting as"}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {row.directlyEligible === true ? <SelectItem value={"__none__"}>Myself</SelectItem> : null}
+                              {row.directlyEligible !== true && needsActorSelection ? (
+                                <SelectItem value={"__none__"}>Select an eligible principal</SelectItem>
+                              ) : null}
+                              {actorOptions.map((option) => (
+                                <SelectItem key={option.identityHex} value={String(option.identityHex)}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </label>
+                      ) : null}
+                      {status === "Open" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          data-testid={`approval-claim-${taskId}`}
+                          onClick={() => void runAction(() => handleClaim(row))}
+                          disabled={busy || needsActorSelection}
+                        >
+                          <Hand className="mr-1.5 h-4 w-4" />
+                          Claim
+                        </Button>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        data-testid={`approval-approve-${taskId}`}
+                        onClick={() => void runAction(() => handleDecide(row, "Approve"))}
+                        disabled={busy || needsActorSelection}
+                      >
+                        <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        data-testid={`approval-reject-${taskId}`}
+                        onClick={() => {
+                          setRejectingId(rejectingId === taskId ? null : taskId)
+                          setCommentingId(null)
+                          setRejectReason("")
+                        }}
+                        disabled={busy || needsActorSelection}
+                      >
+                        <XCircle className="mr-1.5 h-4 w-4" />
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        data-testid={`approval-comment-${taskId}`}
+                        onClick={() => {
+                          setCommentingId(commentingId === taskId ? null : taskId)
+                          setRejectingId(null)
+                          setCommentText("")
+                        }}
+                        disabled={busy}
+                      >
+                        Comment
+                      </Button>
+                    </div>
+
+                    {needsActorSelection ? (
+                      <p className="text-xs text-muted-foreground" role="status">
+                        Select a currently eligible principal before claiming or deciding this task.
+                      </p>
+                    ) : null}
+
+                    {commentingId === taskId ? (
+                      <div className="space-y-3 border-t pt-4">
+                        <Textarea
+                          aria-label={t("approvals.review.comment", { defaultValue: "Evidence comment" })}
+                          placeholder="Add an evidence comment"
+                          value={commentText}
+                          onChange={(e) => setCommentText(e.target.value)}
+                          rows={3}
+                          data-testid={`approval-comment-text-${taskId}`}
+                        />
+                        <Button
+                          size="sm"
+                          disabled={!commentText.trim() || busy}
+                          data-testid={`approval-comment-confirm-${taskId}`}
+                          onClick={() => void runAction(() => handleComment(row))}
+                        >
+                          Save comment
+                        </Button>
+                      </div>
+                    ) : null}
+
+                    {rejectingId === taskId ? (
+                      <div className="space-y-3 border-t pt-4">
+                        <Textarea
+                          aria-label={t("approvals.review.rejectReason", { defaultValue: "Reason for rejection" })}
+                          aria-required={requireComment}
+                          placeholder={
+                            requireComment
+                              ? "Reason for rejection (required)"
+                              : "Optional comment"
+                          }
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                          rows={3}
+                          data-testid={`approval-reject-reason-${taskId}`}
+                        />
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={(requireComment && !rejectReason.trim()) || busy}
+                          data-testid={`approval-reject-confirm-${taskId}`}
+                          onClick={() => void runAction(() => handleReject(row))}
+                        >
+                          Confirm rejection
+                        </Button>
+                      </div>
+                    ) : null}
+                      </div>
+                    </details>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {canReviewRules && <section className="space-y-2 border-t pt-4">
+            <h2 className="font-medium">{t("approvals.policy.title", { defaultValue: "Approval rules" })}</h2>
+            <p className="text-sm text-muted-foreground">
+              {t("approvals.policy.description", { defaultValue: "Approval rules determine which business actions need review." })}{" "}
+              <Link href="/workflows" className="text-primary hover:underline">
+                {t("approvals.policy.link", { defaultValue: "Manage approval rules" })}
+              </Link>
+            </p>
+          </section>}
+        </div>
+      </OperationalPageComposition>
     </div>
   )
 }
