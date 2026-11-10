@@ -44,6 +44,7 @@ export interface ChatMessage {
   id: string
   role: "user" | "assistant" | "system"
   content: string
+  recoveryPath?: "/ai-skills"
   timestamp: Date
   actions?: ChatAction[]
   /** Retrieved memory / RAG citations (assistant messages) */

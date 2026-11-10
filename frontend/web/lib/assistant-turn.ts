@@ -1,13 +1,19 @@
 import type { GuideReference } from "@lumiere/ui/lib/assistant-guide-types"
 import { guideId, guideRevision } from "./assistant-guides"
 import type { AiRagSource } from "@lumiere/query-hooks/hooks/ai-memory"
-import { HttpResponseError } from "@lumiere/api-client/response-error"
+import { HttpResponseError, httpResponseError } from "@lumiere/api-client/response-error"
 import { parseAssistantUiProposals, type AssistantUiProposal } from "./assistant-native-actions"
 import { parseImportTaskStatuses } from "./import-task-status"
 import type { ChatImportTaskStatus } from "@lumiere/ui/lib/import-task-status"
 
 export type TurnFailure = "denied" | "unavailable" | "failed" | "outcome_unknown"
-export type TurnAttempt<T> = { kind: "ready"; value: T } | { kind: TurnFailure }
+type SetupFailure = {
+  code: "ai_default_agent_not_provisioned" | "ai_surface_skill_not_provisioned"
+  message: string
+  recoveryPath?: "/ai-skills"
+}
+export type AssistantTurnFailure = { kind: TurnFailure; setup?: SetupFailure }
+type TurnAttempt<T> = { kind: "ready"; value: T } | AssistantTurnFailure
 export type AssistantTurn<A, D> = {
   answer: TurnAttempt<A>
   drafts: TurnAttempt<D[]> | { kind: "not_requested" }
@@ -24,6 +30,37 @@ export function turnFailure(error: unknown): TurnFailure {
   return "outcome_unknown"
 }
 
+export function assistantSetupFailure(error: unknown): SetupFailure | undefined {
+  if (!(error instanceof HttpResponseError) || error.status !== 503) return undefined
+
+  const { code, message, recoveryPath } = error
+  if (code !== "ai_default_agent_not_provisioned" && code !== "ai_surface_skill_not_provisioned") return undefined
+
+  return { code, message, recoveryPath: aiSkillsRecoveryPath(recoveryPath) }
+}
+
+function aiSkillsRecoveryPath(value: unknown): "/ai-skills" | undefined {
+  return value === "/ai-skills" ? value : undefined
+}
+
+export function parseStoredAssistantRecovery(raw: string | null | undefined) {
+  if (!raw) return undefined
+  try {
+    return aiSkillsRecoveryPath(JSON.parse(raw)?.assistantRecoveryPath)
+  } catch {
+    return undefined
+  }
+}
+
+export function withAssistantRecoveryMetadata(
+  raw: string | null,
+  recoveryPath: SetupFailure["recoveryPath"],
+): string | null {
+  return recoveryPath
+    ? JSON.stringify({ ...(raw ? JSON.parse(raw) : {}), assistantRecoveryPath: recoveryPath })
+    : raw
+}
+
 /** Presentation coordination only. Existing server routes own all admission and effects.
  * Each callback runs once; neither partial failure nor a lost reply causes redispatch.
  */
@@ -35,7 +72,10 @@ export async function coordinateAssistantTurn<A, D>(args: {
   if (!args.isCurrent()) return { kind: "scope_changed" }
   const attempt = async <T>(run: () => Promise<T>): Promise<TurnAttempt<T>> => {
     try { return { kind: "ready", value: await run() } }
-    catch (error) { return { kind: turnFailure(error) } }
+    catch (error) {
+      const setup = assistantSetupFailure(error)
+      return { kind: turnFailure(error), ...(setup && { setup }) }
+    }
   }
   const [answer, drafts] = await Promise.all([
     attempt(args.answer),
@@ -49,7 +89,7 @@ export async function coordinateAssistantTurn<A, D>(args: {
  * The gateway emits sources then done; EOF, errors and malformed metadata are uncertain.
  */
 export async function readAssistantStream<T>(response: Response, parseMetadata: (raw: string) => T): Promise<T & { answer: string }> {
-  if (!response.ok) throw new HttpResponseError(response.status, "Assistant stream rejected")
+  if (!response.ok) throw await httpResponseError(response, "Assistant stream rejected")
   if (!response.body || !response.headers.get("content-type")?.includes("text/event-stream")) {
     throw new Error("Assistant stream is unavailable")
   }

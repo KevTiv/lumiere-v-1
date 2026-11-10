@@ -58,6 +58,7 @@ import { matchingChatSkills, slashSkillToken } from "../lib/chat-skill-search"
 
 interface ChatReply {
   content: string
+  recoveryPath?: ChatMessage["recoveryPath"]
   runId?: number
   sources?: ChatMessageSourceRef[]
   actions?: ChatAction[]
@@ -533,6 +534,7 @@ export function AIChatPanel({
                 ? streamedActions
                 : undefined,
           guides: reply.guides,
+          recoveryPath: reply.recoveryPath,
           importTasks: reply.importTasks,
           metadata: {
             duration: Math.round(t1 - t0),
@@ -555,6 +557,7 @@ export function AIChatPanel({
           sources: reply.sources && reply.sources.length > 0 ? reply.sources : undefined,
           actions: reply.actions && reply.actions.length > 0 ? reply.actions : undefined,
           guides: reply.guides,
+          recoveryPath: reply.recoveryPath,
           importTasks: reply.importTasks,
           metadata: {
             duration: Math.round(t1 - t0),
@@ -858,6 +861,11 @@ export function AIChatPanel({
                       )}>
                         <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.content}</p>
                       </div>
+                      {message.role === "assistant" && message.recoveryPath === "/ai-skills" && (
+                        <a className="text-sm font-medium text-primary underline underline-offset-4" href={message.recoveryPath}>
+                          {t("aiSkills.title")}
+                        </a>
+                      )}
                       {message.role === "assistant" ? message.importTasks?.map(status => <ImportTaskStatusCard key={status.taskId} status={status} companyId={context?.companyId} />) : null}
                       {message.role === "assistant" && config?.onOpenGuide ? <>
                         {message.guides?.map((reference) => <AssistantGuideCard key={`${reference.guideId}:${reference.revision}`} title={reference.title ?? t("aiChat.guide.savedGuide", { defaultValue: "Saved ERP guide" })} module={reference.module} revision={reference.revision} onOpen={() => void handleOpenGuide({ messageId: message.id, reference })} />)}

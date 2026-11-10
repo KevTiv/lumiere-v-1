@@ -71,7 +71,10 @@ import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteCo
 import { isAssistantErrorQuestion } from "@/lib/assistant-error-help"
 import { AI_WORKSPACE_SCOPES, resolveAiWorkspaceScope } from "@/lib/ai-workspace-scope"
 import { performSignOut } from "@/lib/auth-sign-out"
-import { assistantAnswer, assistantAnswerMetadata, coordinateAssistantTurn, readAssistantStream, type TurnFailure } from "@/lib/assistant-turn"
+import {
+  assistantAnswer, assistantAnswerMetadata, assistantSetupFailure, coordinateAssistantTurn,
+  parseStoredAssistantRecovery, readAssistantStream, withAssistantRecoveryMetadata, type AssistantTurnFailure,
+} from "@/lib/assistant-turn"
 import { i18n } from "@lumiere/i18n"
 import { assistantHistoryScope, saveAssistantHistory, scopedAssistantSession } from "@/lib/assistant-history"
 import { useChatImportTasks } from "@/lib/chat-import-tasks"
@@ -261,6 +264,7 @@ function ErpAiChatPanel({
       sources: parseStoredSources(row.sourcesJson ?? row.sources_json),
       actions: [...(parseStoredChatActions(row.metadata) ?? []), ...parseNativeChatActions(row.metadata, actionScope)] as ChatAction[],
       guides: parseStoredGuideReferences(row.metadata),
+      recoveryPath: parseStoredAssistantRecovery(row.metadata),
       metadata: {
         model: row.model ?? undefined,
         duration:
@@ -296,6 +300,7 @@ function ErpAiChatPanel({
       actions?: ChatAction[]
       runId?: number
       guides?: GuideReference[]
+      recoveryPath?: ChatMessage["recoveryPath"]
     }) => {
       if (!sessionKey || !orgReady || operatingCompanyId == null || operatingCompanyId <= 0) return
       const result = await saveAssistantHistory({
@@ -315,17 +320,23 @@ function ErpAiChatPanel({
           ui_context_json: JSON.stringify(args.uiContext ?? null),
           model: args.model ?? null,
           duration_ms: args.durationMs ?? null,
-          metadata: withGuideReferencesMetadata(withNativeActionsMetadata(
-            args.actions?.length || args.runId != null
-              ? chatActionsToMetadata(
-                  (args.actions ?? []).filter(
-                    (action): action is Extract<ChatAction, { type: "draft" }> =>
-                      action.type === "draft" && action.draft != null,
-                  ),
-                  args.runId,
-                )
-              : null, args.actions),
-            args.guides,
+          metadata: withAssistantRecoveryMetadata(
+            withGuideReferencesMetadata(
+              withNativeActionsMetadata(
+                args.actions?.length || args.runId != null
+                  ? chatActionsToMetadata(
+                      (args.actions ?? []).filter(
+                        (action): action is Extract<ChatAction, { type: "draft" }> =>
+                          action.type === "draft" && action.draft != null,
+                      ),
+                      args.runId,
+                    )
+                  : null,
+                args.actions,
+              ),
+              args.guides,
+            ),
+            args.recoveryPath,
           ),
         }) },
       })
@@ -521,16 +532,23 @@ function ErpAiChatPanel({
         if (selectedAgent !== "default" && requestedAgentId == null) {
           throw new Error("The selected AI agent is no longer available. Choose another agent.")
         }
-        const answer = await rag.mutateAsync({
-          query: selectedDocument.action === "explain"
-            ? "Explain the selected spreadsheet cells."
-            : "Check the selected spreadsheet cells for issues.",
-          companyId: operatingCompanyId,
-          spreadsheet_selection: documentSelectionAnalysisReference(selectedDocument.selection),
-          ...(requestedAgentId ? { agent_id: requestedAgentId } : {}),
-        })
-        if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
-        return { content: answer.answer, sources: answer.sources.map(mapRagSourceToChatSource), runId: answer.run_id }
+        try {
+          const answer = await rag.mutateAsync({
+            query: selectedDocument.action === "explain"
+              ? "Explain the selected spreadsheet cells."
+              : "Check the selected spreadsheet cells for issues.",
+            companyId: operatingCompanyId,
+            spreadsheet_selection: documentSelectionAnalysisReference(selectedDocument.selection),
+            ...(requestedAgentId ? { agent_id: requestedAgentId } : {}),
+          })
+          if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
+          return { content: answer.answer, sources: answer.sources.map(mapRagSourceToChatSource), runId: answer.run_id }
+        } catch (error) {
+          if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
+          const setup = assistantSetupFailure(error)
+          if (!setup) throw error
+          return { content: setup.message, recoveryPath: setup.recoveryPath, sources: [] as ChatMessageSourceRef[] }
+        }
       }
       const { includeTypes, uiContext } = buildRequestContext(userText, questionGuide)
       const turnPage = !questionGuide && workspaceScope.usesCurrentPage && pageComposition?.page?.moduleId === module ? pageComposition.page : undefined
@@ -598,18 +616,24 @@ function ErpAiChatPanel({
           return capability && (isAssistantPageAction(action.nativeAction!) || allowedActionModules.includes(capability.module)) && permissionsReady && checkPermission(capability.permission.resource, capability.permission.action).allowed
         }) : []
       const actions = [...draftActions, ...nativeActions]
-      const failureText = (phase: "answer" | "draft", failure: TurnFailure) => i18n.t(`aiChat.turn.${phase}.${failure}`)
-      const parts = [turn.answer.kind === "ready" ? turn.answer.value.answer : failureText("answer", turn.answer.kind)]
+      const failureText = (phase: "answer" | "draft", failure: AssistantTurnFailure) =>
+        failure.setup?.message ?? i18n.t(`aiChat.turn.${phase}.${failure.kind}`)
+      const parts = [turn.answer.kind === "ready" ? turn.answer.value.answer : failureText("answer", turn.answer)]
+      const answerRecovery = turn.answer.kind !== "ready" ? turn.answer.setup : undefined
+      const draftRecovery = turn.drafts.kind !== "ready" && turn.drafts.kind !== "not_requested" ? turn.drafts.setup : undefined
       if (turn.drafts.kind === "ready") {
         parts.push(draftActions.length ? i18n.t("aiChat.turn.reviewDrafts") : i18n.t("aiChat.turn.noDraft"))
-      } else if (turn.drafts.kind !== "not_requested") parts.push(failureText("draft", turn.drafts.kind))
+      } else if (turn.drafts.kind !== "not_requested" && (!draftRecovery || draftRecovery.code !== answerRecovery?.code)) {
+        parts.push(failureText("draft", turn.drafts))
+      }
+      const recoveryPath = answerRecovery?.recoveryPath ?? draftRecovery?.recoveryPath
       const content = parts.join("\n\n")
       void persistExchange({
         userText, assistantText: content, sources, uiContext, guides,
         durationMs: Math.round(performance.now() - started), model: out?.model ?? null,
-        actions: actions.length ? actions : undefined, runId: out?.run_id,
+        actions: actions.length ? actions : undefined, runId: out?.run_id, recoveryPath,
       })
-      return { content, runId: out?.run_id, sources, guides, importTasks: taskStatuses, actions: actions.length ? actions : undefined }
+      return { content, runId: out?.run_id, sources, guides, recoveryPath, importTasks: taskStatuses, actions: actions.length ? actions : undefined }
     },
     [orgId, orgReady, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft],
   )

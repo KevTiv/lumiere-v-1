@@ -8,7 +8,12 @@
 export class HttpResponseError extends Error {
   readonly status: number
 
-  constructor(status: number, message: string) {
+  constructor(
+    status: number,
+    message: string,
+    readonly code?: string,
+    readonly recoveryPath?: string,
+  ) {
     super(message)
     this.name = "HttpResponseError"
     this.status = status
@@ -22,14 +27,8 @@ export class HttpResponseError extends Error {
  * error-body consumer.
  */
 export async function responseErrorMessage(response: Response, fallback?: string): Promise<string> {
-  const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
-
-  return (
-    [payload.error, payload.detail, payload.message, fallback, response.statusText].find(
-      (value): value is string => typeof value === "string" && value.trim() !== "",
-    ) ??
-    `Request failed (${response.status})`
-  )
+  const payload = await readErrorPayload(response)
+  return errorMessage(response, payload, fallback)
 }
 
 /** Build a typed error while consuming an unsuccessful response body once. */
@@ -37,8 +36,30 @@ export async function httpResponseError(
   response: Response,
   fallback?: string,
 ): Promise<HttpResponseError> {
+  const payload = await readErrorPayload(response)
   return new HttpResponseError(
     response.status,
-    await responseErrorMessage(response, fallback),
+    errorMessage(response, payload, fallback),
+    typeof payload.code === "string" ? payload.code : undefined,
+    typeof payload.recovery_path === "string" ? payload.recovery_path : undefined,
+  )
+}
+
+async function readErrorPayload(response: Response): Promise<Record<string, unknown>> {
+  const payload: unknown = await response.json().catch(() => null)
+  return payload && typeof payload === "object" && !Array.isArray(payload)
+    ? (payload as Record<string, unknown>)
+    : {}
+}
+
+function errorMessage(
+  response: Response,
+  payload: Record<string, unknown>,
+  fallback?: string,
+): string {
+  return (
+    [payload.error, payload.detail, payload.message, fallback, response.statusText].find(
+      (value): value is string => typeof value === "string" && value.trim() !== "",
+    ) ?? `Request failed (${response.status})`
   )
 }
