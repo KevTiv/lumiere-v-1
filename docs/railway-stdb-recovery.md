@@ -61,10 +61,12 @@ STDB_BACKUP_DESTINATION=backup:${{spacetimedb-backups.BUCKET}}/production
 
 ## Capture a portable backup
 
-Build and publish the opt-in source image from
-[`Dockerfile.spacetimedb-recovery`](../Dockerfile.spacetimedb-recovery) to a
-registry accessible to the source and recovery environments. Rehearse that
-exact image digest on a disposable deployment with synthetic data. The existing
+Run the [SpacetimeDB recovery drill](../.github/workflows/test-stdb-recovery.yml)
+from `main` with **Run workflow**. It exercises a synthetic backup and restore
+using an isolated S3 bucket, then publishes the recovery image to GHCR. Take the
+digest from the workflow summary and verify the source and recovery environments
+can pull it. Rehearse that exact digest on a disposable deployment with synthetic
+data and Railway bucket references before enabling production capture. The existing
 production entrypoint hands control to the database process, so stopping that
 process normally stops the deployment and makes its mount inaccessible. The
 backup supervisor keeps the mount available, waits for a clean engine shutdown,
