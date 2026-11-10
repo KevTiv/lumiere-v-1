@@ -194,16 +194,145 @@ describe("stored dashboard resolver", () => {
       [1],
       {
         sale_order: [
-          { id: 1, amountTotal: 5, dateOrder: "2026-09-30T12:00:00Z" },
-          { id: 2, amountTotal: 20, dateOrder: "2026-10-10T12:00:00Z" },
+          { id: 1, amountTotal: 5, currencyId: 1, dateOrder: "2026-09-30T12:00:00Z" },
+          { id: 2, amountTotal: 20, currencyId: 1, dateOrder: "2026-10-10T12:00:00Z" },
         ],
+        currency: [{ id: 1, code: "EUR", decimalPlaces: 2 }],
       },
       { startMs: Date.parse("2026-10-01T00:00:00Z"), endMs: Date.parse("2026-10-31T23:59:59Z") },
     )
 
     expect(result.state).toBe("ready")
-    expect(result.widgets[0]).toMatchObject({ type: "kpi", data: { value: "$20" } })
+    expect(result.widgets[0]).toMatchObject({ type: "kpi", data: { value: new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR", currencyDisplay: "code" }).format(20) } })
     expect(storedDashboardExportGate(result)).toEqual({ allowed: true })
+  })
+
+  it("keeps monetary totals separate by currency ID and retains catalog precision", () => {
+    const result = resolveStoredDashboard([baseWidget], [1], {
+      sale_order: [
+        { amountTotal: 0.1, currencyId: "9007199254740992" },
+        { amountTotal: 0.2, currencyId: "9007199254740992" },
+        { amountTotal: 1.001, currencyId: "9007199254740993" },
+      ],
+      currency: [
+        { id: "9007199254740992", code: "EUR", decimalPlaces: 2 },
+        { id: "9007199254740993", code: "KWD", decimalPlaces: 3 },
+      ],
+    })
+    expect(result.state).toBe("ready")
+    expect(result.widgets[0]).toMatchObject({ type: "kpi", data: {
+      value: `${new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR", currencyDisplay: "code" }).format(0.3)} (#9007199254740992) · ${new Intl.NumberFormat(undefined, { style: "currency", currency: "KWD", currencyDisplay: "code", minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(1.001)} (#9007199254740993)`,
+    } })
+  })
+
+  it("does not average across currencies or merge IDs with identical currency codes", () => {
+    const result = resolveStoredDashboard([{ ...baseWidget, aggregation: "average" }], [1], {
+      sale_order: [{ amount_total: 1, currency_id: 1 }, { amount_total: 3, currency_id: 1 }, { amount_total: 10, currency_id: 2 }],
+      currencies: [{ id: 1, code: "EUR", decimal_places: 2 }, { id: 2, code: "EUR", decimal_places: 2 }],
+    })
+    const format = (value: number) => new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR", currencyDisplay: "code" }).format(value)
+    expect(result.widgets[0]).toMatchObject({ type: "kpi", data: { value: `${format(2)} (#1) · ${format(10)} (#2)` } })
+  })
+
+  it.each([
+    [{ amount_total: 12.34 }, [{ id: 1, code: "EUR", decimalPlaces: 2 }]],
+    [{ amount_total: 12.34, currencyId: 2 }, [{ id: 1, code: "EUR", decimalPlaces: 2 }]],
+    [{ amount_total: 12.34, currencyId: 1 }, []],
+    [{ amount_total: 12.34, currencyId: 1 }, [{ id: 1, code: "EUR" }]],
+    [{ amount_total: 12.34, currencyId: 1 }, [{ id: 1, decimalPlaces: 2 }]],
+    [{ amount_total: 1.001, currencyId: 1 }, [{ id: 1, code: "EUR", decimalPlaces: 2 }]],
+    [{ amount_total: 1e-20, currencyId: 1 }, [{ id: 1, code: "EUR", decimalPlaces: 2 }]],
+    [{ amount_total: Number.MAX_SAFE_INTEGER, currencyId: 1 }, [{ id: 1, code: "EUR", decimalPlaces: 2 }]],
+    [{ amount_total: 1, currencyId: 9007199254740992 }, [{ id: 9007199254740992, code: "EUR", decimalPlaces: 2 }]],
+    [{ amount_total: 1, currencyId: 1 }, [{ id: 1, code: "EUR", decimalPlaces: 2 }, { id: 1, code: "USD", decimalPlaces: 2 }]],
+  ])("withholds money whose currency or exact amount cannot be verified", (row, currency) => {
+    const result = resolveStoredDashboard([baseWidget], [1], { sale_order: [row], currency })
+    expect(result.state).toBe("partial")
+    expect(result.widgets[0]).toMatchObject({ type: "diagnostic", data: { code: "missing-measure" } })
+    expect(storedDashboardExportGate(result).allowed).toBe(false)
+  })
+
+  it.each(["loading", "denied", "unavailable", "partial"] as const)("does not use cached currency data when its source is %s", (status) => {
+    const result = resolveStoredDashboard([baseWidget], [1], {
+      sale_order: [{ amount_total: 12.34, currencyId: 1 }], currency: [{ id: 1, code: "EUR", decimalPlaces: 2 }],
+    }, { sourceStates: { currency: { status, rowCount: 1 } } })
+    expect(result.widgets.every((widget) => widget.type !== "kpi")).toBe(true)
+    expect(storedDashboardExportGate(result).allowed).toBe(false)
+  })
+
+  it("honors an explicit currency field and zero-decimal currency", () => {
+    const result = resolveStoredDashboard([{ ...baseWidget,
+      fields: ["net"], configuration: JSON.stringify({ ...JSON.parse(strictBinding(null, "net")), currencyField: "settlement_currency_id" }),
+    }], [1], { sale_order: [{ net: 150, settlementCurrencyId: { some: 1 } }], res_currency: [{ id: 1, code: "JPY", decimalPlaces: 0 }] })
+    expect(result.widgets[0]).toMatchObject({ type: "kpi", data: { value: new Intl.NumberFormat(undefined, { style: "currency", currency: "JPY", currencyDisplay: "code" }).format(150) } })
+  })
+
+  it.each(["price_total", "price_subtotal", "balance_end_real", "unit_cost"])("preserves currency boundaries for %s", (field) => {
+    const result = resolveStoredDashboard([{ ...baseWidget, model: "sale_order_line", fields: [field], configuration: strictBinding(null, field) }], [1], {
+      sale_order_line: [{ [field]: 100.25, currencyId: 1 }, { [field]: 200.5, currencyId: 2 }],
+      currency: [{ id: 1, code: "EUR", decimalPlaces: 2 }, { id: 2, code: "USD", decimalPlaces: 2 }],
+    })
+    expect(result.widgets[0]).toMatchObject({ type: "kpi", data: { value: expect.stringContaining("EUR") } })
+    expect(result.widgets[0]).toMatchObject({ type: "kpi", data: { value: expect.stringContaining("USD") } })
+    const missing = resolveStoredDashboard([{ ...baseWidget, fields: [field], configuration: strictBinding(null, field) }], [1], { sale_order: [{ [field]: 100 }] })
+    expect(missing.widgets[0]).toMatchObject({ type: "diagnostic", data: { code: "missing-measure" } })
+  })
+
+  it.each([
+    ["account_move_line", "debit", "EUR"],
+    ["account_move_line", "credit", "EUR"],
+    ["account_move_line", "balance", "EUR"],
+    ["account_move_line", "amount_residual", "EUR"],
+    ["account_move_line", "amount_currency", "USD"],
+    ["account_move_line", "debit_currency", "USD"],
+    ["account_move_line", "price_total", "USD"],
+    ["account_move", "amount_total_signed", "EUR"],
+    ["account_move", "amount_residual_signed", "EUR"],
+    ["account_move", "amount_total_in_currency_signed", "USD"],
+    ["account-move-lines", "debit", "EUR"],
+    ["opportunities", "expected_revenue", "EUR"],
+  ])("uses the recorded currency basis for %s.%s", (model, field, currency) => {
+    const result = resolveStoredDashboard([{ ...baseWidget, model, fields: [field], configuration: strictBinding(null, field) }], [1], {
+      [model]: [{ [field]: 90, currencyId: 2, companyCurrencyId: 1 }],
+      currency: [{ id: 1, code: "EUR", decimalPlaces: 2 }, { id: 2, code: "USD", decimalPlaces: 2 }],
+    })
+    expect(result.widgets[0]).toMatchObject({ type: "kpi", data: { value: new Intl.NumberFormat(undefined, { style: "currency", currency, currencyDisplay: "code" }).format(90) } })
+  })
+
+  it("recognizes stock valuation through registered resource aliases", () => {
+    const result = resolveStoredDashboard([{ ...baseWidget, model: "stock-quants", fields: ["value"], configuration: strictBinding(null, "value") }], [1], {
+      'stock-quants': [{ value: 100, currencyId: 1 }, { value: 200, currencyId: 2 }],
+      currency: [{ id: 1, code: "EUR", decimalPlaces: 2 }, { id: 2, code: "USD", decimalPlaces: 2 }],
+    })
+    expect(result.widgets[0]).toMatchObject({ type: "kpi", data: { value: expect.stringContaining("EUR") } })
+    expect(result.widgets[0]).toMatchObject({ type: "kpi", data: { value: expect.stringContaining("USD") } })
+  })
+
+  it.each(["average", "avg", "min", "max"])("does not invent zero for an empty %s", (aggregation) => {
+    const result = resolveStoredDashboard([{ ...baseWidget, aggregation }], [1], { sale_order: [] })
+    expect(result.widgets[0]).toMatchObject({ type: "diagnostic", data: { code: "missing-measure", message: expect.stringContaining("no observations") } })
+    expect(storedDashboardExportGate(result).allowed).toBe(false)
+  })
+
+  it("keeps empty sums and counts as plain zero without inventing a currency", () => {
+    for (const aggregation of ["sum", "count"]) {
+      const result = resolveStoredDashboard([{ ...baseWidget, aggregation }], [1], { sale_order: [] })
+      expect(result.state).toBe("empty")
+      expect(result.widgets[0]).toMatchObject({ type: "kpi", data: { value: "0" } })
+      expect(storedDashboardExportGate(result).allowed).toBe(true)
+    }
+    const count = resolveStoredDashboard([{ ...baseWidget, aggregation: "count" }], [1], { sale_order: [{ amount_total: 1 }, { amount_total: 2 }] })
+    expect(count.widgets[0]).toMatchObject({ type: "kpi", data: { value: "2" } })
+  })
+
+  it("keeps count-only KPIs available when currency metadata is loading or denied", () => {
+    for (const status of ["loading", "denied"] as const) {
+      const result = resolveStoredDashboard([{ ...baseWidget, aggregation: "count" }], [1], { sale_order: [{ id: 1 }, { id: 2 }] }, {
+        sourceStates: { sale_order: { status: "ready", rowCount: 2 }, currency: { status, rowCount: 0 } },
+      })
+      expect(result.state).toBe("ready")
+      expect(result.widgets[0]).toMatchObject({ type: "kpi", data: { value: "2" } })
+    }
   })
 
   it("aggregates a large source deterministically and applies the persisted chart limit", () => {

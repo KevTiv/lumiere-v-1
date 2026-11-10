@@ -1,13 +1,26 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { taskAttachmentCounts, taskProgressPercent, toTaskBoardItem } from './task-board-items';
+import { taskAttachmentCounts, taskBoardItemInState, taskProgressPercent, toTaskBoardItem } from './task-board-items';
 
 const lookups = {
   projectNames: new Map([['7', 'Website']]),
   identityLabels: new Map([['abc123', 'Ada Lovelace']]),
   attachmentCounts: new Map([['3', 2]]),
 };
+
+test('optimistic closure and reopening keep column and closed flag consistent', () => {
+  const open = toTaskBoardItem({ id: 1, name: 'Overdue task', state: 'InProgress', priority: '1', isClosed: false }, lookups);
+  for (const state of ['Done', 'Cancelled'] as const) {
+    const closed = taskBoardItemInState(open, state);
+    assert.equal(closed.columnId, state);
+    assert.equal(closed.isClosed, true);
+    const reopened = taskBoardItemInState(closed, 'InProgress');
+    assert.equal(reopened.columnId, 'InProgress');
+    assert.equal(reopened.isClosed, false);
+  }
+  assert.equal(open.isClosed, false);
+});
 
 test('a task row becomes a board item with names, counts and its column', () => {
   const item = toTaskBoardItem(

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { LumiereApiProvider, createLumiereApiClient } from '@lumiere/api-client';
 import { ErpSessionProvider, useErpSession } from '@lumiere/erp-session';
+import { currenciesQueryKey } from '@lumiere/query-hooks/hooks/settings-currencies';
 import { I18nProvider } from '@lumiere/i18n';
 import { RBACProvider } from '../../../packages/ui/src/lib/rbac-context';
 import { ThemeProvider } from '../../../packages/ui/src/components/theme-provider';
@@ -55,7 +56,7 @@ export function SubscriptionFixture({ id }: { id?: string }) {
       value.setQueryData(['stdb', resource, '1'], rows);
       for (const company of [1, 2]) value.setQueryData(['typed-stdb', resource, '1', 'company', company], rows);
     }
-    value.setQueryData(['currencies'], [{ id: 8n, code: 'USD', name: 'US Dollar', decimalPlaces: 2 }]);
+    value.setQueryData(currenciesQueryKey({ organizationId: 1, identity: 'ab'.repeat(32) }), [{ id: 8n, code: 'USD', name: 'US Dollar', decimalPlaces: 2 }]);
     return value;
   });
   return <LumiereApiProvider client={fixtureApi}><QueryClientProvider client={client}><I18nProvider language="en"><RBACProvider useDefaultFixtures><ErpSessionProvider value={{ identity: 'ab'.repeat(32), connected: false, organizationId: 1, companyIds: [1, 2] }}><ThemeProvider defaultTheme="light" storageKey="subscription-preview">

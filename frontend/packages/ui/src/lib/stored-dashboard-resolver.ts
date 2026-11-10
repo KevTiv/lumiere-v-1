@@ -1,4 +1,6 @@
 import { moduleHistoryTimestampMs } from "./module-history-filter"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
+import { normalizeDashboardModel, resolveDashboardModelResourceKey, tableNameForResourceKey } from "@lumiere/stdb/stored-dashboard-model-registry"
 import type { DashboardWidget, DiagnosticWidget, GridWidth } from "./dashboard-types"
 import {
   resolveStoredDashboardDrillTarget,
@@ -181,6 +183,8 @@ interface StoredDashboardBindingV1 {
   version: 1
   timeField: string | null
   measureField: string | null
+  /** Optional for measures whose currency is not stored in currency_id. */
+  currencyField?: string | null
   missingTimestampPolicy: "reject"
   missingMeasurePolicy: "reject"
 }
@@ -194,6 +198,7 @@ function parseBinding(raw: unknown): ParseResult<StoredDashboardBindingV1 | null
       parsed.version !== 1 ||
       (parsed.timeField != null && typeof parsed.timeField !== "string") ||
       (parsed.measureField != null && typeof parsed.measureField !== "string") ||
+      (parsed.currencyField != null && typeof parsed.currencyField !== "string") ||
       parsed.missingTimestampPolicy !== "reject" ||
       parsed.missingMeasurePolicy !== "reject"
     ) {
@@ -205,6 +210,7 @@ function parseBinding(raw: unknown): ParseResult<StoredDashboardBindingV1 | null
         version: 1,
         timeField: parsed.timeField?.trim() || null,
         measureField: parsed.measureField?.trim() || null,
+        currencyField: parsed.currencyField?.trim() || null,
         missingTimestampPolicy: "reject",
         missingMeasurePolicy: "reject",
       },
@@ -330,6 +336,13 @@ function applyMeasureCompleteness(
       message: "This widget does not declare the measure used by its aggregation.",
     }
   }
+  if (rows.length === 0 && aggregation !== "sum") {
+    return {
+      ok: false,
+      code: "missing-measure",
+      message: `There are no observations to calculate ${aggregation} for ${field}.`,
+    }
+  }
   const rejectedRows = rows.filter((row) => {
     const encoded = scalarField(rowField(row, field)).trim()
     return encoded === "" || !Number.isFinite(Number(encoded))
@@ -352,13 +365,104 @@ function aggregateValue(
 ): number {
   if (aggregation === "count") return rows.length
   const values = rows.map((row) => Number(scalarField(rowField(row, field))))
-  if (values.length === 0) return 0
+  if (values.length === 0) return aggregation === "sum" ? 0 : Number.NaN
   if (aggregation === "sum") return values.reduce((sum, value) => sum + value, 0)
   if (aggregation === "average" || aggregation === "avg") {
     return values.reduce((sum, value) => sum + value, 0) / values.length
   }
   if (aggregation === "min") return Math.min(...values)
   return Math.max(...values)
+}
+
+const CURRENCY_SOURCE_KEYS = ["currency", "currencies", "res_currency"]
+
+function modelTable(model: string): string {
+  const resource = resolveDashboardModelResourceKey(model)
+  return resource ? tableNameForResourceKey(resource) : normalizeDashboardModel(model)
+}
+
+function monetaryMeasure(model: string, field: string, binding: StoredDashboardBindingV1 | null): boolean {
+  if (binding?.currencyField) return true
+  const key = field.replace(/_/g, "").toLowerCase()
+  // unit_amount on timesheets is a duration, not money.
+  if (key !== "unitamount" && /amount|revenue|price|balance|cost/.test(key) && !key.endsWith("id")) return true
+  if (["debit", "credit", "debitcurrency", "creditcurrency", "margin", "wage", "salary", "fee"].includes(key)) return true
+  return modelTable(model) === "stock_quant" && ["value", "cost"].includes(key)
+}
+
+function defaultCurrencyField(model: string, field: string): string {
+  const normalizedModel = modelTable(model)
+  const key = field.replace(/_/g, "").toLowerCase()
+  if (["opportunity", "crm_opportunity", "crm_lead"].includes(normalizedModel)) return "company_currency_id"
+  if (["account_move_line", "account_move_lines"].includes(normalizedModel) &&
+    ["debit", "credit", "balance", "amountresidual"].includes(key)) return "company_currency_id"
+  if (["account_move", "account_moves"].includes(normalizedModel) &&
+    key.endsWith("signed") && key !== "amounttotalincurrencysigned") return "company_currency_id"
+  return "currency_id"
+}
+
+interface MonetaryGroup {
+  code: string
+  decimals: number
+  amounts: bigint[]
+}
+
+function monetaryKpiValue(
+  rows: DashboardRecord[],
+  model: string,
+  field: string,
+  aggregation: string,
+  binding: StoredDashboardBindingV1 | null,
+  currencies: DashboardRecord[],
+): ParseResult<string> {
+  const fail = (message: string): ParseResult<string> => ({ ok: false, code: "missing-measure", message })
+  // No rows establish no monetary unit. An empty sum is a bare zero, never an invented $0.
+  if (rows.length === 0) return aggregation === "sum"
+    ? { ok: true, value: "0" }
+    : fail(`There are no observations to calculate ${aggregation} for ${field}.`)
+  const currencyField = binding?.currencyField ?? defaultCurrencyField(model, field)
+  const catalog = new Map<string, DashboardRecord | null>()
+  for (const currency of currencies) {
+    const id = parseStrictU64(currency.id)?.toString()
+    if (id) catalog.set(id, catalog.has(id) ? null : currency)
+  }
+  const groups = new Map<string, MonetaryGroup>()
+  for (const row of rows) {
+    const parsedId = parseStrictU64(rowField(row, currencyField))
+    if (!parsedId) return fail(`The currency in ${currencyField} is unavailable. This monetary total cannot be verified.`)
+    const id = parsedId.toString()
+    const currency = catalog.get(id)
+    if (!currency) return fail(`Currency #${id} is unavailable or ambiguous. This monetary total cannot be verified.`)
+    const code = scalarField(currency.code).trim().toUpperCase()
+    const decimals = rowField(currency, "decimal_places")
+    if (!/^[A-Z]{3}$/.test(code) || typeof decimals !== "number" || !Number.isInteger(decimals) || decimals < 0 || decimals > 6) {
+      return fail(`The code or precision of currency #${id} is unavailable. This monetary total cannot be verified.`)
+    }
+    const encoded = scalarField(rowField(row, field)).trim()
+    if (!/^-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(encoded)) return fail(`This widget has incomplete monetary data in ${field}.`)
+    const scaled = Number(encoded) * 10 ** decimals
+    const rounded = Math.round(scaled)
+    if (!Number.isSafeInteger(rounded) || Math.abs(scaled - rounded) >= 0.000001 || (rounded === 0 && Number(encoded) !== 0)) {
+      return fail(`The amount in ${field} cannot be represented safely in currency #${id}.`)
+    }
+    const group: MonetaryGroup = groups.get(id) ?? { code, decimals, amounts: [] }
+    group.amounts.push(BigInt(rounded))
+    groups.set(id, group)
+  }
+  const values: string[] = []
+  for (const [id, group] of [...groups.entries()].sort(([a], [b]) => BigInt(a) < BigInt(b) ? -1 : 1)) {
+    let minor = group.amounts.reduce((sum, amount) => sum + amount, 0n)
+    if (aggregation === "min") minor = group.amounts.reduce((min, amount) => amount < min ? amount : min)
+    if (aggregation === "max") minor = group.amounts.reduce((max, amount) => amount > max ? amount : max)
+    if (minor > BigInt(Number.MAX_SAFE_INTEGER) || minor < BigInt(Number.MIN_SAFE_INTEGER)) return fail("This monetary total exceeds the supported precision.")
+    const amount = Number(minor) / (aggregation === "avg" || aggregation === "average" ? group.amounts.length : 1) / 10 ** group.decimals
+    const formatted = new Intl.NumberFormat(undefined, {
+      style: "currency", currency: group.code, currencyDisplay: "code",
+      minimumFractionDigits: group.decimals, maximumFractionDigits: group.decimals,
+    }).format(amount)
+    values.push(groups.size > 1 ? `${formatted} (#${id})` : formatted)
+  }
+  return { ok: true, value: values.join(" · ") }
 }
 
 function gridWidthFromColumns(width: number): GridWidth {
@@ -565,15 +669,41 @@ export function resolveStoredDashboard(
     const widgetType = widgetTypeTag(row.widgetType ?? row.widget_type)
 
     if (widgetType === "Kpi") {
-      const value = aggregateValue(sourceRows, primaryField, aggregationResult.value)
-      const isCurrency = primaryField.includes("amount") || primaryField.includes("revenue")
+      const aggregation = aggregationResult.value
+      let value: string
+      if (aggregation !== "count" && monetaryMeasure(model, primaryField, binding)) {
+        const currencyKey = CURRENCY_SOURCE_KEYS.find((key) => Object.hasOwn(dataSources, key)) ?? "currency"
+        const currencyState = options?.sourceStates?.[currencyKey]
+        if (currencyState) {
+          usedSourceStates[currencyKey] = currencyState
+          const issue = sourceIssue(widgetId, currencyKey, currencyState)
+          if (issue) {
+            issues.push(issue)
+            if (currencyState.status === "partial") pushDiagnostic({ code: "missing-measure", message: issue.message })
+            return
+          }
+        }
+        const result = monetaryKpiValue(sourceRows, model, primaryField, aggregation, binding, dataSources[currencyKey] ?? [])
+        if (!result.ok) {
+          pushDiagnostic(result)
+          return
+        }
+        value = result.value
+      } else {
+        const number = aggregateValue(sourceRows, primaryField, aggregation)
+        if (!Number.isFinite(number)) {
+          pushDiagnostic({ code: "missing-measure", message: "This aggregate exceeds the supported numeric range." })
+          return
+        }
+        value = number.toLocaleString()
+      }
       widgets.push({
         id: widgetId,
         type: "kpi",
         title,
         width,
         data: {
-          value: isCurrency ? `$${Math.round(value).toLocaleString()}` : value.toLocaleString(),
+          value,
           label: title,
         },
       })

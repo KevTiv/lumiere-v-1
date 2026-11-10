@@ -1,7 +1,7 @@
 import type { TaskBoardItem } from '@lumiere/ui';
 import { identityToHex, resolveIdentityLabel } from '@lumiere/ui/lib/identity-label';
 import { formatTimestampLike } from '@lumiere/ui/lib/entity-row-values';
-import { taskBoardState } from '../projects/project-record';
+import { projectStatusTag, TASK_BOARD_STATES, taskBoardState, type TaskBoardState } from '../projects/project-record';
 
 /** The task fields the board reads; generated `ProjectTask` rows satisfy it. */
 export interface TaskBoardSourceRow {
@@ -12,7 +12,7 @@ export interface TaskBoardSourceRow {
   projectId?: unknown;
   userIds?: readonly unknown[];
   dateDeadline?: unknown;
-  isClosed: boolean;
+  isClosed?: unknown;
   messageIds?: readonly unknown[];
   progress?: number;
   plannedHours?: number;
@@ -28,6 +28,17 @@ export interface TaskBoardLookups {
   attachmentCounts: ReadonlyMap<string, number>;
 }
 
+export interface TaskSummaryCompleteness {
+  state: boolean;
+  closure: boolean;
+  deadline: boolean;
+}
+
+export interface TaskBoardProjection extends TaskBoardItem {
+  /** Keep redaction distinct from the board's visual fallbacks. */
+  summaryCompleteness: TaskSummaryCompleteness;
+}
+
 /** Percent done: the stored progress, else effective over planned hours, else unknown. */
 export function taskProgressPercent(row: Pick<TaskBoardSourceRow, 'progress' | 'plannedHours' | 'effectiveHours'>): number | null {
   const stored = Number(row.progress ?? 0);
@@ -38,9 +49,10 @@ export function taskProgressPercent(row: Pick<TaskBoardSourceRow, 'progress' | '
   return null;
 }
 
-export function toTaskBoardItem(row: TaskBoardSourceRow, lookups: TaskBoardLookups): TaskBoardItem {
+export function toTaskBoardItem(row: TaskBoardSourceRow, lookups: TaskBoardLookups): TaskBoardProjection {
   const id = String(row.id);
   const projectId = row.projectId == null ? undefined : String(row.projectId);
+  const deadline = formatTimestampLike(row.dateDeadline);
   return {
     id,
     title: row.name || `#${id}`,
@@ -52,11 +64,26 @@ export function toTaskBoardItem(row: TaskBoardSourceRow, lookups: TaskBoardLooku
       .map((identity) => identityToHex(identity))
       .filter((hex) => hex !== '')
       .map((hex) => ({ id: hex, name: resolveIdentityLabel(hex, lookups.identityLabels) })),
-    dueAt: formatTimestampLike(row.dateDeadline)?.getTime() ?? null,
+    dueAt: deadline?.getTime() ?? null,
     isClosed: row.isClosed === true,
+    summaryCompleteness: {
+      state: (TASK_BOARD_STATES as readonly string[]).includes(projectStatusTag(row.state)),
+      closure: typeof row.isClosed === 'boolean',
+      deadline: row.dateDeadline === null || deadline != null,
+    },
     commentCount: row.messageIds?.length ?? 0,
     attachmentCount: lookups.attachmentCounts.get(id) ?? 0,
     progress: taskProgressPercent(row),
+  };
+}
+
+/** An optimistic move must update lifecycle flags alongside its visible column. */
+export function taskBoardItemInState(item: TaskBoardProjection, state: TaskBoardState): TaskBoardProjection {
+  return {
+    ...item,
+    columnId: state,
+    isClosed: state === 'Done' || state === 'Cancelled',
+    summaryCompleteness: { ...item.summaryCompleteness, state: true, closure: true },
   };
 }
 

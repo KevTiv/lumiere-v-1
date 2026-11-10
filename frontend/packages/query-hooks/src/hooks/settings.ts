@@ -13,6 +13,8 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useErpSession } from '@lumiere/erp-session'
+import { currenciesQueryOptions } from './settings-currencies'
 
 // ── Organization Mutations ─────────────────────────────────────────────────
 
@@ -61,18 +63,10 @@ export function useCreateOrganization() {
 
 // ── Reference data (superuser) ───────────────────────────────────────────────
 
-/** Active global currencies, also available before a user creates their tenant. */
+/** Active tenant currencies, or the authenticated code-only onboarding catalog before tenant creation. */
 export function useCurrencies() {
-  return useQuery<Record<string, unknown>[]>({
-    queryKey: ['currencies'],
-    queryFn: async () => {
-      const response = await apiFetch('/api/bootstrap/currencies')
-      if (!response.ok) throw new Error('Failed to load currencies')
-      const payload = (await response.json()) as { data?: Record<string, unknown>[] }
-      return payload.data ?? []
-    },
-    staleTime: 5 * 60_000,
-  })
+  const session = useErpSession()
+  return useQuery<Record<string, unknown>[]>(currenciesQueryOptions(session))
 }
 
 export function useCreateCountry() {
