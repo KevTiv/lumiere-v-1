@@ -918,7 +918,12 @@ export function AIChatPanel({
                                   >
                                     {badgeLabel}
                                   </span>
-                                  {src.href ? (
+                                  {src.source_kind === "managed_document_selection" && config?.onOpenDocumentSource ? (
+                                    <button type="button" className="text-start text-primary underline-offset-2 hover:underline"
+                                      onClick={() => config.onOpenDocumentSource?.(src)}>
+                                      {citationLabel}
+                                    </button>
+                                  ) : src.href ? (
                                     <a
                                       href={src.href}
                                       className="text-primary hover:underline underline-offset-2"

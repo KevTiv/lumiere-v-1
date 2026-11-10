@@ -1,7 +1,8 @@
 use lumiere_file_inspection::{
-    inspect_csv, inspect_csv_records, inspect_matrix, inspect_text, is_formula_injection,
-    parse_csv, parse_csv_records, prepare_csv_source, CsvDelimiter, InspectionError,
-    MAX_CELL_CHARS, MAX_COLUMNS, MAX_CONTENT_BYTES, MAX_FINDINGS, MAX_ROWS,
+    inspect_csv, inspect_csv_records, inspect_document_csv, inspect_matrix, inspect_text,
+    is_formula_injection, parse_csv, parse_csv_records, parse_document_csv_with_options,
+    prepare_csv_source, CsvDelimiter, InspectionError, MAX_CELL_CHARS, MAX_COLUMNS,
+    MAX_CONTENT_BYTES, MAX_FINDINGS, MAX_ROWS,
 };
 
 #[test]
@@ -214,6 +215,64 @@ fn source_dialect_detection_never_falls_back_after_a_malformed_tail() {
         prepare_csv_source(vec!["h"; MAX_COLUMNS + 1].join(";").as_bytes(), None),
         Err(InspectionError::LimitExceeded("200 columns"))
     ));
+}
+
+#[test]
+fn document_csv_admission_keeps_alternate_formats_manual_and_binds_original_bytes() {
+    let expected = [vec!["ID", "Description"], vec!["0007", " Café "]];
+    let text = "ID;Description\n0007; Café ";
+    let utf16 = format!("\u{feff}{text}")
+        .encode_utf16()
+        .flat_map(u16::to_be_bytes)
+        .collect::<Vec<_>>();
+    let sources = [
+        text.as_bytes(),
+        utf16.as_slice(),
+        b"ID\tDescription\n0007\t Caf\xe9 ",
+    ];
+    let mut hashes = Vec::new();
+    for source in sources {
+        let inspected = inspect_document_csv(source).unwrap();
+        assert_eq!(inspected.records, expected);
+        assert!(inspected.report.processing_allowed);
+        assert!(!inspected.report.ai_allowed);
+        assert!(!hashes.contains(&inspected.content_sha256));
+        hashes.push(inspected.content_sha256);
+    }
+
+    assert!(
+        inspect_document_csv(b"ID,Description\n0007,Coffee")
+            .unwrap()
+            .report
+            .ai_allowed
+    );
+    assert!(
+        !inspect_document_csv(b"ID,Description;Note\n0007,Coffee;=1+2")
+            .unwrap()
+            .report
+            .ai_allowed
+    );
+    assert!(matches!(
+        inspect_document_csv("x;".repeat(MAX_COLUMNS).as_bytes()),
+        Err(InspectionError::LimitExceeded("200 columns"))
+    ));
+    assert!(inspect_document_csv(b"ID;Note\n0007;\"unfinished").is_err());
+    assert!(inspect_document_csv(b"ID;Note\n0007;binary\0text").is_err());
+}
+
+#[test]
+fn document_csv_resolves_the_explicit_viewer_interpretation() {
+    let bytes = b"ID,Title;Note\r\n0007,0008; \" Caf\xe9\r\n line \"\t\r\n";
+    assert_eq!(
+        parse_document_csv_with_options(bytes, "windows-1252", ';').unwrap(),
+        [
+            vec!["ID,Title", "Note"],
+            vec!["0007,0008", " Café\r\n line "]
+        ]
+    );
+    assert!(parse_document_csv_with_options(bytes, "utf-8", ';').is_err());
+    assert!(parse_document_csv_with_options(b"ID;Note", "utf-8", '|').is_err());
+    assert!(parse_document_csv_with_options(b"\xef\xbb\xbfID;Note", "windows-1252", ';').is_err());
 }
 
 #[test]

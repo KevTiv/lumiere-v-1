@@ -17,7 +17,7 @@ const manifest = () => ({
 })
 
 function fixture() {
-  const tables = { profiles: [], policies: [], agents: [], configs: [], prices: [], budgets: [], calibration: [] }
+  const tables = { profiles: [], policies: [], agents: [], configs: [], prices: [], budgets: [], calibration: [], surfaces: [], surfaceConfigs: [] }
   const writes = []
   const client = {
     async verifyTarget(org) { assert.equal(org, 9) },
@@ -27,12 +27,13 @@ function fixture() {
     },
     async sql(sql, role) {
       if (sql.includes('FROM company ')) return [{ id: 3, organization_id: 9 }]
+      if (sql.includes('FROM ai_skill ') && !sql.includes("skill_key = 'report_analysis'")) return tables.surfaces
       if (sql.includes('FROM ai_skill ')) return [{ id: 8, organization_id: 0, is_active: true }]
       if (sql.includes('FROM ai_skill_release ')) return [{ id: 5, skill_version_id: 6 }]
       if (sql.includes('FROM ai_model_profile ')) return tables.profiles.filter(row => sql.includes(`'${row.profile_key}'`))
       if (sql.includes('FROM ai_intelligence_policy ')) return tables.policies
       if (sql.includes('FROM ai_agent ')) return tables.agents
-      if (sql.includes('FROM ai_skill_config ')) return tables.configs
+      if (sql.includes('FROM ai_skill_config ')) return sql.includes('AND skill_id =') ? tables.configs : [...tables.configs, ...tables.surfaceConfigs]
       if (sql.includes('FROM ai_spend_price_snapshot_read ')) {
         assert.equal(role, 'spend')
         return tables.prices.filter(row => sql.includes(`'${row.model}'`))
@@ -52,6 +53,13 @@ function fixture() {
         const params = args[2]
         tables.prices.push({ ...params, version: tables.prices.length + 1 })
         if (!tables.budgets.length) tables.budgets.push({ ...params, settled_units: 77, outstanding_units: 23 })
+      } else if (name === 'provision_ai_company_defaults') {
+        assert.deepEqual(args, [9, 3, 12, 'mistral-pilot@1'])
+        assert.equal(tables.calibration.length, 1, 'bootstrap must register built-ins first')
+        assert.equal(tables.budgets.length, 1, 'share the funded agent')
+        assert.equal(tables.prices.length, 2, 'pricing must be provisioned first')
+        tables.surfaceConfigs = tables.surfaces.map(row => ({ skill_id: row.id, company_id: { some: 3 }, is_enabled: true, config_json: JSON.stringify({ defaultAgentId: 12 }) }))
+        tables.agents[0].allowed_actions = ['skill_run', 'chat', 'form_suggest', 'action_draft']
       } else if (name === 'upsert_ai_skill_config') tables.configs.splice(0, 1, { ...args[1] })
       else throw new Error(`unexpected reducer ${name}`)
     },
@@ -59,6 +67,7 @@ function fixture() {
       writes.push('bootstrap')
       assert.deepEqual(body, { orgId: 9, intelligencePolicyRef: 'mistral-pilot@1' })
       tables.calibration = [{ id: 1 }]
+      tables.surfaces = ['rag_generation', 'form_suggestion', 'action_draft_generation'].map((skill_key, index) => ({ id: 20 + index, organization_id: 9, skill_key, is_active: true }))
     },
   }
   return { tables, writes, client }
@@ -81,6 +90,8 @@ test('apply is idempotent, preserves counters and scoped settings, and verifies 
   assert.equal(first.applied, true)
   assert.equal(first.readyForKey, true)
   assert.equal(first.agentId, 12)
+  assert.equal(writes.at(-1), 'provision_ai_company_defaults')
+  assert.ok(tables.agents[0].allowed_actions.includes('chat'))
   const state = structuredClone(tables)
   writes.length = 0
   assert.equal((await provision(manifest(), client, true)).readyForKey, true)
@@ -229,7 +240,11 @@ test('provisioning payloads match the immutable released parameter contracts', a
   const { client } = fixture()
   const call = client.call
   client.call = async (name, args) => {
-    assert.deepEqual(Object.keys(args.at(-1)).sort(), fields(name), name)
+    if (name !== 'provision_ai_company_defaults') {
+      assert.deepEqual(Object.keys(args.at(-1)).sort(), fields(name), name)
+    } else {
+      assert.deepEqual(args, [9, 3, 12, 'mistral-pilot@1'])
+    }
     return call(name, args)
   }
   await provision(manifest(), client, true)
@@ -271,4 +286,41 @@ test('live SQL identity product is checked against the authenticated reader', as
     matches = false
     await assert.rejects(client.verifyTarget(9), /not registered/)
   }
+})
+
+
+test('surface setup read-back detects an unconfirmed reducer and does not retry it', async () => {
+  const { client, writes } = fixture()
+  const call = client.call
+  client.call = async (name, args) => {
+    if (name === 'provision_ai_company_defaults') { writes.push(name); return }
+    return call(name, args)
+  }
+  await assert.rejects(provision(manifest(), client, true), /read-back incomplete: surface:/)
+  assert.equal(writes.filter(name => name === 'provision_ai_company_defaults').length, 1)
+})
+
+test('surface check honors inherited disablement and custom company agent bindings', async () => {
+  const { client, tables, writes } = fixture()
+  await provision(manifest(), client, true)
+  tables.surfaceConfigs[0] = { skill_id: 20, company_id: { none: [] }, is_enabled: false, config_json: '{}' }
+  tables.surfaceConfigs[1].config_json = '{"default_agent_id":99}'
+  const before = structuredClone(tables)
+  writes.length = 0
+  assert.equal((await provision(manifest(), client)).readyForKey, true)
+  assert.deepEqual(tables, before)
+  assert.deepEqual(writes, [])
+})
+
+
+test('explicit policy-only surface override is preserved and reported for review', async () => {
+  const { client, tables, writes } = fixture()
+  await provision(manifest(), client, true)
+  tables.surfaceConfigs[0].config_json = '{"intelligencePolicyRef":"custom@2"}'
+  writes.length = 0
+  const result = await provision(manifest(), client)
+  assert.equal(result.readyForKey, false)
+  assert.ok(result.missing.includes('surface:rag_generation:explicit-override-needs-review'))
+  assert.deepEqual(result.generationSurfaces[0], { key: 'rag_generation', status: 'blocked_override' })
+  assert.deepEqual(writes, [])
 })

@@ -248,6 +248,99 @@ pub(crate) async fn read_document_versions(
     Ok(rows)
 }
 
+/// Resolve only the requested parent/version through the canonical document tree.
+pub(crate) async fn read_spreadsheet_document_rows(
+    context: &crate::trusted_context::TrustedOperationContext,
+    requested_company_id: Option<u64>,
+    document_id: u64,
+    version_id: Option<u64>,
+) -> Result<(Value, Option<Value>), ApiError> {
+    let organization_id = context.organization_id();
+    let field_access = Some(context.field_access());
+    let actor = context.actor_identity();
+    let identity = require_read_context("documents", organization_id, actor, field_access)?;
+    let required = if version_id.is_some() {
+        &["company_id", "owner_id"][..]
+    } else {
+        &[
+            "company_id",
+            "owner_id",
+            "url",
+            "checksum",
+            "current_version_id",
+        ][..]
+    };
+    require_spreadsheet_fields(field_access, "documents", required)?;
+    let client = context.client();
+    let source_columns = if version_id.is_none() {
+        ", url, checksum, current_version_id"
+    } else {
+        ""
+    };
+    let mut parents = client.query_sql(&format!(
+        "SELECT id, organization_id, company_id, folder_id, owner_id, is_deleted{source_columns} FROM document WHERE organization_id = {organization_id} AND id = {document_id} AND is_deleted = false AND owner_id = {identity}"
+    )).await.map_err(ApiError::internal)?;
+    let parent = take_exact_spreadsheet_row(&mut parents)?;
+    let tree = tree::read_tree(client, organization_id, actor, requested_company_id).await?;
+    if document_row_id(&parent, "id", "id") != Some(document_id)
+        || !tree.document_visible(&parent, false)
+    {
+        return Err(spreadsheet_source_not_found());
+    }
+    let version = if let Some(version_id) = version_id {
+        require_read_context("document-versions", organization_id, actor, field_access)?;
+        require_spreadsheet_fields(field_access, "document-versions", &["url", "checksum"])?;
+        let mut versions = client.query_sql(&format!(
+            "SELECT id, organization_id, document_id, url, checksum, created_by FROM document_version WHERE organization_id = {organization_id} AND document_id = {document_id} AND id = {version_id} AND created_by = {identity}"
+        )).await.map_err(ApiError::internal)?;
+        let version = take_exact_spreadsheet_row(&mut versions)?;
+        let creator = version
+            .get("createdBy")
+            .or_else(|| version.get("created_by"))
+            .and_then(Value::as_str)
+            .and_then(|value| identity_sql_literal(value).ok());
+        if document_row_id(&version, "id", "id") != Some(version_id)
+            || document_row_id(&version, "documentId", "document_id") != Some(document_id)
+            || document_row_id(&version, "organizationId", "organization_id")
+                != Some(organization_id)
+            || creator.as_deref() != Some(identity.as_str())
+        {
+            return Err(spreadsheet_source_not_found());
+        }
+        Some(version)
+    } else {
+        None
+    };
+    Ok((parent, version))
+}
+
+fn require_spreadsheet_fields(
+    access: Option<&FieldAccessContext>,
+    resource: &str,
+    fields: &[&str],
+) -> Result<(), ApiError> {
+    if fields
+        .iter()
+        .any(|field| !has_resource_field_read_permission(access, resource, field))
+    {
+        return Err(ApiError::Forbidden(
+            "Spreadsheet source field access denied".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn take_exact_spreadsheet_row(rows: &mut Vec<Value>) -> Result<Value, ApiError> {
+    if rows.len() != 1 {
+        return Err(spreadsheet_source_not_found());
+    }
+    rows.pop().ok_or_else(spreadsheet_source_not_found)
+}
+
+fn spreadsheet_source_not_found() -> ApiError {
+    ApiError::NotFound("spreadsheet version not found".into())
+}
+
 /// Child reads inherit the document permission, not a separately provisioned child grant.
 pub(super) fn has_document_read_permission(field_access: Option<&FieldAccessContext>) -> bool {
     if field_access.is_some_and(|access| stdb_auth::resource_read_denied(access, "documents")) {

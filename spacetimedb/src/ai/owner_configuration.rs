@@ -316,6 +316,7 @@ pub(crate) fn budget_for_reservation(
     if current_period(ctx.timestamp)? != period {
         return Err("reservation period is not current UTC month".into());
     }
+    super::platform_defaults::ensure_managed_period(ctx, org, agent)?;
     let rows = ctx
         .db
         .ai_spend_budget()

@@ -12,6 +12,7 @@ use tokio::{
 
 use crate::error::ApiError;
 
+pub(crate) const VIEWER_POLICY_VERSION: &str = "xlsx-viewer-seccomp-v1";
 pub(crate) const XLSX_POLICY_VERSION: &str = "xlsx-static-seccomp-v1";
 pub(crate) const MAX_WORKBOOK_BYTES: usize = 5_000_000;
 pub(crate) const OFFICE_PREVIEW_POLICY_VERSION: &str = "office-static-seccomp-v1";
@@ -82,21 +83,44 @@ pub(crate) async fn inspect_xlsx(bytes: &[u8]) -> Result<ExtractedWorkbook, ApiE
     inspect_xlsx_with_script(bytes, &worker_script()).await
 }
 
+pub(crate) async fn inspect_xlsx_viewer(
+    bytes: &[u8],
+) -> Result<crate::spreadsheet::ExtractedSpreadsheet, ApiError> {
+    let output = run_worker(bytes, &worker_script(), Some("--viewer"), MAX_OUTPUT_BYTES).await?;
+    let extracted: crate::spreadsheet::ExtractedSpreadsheet = decode_result(&output)?;
+    if extracted.policy_version != VIEWER_POLICY_VERSION
+        || extracted.source_sha256 != hex::encode(Sha256::digest(bytes))
+    {
+        return Err(ApiError::Unavailable(
+            "workbook inspection identity mismatch".into(),
+        ));
+    }
+    extracted.validate()?;
+    Ok(extracted)
+}
+
 async fn inspect_xlsx_with_script(
     bytes: &[u8],
     script: &str,
 ) -> Result<ExtractedWorkbook, ApiError> {
     let output = run_worker(bytes, script, None, MAX_OUTPUT_BYTES).await?;
-    let extracted: ExtractedWorkbook = serde_json::from_slice(&output).map_err(|_| {
-        ApiError::Unavailable("workbook inspection returned an invalid result".into())
-    })?;
+    let extracted: ExtractedWorkbook = decode_result(&output)?;
     validate_result(&extracted, bytes)?;
     Ok(extracted)
 }
 
 fn worker_script() -> String {
-    std::env::var("LUMIERE_WORKBOOK_EXTRACT_SCRIPT")
-        .unwrap_or_else(|_| "/app/scripts/workbook-extract.py".into())
+    std::env::var("LUMIERE_WORKBOOK_EXTRACT_SCRIPT").unwrap_or_else(|_| {
+        if cfg!(test) {
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../scripts/workbook-extract.py"
+            )
+            .into()
+        } else {
+            "/app/scripts/workbook-extract.py".into()
+        }
+    })
 }
 
 /// Extract display-only data from authorized immutable bytes.
@@ -165,6 +189,11 @@ async fn inspect_office_preview_with_script(
         ));
     }
     Ok(extracted)
+}
+
+fn decode_result<T: serde::de::DeserializeOwned>(output: &[u8]) -> Result<T, ApiError> {
+    serde_json::from_slice(output)
+        .map_err(|_| ApiError::Unavailable("workbook inspection returned an invalid result".into()))
 }
 
 async fn run_worker(

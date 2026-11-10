@@ -317,9 +317,7 @@ pub(super) async fn inspect_blob(
             ("bounded_text", report.ai_allowed)
         }
         "text/csv" | "application/csv" => {
-            let text = std::str::from_utf8(bytes)
-                .map_err(|_| invalid("CSV documents must contain valid UTF-8"))?;
-            let inspected = lumiere_file_inspection::inspect_csv_records(text)
+            let inspected = lumiere_file_inspection::inspect_document_csv(bytes)
                 .map_err(|error| invalid(&error.to_string()))?;
             dataset_sha256 = Some(inspected.dataset_sha256);
             content_policy_version = Some(inspected.report.policy_version);
@@ -358,9 +356,19 @@ pub(super) async fn inspect_blob(
                 )
             }
             Err(ApiError::BadRequest(_)) => {
-                crate::file_extraction::inspect_office_preview(bytes, XLSX_MIME).await?;
-                content_policy_version = Some(OFFICE_PREVIEW_POLICY_VERSION.into());
-                ("office_preview_xlsx", false)
+                match crate::file_extraction::inspect_xlsx_viewer(bytes).await {
+                    Ok(_) => {
+                        content_policy_version =
+                            Some(crate::file_extraction::VIEWER_POLICY_VERSION.into());
+                        ("viewer_xlsx", false)
+                    }
+                    Err(ApiError::BadRequest(_)) => {
+                        crate::file_extraction::inspect_office_preview(bytes, XLSX_MIME).await?;
+                        content_policy_version = Some(OFFICE_PREVIEW_POLICY_VERSION.into());
+                        ("office_preview_xlsx", false)
+                    }
+                    Err(error) => return Err(error),
+                }
             }
             Err(error) => return Err(error),
         },
@@ -406,18 +414,26 @@ fn receipt_is_current(receipt: &BlobInspectionReceipt) -> bool {
                 | "bounded_raster_header"
                 | "bounded_pdf_structure"
                 | "restricted_xlsx"
+                | "viewer_xlsx"
                 | "office_preview_xlsx"
                 | "office_preview_docx"
         )
-        && (!matches!(
-            receipt.profile.as_str(),
-            "bounded_text" | "bounded_csv_records"
-        ) || receipt.content_policy_version.as_deref()
-            == Some(lumiere_file_inspection::INSPECTION_POLICY_VERSION))
+        && (receipt.profile != "bounded_text"
+            || receipt.content_policy_version.as_deref()
+                == Some(lumiere_file_inspection::INSPECTION_POLICY_VERSION))
+        && (receipt.profile != "bounded_csv_records"
+            || receipt.content_policy_version.as_deref()
+                == Some(lumiere_file_inspection::DOCUMENT_CSV_POLICY_VERSION))
+        && (receipt.profile != "viewer_xlsx"
+            || (!receipt.ai_allowed
+                && receipt.dataset_sha256.is_none()
+                && receipt.content_policy_version.as_deref()
+                    == Some(crate::file_extraction::VIEWER_POLICY_VERSION)))
         && (!matches!(
             receipt.profile.as_str(),
             "office_preview_xlsx" | "office_preview_docx"
         ) || (!receipt.ai_allowed
+            && receipt.dataset_sha256.is_none()
             && receipt.content_policy_version.as_deref() == Some(OFFICE_PREVIEW_POLICY_VERSION)))
         && (receipt.profile != "restricted_xlsx"
             || receipt.content_policy_version.as_deref()
@@ -560,6 +576,62 @@ mod tests {
         assert!(receipt.processing_allowed);
         assert!(!receipt.ai_allowed);
         assert!(require_ai_eligibility(&receipt).is_err());
+    }
+
+    #[tokio::test]
+    async fn document_csv_admits_alternate_dialects_and_legacy_encodings_for_manual_viewing() {
+        let utf16: Vec<u8> = "\u{feff}ID;Description\r\n0007;\"Café\r\nnotes\"\r\n"
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        for bytes in [
+            utf16.as_slice(),
+            b"ID\tDescription\n0007\t\"a,b; c\"\n".as_slice(),
+            b"ID;Description\n0007;Caf\xe9\n".as_slice(),
+            b"ID,Value;Notes\n0007,1;2\n".as_slice(),
+        ] {
+            let metadata = meta("report.csv", "text/csv", bytes);
+            let receipt = inspect_blob(&metadata, bytes).await.unwrap();
+            assert!(receipt.processing_allowed && !receipt.ai_allowed);
+            assert!(verify_receipt(&receipt, &metadata, bytes).is_ok());
+        }
+
+        let too_many_columns = "x;".repeat(lumiere_file_inspection::MAX_COLUMNS);
+        for bytes in [
+            too_many_columns.as_bytes(),
+            b"ID;Description\n0007;\"unclosed",
+            b"ID;Description\n0007;binary\0text",
+            b"\xff\xfeA\0B",
+        ] {
+            assert!(inspect_blob(&meta("report.csv", "text/csv", bytes), bytes)
+                .await
+                .is_err());
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn spreadsheet_viewer_admission_preserves_formulas_without_import_or_ai_eligibility() {
+        let mut workbook = rust_xlsxwriter::Workbook::new();
+        let sheet = workbook.add_worksheet();
+        sheet.write_formula(0, 0, "=SUM(1,2)").unwrap();
+        workbook
+            .add_worksheet()
+            .write_string(0, 0, "Separate sheet")
+            .unwrap();
+        let bytes = workbook.save_to_buffer().unwrap();
+        let metadata = meta("report.xlsx", crate::spreadsheet::XLSX_CONTENT_TYPE, &bytes);
+        let receipt = inspect_blob(&metadata, &bytes).await.unwrap();
+        assert_eq!(receipt.profile, "viewer_xlsx");
+        assert!(receipt.processing_allowed);
+        assert!(!receipt.ai_allowed);
+        assert!(receipt.dataset_sha256.is_none());
+        assert!(verify_receipt(&receipt, &metadata, &bytes).is_ok());
+        assert!(require_ai_eligibility(&receipt).is_err());
+        let mut forged = receipt;
+        forged.ai_allowed = true;
+        assert!(!receipt_is_current(&forged));
+        assert!(crate::file_extraction::inspect_xlsx(&bytes).await.is_err());
     }
 
     #[test]

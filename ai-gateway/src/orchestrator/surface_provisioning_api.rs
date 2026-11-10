@@ -118,13 +118,92 @@ pub(crate) struct ApiSurfaceWriter<'a> {
     api_token: &'a str,
     identity: String,
     organization_id: u64,
+    is_superuser: bool,
 }
 
 impl<'a> ApiSurfaceWriter<'a> {
+    pub(crate) fn require_platform_admin(&self) -> Result<()> {
+        if !self.is_superuser {
+            anyhow::bail!("platform administrator required");
+        }
+        Ok(())
+    }
+
     /// Keep the native catalog read bound to the organization authorized during
     /// construction; callers cannot supply a different scope for a no-op setup.
     pub(crate) async fn provision(&self, reader: &StdbClient) -> Result<Vec<ProvisionedSurface>> {
         provision_generation_surfaces(self, reader, self.organization_id).await
+    }
+
+    /// Apply defaults through the same actor-authorized operation bridge.
+    pub(crate) async fn provision_company_defaults(
+        &self,
+        company_id: u64,
+        agent_id: u64,
+        intelligence_policy_ref: &str,
+    ) -> Result<()> {
+        self.company_operation(
+            "erp.provision_ai_company_defaults",
+            json!({
+                "companyId": company_id,
+                "agentId": agent_id,
+                "intelligencePolicyRef": intelligence_policy_ref,
+            }),
+        )
+        .await
+    }
+
+    /// Enrollment selects the platform-approved template inside the reducer.
+    pub(crate) async fn enroll_company_defaults(&self, company_id: u64) -> Result<()> {
+        self.company_operation(
+            "erp.enroll_ai_company_defaults",
+            json!({"companyId": company_id}),
+        )
+        .await
+    }
+
+    pub(crate) async fn company_operation(
+        &self,
+        operation: &str,
+        payload: serde_json::Value,
+    ) -> Result<()> {
+        let mut url = self.origin.clone();
+        url.set_path(&format!("/v1/operations/{operation}"));
+        let response = self
+            .http
+            .post(url)
+            .bearer_auth(self.api_token)
+            .header("x-stdb-identity", &self.identity)
+            .header(ORGANIZATION_HEADER, self.organization_id)
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|source| ApiSurfaceError::Transport {
+                stage: ApiStage::Create,
+                source,
+            })?;
+        if response.status() != StatusCode::OK {
+            return Err(ApiSurfaceError::Rejected {
+                stage: ApiStage::Create,
+                status: response.status().as_u16(),
+            }
+            .into());
+        }
+        let bytes = bounded_response(response, ApiStage::Create, MAX_OPERATION_BYTES).await?;
+        let receipt: OperationReceipt =
+            serde_json::from_slice(&bytes).map_err(|_| ApiSurfaceError::InvalidResponse {
+                stage: ApiStage::Create,
+            })?;
+        if !receipt.ok
+            || receipt.operation_id != operation
+            || receipt.correlation_id.trim().is_empty()
+        {
+            return Err(ApiSurfaceError::InvalidResponse {
+                stage: ApiStage::Create,
+            }
+            .into());
+        }
+        Ok(())
     }
 
     pub(crate) async fn authorize(
@@ -183,6 +262,7 @@ impl<'a> ApiSurfaceWriter<'a> {
             api_token,
             identity: session.identity_hex,
             organization_id,
+            is_superuser: session.field_access.is_superuser,
         })
     }
 }
@@ -324,5 +404,25 @@ mod tests {
         ] {
             assert!(trusted_origin(origin).is_err(), "{origin}");
         }
+    }
+}
+
+#[cfg(test)]
+mod platform_authority_tests {
+    use super::*;
+
+    #[test]
+    fn tenant_configuration_permission_does_not_grant_platform_authority() {
+        let mut writer = ApiSurfaceWriter {
+            http: Client::new(),
+            origin: Url::parse("http://localhost:3000").unwrap(),
+            api_token: "test-session",
+            identity: "test-actor".into(),
+            organization_id: 7,
+            is_superuser: false,
+        };
+        assert!(writer.require_platform_admin().is_err());
+        writer.is_superuser = true;
+        assert!(writer.require_platform_admin().is_ok());
     }
 }

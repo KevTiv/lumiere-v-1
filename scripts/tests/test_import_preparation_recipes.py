@@ -48,6 +48,45 @@ class PreparationRecipeTests(unittest.TestCase):
         self.assertEqual(sheet["worksheet"], "Sheet 1")
         self.assertEqual([(record["record"], record["rowStart"]) for record in sheet["records"]], [(1, 3), (2, 9)])
 
+    def test_managed_csv_preserves_selected_dialect_values_and_physical_lines(self):
+        contents = 'private;name;email;hidden\r\nignored;Before;outside;secret\r\nignore; "Café\r\nShop" ;a@example.test;also hidden\r\n'
+        file = source("data.csv", contents.encode("windows-1252"))
+        selection = {"documentId": "81", "versionId": "93", "current": False,
+                     "sheetName": "CSV", "firstRow": 3, "lastRow": 3,
+                     "firstColumn": 2, "lastColumn": 3, "headerRow": 1,
+                     "encoding": "windows-1252"}
+        result = prepare([file], [config(file, delimiter=";", managedSelection=selection)])
+        batch, = result["datasets"]
+        self.assertEqual(batch["targetEntity"], "contact")
+        item, = batch["items"]
+        self.assertEqual(item["source"]["row"], 3)
+        self.assertEqual(item["source"]["sha256"], config(file)["sourceSha256"])
+        self.assertEqual(item["fields"][0]["sourceValue"], "Café\r\nShop")
+        self.assertNotIn("outside", json.dumps(batch))
+        self.assertNotIn("also hidden", json.dumps(batch))
+        file_coverage = result["coverage"]["files"][0]
+        self.assertEqual([(row["rowStart"], row["rowEnd"]) for row in file_coverage["records"]],
+                         [(1, 1), (3, 4)])
+        self.assertEqual(file_coverage["sections"][0]["firstColumn"], 2)
+
+    def test_managed_workbook_uses_exact_sheet_and_leaves_formulas_outside_selection(self):
+        contents = workbook('<row r="2"><c r="A2"><f>NOW()</f></c>'
+                            '<c r="B2" t="inlineStr"><is><t>chosen</t></is></c></row>'
+                            '<row r="9"><c r="A9" t="inlineStr"><is><t>outside</t></is></c></row>',
+                            sheet_count=2)
+        file = source("two-sheets.xlsx", contents)
+        selection = {"documentId": "81", "versionId": "93", "current": True,
+                     "sheetName": "Sheet 1", "firstRow": 2, "lastRow": 2,
+                     "firstColumn": 2, "lastColumn": 2}
+        result = prepare([file], [config(file, managedSelection=selection)])
+        batch, = result["datasets"]
+        self.assertEqual(batch["targetEntity"], "source_observation")
+        self.assertEqual(batch["items"][0]["source"]["row"], 2)
+        self.assertEqual(batch["items"][0]["proposed"]["source_cells"], '["chosen"]')
+        self.assertEqual(result["coverage"]["files"][0]["worksheet"], "Sheet 1")
+        with self.assertRaisesRegex(module.PreparationError, "missing or ambiguous"):
+            prepare([file], [config(file, managedSelection={**selection, "sheetName": "Missing"})])
+
     def test_held_file_has_exact_original_identity_and_never_claims_record_coverage(self):
         broken = source("broken.csv", 'name,email\n"unfinished')
         result = prepare([broken, source("contacts.csv", "name,email\nAlice,a@example.test\n")])

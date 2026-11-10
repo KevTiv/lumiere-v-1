@@ -1,11 +1,52 @@
 {
+  "aiHarness": {
+    "platformProfile": {
+      "tab": "Wasifu wa AI",
+      "title": "Wasifu wa AI wa jukwaa",
+      "description": "Chagua modeli na sera ya matumizi mara moja. Mashirika yanayostahili hurithi wakala na ujuzi chaguomsingi kiotomatiki. Data na ruhusa za watumiaji hubaki ndani ya mipaka yake.",
+      "loading": "Inapakia wasifu wa AI…",
+      "unavailable": "Wasifu wa AI haukuweza kupakiwa.",
+      "retry": "Jaribu tena",
+      "invalid": "Kagua mipangilio ya wasifu wa AI.",
+      "active": "Chaguomsingi la sasa: {{key}}, toleo {{version}}",
+      "empty": "Hakuna wasifu chaguomsingi uliochapishwa. Sanidi na uchapishe wasifu ili kuandaa mashirika kiotomatiki.",
+      "chooseProvider": "Chagua mtoa huduma",
+      "limits": "Mipaka ya matumizi ya shirika",
+      "budgetHint": "Bajeti ya kila mwezi inashirikiwa na kampuni zote katika shirika. Bajeti na bei hutumia sehemu ndogo za sarafu: 1,000,000 ni sawa na kitengo kimoja cha sarafu iliyochaguliwa.",
+      "publishHint": "Uchapishaji huunda toleo lisilobadilika na kulifanya chaguomsingi kwa usajili mpya. Usajili uliopo, mipangilio maalum na vipengele vilivyozimwa huhifadhiwa.",
+      "saved": "Wasifu chaguomsingi umechapishwa. Mashirika mapya yanayostahili yanaweza kuurithi kiotomatiki.",
+      "publish": "Chapisha kama chaguomsingi",
+      "publishing": "Inachapisha…",
+      "modelHint": "Tumia matoleo halisi ya modeli yanayosaidia zana na majibu yenye muundo. Modeli zote mbili lazima zitumie mtoa huduma mmoja. Taarifa za kuingia zinahifadhiwa kwenye seva.",
+      "roles": {
+        "generation_profile": "Modeli ya kutengeneza majibu",
+        "review_profile": "Modeli huru ya ukaguzi"
+      },
+      "fields": {
+        "template_key": "Ufunguo wa wasifu",
+        "template_version": "Toleo jipya",
+        "currency": "Msimbo wa sarafu",
+        "provider": "Mtoa huduma",
+        "model": "Kitambulisho halisi cha modeli",
+        "max_tokens": "Kikomo cha tokeni za matokeo",
+        "context_window": "Dirisha la muktadha (tokeni)",
+        "timeout_ms": "Muda wa ombi (ms)",
+        "max_concurrency": "Maombi kwa wakati mmoja",
+        "input_cost_per_1k_microunits": "Bei ya tokeni 1,000 za ingizo (sehemu ndogo)",
+        "output_cost_per_1k_microunits": "Bei ya tokeni 1,000 za matokeo (sehemu ndogo)",
+        "monthly_limit_units": "Bajeti ya mwezi (sehemu ndogo)",
+        "rate_limit_per_minute": "Maombi kwa dakika",
+        "max_enrolled_organizations": "Idadi ya juu ya mashirika yanayofadhiliwa"
+      }
+    }
+  },
   "aiSkills": {
     "setup": {
       "title": "Maandalizi ya vipengele vya AI",
       "action": "Sanidi vipengele vya AI",
       "settingUp": "Inaandaa…",
-      "description": "Sajili ujuzi unaokosekana wa majibu ya gumzo, mapendekezo ya fomu na rasimu za hatua. Mipangilio na matoleo yaliyopo huhifadhiwa.",
-      "prerequisites": "Hii inaandaa maelezo ya ujuzi. Ukaguzi wa mtoa huduma, kampuni, bajeti na toleo bado hutumika unapotumia AI.",
+      "description": "Tumia wasifu wa AI wa kampuni kwa majibu ya gumzo, mapendekezo ya fomu na rasimu za hatua. Mipangilio maalum na vipengele vilivyozimwa huhifadhiwa.",
+      "prerequisites": "Hutumia wasifu uliopo wa kampuni au chaguomsingi la jukwaa. Ukaguzi wa mtoa huduma, bajeti na matoleo bado hutumika wakati AI inaendeshwa.",
       "permissionRequired": "Ruhusa ya kuunda ujuzi inahitajika kufanya maandalizi.",
       "checked": "Maelezo ya ujuzi yamekaguliwa.",
       "skills": {
@@ -17,6 +58,12 @@
         "created": "Imeongezwa",
         "existing": "Imesajiliwa tayari",
         "inactive": "Haijawashwa (haijabadilishwa)"
+      },
+      "companyRequired": "Chagua kampuni kabla ya kusanidi vipengele vya AI.",
+      "companyStatus": {
+        "configured": "Mipangilio chaguomsingi ya AI imetumika. Mipangilio maalum na vipengele vilivyozimwa vimehifadhiwa.",
+        "profile_required": "Hakuna wasifu wa AI unaostahili. Mwombe msimamizi wa jukwaa achapishe wasifu chaguomsingi, kisha ujaribu tena.",
+        "preserved": "Mipangilio ya AI iliyopo imehifadhiwa. Mipangilio maalum au iliyozimwa bado huamua upatikanaji."
       }
     }
   },

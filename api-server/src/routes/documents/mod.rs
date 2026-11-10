@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use crate::state::AppState;
 use axum::{
+    extract::DefaultBodyLimit,
     routing::{get, post},
     Router,
 };
@@ -15,6 +16,8 @@ mod pivot;
 mod quotations;
 mod retention;
 mod sales;
+mod selection_evidence;
+mod spreadsheet;
 
 use self::accounting::account_move_pdf;
 use self::attachment::attachment_response;
@@ -24,7 +27,23 @@ use self::sales::sale_order_pdf;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
+        .route(
+            "/documents/spreadsheet/selection-evidence",
+            post(selection_evidence::read).layer(DefaultBodyLimit::max(8192)),
+        )
         .merge(crate::document_blobs::blob_router())
+        .route(
+            "/documents/spreadsheet/:document_id/:version_id",
+            get(spreadsheet::metadata),
+        )
+        .route(
+            "/documents/spreadsheet/:document_id/:version_id/range",
+            get(spreadsheet::range),
+        )
+        .route(
+            "/documents/spreadsheet/:document_id/:version_id/search",
+            get(spreadsheet::search),
+        )
         .route("/documents/retention/preview", get(retention::preview))
         .route(
             "/documents/pdf/financial-report/:report_id",
