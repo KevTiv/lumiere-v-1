@@ -6180,6 +6180,66 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/metered_spend.rs: private scoped token/page metering sharing canonical monthly/prepaid reservations; sender-scoped dedicated-reader views"
+    },
+    "provision_ai_company_defaults": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/company_defaults.rs: fills missing bindings and actions without resetting existing tenant settings or spend"
+    },
+    "enroll_ai_company_defaults": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/platform_defaults.rs: immutable template and enrollment uniqueness guards preserve settings and funding on retry"
+    },
+    "register_ai_platform_template": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/platform_defaults.rs: immutable template and enrollment uniqueness guards preserve settings and funding on retry"
+    },
+    "set_ai_platform_default": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/platform_defaults.rs: immutable template and enrollment uniqueness guards preserve settings and funding on retry"
+    },
+    "publish_ai_platform_skill": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/platform_defaults.rs: immutable template and enrollment uniqueness guards preserve settings and funding on retry"
+    },
+    "ensure_ai_managed_allowance": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/platform_defaults.rs: immutable template and enrollment uniqueness guards preserve settings and funding on retry"
     }
   }
 }

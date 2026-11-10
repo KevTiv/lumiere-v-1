@@ -21,6 +21,7 @@ use tokio::{
 
 use crate::{cold_tier::pg_pool, error::ApiError, state::AppState, web_session::OrgSession};
 
+mod managed_source;
 mod manifest;
 #[cfg(test)]
 mod tests;
@@ -653,6 +654,16 @@ async fn create(
         actor: context.actor_identity(),
     };
     let (originals, hash) = decode_submission(&body)?;
+    if let Some(preparation) = &body.preparation {
+        managed_source::verify_submission(
+            &state,
+            &session,
+            body.company_id,
+            preparation,
+            &originals,
+        )
+        .await?;
+    }
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
     accept(&pool, scoped, &body, &originals, &hash).await?;
     Ok(Json(read_task(&pool, scoped, &body.request_id).await?))
@@ -781,6 +792,13 @@ pub(super) async fn create_prepared_task_from_saved_sources(
         ));
     }
     let source_task = read_task(pool, scoped, source_request).await?;
+    if managed_source::has_selection(&source_task["preparation"])
+        || managed_source::has_selection(&preparation)
+    {
+        return Err(ApiError::BadRequest(
+            "open the managed document again to prepare a different selection".into(),
+        ));
+    }
     let client = pool.get().await.map_err(ApiError::internal)?;
     let saved = client.query("SELECT ordinal,file_name,original_bytes FROM lumiere_platform.import_task_source WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 AND ordinal=ANY($5::int[])", &[&scoped.organization.to_string(),&scoped.company.to_string(),&scoped.actor,&source_request,&source_ordinals]).await.map_err(ApiError::internal)?;
     if saved.len() != source_ordinals.len() {

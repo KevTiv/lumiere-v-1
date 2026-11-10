@@ -46,6 +46,13 @@ enum FieldState {
     Closed,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RecordMode {
+    Import,
+    Header,
+    Document,
+}
+
 /// Parse comma-separated records, quoted line breaks and escaped double quotes.
 /// Empty physical records are preserved; a final record terminator adds no row.
 ///
@@ -83,7 +90,69 @@ fn flat_records(
 /// Rejects the same malformed quoting, controls and resource limits as flat CSV.
 pub fn parse_csv_records(text: &str) -> Result<Vec<Vec<String>>, InspectionError> {
     let offset = validate_input(text)?;
-    parse_records(&text[offset..], offset, ',', false)
+    parse_records(&text[offset..], offset, ',', RecordMode::Import)
+}
+
+/// Resolve a document dialect without imposing native import header rules.
+/// Only an unambiguous comma interpretation is eligible for existing AI consumers.
+pub(crate) fn parse_document_csv(text: &str) -> Result<(Vec<Vec<String>>, bool), InspectionError> {
+    let offset = validate_input(text)?;
+    let text = &text[offset..];
+    let mut selected = parse_records(text, offset, ',', RecordMode::Document);
+    let mut best_score = selected
+        .as_ref()
+        .map_or((0, 0), |rows| document_score(rows));
+    let mut unambiguous_comma = best_score.0 > 0;
+    let mut alternative_limit = None;
+    for delimiter in [';', '\t'] {
+        match parse_records(text, offset, delimiter, RecordMode::Document) {
+            Ok(candidate) => {
+                let score = document_score(&candidate);
+                if score.0 > 0 {
+                    unambiguous_comma = false;
+                }
+                if score > best_score {
+                    selected = Ok(candidate);
+                    best_score = score;
+                }
+            }
+            Err(error @ InspectionError::LimitExceeded(_)) => {
+                alternative_limit = Some(error);
+            }
+            Err(_) => {}
+        }
+    }
+    if best_score.0 == 0 {
+        if let Some(error) = alternative_limit {
+            return Err(error);
+        }
+        // Every valid interpretation has a single column.
+        unambiguous_comma = true;
+    }
+    selected.map(|records| (records, unambiguous_comma))
+}
+
+pub(crate) fn parse_document_csv_with_delimiter(
+    text: &str,
+    delimiter: char,
+) -> Result<Vec<Vec<String>>, InspectionError> {
+    if !matches!(delimiter, ',' | ';' | '\t') {
+        return Err(InspectionError::InvalidCsv("uses an unsupported delimiter"));
+    }
+    let offset = validate_input(text)?;
+    parse_records(&text[offset..], offset, delimiter, RecordMode::Document)
+}
+
+fn document_score(records: &[Vec<String>]) -> (usize, usize) {
+    let mut frequencies = [0; MAX_COLUMNS + 1];
+    let mut multi_column_rows = 0;
+    let mut consistent_rows = 0;
+    for row in records.iter().filter(|row| row.len() > 1).take(64) {
+        multi_column_rows += 1;
+        frequencies[row.len()] += 1;
+        consistent_rows = consistent_rows.max(frequencies[row.len()]);
+    }
+    (multi_column_rows, consistent_rows)
 }
 
 /// Resolve the delimiter from the first logical record, then parse the whole input.
@@ -104,7 +173,7 @@ pub(crate) fn parse_csv_source(
             CsvDelimiter::Pipe,
         ];
         let mut matching = candidates.into_iter().filter(|delimiter| {
-            match parse_records(text, offset, delimiter.character(), true) {
+            match parse_records(text, offset, delimiter.character(), RecordMode::Header) {
                 Ok(records) => records.first().is_some_and(|header| header.len() > 1),
                 // An oversized header still identifies its delimiter.
                 Err(InspectionError::LimitExceeded("200 columns")) => true,
@@ -119,7 +188,12 @@ pub(crate) fn parse_csv_source(
         }
         inferred
     };
-    let (headers, rows) = flat_records(parse_records(text, offset, delimiter.character(), false)?)?;
+    let (headers, rows) = flat_records(parse_records(
+        text,
+        offset,
+        delimiter.character(),
+        RecordMode::Import,
+    )?)?;
     Ok((delimiter, headers, rows))
 }
 
@@ -141,7 +215,7 @@ fn parse_records(
     text: &str,
     offset: usize,
     delimiter: char,
-    header_only: bool,
+    mode: RecordMode,
 ) -> Result<Vec<Vec<String>>, InspectionError> {
     let mut records = Vec::new();
     let mut row = Vec::new();
@@ -169,7 +243,7 @@ fn parse_records(
         }
         match ch {
             ch if ch == delimiter || matches!(ch, '\r' | '\n') => {
-                push_field(&mut row, &mut field, &mut total_cells)?;
+                push_field(&mut row, &mut field, &mut total_cells, mode)?;
                 cell_chars = 0;
                 state = FieldState::Start;
                 if ch != delimiter {
@@ -177,13 +251,17 @@ fn parse_records(
                         chars.next();
                     }
                     push_record(&mut records, &mut row)?;
-                    if header_only {
+                    if mode == RecordMode::Header {
                         return Ok(records);
                     }
                     record_terminated = true;
                 }
             }
-            '"' if state == FieldState::Start => state = FieldState::Quoted,
+            '"' if state == FieldState::Start => {
+                field.clear();
+                cell_chars = 0;
+                state = FieldState::Quoted;
+            }
             '"' => {
                 return Err(InspectionError::CsvLocation {
                     record: records.len() + 1,
@@ -202,7 +280,9 @@ fn parse_records(
                 });
             }
             _ => {
-                state = FieldState::Unquoted;
+                if mode != RecordMode::Document || !matches!(ch, ' ' | '\t') {
+                    state = FieldState::Unquoted;
+                }
                 push_char(&mut field, ch, &mut cell_chars)?;
             }
         }
@@ -216,7 +296,7 @@ fn parse_records(
         });
     }
     if !record_terminated {
-        push_field(&mut row, &mut field, &mut total_cells)?;
+        push_field(&mut row, &mut field, &mut total_cells, mode)?;
         push_record(&mut records, &mut row)?;
     }
     Ok(records)
@@ -260,6 +340,7 @@ fn push_field(
     row: &mut Vec<String>,
     field: &mut String,
     total_cells: &mut usize,
+    mode: RecordMode,
 ) -> Result<(), InspectionError> {
     if row.len() >= MAX_COLUMNS {
         return Err(InspectionError::LimitExceeded("200 columns"));
@@ -268,8 +349,12 @@ fn push_field(
     if *total_cells > MAX_MATRIX_CELLS {
         return Err(InspectionError::LimitExceeded("1000000 cells"));
     }
-    row.push(field.trim().to_owned());
-    field.clear();
+    if mode == RecordMode::Document {
+        row.push(std::mem::take(field));
+    } else {
+        row.push(field.trim().to_owned());
+        field.clear();
+    }
     Ok(())
 }
 

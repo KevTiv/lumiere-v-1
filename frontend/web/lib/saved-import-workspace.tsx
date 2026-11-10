@@ -35,6 +35,7 @@ import {
 } from "./use-saved-import-task"
 import type { ReviewedImportSource } from "./import-review-model"
 import type { ChatImportTask } from "./chat-import-task"
+import { DocumentViewerDialog } from "../components/document-viewer-dialog"
 import { ImportPreparationPanel } from "./import-preparation-panel"
 
 export function SavedImportWorkspace({
@@ -77,6 +78,14 @@ export function SavedImportWorkspace({
     view === "results" ? "results" : "preview",
   )
   const [nativePreview, setNativePreview] = useState(false)
+  const [sourcePreview, setSourcePreview] = useState<{
+    documentId: string
+    versionId: string
+  } | null>(null)
+  const managedSource = task?.preparation?.files.find(
+    (file) => file.managedSelection,
+  )
+  const managedSelection = managedSource?.managedSelection
   const [continuationBlock, setContinuationBlock] =
     useState<GuidedImportContinuationBlock>(null)
   const lastContinuationBlock = useRef<GuidedImportContinuationBlock>(null)
@@ -331,6 +340,48 @@ export function SavedImportWorkspace({
             failed={workflow.isError}
             onRetry={() => void workflow.refetch()}
           />
+          {managedSelection && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <p>
+                {t("documents.viewer.savedSelection", {
+                  defaultValue:
+                    "Selected source · {{sheet}} · R{{firstRow}}C{{firstColumn}}:R{{lastRow}}C{{lastColumn}}",
+                  sheet: managedSelection.sheetName,
+                  firstRow: managedSelection.firstRow,
+                  lastRow: managedSelection.lastRow,
+                  firstColumn: managedSelection.firstColumn,
+                  lastColumn: managedSelection.lastColumn,
+                })}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setSourcePreview({
+                    documentId: managedSelection.documentId,
+                    versionId: managedSelection.versionId,
+                  })
+                }
+              >
+                {t("documents.viewer.openSourceVersion", {
+                  defaultValue: "Open source version",
+                })}
+              </Button>
+            </div>
+          )}
+          {sourcePreview &&
+            managedSelection?.documentId === sourcePreview.documentId &&
+            managedSelection.versionId === sourcePreview.versionId && (
+              <DocumentViewerDialog
+                organizationId={BigInt(scope.organizationId)}
+                documentId={sourcePreview.documentId}
+                versionId={sourcePreview.versionId}
+                onOpenChange={(open) => {
+                  if (!open) setSourcePreview(null)
+                }}
+              />
+            )}
           <ul className="space-y-2">
             {task.files.map((file) => (
               <li
@@ -512,7 +563,7 @@ export function SavedImportWorkspace({
                   })}
             </Button>
           ) : null}
-          {allowImport ? (
+          {allowImport && !managedSelection ? (
             <ImportPreparationPanel
               task={task}
               organizationId={scope.organizationId}

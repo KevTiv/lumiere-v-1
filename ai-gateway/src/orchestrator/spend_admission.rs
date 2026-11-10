@@ -134,9 +134,19 @@ impl SpendLedger for StdbSpendLedger<'_> {
         agent_id: u64,
         period: &str,
     ) -> Result<Option<SpendBudget>> {
-        SpendReader::new(self.reader)
-            .budget(organization_id, agent_id, period)
-            .await
+        let reader = SpendReader::new(self.reader);
+        if let Some(budget) = reader.budget(organization_id, agent_id, period).await? {
+            return Ok(Some(budget));
+        }
+        // Only the approved managed enrollment can renew its pinned allowance.
+        // This reducer never grants actions, creates agents or resets settled spend.
+        self.writer
+            .call_reducer(stdb_client::reducer_call!(
+                "ensure_ai_managed_allowance",
+                serde_json::json!([organization_id, agent_id]),
+            ))
+            .await?;
+        reader.budget(organization_id, agent_id, period).await
     }
 
     async fn latest_price_snapshot(
@@ -1149,6 +1159,75 @@ pub(crate) mod tests {
     use std::sync::Mutex;
 
     use crate::providers::llm::ThinkingMode;
+
+    #[tokio::test]
+    async fn managed_allowance_renewal_uses_writer_only_after_missing_budget() {
+        use axum::{extract::State, http::HeaderMap, routing::post, Json, Router};
+        use serde_json::{json, Value};
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
+        async fn sql(
+            State(writes): State<Arc<AtomicUsize>>,
+            headers: HeaderMap,
+            statement: String,
+        ) -> Json<Value> {
+            assert_eq!(headers["authorization"], "Bearer reader");
+            assert!(statement.contains("ai_spend_budget_read"));
+            let names = [
+                "id",
+                "organization_id",
+                "agent_id",
+                "billing_period",
+                "currency",
+                "limit_units",
+                "settled_units",
+                "outstanding_units",
+            ];
+            let rows = if writes.load(Ordering::SeqCst) == 0 {
+                vec![]
+            } else {
+                vec![json!([1, 9, 7, "2026-09", "USD", 100, 40, 10])]
+            };
+            Json(
+                json!([{"schema":{"elements":names.map(|name|json!({"name":{"some":name}}))},"rows":rows}]),
+            )
+        }
+        async fn renew(
+            State(writes): State<Arc<AtomicUsize>>,
+            headers: HeaderMap,
+            Json(args): Json<Value>,
+        ) {
+            assert_eq!(headers["authorization"], "Bearer writer");
+            assert_eq!(args, json!([9, 7]));
+            writes.fetch_add(1, Ordering::SeqCst);
+        }
+        let writes = Arc::new(AtomicUsize::new(0));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let app = Router::new()
+            .route("/v1/database/fixture/sql", post(sql))
+            .route(
+                "/v1/database/fixture/call/ensure_ai_managed_allowance",
+                post(renew),
+            )
+            .with_state(writes.clone());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let reader = StdbClient::new(base.clone(), "fixture".into(), "reader".into());
+        let writer = StdbClient::new(base, "fixture".into(), "writer".into());
+        let ledger = StdbSpendLedger {
+            reader: &reader,
+            writer: &writer,
+        };
+        for _ in 0..2 {
+            let budget = ledger.budget(9, 7, "2026-09").await.unwrap().unwrap();
+            assert_eq!(budget.settled_units, 40);
+            assert_eq!(budget.outstanding_units, 10);
+        }
+        assert_eq!(writes.load(Ordering::SeqCst), 1);
+        server.abort();
+    }
 
     fn fixed_clock() -> DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 9, 13, 12, 0, 0).unwrap()

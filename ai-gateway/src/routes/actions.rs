@@ -9,7 +9,7 @@ use crate::{
         resolve_surface_agent, AgentLimitViolation,
     },
     ai_spend::{self, input_request_key, RequestKind, SpendReader},
-    error::{AppError, AppResult, SurfaceSkillNotProvisioned},
+    error::{AppError, AppResult, DefaultAgentNotProvisioned, SurfaceSkillNotProvisioned},
     harness::snapshot::{
         fetch_authorized_live_snapshots, filter_entity_refs_by_allowed_types, ActorCredentials,
         EntityRef, LiveSnapshot,
@@ -37,6 +37,7 @@ const ACTION_DRAFT_MAX_TOKENS: u32 = 2048;
 enum DraftActionsError {
     Limit(AgentLimitViolation),
     Setup(SurfaceSkillNotProvisioned),
+    DefaultSetup(DefaultAgentNotProvisioned),
     Other(String),
 }
 
@@ -48,7 +49,10 @@ impl DraftActionsError {
     fn from_agent_resolution(error: anyhow::Error) -> Self {
         match error.downcast::<SurfaceSkillNotProvisioned>() {
             Ok(error) => Self::Setup(error),
-            Err(error) => Self::other(error.to_string()),
+            Err(error) => match error.downcast::<DefaultAgentNotProvisioned>() {
+                Ok(error) => Self::DefaultSetup(error),
+                Err(error) => Self::other(error.to_string()),
+            },
         }
     }
 }
@@ -930,6 +934,7 @@ pub async fn post_draft(
         }
         Err(DraftActionsError::Limit(violation)) => return Err(violation.into_app_error()),
         Err(DraftActionsError::Setup(error)) => return Err(error.into()),
+        Err(DraftActionsError::DefaultSetup(error)) => return Err(error.into()),
         Err(DraftActionsError::Other(err)) => {
             return Err(AppError::Internal(format!(
                 "action draft generation failed before stable persistence: {err}"

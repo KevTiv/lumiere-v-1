@@ -220,7 +220,10 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
   const { data: teamMembers = [] } = useAiTeamMembers(orgId)
   const { data: memberSkills = [] } = useAiTeamMemberSkills(orgId)
   const syncSkills = useSyncAiSkills(organizationId)
-  const provisionSurfaces = useProvisionAiSurfaces(organizationId)
+  const provisionSurfaces = useProvisionAiSurfaces(organizationId, operatingCompanyId ?? undefined)
+  const companySetup = operatingCompanyId != null && provisionSurfaces.data?.company_setup?.company_id === operatingCompanyId
+    ? provisionSurfaces.data.company_setup
+    : undefined
   const canProvisionSurfaces = permissionsReady === true && checkPermission("ai_skill", "create").allowed
   const createSkill = useCreateAiSkill(organizationId)
   const setSkillActive = useSetAiSkillActive(organizationId)
@@ -370,7 +373,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           <Button
             type="button"
             variant="outline"
-            disabled={isPending || !canProvisionSurfaces}
+            disabled={isPending || !canProvisionSurfaces || !operatingCompanyId}
             onClick={() => provisionSurfaces.mutate()}
             data-testid="ai-skills-provision-surfaces"
           >
@@ -378,14 +381,17 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">{t("aiSkills.setup.prerequisites")}</p>
+        {!operatingCompanyId ? (
+          <p className="text-sm text-muted-foreground">{t("aiSkills.setup.companyRequired")}</p>
+        ) : null}
         {permissionsReady === true && !canProvisionSurfaces ? (
           <p className="text-sm text-muted-foreground">{t("aiSkills.setup.permissionRequired")}</p>
         ) : null}
-        {provisionSurfaces.data ? (
+        {companySetup ? (
           <div role="status" className="space-y-2 text-sm">
-            <p>{t("aiSkills.setup.checked")}</p>
+            <p>{t(`aiSkills.setup.companyStatus.${companySetup.status}`)}</p>
             <ul className="space-y-1">
-              {provisionSurfaces.data.skills.map((skill) => (
+              {provisionSurfaces.data?.skills.map((skill) => (
                 <li key={skill.skill_key} className="flex flex-wrap justify-between gap-2">
                   <span>{t(`aiSkills.setup.skills.${skill.skill_key}`)}</span>
                   <span className="text-muted-foreground">{t(`aiSkills.setup.status.${skill.status}`)}</span>

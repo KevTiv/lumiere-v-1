@@ -47,7 +47,9 @@ pub use company_scope::{
 };
 use crm::filter_crm_company_rows;
 use documents::{read_document_templates, read_mail_templates};
-pub(crate) use documents::{read_document_versions, read_documents, DocumentReadProjection};
+pub(crate) use documents::{
+    read_document_versions, read_documents, read_spreadsheet_document_rows, DocumentReadProjection,
+};
 use hr::{maybe_log_hr_pii_read, read_direct_reports, read_employees, read_my_employee};
 use messaging::read_queued_mail_messages;
 use row_values::row_company_matches;

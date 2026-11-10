@@ -1,0 +1,36 @@
+name: SpacetimeDB recovery drill
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile.spacetimedb-recovery
+      - infra/spacetimedb/**
+      - scripts/railway-stdb-*
+      - scripts/tests/*stdb*recovery*
+      - scripts/tests/*stdb*restore*
+      - scripts/tests/*stdb*supervisor*
+      - scripts/tests/fixtures/stdb-production-upgrade/**
+      - .github/workflows/test-stdb-recovery.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Build the synthetic database module
+        run: cargo build --locked --release --target wasm32-unknown-unknown --manifest-path scripts/tests/fixtures/stdb-production-upgrade/Cargo.toml
+      - name: Build the opt-in recovery image
+        run: docker build --file Dockerfile.spacetimedb-recovery --tag lumiere-stdb-recovery-test .
+      - name: Exercise capture and isolated restore
+        run: |
+          bash scripts/tests/test-railway-stdb-recovery-engine.sh \
+            lumiere-stdb-recovery-test \
+            scripts/tests/fixtures/stdb-production-upgrade/target/wasm32-unknown-unknown/release/lumiere_upgrade_baseline.wasm

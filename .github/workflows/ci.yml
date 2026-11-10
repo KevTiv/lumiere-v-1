@@ -216,6 +216,9 @@ jobs:
       - name: Managed document storage and scoped byte access
         run: |
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib document_blob
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib spreadsheet
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::documents::selection_evidence::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --bin gateway routes::rag::spreadsheet::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib config::tests::document_
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --bin document-blob-migrate
 

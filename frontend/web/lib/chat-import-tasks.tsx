@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { apiFetch } from "./api-fetch"
 import { ChatReconciliationPreview } from "./chat-reconciliation-preview"
 import { DataImportWorkspace } from "./data-import-workspace"
+import type { ImportPreparation } from "./import-preparation"
 import type { ImportTaskView } from "./import-task-navigation"
 import {
   chatImportScopeKey, listChatImportTasks, parseChatImportTask, recoverChatImportPointer, recoverChatImportDecision,
@@ -86,14 +87,14 @@ export function useChatImportTasks(args: {
     void reload()
   }, [key, epoch, reload])
 
-  const importFiles = useCallback(async (files: File[]) => {
+  const importFiles = useCallback(async (files: File[], preparation?: ImportPreparation) => {
     if (!scope || !isCurrent() || running.current?.epoch === epoch || authorization.current.epoch !== epoch || !authorization.current.available) throw new Error("Check access to saved imports and wait for the current submission before adding files.")
     const operation = { epoch, version: ++loadVersion.current }
     running.current = operation
     const current = () => isCurrent() && running.current === operation && loadVersion.current === operation.version
     setState(previous => ({ ...previous, busy: true, error: null }))
     try {
-      const task = await submitChatImportFiles({ files, scope, storage: window.localStorage, fetcher: apiFetch, isCurrent: current, knownTasks: state.key === key && state.epoch === epoch ? state.tasks : [] })
+      const task = await submitChatImportFiles({ files, scope, storage: window.localStorage, fetcher: apiFetch, isCurrent: current, knownTasks: state.key === key && state.epoch === epoch ? state.tasks : [], preparation })
       if (current()) {
         setState(previous => ({ ...previous, tasks: mergeTask(previous.tasks, task), pointer: null }))
         setFocus({ key: key!, epoch, taskId: task.requestId })

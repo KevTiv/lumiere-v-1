@@ -1,0 +1,14 @@
+FROM clockworklabs/spacetime:v2.8.2@sha256:8ea57631d87d1eecbfabfe91e11b895e5e93fde7bf440c1b64e856e43ede07d2
+
+USER root
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends age ca-certificates jq python3 rclone util-linux \
+  && rm -rf /var/lib/apt/lists/* \
+  && install -d -o 1000 -g 1000 /data
+
+COPY --chmod=0755 infra/spacetimedb/railway-entrypoint.sh /usr/local/bin/lumiere-spacetimedb
+COPY --chmod=0755 scripts/railway-stdb-backup.sh /usr/local/bin/lumiere-stdb-backup
+COPY scripts/railway-stdb-restore.py scripts/railway-stdb-supervisor.py /usr/local/lib/lumiere/
+
+EXPOSE 3000
+ENTRYPOINT ["python3", "/usr/local/lib/lumiere/railway-stdb-supervisor.py"]

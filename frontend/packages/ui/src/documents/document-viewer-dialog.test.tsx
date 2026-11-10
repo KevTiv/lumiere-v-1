@@ -19,6 +19,7 @@ import {
   vi,
 } from "vitest"
 import { DocumentViewerDialog } from "../../../../web/components/document-viewer-dialog"
+import { DocumentSelectionActionsContext } from "../../../../web/lib/document-selection-actions"
 
 type DocumentRow = {
   id: string
@@ -222,8 +223,10 @@ afterEach(() => {
 describe("shared saved-file viewer", () => {
   it("shows exact CSV content with version selection and fresh authorized reads", async () => {
     render(<DocumentViewerDialog {...props} />)
-    const table = await screen.findByRole("table", { name: "CSV preview" })
-    expect(within(table).getByRole("cell", { name: "Coffee" })).toBeTruthy()
+    const table = await screen.findByRole("grid", { name: "CSV preview" })
+    expect(
+      await within(table).findByRole("gridcell", { name: "Coffee" }),
+    ).toBeTruthy()
     expect(screen.getByRole("combobox", { name: "File version" })).toBeTruthy()
     expect(blobRequests()[0]?.[0]).toBe(
       `${currentUrl}?sha256=${fixture.documents[0]!.checksum}`,
@@ -237,8 +240,8 @@ describe("shared saved-file viewer", () => {
     )
     fireEvent.click(screen.getByRole("combobox", { name: "File version" }))
     fireEvent.click(await screen.findByRole("option", { name: "Version 1" }))
-    await screen.findByRole("cell", { name: "Tea" })
-    expect(screen.queryByRole("cell", { name: "Coffee" })).toBeNull()
+    await screen.findByRole("gridcell", { name: "Tea" })
+    expect(screen.queryByRole("gridcell", { name: "Coffee" })).toBeNull()
     expect(blobRequests()[1]?.[0]).toContain(olderUrl)
     expect(
       fixture.fetcher.mock.calls.filter(([url]) =>
@@ -247,7 +250,7 @@ describe("shared saved-file viewer", () => {
     ).toBe(2)
   })
 
-  it("paginates CSV records and treats formula-like cells as inert text", async () => {
+  it("virtualizes CSV records and finds offscreen cells without interpreting formulas", async () => {
     // Quoting is part of the original file and is displayed as a cell value.
     setupFile(
       "Report\n" +
@@ -258,14 +261,109 @@ describe("shared saved-file viewer", () => {
         ).join("\n"),
     )
     render(<DocumentViewerDialog {...props} />)
-    await screen.findByRole("cell", {
+    await screen.findByRole("gridcell", {
       name: '=HYPERLINK("https://example.com")',
     })
     expect(screen.queryByRole("link")).toBeNull()
-    expect(screen.queryByRole("cell", { name: "item-59" })).toBeNull()
-    fireEvent.click(screen.getByRole("button", { name: "Next" }))
-    expect(screen.getByRole("cell", { name: "item-59" })).toBeTruthy()
-    expect(screen.getByText("Rows 51–61 of 61")).toBeTruthy()
+    expect(screen.queryByRole("gridcell", { name: "item-59" })).toBeNull()
+    fireEvent.change(screen.getByRole("searchbox", { name: "Find in sheet" }), {
+      target: { value: "item-59" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Next match" }))
+    await screen.findByText("A61", { selector: "[role=status]" })
+    const grid = screen.getByRole("grid")
+    // JSDOM does not generate scroll events when a scroll offset is assigned.
+    fireEvent.scroll(grid)
+    expect(
+      (await screen.findByRole("gridcell", { name: "item-59" })).getAttribute(
+        "aria-selected",
+      ),
+    ).toBe("true")
+    expect(screen.queryByRole("gridcell", { name: "item-0" })).toBeNull()
+  })
+
+  it("reparses verified CSV bytes after an encoding error", async () => {
+    setupFile(new Uint8Array([78, 97, 109, 101, 10, 67, 97, 102, 233]))
+    render(<DocumentViewerDialog {...props} />)
+    await screen.findByRole("alert")
+    expect(screen.getByRole("button", { name: "Download file" })).toBeTruthy()
+    fireEvent.click(screen.getByRole("combobox", { name: "Encoding" }))
+    fireEvent.click(await screen.findByRole("option", { name: "Windows-1252" }))
+    await screen.findByRole("gridcell", { name: "Café" })
+    expect(screen.queryByRole("alert")).toBeNull()
+    expect(blobRequests()).toHaveLength(1)
+  })
+
+  it("copies a keyboard range and shows the untruncated cell", async () => {
+    setupFile('Name,Notes\nCoffee,"two\nlines"\n')
+    render(<DocumentViewerDialog {...props} />)
+    await screen.findByRole("gridcell", { name: "Coffee" })
+    const grid = screen.getByRole("grid")
+    fireEvent.click(screen.getByRole("gridcell", { name: "Coffee" }))
+    fireEvent.keyDown(grid, { key: "ArrowRight", shiftKey: true })
+    const clipboardData = { setData: vi.fn() }
+    fireEvent.copy(grid, { clipboardData })
+    expect(clipboardData.setData).toHaveBeenCalledWith(
+      "text/plain",
+      'Coffee\t"two\nlines"',
+    )
+    fireEvent.click(screen.getByRole("button", { name: "Cell details" }))
+    expect(
+      screen.getByLabelText("Cell details", { selector: "div" }).textContent,
+    ).toContain("two\nlines")
+  })
+
+  it("extends a selection with the touch range toggle", async () => {
+    render(<DocumentViewerDialog {...props} />)
+    fireEvent.click(await screen.findByRole("gridcell", { name: "Name" }))
+    const extend = screen.getByRole("button", { name: "Extend selection" })
+    fireEvent.click(extend)
+    expect(extend.getAttribute("aria-pressed")).toBe("true")
+    fireEvent.click(screen.getByRole("gridcell", { name: "1200" }))
+    expect(screen.getByText("A1:B2")).toBeTruthy()
+    expect(
+      screen
+        .getByRole("gridcell", { name: "Coffee" })
+        .getAttribute("aria-selected"),
+    ).toBe("true")
+    fireEvent.click(extend)
+    fireEvent.click(screen.getByRole("gridcell", { name: "1200" }))
+    expect(screen.getByText("B2")).toBeTruthy()
+    expect(
+      screen
+        .getByRole("gridcell", { name: "Coffee" })
+        .getAttribute("aria-selected"),
+    ).toBe("false")
+  })
+
+  it("passes canonical CSV coordinates and parse settings to an authorized selection action", async () => {
+    const action = vi.fn().mockResolvedValue(undefined)
+    render(
+      <DocumentSelectionActionsContext.Provider value={action}>
+        <DocumentViewerDialog {...props} />
+      </DocumentSelectionActionsContext.Provider>,
+    )
+    fireEvent.click(await screen.findByRole("gridcell", { name: "Coffee" }))
+    fireEvent.click(screen.getByRole("button", { name: "CSV options" }))
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Use first row as headings" }),
+    )
+    fireEvent.click(screen.getByRole("button", { name: "Explain" }))
+    await waitFor(() =>
+      expect(action).toHaveBeenCalledWith(
+        "explain",
+        expect.objectContaining({
+          organizationId: 7n,
+          companyId: 3n,
+          source: expect.objectContaining({ documentId: "1", versionId: "11" }),
+          sheetName: "CSV",
+          range: { firstRow: 2, lastRow: 2, firstColumn: 1, lastColumn: 1 },
+          text: "Coffee",
+          parsing: { delimiter: ",", encoding: "utf-8", headerRow: 1 },
+        }),
+        expect.any(AbortSignal),
+      ),
+    )
   })
 
   it("switches inspected worksheets and displays cells as literal text", async () => {
@@ -276,29 +374,31 @@ describe("shared saved-file viewer", () => {
     )
     const source = fixture.documents[0]!
     fixture.fetcher.mockImplementation(async (url: string) =>
-      url.includes("preview=true")
-        ? Response.json({
-            sourceSha256: source.checksum,
-            sourceSize: source.fileSize,
-            preview: {
-              kind: "xlsx",
-              sheets: [
-                {
-                  name: "Ledger",
-                  columns: 1,
-                  rows: [["Rent"]],
-                  truncated: false,
-                },
-                {
-                  name: "Notes",
-                  columns: 1,
-                  rows: [["<script>"]],
-                  truncated: true,
-                },
-              ],
-            },
-          })
-        : responseFor(url),
+      url.startsWith("/api/documents/spreadsheet/")
+        ? new Response("unreadable", { status: 422 })
+        : url.includes("preview=true")
+          ? Response.json({
+              sourceSha256: source.checksum,
+              sourceSize: source.fileSize,
+              preview: {
+                kind: "xlsx",
+                sheets: [
+                  {
+                    name: "Ledger",
+                    columns: 1,
+                    rows: [["Rent"]],
+                    truncated: false,
+                  },
+                  {
+                    name: "Notes",
+                    columns: 1,
+                    rows: [["<script>"]],
+                    truncated: true,
+                  },
+                ],
+              },
+            })
+          : responseFor(url),
     )
     render(<DocumentViewerDialog {...props} />)
     const ledger = await screen.findByRole("table", { name: "Ledger" })
@@ -311,7 +411,7 @@ describe("shared saved-file viewer", () => {
     expect(screen.getByText(/worksheet preview is limited/)).toBeTruthy()
     expect(blobRequests()).toHaveLength(1)
     expect(blobRequests()[0]?.[0]).toBe(
-      `${currentUrl}?sha256=${source.checksum}&preview=true&documentId=1&companyId=3`,
+      `${currentUrl}?sha256=${source.checksum}&preview=true&documentId=1&versionId=11&companyId=3`,
     )
   })
 
@@ -389,11 +489,11 @@ describe("shared saved-file viewer", () => {
 
   it("drops current content immediately on company change without reopening it in the new scope", async () => {
     const view = render(<DocumentViewerDialog {...props} />)
-    await screen.findByRole("cell", { name: "Coffee" })
+    await screen.findByRole("gridcell", { name: "Coffee" })
     const previousRequests = fixture.fetcher.mock.calls.length
     fixture.session = { ...fixture.session, activeCompanyId: 4 }
     view.rerender(<DocumentViewerDialog {...props} />)
-    expect(screen.queryByRole("table")).toBeNull()
+    expect(screen.queryByRole("grid")).toBeNull()
     expect(screen.getByRole("alert").textContent).toContain(
       "Your workspace changed",
     )
@@ -417,19 +517,19 @@ describe("shared saved-file viewer", () => {
     const view = render(<DocumentViewerDialog {...props} />)
     await waitFor(() => expect(oldRequest.signal).toBeDefined())
     view.rerender(<DocumentViewerDialog {...props} versionId="10" />)
-    await screen.findByRole("cell", { name: "Tea" })
+    await screen.findByRole("gridcell", { name: "Tea" })
     await act(async () => {
       finish(responseFor(`${currentUrl}?sha256=ignored`))
     })
     expect(oldRequest.signal?.aborted).toBe(true)
-    expect(screen.queryByRole("cell", { name: "Coffee" })).toBeNull()
-    expect(screen.getByRole("cell", { name: "Tea" })).toBeTruthy()
+    expect(screen.queryByRole("gridcell", { name: "Coffee" })).toBeNull()
+    expect(screen.getByRole("gridcell", { name: "Tea" })).toBeTruthy()
   })
 
   it("allows current-file reads without requesting unauthorized version history", async () => {
     fixture.versionsAllowed = false
     render(<DocumentViewerDialog {...props} />)
-    await screen.findByRole("cell", { name: "Coffee" })
+    await screen.findByRole("gridcell", { name: "Coffee" })
     expect(screen.queryByRole("combobox")).toBeNull()
     expect(
       fixture.fetcher.mock.calls.some(([url]) =>
@@ -440,11 +540,11 @@ describe("shared saved-file viewer", () => {
 
   it("rechecks the exact record before downloading and clears preview after revocation", async () => {
     render(<DocumentViewerDialog {...props} />)
-    await screen.findByRole("cell", { name: "Coffee" })
+    await screen.findByRole("gridcell", { name: "Coffee" })
     fixture.documents = []
     fireEvent.click(screen.getByRole("button", { name: "Download file" }))
     await screen.findByRole("alert")
-    expect(screen.queryByRole("table")).toBeNull()
+    expect(screen.queryByRole("grid")).toBeNull()
     expect(blobRequests()).toHaveLength(1)
     expect(URL.createObjectURL).not.toHaveBeenCalled()
   })
@@ -454,7 +554,7 @@ describe("shared saved-file viewer", () => {
       .spyOn(HTMLAnchorElement.prototype, "click")
       .mockImplementation(() => {})
     render(<DocumentViewerDialog {...props} />)
-    await screen.findByRole("cell", { name: "Coffee" })
+    await screen.findByRole("gridcell", { name: "Coffee" })
     fireEvent.click(screen.getByRole("button", { name: "Download file" }))
     await waitFor(() => expect(click).toHaveBeenCalledOnce())
     expect(blobRequests()).toHaveLength(2)
@@ -464,6 +564,140 @@ describe("shared saved-file viewer", () => {
         String(url).startsWith("/api/query/documents?"),
       ).length,
     ).toBe(2)
+  })
+
+  it("renders scoped XLSX ranges, keeps merged values at the scroll edge, and switches sheets", async () => {
+    setupFile(
+      "workbook",
+      "book.xlsx",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    const identity = {
+      documentId: "1",
+      versionId: "11",
+      checksum: fixture.documents[0]!.checksum,
+    }
+    const maxRows = 1_048_576
+    const merge = {
+      rowStart: 0,
+      rowCount: 170,
+      columnStart: 0,
+      columnCount: 2,
+    }
+    fixture.fetcher.mockImplementation(async (url: string) => {
+      if (!url.startsWith("/api/documents/spreadsheet/"))
+        return responseFor(url)
+      const { pathname, searchParams } = new URL(url, "https://viewer.test")
+      if (!pathname.endsWith("/range"))
+        return Response.json({
+          ...identity,
+          format: "xlsx",
+          dateSystem: "1900",
+          sheets: [
+            {
+              id: "0",
+              name: "Summary",
+              visibility: "visible",
+              rowCount: maxRows,
+              columnCount: 3,
+              merges: [merge],
+            },
+            {
+              id: "1",
+              name: "Archive",
+              visibility: "hidden",
+              rowCount: 1,
+              columnCount: 1,
+            },
+          ],
+        })
+      const sheetId = searchParams.get("sheetId")
+      const rowStart = Number(searchParams.get("rowStart"))
+      const rowCount = Number(searchParams.get("rowCount"))
+      const columnStart = Number(searchParams.get("columnStart"))
+      const columnCount = Number(searchParams.get("columnCount"))
+      const value = sheetId === "0" ? "Merged summary" : "Previous harvest"
+      return Response.json({
+        ...identity,
+        sheetId,
+        rowStart,
+        rowCount,
+        columnStart,
+        columnCount,
+        cells:
+          rowStart === 0
+            ? [{ row: 0, column: 0, kind: "text", value, displayValue: value }]
+            : rowStart + rowCount === maxRows
+              ? [
+                  {
+                    row: maxRows - 1,
+                    column: 2,
+                    kind: "text",
+                    value: "Final record",
+                    displayValue: "Final record",
+                  },
+                ]
+              : [],
+        merges: sheetId === "0" && rowStart < 170 ? [merge] : [],
+      })
+    })
+    render(<DocumentViewerDialog {...props} />)
+    const cell = await screen.findByRole("gridcell", {
+      name: "Merged summary",
+    })
+    expect(cell.getAttribute("aria-colspan")).toBe("2")
+    const grid = screen.getByRole("grid", { name: "Spreadsheet preview" })
+    const trackScale = (maxRows * 28 + 30 - 400) / (8_000_000 - 400)
+    grid.scrollTop = (140 * 28) / trackScale
+    fireEvent.scroll(grid)
+    await waitFor(() =>
+      expect(
+        fixture.fetcher.mock.calls.some(([url]) =>
+          String(url).includes("rowStart=0&rowCount=1"),
+        ),
+      ).toBe(true),
+    )
+    expect(
+      await screen.findByRole("gridcell", { name: "Merged summary" }),
+    ).toBeTruthy()
+    expect(
+      screen.queryByRole("rowheader", { name: "1", exact: true }),
+    ).toBeNull()
+    fireEvent.keyDown(grid, { key: "End", ctrlKey: true })
+    fireEvent.scroll(grid)
+    expect(
+      await screen.findByRole("gridcell", { name: "Final record" }),
+    ).toBeTruthy()
+    fireEvent.click(screen.getByRole("combobox", { name: "Sheet" }))
+    fireEvent.click(
+      await screen.findByRole("option", { name: "Archive (hidden)" }),
+    )
+    await screen.findByRole("gridcell", { name: "Previous harvest" })
+    expect(
+      screen.queryByRole("gridcell", { name: "Merged summary" }),
+    ).toBeNull()
+    expect(blobRequests()).toHaveLength(0)
+  })
+
+  it("keeps authorized original download available when workbook parsing fails", async () => {
+    setupFile(
+      "workbook",
+      "book.xlsx",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    fixture.fetcher.mockImplementation(async (url: string) =>
+      url.startsWith("/api/documents/spreadsheet/") ||
+      url.includes("preview=true")
+        ? new Response("unreadable", { status: 422 })
+        : responseFor(url),
+    )
+    render(<DocumentViewerDialog {...props} />)
+    await screen.findByText("The workbook could not be read as a spreadsheet.")
+    expect(
+      blobRequests().every(([url]) => String(url).includes("preview=true")),
+    ).toBe(true)
+    expect(screen.queryByRole("grid")).toBeNull()
+    expect(screen.getByRole("button", { name: "Download file" })).toBeTruthy()
   })
 
   it("does not render unsupported documents or fetch their bytes automatically", async () => {
@@ -503,7 +737,7 @@ describe("shared saved-file viewer", () => {
     const trigger = screen.getByRole("button", { name: "Open attachment" })
     trigger.focus()
     fireEvent.click(trigger)
-    await screen.findByRole("table")
+    await screen.findByRole("grid")
     fireEvent.click(screen.getByRole("button", { name: "Close" }))
     await waitFor(() => expect(document.activeElement).toBe(trigger))
   })
