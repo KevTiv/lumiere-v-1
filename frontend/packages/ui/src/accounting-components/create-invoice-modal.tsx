@@ -7,7 +7,7 @@ import { toCreateManualAccountInvoiceParams } from "@lumiere/erp-shared/accounti
 import { useTranslation } from "@lumiere/i18n"
 import { ChevronDown, Eye, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -375,9 +375,9 @@ function ReleasedCreateInvoiceModal({
   }
 
   return <Dialog open={open} onOpenChange={(next) => !next && close()}>
-    <DialogContent data-testid="create-invoice-modal" className="flex h-[min(94dvh,960px)] max-w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1480px,calc(100%-3rem))]">
-      <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 sm:px-6"><DialogTitle className="text-xl font-semibold tracking-tight">{t(`accounting.forms.${copyKey}.createTitle`)}</DialogTitle><DialogDescription>Prepare the details and review the document before saving a draft.</DialogDescription></DialogHeader>
-      <div ref={scrollBodyRef} data-testid="create-invoice-scroll-body" className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">
+    <DialogContent size="document" layout="bounded" data-testid="create-invoice-modal" className="h-[min(94dvh,60rem)] gap-0 p-0 sm:w-[min(92.5rem,calc(100%-3rem))]">
+      <DialogHeader className="border-b px-5 py-5 sm:px-6"><DialogTitle className="text-xl font-semibold tracking-tight">{t(`accounting.forms.${copyKey}.createTitle`)}</DialogTitle><DialogDescription>Prepare the details and review the document before saving a draft.</DialogDescription></DialogHeader>
+      <DialogBody ref={scrollBodyRef} data-testid="create-invoice-scroll-body" className="p-4 sm:p-6">
       {error ? <div className="mb-4 space-y-2 rounded-md border bg-destructive/5 p-3 text-sm [overflow-wrap:anywhere]"><p role="alert" className="text-destructive">{error}</p>{onExplainError ? <Button type="button" variant="outline" size="sm" onClick={() => onExplainError(error)}>{t("common.explainError", { defaultValue: "Explain this error" })}</Button> : null}</div> : null}
       {assistantRequest ? <AssistantFormProposals key={`${assistantRequest.scopeKey}:${formId}`} scopeKey={assistantRequest.scopeKey} prompt={assistantRequest.prompt} companyId={Number(companyId)} entityType="account_move" formId={formId} blocked={locked || saving || companyMismatch || !personalizationReady} fields={[
         { name: "partnerId", label: kind === "bill" ? t("accounting.workflowGuide.vendor", { defaultValue: "Vendor" }) : t("accounting.workflowGuide.customer", { defaultValue: "Customer" }), type: "select", required: true, options: partnerOptions },
@@ -492,7 +492,7 @@ function ReleasedCreateInvoiceModal({
       } preview={
       <div className="min-w-0 rounded-xl bg-muted/40 p-4 sm:p-6"><div className="mb-4 flex items-center gap-2 text-sm font-medium"><Eye className="size-4 text-muted-foreground" />Live preview</div><InvoiceDocument title={kind === "bill" ? "Vendor bill" : "Invoice"} reference={reference} partnerLabel={kind === "bill" ? "Vendor" : "Bill to"} partner={partnerOptions.find((option) => option.value === partnerId)?.label} date={invoiceDate} dueDate={dueDate} currency={currency} lines={lineItems} subtotal={subtotal} tax={totalTax} total={subtotal + totalTax} personalization={kind === "invoice" ? previewPersonalization : undefined} notes={notes} draft /></div>
       } />
-      </div>
+      </DialogBody>
       <DialogFooter className="m-0 shrink-0 flex-row flex-wrap items-center justify-between gap-3 rounded-none bg-background px-5 sm:justify-between sm:px-6"><div className="mr-auto min-w-0 text-sm"><span className="text-muted-foreground">Total</span><p className="font-semibold tabular-nums [overflow-wrap:anywhere]">{money(subtotal + totalTax)}</p></div>{dirty && !locked ? <Button variant="ghost" onClick={() => void discard()} disabled={saving}>Discard draft</Button> : null}<Button variant="outline" onClick={close} disabled={saving}>{locked ? "Close and keep draft" : t("common.cancel")}</Button>{locked
         ? <Button onClick={() => void checkStatus()} disabled={saving}>Check previous action</Button>
         : <Button data-testid="create-invoice-save-draft" onClick={() => void save()} disabled={!canSave}>Save as Draft</Button>}</DialogFooter>
@@ -634,22 +634,24 @@ function LegacyCreateInvoiceModal({
   }
 
   return <Dialog open={open} onOpenChange={(next) => { if (!next && !saving) onClose() }}>
-    <DialogContent data-testid="create-invoice-modal" className="max-h-[90vh] max-w-4xl overflow-y-auto sm:max-w-4xl">
+    <DialogContent size="record" layout="bounded" data-testid="create-invoice-modal">
       <DialogHeader><DialogTitle>{documentKind === "bill" ? "New bill" : "New invoice"}</DialogTitle></DialogHeader>
-      <div className="grid gap-4 md:grid-cols-2">
-        <FieldSelect label={documentKind === "bill" ? "Vendor" : "Customer"} testId="create-invoice-partner" value={partnerId} onChange={setPartnerId} options={partnerOptions} />
-        <FieldSelect label="Journal" value={journalId} onChange={setJournalId} options={journalOptions} />
-        <FieldSelect label={documentKind === "bill" ? "Payable account" : "Receivable account"} value={counterpartAccountId} onChange={setCounterpartAccountId} options={counterpartAccountOptions} />
-        <div className="space-y-2"><Label htmlFor="legacy-invoice-date">{documentKind === "bill" ? "Bill Date" : "Invoice Date"}</Label><DatePicker id="legacy-invoice-date" value={invoiceDate} onChange={(value) => setInvoiceDate(value)} /></div>
-        <div className="space-y-2"><Label htmlFor="legacy-invoice-due-date">Due Date</Label><DatePicker id="legacy-invoice-due-date" min={invoiceDate} value={dueDate} onChange={(value) => setDueDate(value)} /></div>
-      </div>
-      <div className="grid gap-3 rounded-md border p-3 md:grid-cols-5">
-        <div className="space-y-2 md:col-span-2"><Label htmlFor="legacy-line-description">Description</Label><Input id="legacy-line-description" data-testid="create-invoice-line-description" value={line.description} onChange={(event) => setLine((value) => ({ ...value, description: event.target.value }))} /></div>
-        <div className="space-y-2"><Label htmlFor="legacy-line-quantity">Qty</Label><Input id="legacy-line-quantity" type="number" min={0.000001} step="any" value={line.quantity} onChange={(event) => setLine((value) => ({ ...value, quantity: Number(event.target.value) }))} /></div>
-        <div className="space-y-2"><Label htmlFor="legacy-line-price">Unit price</Label><Input id="legacy-line-price" data-testid="create-invoice-line-unit-price" type="number" min={0} step="0.01" value={line.unitPrice} onChange={(event) => setLine((value) => ({ ...value, unitPrice: Number(event.target.value) }))} /></div>
-        <FieldSelect label="Tax" testId="create-invoice-line-tax" value={line.taxId || NONE} onChange={(value) => setLine((current) => ({ ...current, taxId: value === NONE ? "" : value }))} options={[{ value: NONE, label: "No tax" }, ...taxOptions]} />
-      </div>
-      <div className="text-right text-sm">Subtotal: {formatLegacyAmount(amountUntaxed, currencyCode)} · Tax: {formatLegacyAmount(amountTax, currencyCode)} · <strong>Total: {formatLegacyAmount(amountTotal, currencyCode)}</strong></div>
+      <DialogBody className="@container space-y-4">
+        <div className="grid grid-cols-1 gap-4 @md:grid-cols-2">
+          <FieldSelect label={documentKind === "bill" ? "Vendor" : "Customer"} testId="create-invoice-partner" value={partnerId} onChange={setPartnerId} options={partnerOptions} />
+          <FieldSelect label="Journal" value={journalId} onChange={setJournalId} options={journalOptions} />
+          <FieldSelect label={documentKind === "bill" ? "Payable account" : "Receivable account"} value={counterpartAccountId} onChange={setCounterpartAccountId} options={counterpartAccountOptions} />
+          <div className="space-y-2"><Label htmlFor="legacy-invoice-date">{documentKind === "bill" ? "Bill Date" : "Invoice Date"}</Label><DatePicker id="legacy-invoice-date" value={invoiceDate} onChange={(value) => setInvoiceDate(value)} /></div>
+          <div className="space-y-2"><Label htmlFor="legacy-invoice-due-date">Due Date</Label><DatePicker id="legacy-invoice-due-date" min={invoiceDate} value={dueDate} onChange={(value) => setDueDate(value)} /></div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 rounded-md border p-3 @2xl:grid-cols-5">
+          <div className="space-y-2 @2xl:col-span-2"><Label htmlFor="legacy-line-description">Description</Label><Input id="legacy-line-description" data-testid="create-invoice-line-description" value={line.description} onChange={(event) => setLine((value) => ({ ...value, description: event.target.value }))} /></div>
+          <div className="space-y-2"><Label htmlFor="legacy-line-quantity">Qty</Label><Input id="legacy-line-quantity" type="number" min={0.000001} step="any" value={line.quantity} onChange={(event) => setLine((value) => ({ ...value, quantity: Number(event.target.value) }))} /></div>
+          <div className="space-y-2"><Label htmlFor="legacy-line-price">Unit price</Label><Input id="legacy-line-price" data-testid="create-invoice-line-unit-price" type="number" min={0} step="0.01" value={line.unitPrice} onChange={(event) => setLine((value) => ({ ...value, unitPrice: Number(event.target.value) }))} /></div>
+          <FieldSelect label="Tax" testId="create-invoice-line-tax" value={line.taxId || NONE} onChange={(value) => setLine((current) => ({ ...current, taxId: value === NONE ? "" : value }))} options={[{ value: NONE, label: "No tax" }, ...taxOptions]} />
+        </div>
+        <div className="text-right text-sm">Subtotal: {formatLegacyAmount(amountUntaxed, currencyCode)} · Tax: {formatLegacyAmount(amountTax, currencyCode)} · <strong>Total: {formatLegacyAmount(amountTotal, currencyCode)}</strong></div>
+      </DialogBody>
       <DialogFooter><Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button><Button data-testid="create-invoice-save-draft" onClick={() => void save()} disabled={!canSave}>{documentKind === "bill" ? "Save bill draft" : t("accounting.forms.newInvoice.saveDraft")}</Button></DialogFooter>
     </DialogContent>
   </Dialog>

@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { I18nProvider, i18n } from "@lumiere/i18n"
 import { createLumiereApiClient, LumiereApiProvider } from "@lumiere/api-client"
 import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
 import { Button } from "../../../../../packages/ui/src/components/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../../../../packages/ui/src/components/dialog"
+import { Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../../../../packages/ui/src/components/dialog"
+import { ImportAssistantWizard } from "../../../../../packages/ui/src/import-assistant/import-assistant-wizard"
 import { FormModal } from "../../../../../packages/ui/src/forms/form-modal"
 import type { FormConfig } from "../../../../../packages/ui/src/lib/form-types"
 import { EntityTable } from "../../../../../packages/ui/src/entity-views/entity-table"
@@ -69,7 +70,7 @@ const stressForm: FormConfig = {
     ] },
     ...Array.from({ length: 20 }, (_, index) => ({
       id: `reference-${index}`, name: `reference-${index}`, type: "text" as const,
-      label: `Business reference ${index + 1} with a longer translated description`, defaultValue: `Original value ${index + 1}`,
+      label: `Business reference ${index + 1} with a longer translated description`, defaultValue: `Original value ${index + 1}`, required: index === 19,
     })),
   ] }],
 }
@@ -93,8 +94,11 @@ export default function OverflowFixture() {
   const [expanded, setExpanded] = useState(false)
   const [readOnly, setReadOnly] = useState(false)
   const [sheet, setSheet] = useState(false)
-  const [plainDialog, setPlainDialog] = useState(false)
+  const [stressDialog, setStressDialog] = useState<"plain" | "bounded" | null>(null)
+  const stressOpener = useRef<HTMLButtonElement>(null)
+  const StressBody = stressDialog === "bounded" ? DialogBody : "div"
   const [formDialog, setFormDialog] = useState(false)
+  const [importDialog, setImportDialog] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [chat, setChat] = useState<"closed" | "floating" | "docked">("closed")
   const [lastAction, setLastAction] = useState("")
@@ -160,8 +164,10 @@ export default function OverflowFixture() {
                   </label>
                   <Button onClick={() => setReadOnly(!readOnly)}>Toggle read-only</Button>
                   <Button onClick={() => setSheet(true)}>Open record sheet</Button>
-                  <Button onClick={() => setPlainDialog(true)}>Open stressed plain dialog</Button>
+                  <Button onClick={(event) => { stressOpener.current = event.currentTarget; setStressDialog("plain") }}>Open stressed plain dialog</Button>
+                  <Button onClick={(event) => { stressOpener.current = event.currentTarget; setStressDialog("bounded") }}>Open stressed bounded dialog</Button>
                   <Button onClick={() => { setFormError(null); setFormDialog(true) }}>Open stressed form dialog</Button>
+                  <Button onClick={() => setImportDialog(true)}>Open wide import wizard</Button>
                   <Button onClick={() => setChat("floating")}>Open floating chat</Button>
                   <Button onClick={() => setChat("docked")}>Open docked chat</Button>
                 </div>
@@ -246,17 +252,17 @@ export default function OverflowFixture() {
                   </Sample>
                 </div>
               </main>
-              <Dialog open={plainDialog} onOpenChange={setPlainDialog}>
-                <DialogContent data-testid="plain-stress-dialog">
+              <Dialog open={stressDialog !== null} onOpenChange={(open) => { if (!open) setStressDialog(null) }}>
+                <DialogContent layout={stressDialog === "bounded" ? "bounded" : undefined} finalFocus={stressOpener} data-testid="plain-stress-dialog">
                   <DialogHeader>
                     <DialogTitle>Review a document with a long translated confirmation title</DialogTitle>
                     <DialogDescription>Inspect every entry before confirming this synthetic action.</DialogDescription>
                   </DialogHeader>
-                  <div data-testid="plain-stress-body" className="space-y-4">
+                  <StressBody data-testid="plain-stress-body" className="space-y-4">
                     {Array.from({ length: 20 }, (_, index) => <p key={index} data-testid={`plain-stress-row-${index}`}>Document entry {index + 1}: {longValue}</p>)}
-                  </div>
+                  </StressBody>
                   <DialogFooter>
-                    <Button data-testid="plain-stress-confirm" onClick={() => setPlainDialog(false)}>Confirm document review</Button>
+                    <DialogClose render={<Button data-testid="plain-stress-confirm" />}>Confirm document review</DialogClose>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -268,6 +274,14 @@ export default function OverflowFixture() {
                 draft={false}
                 showSubmitSuccessToast={false}
                 onSubmit={async () => { setFormError(modalError); throw new Error("Synthetic save rejected") }}
+              />
+              <ImportAssistantWizard
+                open={importDialog}
+                onOpenChange={setImportDialog}
+                organizationId={1}
+                targetEntity="contact"
+                title="Review a wide historical contact import"
+                onImport={async () => { setLastAction("import confirmed") }}
               />
               <EntityRecordSheet
                 open={sheet}

@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -85,94 +86,98 @@ function PaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent size="confirmation" layout="bounded">
         <DialogHeader>
           <DialogTitle className="text-xl">{t("pos.payment.title")}</DialogTitle>
         </DialogHeader>
 
-        {done ? (
-          <div className="flex flex-col items-center py-10 gap-4">
-            <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center">
-              <CheckCircle2 className="h-9 w-9 text-success" />
-            </div>
-            <p className="text-2xl font-bold text-success">{t("pos.payment.complete")}</p>
-            {method === "cash" && change > 0 && (
-              <p className="text-lg text-muted-foreground">{t("pos.payment.change")}: <strong>{fmt(change)}</strong></p>
-            )}
-          </div>
-        ) : (
-          <>
-            {/* Total */}
-            <div className="text-center py-4">
-              <p className="text-sm text-muted-foreground uppercase tracking-wider">{t("pos.payment.amountDue")}</p>
-              <p className="text-5xl font-black text-primary mt-1">{fmt(total)}</p>
-            </div>
-
-            {/* Method selector */}
-            <div className="flex gap-2">
-              {paymentMethods.map(({ id, label, icon: Icon }) => (
-                <button
-                  type="button"
-                  key={id}
-                  onClick={() => setMethod(id)}
-                  className={cn(
-                    "flex-1 flex flex-col items-center gap-1.5 py-3 rounded-lg border-2 text-sm font-medium transition-colors",
-                    method === id
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/40"
-                  )}
-                >
-                  <Icon className="h-5 w-5" />
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {/* Cash tendered */}
-            {method === "cash" && (
-              <div className="space-y-3">
-                <Input
-                  type="number"
-                  placeholder={t("pos.payment.amountTendered")}
-                  value={tendered}
-                  onChange={(e) => setTendered(e.target.value)}
-                  className="text-2xl h-14 text-center font-bold"
-                />
-                <div className="flex gap-2">
-                  {quickAmounts.map((amt) => (
-                    <button
-                      type="button"
-                      key={amt}
-                      onClick={() => setTendered(String(amt))}
-                      className="flex-1 py-2 rounded-md bg-muted hover:bg-muted/80 text-sm font-medium transition-colors"
-                    >
-                      {fmt(amt)}
-                    </button>
-                  ))}
-                </div>
-                {tenderedNum > 0 && (
-                  <div className="flex justify-between text-sm font-medium p-3 rounded-lg bg-muted">
-                    <span>{t("pos.payment.change")}</span>
-                    <span className={cn(change >= 0 ? "text-success" : "text-destructive")}>
-                      {fmt(change)}
-                    </span>
-                  </div>
-                )}
+        <DialogBody className="space-y-4">
+          {done ? (
+            <div className="flex flex-col items-center py-10 gap-4">
+              <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center">
+                <CheckCircle2 className="h-9 w-9 text-success" />
               </div>
-            )}
+              <p className="text-2xl font-bold text-success">{t("pos.payment.complete")}</p>
+              {method === "cash" && change > 0 && (
+                <p className="text-lg text-muted-foreground">{t("pos.payment.change")}: <strong>{fmt(change)}</strong></p>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Total */}
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground uppercase tracking-wider">{t("pos.payment.amountDue")}</p>
+                <p className="text-5xl font-black text-primary mt-1">{fmt(total)}</p>
+              </div>
 
-            <DialogFooter className="gap-2 sm:gap-2">
-              <Button variant="outline" onClick={onClose} className="flex-1">{t("common.cancel")}</Button>
-              <Button
-                onClick={handleCharge}
-                className="flex-1 gap-2"
-                disabled={method === "cash" && tenderedNum < total}
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                {t("pos.payment.charge", { amount: fmt(total) })}
-              </Button>
-            </DialogFooter>
-          </>
+              {/* Method selector */}
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,6rem),1fr))] gap-2">
+                {paymentMethods.map(({ id, label, icon: Icon }) => (
+                  <button
+                    type="button"
+                    key={id}
+                    onClick={() => setMethod(id)}
+                    className={cn(
+                      "flex min-w-0 flex-col items-center gap-1.5 px-2 py-3 rounded-lg border-2 text-sm font-medium transition-colors",
+                      method === id
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/40"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Cash tendered */}
+              {method === "cash" && (
+                <div className="space-y-3">
+                  <Input
+                    type="number"
+                    placeholder={t("pos.payment.amountTendered")}
+                    value={tendered}
+                    onChange={(e) => setTendered(e.target.value)}
+                    className="text-2xl h-14 text-center font-bold"
+                  />
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,6rem),1fr))] gap-2">
+                    {quickAmounts.map((amt) => (
+                      <button
+                        type="button"
+                        key={amt}
+                        onClick={() => setTendered(String(amt))}
+                        className="min-w-0 rounded-md bg-muted px-2 py-2 hover:bg-muted/80 text-sm font-medium transition-colors"
+                      >
+                        {fmt(amt)}
+                      </button>
+                    ))}
+                  </div>
+                  {tenderedNum > 0 && (
+                    <div className="flex flex-wrap justify-between gap-2 rounded-lg bg-muted p-3 text-sm font-medium">
+                      <span>{t("pos.payment.change")}</span>
+                      <span className={cn(change >= 0 ? "text-success" : "text-destructive")}>
+                        {fmt(change)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </DialogBody>
+
+        {!done && (
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose} className="flex-1">{t("common.cancel")}</Button>
+            <Button
+              onClick={handleCharge}
+              className="flex-1 gap-2"
+              disabled={method === "cash" && tenderedNum < total}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              {t("pos.payment.charge", { amount: fmt(total) })}
+            </Button>
+          </DialogFooter>
         )}
       </DialogContent>
     </Dialog>
@@ -185,11 +190,11 @@ function ReceiptDialog({ order, onClose }: { order: POSOrder | null; onClose: ()
   if (!order) return null
   return (
     <Dialog open={!!order} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-sm">
+      <DialogContent size="confirmation" layout="bounded">
         <DialogHeader>
           <DialogTitle>{t("pos.receipt.title")}</DialogTitle>
         </DialogHeader>
-        <div className="font-mono text-sm space-y-3">
+        <DialogBody className="space-y-3 font-mono text-sm">
           <div className="text-center space-y-0.5">
             <p className="font-bold text-base">{t("pos.receipt.storeName")}</p>
             <p className="text-muted-foreground text-xs">{t("pos.receipt.storeAddress")}</p>
@@ -198,12 +203,12 @@ function ReceiptDialog({ order, onClose }: { order: POSOrder | null; onClose: ()
           </div>
           <Separator />
           {order.items.map((item) => (
-            <div key={item.product.id} className="flex justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <p className="truncate">{item.product.name}</p>
+            <div key={item.product.id} className="flex flex-wrap justify-between gap-2">
+              <div className="min-w-0 flex-1 basis-28">
+                <p>{item.product.name}</p>
                 <p className="text-muted-foreground text-xs">{item.quantity} x {fmt(item.product.price)}</p>
               </div>
-              <span className="shrink-0">{fmt(item.lineTotal)}</span>
+              <span className="max-w-full">{fmt(item.lineTotal)}</span>
             </div>
           ))}
           <Separator />
@@ -217,7 +222,7 @@ function ReceiptDialog({ order, onClose }: { order: POSOrder | null; onClose: ()
           </div>
           <Separator />
           <p className="text-center text-muted-foreground text-xs">{t("pos.receipt.thankYou")}</p>
-        </div>
+        </DialogBody>
         <DialogFooter>
           <Button variant="outline" className="w-full" onClick={onClose}>{t("pos.receipt.close")}</Button>
         </DialogFooter>

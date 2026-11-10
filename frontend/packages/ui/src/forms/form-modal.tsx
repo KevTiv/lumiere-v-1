@@ -7,6 +7,7 @@ import * as Icons from "lucide-react"
 import React from "react"
 import { toast } from "sonner"
 
+import { Button } from "../components/button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,9 +20,12 @@ import {
 } from "../components/alert-dialog"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
+  DialogSkeleton,
   DialogTitle,
 } from "../components/dialog"
 import type { AiFormAssistConfig, FormConfig, FormPreviewRenderer } from "../lib/form-types"
@@ -36,6 +40,8 @@ export interface FormModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   config: FormConfig
+  /** State before the initial values are available. Leave unset during saves and background refreshes. */
+  initialState?: { status: "loading"; label?: string } | { status: "error"; message: string; onRetry?: () => void }
   onSubmit?: (data: Record<string, unknown>) => void | Promise<void>
   className?: string
   /**
@@ -79,6 +85,7 @@ export function FormModal({
   open,
   onOpenChange,
   config,
+  initialState,
   onSubmit,
   className,
   closeOnSubmit = true,
@@ -182,19 +189,23 @@ export function FormModal({
   const HeaderIcon = config.icon
     ? (Icons as Record<string, unknown>)[config.icon] as React.ComponentType<{ className?: string }> | undefined
     : undefined
+  const description = config.description
+    ? <DialogDescription className={workspaceStyles.sectionDescription}>{config.description}</DialogDescription>
+    : null
 
   return (
     <Dialog open={open} onOpenChange={requestOpenChange}>
       <DialogContent
         data-testid={`form-modal-${config.id}`}
         size={size}
+        layout="bounded"
         className={cn(
           workspaceStyles.surface,
-          "flex min-h-0 flex-col gap-0 overflow-hidden p-0",
+          "gap-0 p-0",
           className
         )}
       >
-        <DialogHeader className={cn(workspaceStyles.pageHeader, "sticky top-0 z-10 min-w-0 flex-shrink-0 bg-card/95 px-4 py-4 pe-12 backdrop-blur sm:px-6 sm:py-5 sm:pe-12")}>
+        <DialogHeader className={cn(workspaceStyles.pageHeader, "bg-card/95 px-4 py-3 pe-12 backdrop-blur sm:px-6 sm:py-5 sm:pe-12")}>
           <div className="flex items-center gap-3">
             {HeaderIcon && (
               <div className={cn(
@@ -208,20 +219,31 @@ export function FormModal({
               <DialogTitle className={cn(workspaceStyles.sectionTitle, "[overflow-wrap:anywhere]")} data-testid="form-modal-title">
                 {config.title}
               </DialogTitle>
-              {config.description && (
-                <DialogDescription className={cn(workspaceStyles.sectionDescription, "mt-1")}>
-                  {config.description}
-                </DialogDescription>
-              )}
             </div>
           </div>
         </DialogHeader>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {initialState ? (
+          <>
+            <DialogBody className="space-y-4 px-6 py-5">
+              {description}
+              {initialState.status === "loading"
+                ? <DialogSkeleton label={initialState.label} />
+                : <p role="alert" className="text-destructive">{initialState.message}</p>}
+            </DialogBody>
+            {initialState.status === "error" ? (
+              <DialogFooter className="mx-0 mb-0">
+                <Button type="button" variant="outline" onClick={handleCancel}>{t("common.close")}</Button>
+                {initialState.onRetry ? <Button type="button" variant="outline" onClick={initialState.onRetry}>{t("common.retry")}</Button> : null}
+              </DialogFooter>
+            ) : null}
+          </>
+        ) : <DialogBody className="flex flex-col overflow-hidden">
           <ModularForm
             key={formRevision}
             config={{ ...config, title: "", description: "", layout: "default" }}
             scrollable
+            bodyIntro={description}
             onSubmit={handleSubmit}
             submitError={submitError}
             onExplainError={onExplainError}
@@ -236,7 +258,7 @@ export function FormModal({
             draft={draft}
             draftKey={draftKey}
           />
-        </div>
+        </DialogBody>}
         <AlertDialog open={confirmingDiscard} onOpenChange={setConfirmingDiscard}>
           <AlertDialogContent data-testid="discard-changes-dialog">
             <AlertDialogHeader>

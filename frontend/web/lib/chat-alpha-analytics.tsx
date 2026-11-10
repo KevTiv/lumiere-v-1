@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Button } from "@lumiere/ui/components/button"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@lumiere/ui/components/dialog"
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@lumiere/ui/components/dialog"
 
 import { apiFetch } from "./api-fetch"
 
@@ -87,57 +87,61 @@ export function ChatAlphaAnalytics({ companyId, companyName }: { companyId: numb
 
   return (
     <Dialog open={open} onOpenChange={(next) => { reset(); setOpen(next) }}>
-      <Button type="button" variant="outline" onClick={() => { reset(); setOpen(true) }}>
+      <DialogTrigger render={<Button type="button" variant="outline" />}>
         Analyze company data
-      </Button>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
-        <DialogTitle>Company analytics</DialogTitle>
-        <DialogDescription>{companyName ?? `Company ${companyId}`} · Authorized data preview</DialogDescription>
-        <label className="grid gap-1 text-sm">
-          Analysis
-          <select className="rounded-md border bg-background p-2" value={view} onChange={(event) => {
-            reset()
-            setActivity(undefined)
-            setView(event.target.value as View)
-          }}>
-            <option value="coverage">Data coverage</option>
-            <option value="compare_activity">Compare period activity</option>
-            <option value="purchasing_reconciliation">Purchase receipt links</option>
-            {QUEUES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-          </select>
-        </label>
-        {view === "compare_activity" && (
-          <form className="grid items-end gap-2 sm:grid-cols-4" onSubmit={(event) => {
-            event.preventDefault()
-            const form = new FormData(event.currentTarget)
-            reset()
-            setActivity({
-              source: String(form.get("source")),
-              from: String(form.get("from")),
-              through: String(form.get("through")),
-            })
-          }}>
-            <label className="grid gap-1 text-sm">Source
-              <select name="source" className="rounded-md border bg-background p-2">
-                <option value="sales">Sales orders</option>
-                <option value="purchasing">Purchase orders</option>
-                <option value="expenses">Expenses</option>
-                <option value="subscriptions">Subscription starts</option>
-              </select>
-            </label>
-            <label className="grid gap-1 text-sm">From
-              <input name="from" type="date" required className="rounded-md border bg-background p-2" />
-            </label>
-            <label className="grid gap-1 text-sm">Through
-              <input name="through" type="date" required className="rounded-md border bg-background p-2" />
-            </label>
-            <Button type="submit">Compare</Button>
-          </form>
-        )}
-        {view === "compare_activity" && !activity ? null : error ? <div role="alert" className="space-y-2">
-          <p>This analysis is unavailable for the selected company and access level.</p>
-          <Button type="button" variant="outline" onClick={() => { reset(); setAttempt((value) => value + 1) }}>Retry</Button>
-        </div> : !result ? <p role="status">Reading company data…</p> : <AnalyticsResult result={result} />}
+      </DialogTrigger>
+      <DialogContent size="record" layout="bounded">
+        <DialogHeader>
+          <DialogTitle>Company analytics</DialogTitle>
+          <DialogDescription>{companyName ?? `Company ${companyId}`} · Authorized data preview</DialogDescription>
+        </DialogHeader>
+        <DialogBody className="@container/analytics space-y-4">
+          <label className="grid min-w-0 gap-1 text-sm">
+            Analysis
+            <select className="w-full min-w-0 rounded-md border bg-background p-2" value={view} onChange={(event) => {
+              reset()
+              setActivity(undefined)
+              setView(event.target.value as View)
+            }}>
+              <option value="coverage">Data coverage</option>
+              <option value="compare_activity">Compare period activity</option>
+              <option value="purchasing_reconciliation">Purchase receipt links</option>
+              {QUEUES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+          </label>
+          {view === "compare_activity" && (
+            <form className="grid items-end gap-2 @sm/analytics:grid-cols-2 @2xl/analytics:grid-cols-4" onSubmit={(event) => {
+              event.preventDefault()
+              const form = new FormData(event.currentTarget)
+              reset()
+              setActivity({
+                source: String(form.get("source")),
+                from: String(form.get("from")),
+                through: String(form.get("through")),
+              })
+            }}>
+              <label className="grid min-w-0 gap-1 text-sm">Source
+                <select name="source" className="w-full min-w-0 rounded-md border bg-background p-2">
+                  <option value="sales">Sales orders</option>
+                  <option value="purchasing">Purchase orders</option>
+                  <option value="expenses">Expenses</option>
+                  <option value="subscriptions">Subscription starts</option>
+                </select>
+              </label>
+              <label className="grid min-w-0 gap-1 text-sm">From
+                <input name="from" type="date" required className="w-full min-w-0 rounded-md border bg-background p-2" />
+              </label>
+              <label className="grid min-w-0 gap-1 text-sm">Through
+                <input name="through" type="date" required className="w-full min-w-0 rounded-md border bg-background p-2" />
+              </label>
+              <Button type="submit">Compare</Button>
+            </form>
+          )}
+          {view === "compare_activity" && !activity ? null : error ? <div role="alert" className="space-y-2">
+            <p>This analysis is unavailable for the selected company and access level.</p>
+            <Button type="button" variant="outline" onClick={() => { reset(); setAttempt((value) => value + 1) }}>Retry</Button>
+          </div> : !result ? <p role="status">Reading company data…</p> : <AnalyticsResult result={result} />}
+        </DialogBody>
       </DialogContent>
     </Dialog>
   )
@@ -161,7 +165,7 @@ function AnalyticsResult({ result }: { result: Result }) {
           <p className="text-muted-foreground">Dates and row counts describe the observed sample.</p>
           <dl className="divide-y">
             {sources.map((source) => (
-              <div key={source.module} className="grid gap-1 py-2 sm:grid-cols-2">
+              <div key={source.module} className="grid gap-1 py-2 @sm/analytics:grid-cols-2">
                 <dt className="capitalize">{source.module.replaceAll("-", " ")}</dt>
                 <dd>
                   {source.status}

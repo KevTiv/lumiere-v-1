@@ -21,7 +21,7 @@ import type { AbandonedAccountingImportCleanupProps } from "../import-assistant/
 import type { ModuleDataState } from "../lib/module-data-state"
 import { ModuleDataNotice } from "../pages/module-data-notice"
 import { Button } from "./button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./dialog"
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogSkeleton, DialogTitle } from "./dialog"
 import { Input } from "./input"
 import { Label } from "./label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./table"
@@ -173,18 +173,21 @@ export function CsvImportModal({
   }
 
   const busy = isPending || isSubmitting || trackedMutation.isPending || isReading
+  const initialLoading = sourceState?.status === "loading" && !fileName && !request && !submitted
 
   return (
     <Dialog open onOpenChange={(next) => !next && !busy && onClose()}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent size="review" layout="bounded">
         <DialogHeader>
           <DialogTitle>{config.title}</DialogTitle>
           {config.description ? <DialogDescription>{config.description}</DialogDescription> : null}
         </DialogHeader>
 
-        <div className="space-y-4">
+        <DialogBody className="space-y-4">
           <ModuleDataNotice state={sourceState} />
-          {sourceState?.status === "loading" ? <p role="status" className="text-sm text-muted-foreground">{t("common.loading", { defaultValue: "Loading…" })}</p> : null}
+          {initialLoading ? <DialogSkeleton /> : sourceState?.status === "loading" ? (
+            <p role="status" className="text-sm text-muted-foreground">{t("common.loading", { defaultValue: "Loading…" })}</p>
+          ) : null}
           {request ? <CsvImportResult request={request} initialPending={isSubmitting} initialError={error} activeOrganizationId={organizationId} activeCompanyId={trackedImport?.companyId ?? companyId} onNewFile={() => {
             if (!sourceReadyRef.current || busy) return
             setRequest(null); setSubmitted(false); setError(null); setAnalysis(null); setCsvText(""); setFileName(""); setReviewed(false); setFileScope(null)
@@ -195,7 +198,7 @@ export function CsvImportModal({
               abandonedAccountingCleanup={abandonedAccountingCleanup}
             />
           ) : null}
-          {!submitted ? <>
+          {!submitted && !initialLoading ? <>
           {sourceScopeChanged ? <p role="alert" className="text-sm text-destructive">{t("accounting.importReview.scopeChanged", { defaultValue: "The organization, company or import target changed. Select and review the source file again before importing." })}</p> : null}
           {trackedImport && !trackSubmission ? <p className="text-sm text-muted-foreground">{t("common.csvImportDialog.manualResultNotice", { defaultValue: "This import uses manual history selection. Its results cannot yet be linked automatically to this file." })}</p> : null}
           <div className="space-y-2">
@@ -260,8 +263,8 @@ export function CsvImportModal({
                 </p>
               ) : null}
               {review && !sourceScopeChanged ? <AccountingImportReview review={review} reviewed={reviewed} onReviewedChange={setReviewed} /> : null}
-              <div className="max-h-56 overflow-auto rounded-md border">
-                <Table>
+              <div className="min-w-0 rounded-md border">
+                <Table bounded viewportLabel={t("common.importAssistant.preview")}>
                   <TableHeader>
                     <TableRow>
                       {analysis.headers.map((header, index) => (
@@ -289,16 +292,16 @@ export function CsvImportModal({
               {error}
             </p>
           ) : null}
-        </div>
+        </DialogBody>
 
-        <DialogFooter>
+        {!initialLoading ? <DialogFooter>
           <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
             {submitted ? t("common.close", { defaultValue: "Close" }) : config.cancelLabel ?? t("common.cancel")}
           </Button>
           {!submitted ? <Button type="button" disabled={busy || !canSubmit} onClick={() => void handleSubmit()}>
             {config.submitLabel ?? t("common.csvImportDialog.submit", { defaultValue: "Import" })}
           </Button> : null}
-        </DialogFooter>
+        </DialogFooter> : null}
       </DialogContent>
     </Dialog>
   )

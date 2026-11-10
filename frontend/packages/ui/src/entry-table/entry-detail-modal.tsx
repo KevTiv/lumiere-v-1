@@ -7,6 +7,7 @@ import type { EntryData } from "@/lib/entry-table-types"
 import { FormFieldRenderer } from "../forms/forms-field-render"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -180,9 +181,9 @@ export function EntryDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card border-border">
+      <DialogContent size="form" layout="bounded" className="bg-card border-border">
         <DialogHeader>
-          <div className="flex items-center justify-between pr-8">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <DialogTitle>{title || (mode === "view" ? "View Entry" : "Edit Entry")}</DialogTitle>
               {description && <DialogDescription>{description}</DialogDescription>}
@@ -201,7 +202,7 @@ export function EntryDetailModal({
           </div>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <DialogBody className="space-y-6 py-4">
           {mode === "view" ? (
             <div className="grid grid-cols-12 gap-4">
               {fields.map((field) => (
@@ -231,7 +232,7 @@ export function EntryDetailModal({
               ))}
             </div>
           )}
-        </div>
+        </DialogBody>
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={handleCancel}>

@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogHeader,
+  DialogSkeleton,
   DialogTitle,
 } from "@lumiere/ui/components/dialog"
 import {
@@ -165,9 +166,7 @@ export function DocumentViewerDialog({
             })}
           </p>
         ) : !scopeReady || !permissionReady ? (
-          <p role="status">
-            {t("common.loading", { defaultValue: "Loading…" })}
-          </p>
+          <DialogSkeleton variant="document" className="min-h-0 overflow-hidden" />
         ) : !canRead ? (
           <p role="alert">
             {t("documents.viewer.denied", {
@@ -606,11 +605,9 @@ function DocumentViewerBody({
         </div>
       </div>
       {active.status === "loading" ? (
-        <p role="status">
-          {t("documents.viewer.loading", {
-            defaultValue: "Checking access and loading the file…",
-          })}
-        </p>
+        <DialogSkeleton variant="document" className="min-h-0 overflow-hidden" label={t("documents.viewer.loading", {
+          defaultValue: "Checking access and loading the file…",
+        })} />
       ) : active.status === "error" ? (
         <p role="alert" className="text-destructive">
           {errorMessage(active.error, t)}

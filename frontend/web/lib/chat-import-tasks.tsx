@@ -6,7 +6,7 @@ import { ChatDecisionCard } from "@lumiere/ui"
 import type { ChatDecisionAnswer } from "@lumiere/ui/lib/chat-decision-types"
 import { FileIdentity } from "@lumiere/ui/components/file-identity"
 import { Button } from "@lumiere/ui/components/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
 import { apiFetch } from "./api-fetch"
 import { ChatReconciliationPreview } from "./chat-reconciliation-preview"
 import { DataImportWorkspace } from "./data-import-workspace"
@@ -259,14 +259,14 @@ export function useChatImportTasks(args: {
       </div>)}
     </article>)}
     {selectedReview ? <Dialog open onOpenChange={open => { if (!open) { setReview(null); void reload() } }}>
-      <DialogContent size="document" className="flex min-h-0 flex-col overflow-hidden">
-        <DialogHeader className="shrink-0">
-        <DialogTitle>{selectedReview.inspectionOnly ? t("aiChat.import.inspectionTitle", { defaultValue: "Inspect saved source files" }) : t("aiChat.import.reviewTitle", { defaultValue: "Review source and prepare import" })}</DialogTitle>
-        <DialogDescription>{selectedReview.inspectionOnly ? t("aiChat.import.inspectionDescription", { defaultValue: "Review the source evidence. This action does not prepare business records." }) : t("aiChat.import.reviewDescription", { defaultValue: "Resolve uncertain values, then use the import preview to confirm the records to create." })}</DialogDescription>
+      <DialogContent size="document" layout="bounded">
+        <DialogHeader>
+          <DialogTitle>{selectedReview.inspectionOnly ? t("aiChat.import.inspectionTitle", { defaultValue: "Inspect saved source files" }) : t("aiChat.import.reviewTitle", { defaultValue: "Review source and prepare import" })}</DialogTitle>
+          <DialogDescription>{selectedReview.inspectionOnly ? t("aiChat.import.inspectionDescription", { defaultValue: "Review the source evidence. This action does not prepare business records." }) : t("aiChat.import.reviewDescription", { defaultValue: "Resolve uncertain values, then use the import preview to confirm the records to create." })}</DialogDescription>
         </DialogHeader>
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+        <DialogBody>
           <DataImportWorkspace organizationId={scope.organizationId} taskId={selectedReview.taskId} initialReviewId={selectedReview.id} initialView={selectedReview.view} inspectionOnly={selectedReview.inspectionOnly} syncUrl={false} onTaskFocus={focusTask} />
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog> : null}
   </div> : null

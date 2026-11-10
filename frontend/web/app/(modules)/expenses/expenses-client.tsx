@@ -1217,20 +1217,24 @@ function ExpensesClientLoaded({
 
       {decision.modal}
       {finance.modal}
-      {workflowForm?.kind === "setAllocations" && expensesUsable && !allocationReadback.initialized ? <Dialog open onOpenChange={(open) => !open && setWorkflowForm(null)}>
-        <DialogContent size="record"><DialogHeader><DialogTitle>{t("expenses.forms.setAllocations.title")}</DialogTitle>
-          <DialogDescription>{t("expenses.allocations.loadBeforeEdit", { defaultValue: "Load this expense's saved allocations before making changes." })}</DialogDescription></DialogHeader>
-          <p role={allocationReadback.state.status === "loading" ? "status" : "alert"}>{allocationReadback.error ?? t(`expenses.allocations.read.${allocationReadback.state.status}`, { defaultValue: allocationReadback.state.status === "loading" ? "Loading saved allocations…" : allocationReadback.state.status === "denied" ? "Access to this expense's allocations is restricted." : "Saved allocations could not be verified." })}</p>
-          <DialogFooter><Button variant="outline" onClick={() => setWorkflowForm(null)}>{t("common.close")}</Button><Button variant="outline" onClick={allocationReadback.retry}>{t("common.retry")}</Button></DialogFooter>
-        </DialogContent>
-      </Dialog> : null}
-      {workflowFormConfig && workflowForm && expensesUsable && (workflowForm.kind !== "setAllocations" || allocationReadback.initialized) && (
+      {workflowFormConfig && workflowForm && expensesUsable && (
         <FormModal
           onExplainError={explainError}
           key={`${workflowForm.kind}-${rowId(workflowForm.row)}`}
           open={quickActionForm === null}
           onOpenChange={(open) => !open && setWorkflowForm(null)}
           config={workflowFormConfig}
+          initialState={workflowForm.kind === "setAllocations" && !allocationReadback.initialized
+            ? allocationReadback.loading || allocationReadback.state.status === "loading" || (allocationReadback.state.status === "ready" && !allocationReadback.error)
+              ? { status: "loading", label: t("expenses.allocations.read.loading", { defaultValue: "Loading saved allocations…" }) }
+              : {
+                status: "error",
+                message: allocationReadback.error ?? t(`expenses.allocations.read.${allocationReadback.state.status}`, {
+                  defaultValue: allocationReadback.state.status === "denied" ? "Access to this expense's allocations is restricted." : "Saved allocations could not be verified.",
+                }),
+                onRetry: allocationReadback.retry,
+              }
+            : undefined}
           isPending={isFormMutationPending}
           draftKey={workflowForm.kind === "setAllocations" ? `${identity}:${orgId}:${operatingCompanyId}:${rowId(workflowForm.row)}` : undefined}
           submissionDisabled={workflowForm.kind === "setAllocations" && (!allocationReadback.ready || !allocationChoicesReady || permissionsReady === false || !checkPermission("hr_expense", "write").allowed)}

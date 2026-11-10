@@ -5,6 +5,7 @@ import type { TFunction } from "i18next"
 import {
   Button,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -153,13 +154,7 @@ export function WorkflowsRowDialog({
   const canStartWorkflow = usePermission("workflow_instance", "create")
   const canSignalWorkflow = usePermission("workflow_instance", "write")
 
-  if (!row || !tabId) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent />
-      </Dialog>
-    )
-  }
+  if (!row || !tabId) return null
 
   const id = rowId(row)
   const companyId = num(row, "companyId", "company_id")
@@ -198,7 +193,7 @@ export function WorkflowsRowDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+      <DialogContent size="record" layout="bounded">
         <DialogHeader>
           <DialogTitle>
             {tabId === "versions"
@@ -232,7 +227,7 @@ export function WorkflowsRowDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 text-sm" data-testid={`workflow-row-dialog-${tabId}`}>
+        <DialogBody className="space-y-4 text-sm" data-testid={`workflow-row-dialog-${tabId}`}>
           {error ? (
             <p
               className="rounded border border-destructive/40 bg-destructive/5 px-3 py-2 text-destructive"
@@ -698,7 +693,7 @@ export function WorkflowsRowDialog({
               <dd>{String(row.errorSummary ?? row.error_summary ?? "—")}</dd>
             </dl>
           ) : null}
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   )

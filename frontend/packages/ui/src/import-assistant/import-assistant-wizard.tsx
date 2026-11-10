@@ -52,10 +52,12 @@ import { Badge } from "../components/badge"
 import { Button } from "../components/button"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
+  DialogSkeleton,
   DialogTitle,
 } from "../components/dialog"
 import { Input } from "../components/input"
@@ -122,6 +124,8 @@ export function ImportAssistantWizard({
   const orgId = BigInt(organizationId)
   const analyze = useAnalyzeImportMapping()
   const preview = usePreviewImportMapping()
+  const { reset: resetAnalysis } = analyze
+  const { reset: resetPreview } = preview
   const saveTemplate = useSaveImportMappingTemplate(orgId)
   const deleteTemplate = useDeleteImportMappingTemplate(orgId)
   const finalizeJob = useFinalizeImportAssistantJob(orgId)
@@ -201,9 +205,9 @@ export function ImportAssistantWizard({
     submissionStartedRef.current = false
     importCompletedRef.current = false
     finalizedJobIdRef.current = null
-    analyze.reset()
-    preview.reset()
-  }, [analyze, preview])
+    resetAnalysis()
+    resetPreview()
+  }, [resetAnalysis, resetPreview])
 
   useEffect(() => {
     if (!open && !isSubmitting) reset()
@@ -539,15 +543,18 @@ export function ImportAssistantWizard({
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!importBusy) onOpenChange(next) }}>
-      <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-4xl">
+      <DialogContent size="review" layout="bounded">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{t("common.importAssistant.description")}</DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+        <DialogBody className="space-y-4">
           <ModuleDataNotice state={sourceState} />
-          {sourceState?.status === "loading" ? <p role="status" className="text-sm text-muted-foreground">{t("common.loading", { defaultValue: "Loading…" })}</p> : null}
+          {sourceState?.status === "loading" ? (
+            step === "upload" && !fileName ? <DialogSkeleton /> :
+              <p role="status" className="text-sm text-muted-foreground">{t("common.loading", { defaultValue: "Loading…" })}</p>
+          ) : null}
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
             <Badge variant={step === "upload" ? "default" : "outline"}>
               1. {t("common.importAssistant.stepUpload")}
@@ -648,6 +655,7 @@ export function ImportAssistantWizard({
                     analysis={lineAnalysis}
                     mapping={lineMapping}
                     onMappingChange={setLineMapping}
+                    viewportLabel={t("common.importAssistant.lineMappingTitle")}
                   />
                 </div>
               ) : null}
@@ -673,7 +681,7 @@ export function ImportAssistantWizard({
               {linePreviewResult ? (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">{t("common.importAssistant.linePreviewTitle")}</p>
-                  <ImportPreviewGrid preview={linePreviewResult} />
+                  <ImportPreviewGrid preview={linePreviewResult} viewportLabel={t("common.importAssistant.linePreviewTitle")} />
                 </div>
               ) : null}
             </div>
@@ -703,7 +711,7 @@ export function ImportAssistantWizard({
               />
             </div>
           ) : null}
-        </div>
+        </DialogBody>
 
         <DialogFooter className="sm:justify-between">
           <div className="text-xs text-muted-foreground">
@@ -715,7 +723,7 @@ export function ImportAssistantWizard({
               </>
             ) : null}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex min-w-0 flex-wrap gap-2">
             {step !== "upload" && step !== "done" ? (
               <Button
                 type="button"

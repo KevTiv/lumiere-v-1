@@ -6,7 +6,7 @@ import { companyWorkflowRows } from "./expense-workflow-model"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
 import { Textarea } from "@lumiere/ui/components/textarea"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
 import { useApproveExpenseSheet, useRefuseExpenseSheet, useSubmitExpenseSheet } from "@lumiere/query-hooks/hooks/expenses"
 import { expenseVariantTag } from "../../../lib/expense-state"
 import type { ExpenseWorkflowRow } from "./expense-workflow-model"
@@ -52,16 +52,20 @@ export function useExpenseReportDecision(orgId: bigint, companyId: bigint, enabl
   }
   const label = active ? t(`expenses.workflow.${active.kind === "submit" ? "submitReport" : active.kind === "approve" ? "approveReport" : "refuseReport"}`) : ""
   const modal = <Dialog open={active !== null && enabled} onOpenChange={open => { if (!open) close() }}>
-    <DialogContent size="confirmation" data-testid="expense-report-confirm">
+    <DialogContent size="confirmation" layout="bounded" data-testid="expense-report-confirm">
       <DialogHeader><DialogTitle>{label}</DialogTitle>
         <DialogDescription>{String(active?.row.name ?? "")} · {active ? t(`expenses.workflowUi.${active.kind}Effect`) : ""}</DialogDescription>
       </DialogHeader>
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      {active?.kind === "refuse" && <div className="space-y-2">
-        <label htmlFor="expense-report-refuse-reason">{t("expenses.workflow.refuseReason")}</label>
-        <Textarea id="expense-report-refuse-reason" data-testid="expense-report-refuse-reason" value={reason}
-          onChange={event => setReason(event.target.value)} required disabled={pending} aria-invalid={Boolean(error) && !reason.trim()} />
-      </div>}
+      {error || active?.kind === "refuse" ? (
+        <DialogBody className="space-y-2">
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          {active?.kind === "refuse" && <div className="space-y-2">
+            <label htmlFor="expense-report-refuse-reason">{t("expenses.workflow.refuseReason")}</label>
+            <Textarea id="expense-report-refuse-reason" data-testid="expense-report-refuse-reason" value={reason}
+              onChange={event => setReason(event.target.value)} required disabled={pending} aria-invalid={Boolean(error) && !reason.trim()} />
+          </div>}
+        </DialogBody>
+      ) : null}
       <DialogFooter>
         <Button variant="outline" disabled={pending} onClick={close}>{t("common.cancel")}</Button>
         <Button variant={active?.kind === "refuse" ? "destructive" : "default"} disabled={pending || !enabled || !active || !can(active.kind)}

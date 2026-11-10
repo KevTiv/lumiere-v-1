@@ -19,6 +19,7 @@ import type { CrmActivityTarget } from "@lumiere/stdb/types"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -666,16 +667,18 @@ export function CrmRecordChatterDialog({
   const { t } = useTranslation()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="record-chatter-dialog">
+      <DialogContent size="form" layout="bounded" data-testid="record-chatter-dialog">
         <DialogHeader>
           <DialogTitle>{t("crm.chatter.dialogTitle")}</DialogTitle>
         </DialogHeader>
-        <CrmRecordChatter
-          organizationId={organizationId}
-          resModel={resModel}
-          resId={resId}
-          recordTitle={recordTitle}
-        />
+        <DialogBody>
+          <CrmRecordChatter
+            organizationId={organizationId}
+            resModel={resModel}
+            resId={resId}
+            recordTitle={recordTitle}
+          />
+        </DialogBody>
         <DialogFooter>
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
             {t("common.close")}

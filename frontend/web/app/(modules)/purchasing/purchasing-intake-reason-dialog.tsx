@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useId, useState, type FormEvent } from "react"
+import { useEffect, useId, useRef, useState, type FormEvent } from "react"
 import { Button } from "@lumiere/ui/components/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
 import { Label } from "@lumiere/ui/components/label"
 import { Textarea } from "@lumiere/ui/components/textarea"
 
@@ -48,7 +48,9 @@ export function PurchasingIntakeReasonDialog({
   onSubmit,
 }: PurchasingIntakeReasonDialogProps) {
   const [reason, setReason] = useState("")
-  const reasonId = useId()
+  const reasonInput = useRef<HTMLTextAreaElement>(null)
+  const formId = useId()
+  const reasonId = `${formId}-reason`
   const content = copy[kind]
   const trimmedReason = reason.trim()
 
@@ -64,19 +66,20 @@ export function PurchasingIntakeReasonDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !pending && onOpenChange(nextOpen)}>
-      <DialogContent size="form">
-        <form onSubmit={submit} className="contents">
-          <DialogHeader>
-            <DialogTitle>{content.title}</DialogTitle>
-            <DialogDescription>
-              {content.description}
-              {intakeLabel ? ` Intake: ${intakeLabel}.` : ""}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-2">
+      <DialogContent size="form" layout="bounded" initialFocus={reasonInput}>
+        <DialogHeader>
+          <DialogTitle>{content.title}</DialogTitle>
+          <DialogDescription>
+            {content.description}
+            {intakeLabel ? ` Intake: ${intakeLabel}.` : ""}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogBody>
+          <form id={formId} onSubmit={submit} className="grid gap-2">
             <Label htmlFor={reasonId}>{content.label}</Label>
             <Textarea
               id={reasonId}
+              ref={reasonInput}
               autoFocus
               required
               maxLength={2_000}
@@ -88,16 +91,16 @@ export function PurchasingIntakeReasonDialog({
               onChange={(event) => setReason(event.target.value)}
             />
             {error ? <p id={`${reasonId}-error`} className="text-sm text-destructive" role="alert">{error}</p> : null}
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" disabled={pending} onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant={kind === "reject" ? "destructive" : "default"} disabled={!trimmedReason || pending}>
-              {pending ? content.pending : content.submit}
-            </Button>
-          </DialogFooter>
-        </form>
+          </form>
+        </DialogBody>
+        <DialogFooter>
+          <Button type="button" variant="outline" disabled={pending} onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" form={formId} variant={kind === "reject" ? "destructive" : "default"} disabled={!trimmedReason || pending}>
+            {pending ? content.pending : content.submit}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

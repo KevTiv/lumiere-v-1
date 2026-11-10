@@ -4,8 +4,10 @@ import { useTranslation } from "@lumiere/i18n"
 import {
   Button,
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   ModularForm,
@@ -46,8 +48,8 @@ export function HelpdeskTicketDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[760px] max-h-[85vh] flex flex-col bg-card p-0 gap-0">
-        <DialogHeader className="sticky top-0 bg-card z-10 px-6 pt-6 pb-4 border-b border-border/50 flex-shrink-0">
+      <DialogContent size="record" layout="bounded" className="bg-card">
+        <DialogHeader className="border-b border-border/50 pb-4">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 flex-shrink-0">
               <HeaderIcon className="h-4 w-4 text-primary" />
@@ -65,7 +67,7 @@ export function HelpdeskTicketDialog({
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <DialogBody>
           <ModularForm
             key={formConfig.id}
             config={{
@@ -82,10 +84,10 @@ export function HelpdeskTicketDialog({
               {discussion}
             </section>
           ) : null}
-        </div>
+        </DialogBody>
 
         {(canClose || canReopen) && (
-          <div className="flex flex-wrap items-center gap-2 px-6 pb-6 pt-0 border-t border-border/50">
+          <DialogFooter className="sm:justify-start">
             {canClose && (
               <Button
                 type="button"
@@ -109,7 +111,7 @@ export function HelpdeskTicketDialog({
                 {t("helpdesk.forms.ticketDetail.reopenTicket")}
               </Button>
             )}
-          </div>
+          </DialogFooter>
         )}
       </DialogContent>
     </Dialog>

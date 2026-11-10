@@ -28,8 +28,10 @@ import { Button, Input } from "@lumiere/ui"
 import { Textarea } from "@lumiere/ui/components/textarea"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@lumiere/ui/components/dialog"
@@ -690,35 +692,37 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
         </div>
       </div>
       <Dialog open={activationVersionId != null} onOpenChange={(open) => { if (!open) setActivationVersionId(null) }}>
-        <DialogContent>
+        <DialogContent size="form" layout="bounded">
           <DialogHeader>
             <DialogTitle>{t("aiSkills.registry.validation.reviewActivate", { defaultValue: "Review and activate" })}</DialogTitle>
             <DialogDescription>{t("aiSkills.registry.validation.approvalPolicy", { defaultValue: "Owners and organization administrators can approve their own certified skills. Other authors and reviewers need an independent approver. The decision and validation note are recorded." })}</DialogDescription>
           </DialogHeader>
-          <p className="text-sm">{selectedSkill?.name} · v{activationVersion?.version} · {activationVersion?.risk}</p>
-          <ul className="space-y-2 text-sm">
-            {skillFixtures.map((fixture) => {
-              const request = latestCertificationFor(fixtureRowId(fixture), activationVersionId ?? 0, certifications.data ?? [])
-              return <li key={fixtureRowId(fixture)}>{fixture.name} · {request?.readiness?.ready ? t("aiSkills.registry.certification.passed") : t("aiSkills.registry.certification.pendingSuffix")} · #{request?.id ?? "—"}</li>
-            })}
-          </ul>
-          <label className="space-y-1 text-sm">
-            <span>{t("aiSkills.registry.validation.note", { defaultValue: "Validation note" })}</span>
-            <Textarea variant="plain" rows={3} value={activationNote} maxLength={8000} onChange={(event) => setActivationNote(event.target.value)} />
-          </label>
-          <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" checked={activationConfirmed} onChange={(event) => setActivationConfirmed(event.target.checked)} />
-            {t("aiSkills.registry.validation.confirm", { defaultValue: "I reviewed the skill and its passing fixture evidence and approve activation for this organization." })}
-          </label>
-          {actionError ? <p role="alert" className="text-sm text-destructive">{actionError}</p> : null}
-          <div className="flex justify-end gap-2">
+          <DialogBody className="space-y-4">
+            <p className="text-sm">{selectedSkill?.name} · v{activationVersion?.version} · {activationVersion?.risk}</p>
+            <ul className="space-y-2 text-sm">
+              {skillFixtures.map((fixture) => {
+                const request = latestCertificationFor(fixtureRowId(fixture), activationVersionId ?? 0, certifications.data ?? [])
+                return <li key={fixtureRowId(fixture)}>{fixture.name} · {request?.readiness?.ready ? t("aiSkills.registry.certification.passed") : t("aiSkills.registry.certification.pendingSuffix")} · #{request?.id ?? "—"}</li>
+              })}
+            </ul>
+            <label className="grid gap-1 text-sm">
+              <span>{t("aiSkills.registry.validation.note", { defaultValue: "Validation note" })}</span>
+              <Textarea variant="plain" rows={3} value={activationNote} maxLength={8000} onChange={(event) => setActivationNote(event.target.value)} />
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={activationConfirmed} onChange={(event) => setActivationConfirmed(event.target.checked)} />
+              {t("aiSkills.registry.validation.confirm", { defaultValue: "I reviewed the skill and its passing fixture evidence and approve activation for this organization." })}
+            </label>
+            {actionError ? <p role="alert" className="text-sm text-destructive">{actionError}</p> : null}
+          </DialogBody>
+          <DialogFooter>
             <Button variant="outline" disabled={promoteVersion.isPending} onClick={() => setActivationVersionId(null)}>{t("common.cancel")}</Button>
             <Button disabled={!activationReady || !activationNote.trim() || !activationConfirmed || promoteVersion.isPending} onClick={() => void runAction(async () => {
               if (activationVersionId == null || !activationReady) return
               await promoteVersion.mutateAsync({ skillVersionId: activationVersionId, reason: activationNote.trim() })
               setActivationVersionId(null)
             })}>{t("aiSkills.registry.validation.activate", { defaultValue: "Activate certified skill" })}</Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </section>

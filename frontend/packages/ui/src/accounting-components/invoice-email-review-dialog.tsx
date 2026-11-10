@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { Check, Download, Mail, RefreshCw, X } from 'lucide-react';
 import { Button } from '../components/button';
 import { Checkbox } from '../components/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/dialog';
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/dialog';
 import { Input } from '../components/input';
 import { Label } from '../components/label';
 import { Textarea } from '../components/textarea';
@@ -134,13 +134,13 @@ export function InvoiceEmailReviewDialog(props: InvoiceEmailReviewDialogProps) {
   const visible = sourceReady || submitted !== null && !sourceChanged && templateState.status === 'ready' && props.canQueue;
   return <>
     <Dialog open={open} onOpenChange={(next) => { if (!next) close(); }}>
-      <DialogContent showCloseButton={false} className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl" data-testid="invoice-email-review">
-        <DialogHeader className="shrink-0 border-b p-5 pr-16">
+      <DialogContent size="record" layout="bounded" showCloseButton={false} className="gap-0 p-0" data-testid="invoice-email-review">
+        <DialogHeader className="border-b p-4 pe-16 sm:p-5 sm:pe-16">
           <DialogTitle className="flex items-center gap-2 text-lg font-semibold"><Mail className="size-5" />{props.purpose === 'reminder' ? 'Review payment reminder' : 'Review invoice email'}</DialogTitle>
           <DialogDescription>Review the recipient and exact message before adding one email to the queue.</DialogDescription>
           <Button className="absolute right-3 top-3 min-h-11 min-w-11" size="icon" variant="ghost" onClick={close} disabled={pending || checking || pdfPending} aria-label="Close email review"><X className="size-4" /></Button>
         </DialogHeader>
-        <div className="min-h-0 overflow-y-auto overscroll-contain p-5 space-y-5">
+        <DialogBody className="space-y-5 p-4 sm:p-5">
           {sourceChanged ? <div role="alert" className="rounded-lg border p-4 text-sm"><p>The selected company, invoice or readable document data changed. This review still belongs to {document.reference} in {document.companyName}. Return to the original document to continue or check its queue result.</p>{!submitted && !pending && !checking && props.onRefreshDocument ? <Button variant="outline" className="mt-3 min-h-11" onClick={props.onRefreshDocument}>Review current document</Button> : null}</div> : null}
           {!props.canQueue ? <div role="status" className="rounded-lg border p-4 text-sm">Email template read/write and message read access are required to review and confirm this queue request.</div> : null}
           {!document.posted ? <div role="status" className="rounded-lg border p-4 text-sm">Post this customer invoice or credit note before preparing its email.</div> : null}
@@ -202,12 +202,12 @@ export function InvoiceEmailReviewDialog(props: InvoiceEmailReviewDialogProps) {
             </section> : null}
             {!submitted ? <Label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border p-3 font-normal" htmlFor="invoice-email-reviewed"><Checkbox id="invoice-email-reviewed" aria-labelledby="invoice-email-reviewed-label" className="mt-0.5" checked={reviewed} disabled={locked || !template || Boolean(templateProblem) || Boolean(contentProblem) || Boolean(recipientProblem) || !recipient.trim()} onCheckedChange={(checked) => setReviewedKey(checked && contentKey ? contentKey : null)} /><span id="invoice-email-reviewed-label" className="text-sm leading-5">I reviewed this recipient, exact message, invoice context and PDF attachment choice. I understand queueing does not confirm sending.</span></Label> : null}
           </> : null}
-        </div>
-        <footer className="flex shrink-0 flex-col-reverse gap-2 border-t bg-muted/20 p-4 sm:flex-row sm:justify-end">
+        </DialogBody>
+        <DialogFooter className="mx-0 mb-0 bg-muted/20">
           <Button variant="outline" className="min-h-11" onClick={close} disabled={pending || checking || pdfPending}>Close review</Button>
           {!submitted ? <Button variant="ghost" className="min-h-11" onClick={props.onReloadTemplates} disabled={pending || checking || sourceChanged}>Reload templates</Button> : null}
           {outcome?.status === 'unknown' || outcome?.status === 'dispatching' ? <Button className="min-h-11" onClick={() => void check()} disabled={checking || !canCheckOriginal} data-testid="invoice-email-check"><RefreshCw className="mr-2 size-4" />{checking ? 'Checking original request…' : 'Check queue status'}</Button> : outcome?.status !== 'queued' && outcome?.status !== 'dispatched' ? <Button className="min-h-11" onClick={() => void queue()} disabled={!canSubmit} data-testid="invoice-email-queue"><Mail className="mr-2 size-4" />{pending ? 'Queueing email…' : 'Queue email'}</Button> : outcome?.status === 'queued' && props.onDispatch ? <Button className="min-h-11" onClick={() => void dispatch()} disabled={pending || !sourceReady} data-testid="invoice-email-dispatch">{pending ? 'Dispatching reviewed email…' : 'Send reviewed email'}</Button> : <span className="flex min-h-11 items-center gap-2 text-sm text-muted-foreground"><Check className="size-4" />{outcome.status === 'dispatched' ? 'Dispatch recorded' : 'Queue confirmed'}</span>}
-        </footer>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
     {navigationDialog}

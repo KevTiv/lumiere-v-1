@@ -81,6 +81,8 @@ interface ModularFormProps {
   renderPreview?: FormPreviewRenderer
   /** Keep actions outside the scrolling body when embedded in a constrained dialog. */
   scrollable?: boolean
+  /** Additional context above the fields, inside their scroll area. */
+  bodyIntro?: React.ReactNode
   /**
    * Autosave unsaved values to this browser and restore them when the form
    * reopens. Set `false` for credential or otherwise sensitive forms.
@@ -105,6 +107,7 @@ export function ModularForm({
   onDirtyChange,
   renderPreview,
   scrollable = false,
+  bodyIntro,
   draft = true,
   draftKey,
 }: ModularFormProps) {
@@ -112,11 +115,14 @@ export function ModularForm({
   const [submissionError, setSubmissionError] = useState<string | null>(null)
   const visibleSubmitError = submitError || submissionError
   const formBodyRef = useRef<HTMLDivElement>(null)
+  const submitErrorRef = useRef<HTMLDivElement>(null)
   const invalidFieldRef = useRef<string | null>(null)
   useEffect(() => {
-    // Scroll only the field owner; scrolling ancestors can move the dialog header and close control.
-    if (visibleSubmitError && formBodyRef.current) formBodyRef.current.scrollTop = 0
-  }, [visibleSubmitError])
+    if (!visibleSubmitError) return
+    const body = formBodyRef.current
+    if (body && body.scrollHeight > body.clientHeight) body.scrollTop = 0
+    else if (scrollable) submitErrorRef.current?.scrollIntoView?.({ block: "nearest" })
+  }, [scrollable, visibleSubmitError])
   useEffect(() => { setSubmissionError(null) }, [config.id])
   const aiSuggest = useAiFormSuggest()
   const aiRequestInFlight = useRef(false)
@@ -421,13 +427,22 @@ export function ModularForm({
     const field = Array.from(body.querySelectorAll<HTMLElement>("[data-form-field]"))
       .find((element) => element.dataset.formField === name)
     if (!field) return
-    field.querySelector<HTMLElement>('[aria-invalid="true"]:not(:disabled), input:not(:disabled), textarea:not(:disabled), button:not(:disabled)')?.focus({ preventScroll: true })
-    if (scrollable) {
-      const fieldRect = field.getBoundingClientRect()
+    const control = field.querySelector<HTMLElement>('[aria-invalid="true"]:not(:disabled), input:not(:disabled), textarea:not(:disabled), button:not(:disabled)')
+    control?.focus({ preventScroll: true })
+    if (scrollable && body.scrollHeight > body.clientHeight) {
       const bodyRect = body.getBoundingClientRect()
-      if (fieldRect.top < bodyRect.top || fieldRect.bottom > bodyRect.bottom) {
-        body.scrollTop += fieldRect.top - bodyRect.top - 16
+      let { top, bottom } = field.getBoundingClientRect()
+      if (bottom - top > body.clientHeight && control) {
+        const controlRect = control.getBoundingClientRect()
+        const messageRect = field.querySelector('[role="alert"]')?.getBoundingClientRect()
+        // If a long label fills the scrollport, keep the focused control and its error together.
+        top = controlRect.top
+        bottom = messageRect && messageRect.bottom - top <= body.clientHeight
+          ? Math.max(controlRect.bottom, messageRect.bottom)
+          : controlRect.bottom
       }
+      if (top < bodyRect.top) body.scrollTop += top - bodyRect.top
+      else if (bottom > bodyRect.bottom) body.scrollTop += bottom - bodyRect.bottom
     } else {
       field.scrollIntoView?.({ block: "nearest" })
     }
@@ -664,11 +679,12 @@ export function ModularForm({
       >
         <div className="flex min-w-0 flex-col gap-6">
           {visibleSubmitError ? (
-            <div tabIndex={-1} className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive [overflow-wrap:anywhere]" role="alert">
+            <div ref={submitErrorRef} tabIndex={-1} className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive [overflow-wrap:anywhere]" role="alert">
               <p>{visibleSubmitError}</p>
               {onExplainError ? <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => onExplainError(visibleSubmitError)}>{t("aiChat.errorHelp.explain", { defaultValue: "Explain this error" })}</Button> : null}
             </div>
           ) : null}
+          {bodyIntro}
           {fieldsContent}
         </div>
         {hasPreview ? (
@@ -692,7 +708,7 @@ export function ModularForm({
           data-form-actions
           className={cn(
             workspaceStyles.formActions,
-            scrollable && "mt-0 shrink-0 bg-card",
+            scrollable && "mt-0 shrink-0 bg-card [&_button]:h-auto [&_button]:min-h-9 [&_button]:max-w-full [&_button]:whitespace-normal [&_button]:[overflow-wrap:anywhere] pointer-coarse:[&_button]:min-h-11",
             leadingActions ? "justify-between" : "justify-end",
           )}
         >

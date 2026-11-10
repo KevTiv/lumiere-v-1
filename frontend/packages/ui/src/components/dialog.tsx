@@ -6,7 +6,9 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { cn } from "@lumiere/ui/lib/utils"
 import { Button } from "@lumiere/ui/components/button"
 import { XIcon } from "lucide-react"
-import { constrainOverlayStyle, overlayWidths, type OverlaySize } from "./overlay-sizes"
+import { useTranslation } from "@lumiere/i18n"
+import { Skeleton } from "./skeleton"
+import { constrainOverlayStyle, mergeOverlayClassName, overlayWidths, type OverlaySize } from "./overlay-sizes"
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -45,13 +47,17 @@ function DialogContent({
   children,
   showCloseButton = true,
   size,
+  layout,
   style,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
   size?: OverlaySize
+  /** Use with DialogHeader, DialogBody and DialogFooter to scroll the body. */
+  layout?: "bounded"
 }) {
   const popupRef = React.useRef<HTMLDivElement>(null)
+  const overlaySize = size ?? (layout === "bounded" ? "confirmation" : undefined)
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -60,22 +66,27 @@ function DialogContent({
         initialFocus={(interactionType) => {
           const popup = popupRef.current
           // Read long dialogs from their heading rather than jumping to a footer action.
-          if (size === "record" || size === "review" || size === "document") {
+          if (layout === "bounded" || size === "record" || size === "review" || size === "document") {
             return popup?.querySelector<HTMLElement>('[data-slot="dialog-title"]') ?? popup ?? true
           }
           return popup && (interactionType === "touch" || popup.scrollHeight > popup.clientHeight) ? popup : true
         }}
         data-slot="dialog-content"
-        data-size={size}
-        data-reserve-close={size && showCloseButton ? "" : undefined}
-        className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-background p-4 text-sm [overflow-wrap:anywhere] ring-1 ring-foreground/10 duration-100 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-          size ? "group/dialog min-h-0" : "sm:max-w-sm",
-          className
+        data-size={overlaySize}
+        data-layout={layout}
+        data-reserve-close={overlaySize && showCloseButton ? layout ?? "legacy" : undefined}
+        className={mergeOverlayClassName(
+          cn(
+            "fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-background p-4 text-sm [overflow-wrap:anywhere] ring-1 ring-foreground/10 duration-100 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+            layout === "bounded" ? "flex flex-col" : "grid grid-cols-1",
+            overlaySize ? "group/dialog min-h-0" : "sm:max-w-sm",
+          ),
+          className,
         )}
-        style={size ? constrainOverlayStyle(style, {
-          maxWidth: `min(${overlayWidths[size]}, calc(100% - 2rem))`,
+        style={overlaySize ? constrainOverlayStyle(style, {
+          maxWidth: `min(${overlayWidths[overlaySize]}, calc(100% - 2rem))`,
           maxHeight: "calc(100dvh - 2rem)",
+          ...(layout === "bounded" ? { minWidth: 0, minHeight: 0 } : {}),
         }) : style}
         {...props}
       >
@@ -105,9 +116,60 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex min-w-0 flex-col gap-2 group-data-[reserve-close]/dialog:pe-9", className)}
+      className={cn(
+        "flex min-w-0 flex-col gap-2 group-data-[layout=bounded]/dialog:shrink-0 group-data-[reserve-close=legacy]/dialog:pe-9 group-data-[reserve-close=bounded]/dialog:pe-12 pointer-coarse:group-data-[reserve-close=bounded]/dialog:pe-14",
+        className,
+      )}
       {...props}
     />
+  )
+}
+
+function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-body"
+      className={cn(
+        // The popup scrolls on very short screens, keeping the entire body reachable.
+        "min-h-[min(2lh,15dvh)] min-w-0 flex-auto overflow-y-auto [@media(max-height:24rem)]:min-h-0 [@media(max-height:24rem)]:flex-none [@media(max-height:24rem)]:overflow-visible",
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
+function DialogSkeleton({ label, variant = "form", className }: {
+  label?: string
+  variant?: "form" | "document"
+  className?: string
+}) {
+  const { t } = useTranslation()
+  return (
+    <div role="status" data-slot="dialog-skeleton" className={cn("min-w-0 flex-1", className)}>
+      <span className="sr-only">{label ?? t("common.loading", { defaultValue: "Loading…" })}</span>
+      <div aria-hidden="true" className="space-y-4 [&_[data-slot=skeleton]]:motion-reduce:animate-none">
+        {variant === "document" ? (
+          <>
+            <Skeleton className="h-5 w-1/3" />
+            <Skeleton className="h-[min(40dvh,20rem)] w-full" />
+          </>
+        ) : (
+          <>
+            {[0, 1, 2].map((field) => (
+              <div key={field} className="space-y-2">
+                <Skeleton className="h-3 w-24 max-w-full" />
+                <Skeleton className="h-9 w-full" />
+              </div>
+            ))}
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <Skeleton className="h-9 w-20 max-w-[40%]" />
+              <Skeleton className="h-9 w-28 max-w-[50%]" />
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -124,6 +186,8 @@ function DialogFooter({
       data-slot="dialog-footer"
       className={cn(
         "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        "group-data-[layout=bounded]/dialog:min-w-0 group-data-[layout=bounded]/dialog:shrink-0 group-data-[layout=bounded]/dialog:flex-col sm:group-data-[layout=bounded]/dialog:flex-row sm:group-data-[layout=bounded]/dialog:flex-wrap",
+        "group-data-[layout=bounded]/dialog:[&_:is(button,[data-slot=button])]:h-auto group-data-[layout=bounded]/dialog:[&_:is(button,[data-slot=button])]:min-h-9 group-data-[layout=bounded]/dialog:[&_:is(button,[data-slot=button])]:max-w-full group-data-[layout=bounded]/dialog:[&_:is(button,[data-slot=button])]:whitespace-normal pointer-coarse:group-data-[layout=bounded]/dialog:[&_:is(button,[data-slot=button])]:min-h-11",
         className
       )}
       {...props}
@@ -167,12 +231,14 @@ function DialogDescription({
 
 export {
   Dialog,
+  DialogBody,
   DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogOverlay,
+  DialogSkeleton,
   DialogPortal,
   DialogTitle,
   DialogTrigger,

@@ -14,10 +14,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { CreateInvoiceModal } from "../../../../packages/ui/src/accounting-components/create-invoice-modal"
 import { GeneralLedgerView } from "../../../../packages/ui/src/accounting-components/general-ledger-view"
 import { InvoiceDetailModal } from "../../../../packages/ui/src/accounting-components/invoice-detail-modal"
+import { CurrencyFormatProvider } from "../../../../packages/ui/src/lib/currency-context"
 import type { ModuleTab } from "../../../../packages/ui/src/lib/module-types"
 import { accountingWorkspaceNavigation } from "../../../lib/accounting-workspace-navigation"
 import { AccountantOverview } from "../../../app/(modules)/accounting/accountant-overview"
 import { fixtureNow, overviewFixture } from "../fixtures"
+
+const historicalJournalTotal = 3_541_923_100
 
 function AccountingFixture() {
   const [hydrated, setHydrated] = useState(false)
@@ -48,16 +51,32 @@ function AccountingFixture() {
         {tabs.map((tab) => <TabsContent key={tab.id} value={tab.id}>{tab.id === "dashboard"
           ? <AccountantOverview data={overviewFixture} companyName="Lumière Alpha Ltd" now={fixtureNow} onNavigate={setActiveTab} onOpenBankLine={(line, statement) => setBankSelection(`Synthetic bank selection: statement ${String(statement.id)}, line ${String(line.id)}`)} />
           : tab.id === "journal-entries"
-          ? <GeneralLedgerView
+          ? <CurrencyFormatProvider currencies={[{ id: 3n, code: "RWF" }]}>
+            <GeneralLedgerView
               moves={[
                 { id: 901n, name: "INV/2026/0901", companyId: 1n, moveType: { tag: "OutInvoice" }, state: { tag: "Posted" }, paymentState: { tag: "Partial" }, amountTotal: 100, amountResidual: 40 },
                 { id: 902n, name: "BILL/2026/0902", companyId: 1n, moveType: { tag: "InInvoice" }, state: { tag: "Draft" }, paymentState: { tag: "NotPaid" }, partnerId: 2n, ref: "LONG-REFERENCE-".repeat(20) },
+                {
+                  id: 903n,
+                  name: "Historical shop sales and cash receipts, 29 May to 4 June 2023",
+                  companyId: 1n,
+                  date: { microsSinceUnixEpoch: 1_685_880_000_000_000n },
+                  moveType: { tag: "Entry" },
+                  state: { tag: "Draft" },
+                  paymentState: { tag: "NotPaid" },
+                  ref: "HISTORICAL-SHOP-".repeat(10),
+                },
+              ]}
+              moveLines={[
+                { id: 904n, moveId: 903n, companyId: 1n, companyCurrencyId: 3n, debit: historicalJournalTotal, credit: 0, name: "Cash receipts" },
+                { id: 905n, moveId: 903n, companyId: 1n, companyCurrencyId: 3n, debit: 0, credit: historicalJournalTotal, name: "Shop sales" },
               ]}
               partnerLabels={new Map([["2", "Acme Corporation"]])}
               onPostMove={() => setPostRequested(true)}
               onCancelMove={() => undefined}
               onComputeInvoiceTotals={() => undefined}
             />
+          </CurrencyFormatProvider>
           : <section className="mt-5 rounded-xl border bg-card p-5"><h2 className="text-lg font-semibold">{tab.label}</h2><p className="mt-2 text-sm text-muted-foreground">Controlled fixture for workspace navigation and responsive layout.</p><Table><TableHeader><TableRow><TableHead>Record</TableHead><TableHead>State</TableHead></TableRow></TableHeader><TableBody><TableRow><TableCell data-testid="fixture-density-cell">Synthetic record</TableCell><TableCell>Draft</TableCell></TableRow></TableBody></Table></section>}</TabsContent>)}
       </Tabs>
       <CreateInvoiceModal open={invoiceOpen} companyId={1n} onClose={() => setInvoiceOpen(false)}

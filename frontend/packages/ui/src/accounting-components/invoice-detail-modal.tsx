@@ -1,6 +1,6 @@
 "use client"
 
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -76,12 +76,12 @@ export function InvoiceDetailModal({ invoice, open, onClose, currencyCode, curre
   const hasMoreActions = Boolean(onSendEmail || onArchivePdf || (isDraft && moveTypeIsInvoiceOrRefund(invoice.moveType) && onRecalculateTotals))
 
   return <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-    <DialogContent size="review" className="flex flex-col gap-0 overflow-hidden p-0" data-testid="invoice-detail-modal">
-      <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 sm:px-6">
+    <DialogContent size="review" layout="bounded" className="gap-0 p-0" data-testid="invoice-detail-modal">
+      <DialogHeader className="border-b px-5 py-5 sm:px-6">
         <div className="flex flex-wrap items-center gap-3"><DialogTitle className="min-w-0 text-xl font-semibold tracking-tight [overflow-wrap:anywhere]">{invoice.name || (isBill ? "Vendor bill" : "Invoice")}</DialogTitle><Badge className={invoiceStatusBadgeClass[status]}>{t(`accounting.states.${status}`)}</Badge></div>
         <DialogDescription className="[overflow-wrap:anywhere]">{partner}</DialogDescription>
       </DialogHeader>
-      <div className="grid min-h-0 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px]">
+      <DialogBody className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 bg-muted/30 p-4 sm:p-6">{isDraft && outgoing ? <><ModuleDataNotice state={draftPersonalizationState} /><p className="mb-3 text-xs text-muted-foreground">Posting captures the latest company invoice settings shown in this review.</p></> : null}<InvoiceDocument title={isBill ? "Vendor bill" : moveType === "OutRefund" ? "Credit note" : "Invoice"} reference={invoice.name} partnerLabel={isBill ? "Vendor" : t("accounting.invoices.billTo")} partner={partner} date={formatTimestamp(invoice.invoiceDate, true)} dueDate={formatTimestamp(invoice.invoiceDateDue, true)} currency={currency} subtotal={invoice.amountUntaxed ?? null} tax={invoice.amountTax ?? null} total={invoice.amountTotal ?? null} personalization={personalization} notes={documentContent.notes} personalizationError={documentContent.personalizationError} draft={isDraft} />{invoice.ref ? <p className="mt-3 break-words text-xs text-muted-foreground">Reference: {invoice.ref}</p> : null}</div>
         <aside className="order-first space-y-6 border-b p-5 lg:order-none lg:border-b-0 lg:border-l lg:p-6">
           <section>
@@ -103,7 +103,7 @@ export function InvoiceDetailModal({ invoice, open, onClose, currencyCode, curre
           {invoice.invoiceOrigin ? <section className="border-t pt-5"><h3 className="text-xs font-medium text-muted-foreground">{t("accounting.invoices.origin")}</h3><p className="mt-2 break-words text-sm">{invoice.invoiceOrigin}</p></section> : null}
           <section className="border-t pt-5"><h3 className="text-xs font-medium text-muted-foreground">{t("accounting.invoices.activity")}</h3><p className="mt-2 text-sm">{t("accounting.invoices.invoiceCreated")}</p><p className="mt-1 text-xs text-muted-foreground">{t("accounting.invoices.createdOn", { date: formatTimestamp(invoice.createDate) })}</p></section>
         </aside>
-      </div>
+      </DialogBody>
     </DialogContent>
   </Dialog>
 }
