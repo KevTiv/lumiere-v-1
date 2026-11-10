@@ -136,8 +136,8 @@ custom panel has adopted the common composition.
   move below the title in narrow containers. Summary grids follow their panel's
   available width rather than only the viewport breakpoint.
 - Use ellipsis only for compact labels with a constrained width and the complete
-  label retained in the DOM and `title`. Operational amounts wrap so their digits
-  remain available. Board titles may clamp to two lines when opening the card
+  label retained in the DOM and `title`. Stat-card and standalone KPI amounts wrap
+  so their digits remain available. Board titles may clamp to two lines when opening the card
   exposes the complete record. Do not use parent clipping to conceal a layout bug.
 - Extend `frontend/web/tests/ui-overflow.spec.ts` when adding a card composition.
   Its shared fixture exercises long unspaced content, narrow nested panels,
