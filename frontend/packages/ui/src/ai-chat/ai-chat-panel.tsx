@@ -283,7 +283,10 @@ export function AIChatPanel({
   const slash = dismissedSlash === slashSignature ? null : slashSkillToken(input, composerCaret)
   const showSkills = openTools === "skills" || slash !== null
   const showFiles = openTools === "files" && slash === null
-  const moduleLabel = contextOptions?.find(option => option.value === selectedContext)?.label ?? contextOptions?.[0]?.label
+  const activeContext = contextOptions?.find(option => option.value === selectedContext) ?? contextOptions?.[0]
+  const moduleLabel = activeContext?.value === "current"
+    ? context?.activeView ?? activeContext.label
+    : activeContext?.label
   const showContext = !docked && !modal && contextVisible
   const matchingSkills = slash ? matchingChatSkills(skills, slash.query) : skills
   const focusedSkillId = matchingSkills.some(skill => skill.id === activeSkillId) ? activeSkillId : matchingSkills[0]?.id
@@ -422,6 +425,7 @@ export function AIChatPanel({
         if (focusedSkillId) toggleSkill(focusedSkillId)
       } else if (e.key === "Escape") {
         e.preventDefault()
+        e.stopPropagation()
         if (focusedSkillId) setActiveSkillId(focusedSkillId)
         setDismissedSlash(slashSignature)
       }
@@ -442,6 +446,8 @@ export function AIChatPanel({
         e.preventDefault()
         insertCommand(filteredCommands[selectedCommandIndex])
       } else if (e.key === "Escape") {
+        e.preventDefault()
+        e.stopPropagation()
         setShowCommands(false)
       }
     } else if (e.key === "Enter" && !e.shiftKey) {

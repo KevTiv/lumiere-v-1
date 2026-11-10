@@ -1,13 +1,13 @@
 "use client"
 
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { I18nProvider, i18n } from "@lumiere/i18n"
 import { createLumiereApiClient, LumiereApiProvider } from "@lumiere/api-client"
 import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
 import { Button } from "../../../../../packages/ui/src/components/button"
 import { DatePicker } from "../../../../../packages/ui/src/components/date-picker"
-import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../../../../packages/ui/src/components/dialog"
+import { Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../../../../packages/ui/src/components/dialog"
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "../../../../../packages/ui/src/components/sheet"
 import { EventDetailPanel } from "../../../../../packages/ui/src/calendar-components/event-detail-panel"
 import { ImportAssistantWizard } from "../../../../../packages/ui/src/import-assistant/import-assistant-wizard"
@@ -101,6 +101,7 @@ export default function OverflowFixture() {
   const [dateSheet, setDateSheet] = useState(false)
   const [scheduledDate, setScheduledDate] = useState("2026-11-09")
   const [stressDialog, setStressDialog] = useState<"plain" | "bounded" | null>(null)
+  const stressOpener = useRef<HTMLButtonElement>(null)
   const StressBody = stressDialog === "bounded" ? DialogBody : "div"
   const [formDialog, setFormDialog] = useState(false)
   const [importDialog, setImportDialog] = useState(false)
@@ -171,8 +172,8 @@ export default function OverflowFixture() {
                   <Button onClick={() => setSheet(true)}>Open record sheet</Button>
                   <Button onClick={() => setEventSheet(true)}>Open calendar event</Button>
                   <Button onClick={() => setDateSheet(true)}>Open date sheet</Button>
-                  <Button onClick={() => setStressDialog("plain")}>Open stressed plain dialog</Button>
-                  <Button onClick={() => setStressDialog("bounded")}>Open stressed bounded dialog</Button>
+                  <Button onClick={(event) => { stressOpener.current = event.currentTarget; setStressDialog("plain") }}>Open stressed plain dialog</Button>
+                  <Button onClick={(event) => { stressOpener.current = event.currentTarget; setStressDialog("bounded") }}>Open stressed bounded dialog</Button>
                   <Button onClick={() => { setFormError(null); setFormDialog(true) }}>Open stressed form dialog</Button>
                   <Button onClick={() => setImportDialog(true)}>Open wide import wizard</Button>
                   <Button onClick={() => setChat("floating")}>Open floating chat</Button>
@@ -291,7 +292,7 @@ export default function OverflowFixture() {
                 </SheetContent>
               </Sheet>
               <Dialog open={stressDialog !== null} onOpenChange={(open) => { if (!open) setStressDialog(null) }}>
-                <DialogContent layout={stressDialog === "bounded" ? "bounded" : undefined} data-testid="plain-stress-dialog">
+                <DialogContent layout={stressDialog === "bounded" ? "bounded" : undefined} finalFocus={stressOpener} data-testid="plain-stress-dialog">
                   <DialogHeader>
                     <DialogTitle>Review a document with a long translated confirmation title</DialogTitle>
                     <DialogDescription>Inspect every entry before confirming this synthetic action.</DialogDescription>
@@ -300,7 +301,7 @@ export default function OverflowFixture() {
                     {Array.from({ length: 20 }, (_, index) => <p key={index} data-testid={`plain-stress-row-${index}`}>Document entry {index + 1}: {longValue}</p>)}
                   </StressBody>
                   <DialogFooter>
-                    <Button data-testid="plain-stress-confirm" onClick={() => setStressDialog(null)}>Confirm document review</Button>
+                    <DialogClose render={<Button data-testid="plain-stress-confirm" />}>Confirm document review</DialogClose>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
