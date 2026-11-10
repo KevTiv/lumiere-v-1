@@ -54,7 +54,11 @@ test.describe("Sales and invoice flow e2e", { tag: "@dev-fixture" }, () => {
     await gotoModule(page, saleOrderHref(seededId!), "sales")
 
     await expectSeededText(page, "SO/2024/0001", "/api/query/sale-orders")
-    await expect(page.getByText("ACME-2024-001")).toBeVisible()
+    await page.getByRole("button", { name: "View settings", exact: true }).click()
+    await page.getByRole("button", { name: "Choose columns", exact: true }).click()
+    await page.getByRole("menuitemcheckbox", { name: "Customer Ref", exact: true }).click()
+    await page.keyboard.press("Escape")
+    await expect(page.getByTestId(`entity-row-${seededId}`).getByRole("cell", { name: "ACME-2024-001", exact: true })).toBeVisible()
     await expectNoAppError(page)
   })
 

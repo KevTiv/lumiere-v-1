@@ -129,7 +129,8 @@ test.describe("Import rollback", { tag: ["@phase-4", "@import"] }, () => {
     ])
     expect(afterReplay).toEqual(beforeReplay)
 
-    const rollbackBtn = dialog.getByRole("button", { name: /^Rollback import$/i })
+    const importStatus = dialog.getByRole("region", { name: "Import job status", exact: true })
+    const rollbackBtn = importStatus.getByRole("button", { name: /^Rollback import$/i })
     await expect(rollbackBtn).toBeVisible({ timeout: 30_000 })
 
     const [rollbackRes] = await Promise.all([
@@ -137,11 +138,11 @@ test.describe("Import rollback", { tag: ["@phase-4", "@import"] }, () => {
         (res) => matchesOperationResponse(res, "rollback_import_job") && res.ok(),
         { timeout: 60_000 },
       ),
-      dialog.getByRole("button", { name: /^Rollback import$/i }).click(),
+      rollbackBtn.click(),
     ])
     expect(rollbackRes.ok()).toBe(true)
 
-    await expect(dialog.getByText(/rolled back/i)).toBeVisible({ timeout: 30_000 })
+    await expect(importStatus.getByText("This import was rolled back.", { exact: true })).toBeVisible({ timeout: 30_000 })
     await expectRecordAbsentFromQuery(page, "/api/query/contacts", (row) => {
       const rowName = String(row.name ?? row.displayName ?? row.display_name ?? "")
       return rowName === contactName
