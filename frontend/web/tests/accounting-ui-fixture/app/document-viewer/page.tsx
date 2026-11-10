@@ -56,7 +56,38 @@ const files = [
     modifiedBy: "Synthetic viewer",
   },
   {
+    id: "5",
+    name: "Season workbook",
+    fileName: "season.xlsx",
+    mimetype:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    size: 100,
+    folderId: null,
+    updatedAt: 1794096000000,
+    modifiedBy: "Synthetic viewer",
+  },
+  {
+    id: "6",
+    name: "Delimited records",
+    fileName: "delimited.csv",
+    mimetype: "text/csv",
+    size: 100,
+    folderId: null,
+    updatedAt: 1794096000000,
+    modifiedBy: "Synthetic viewer",
+  },
+  {
     id: "7",
+    name: "Malformed records",
+    fileName: "malformed.csv",
+    mimetype: "text/csv",
+    size: 100,
+    folderId: null,
+    updatedAt: 1794096000000,
+    modifiedBy: "Synthetic viewer",
+  },
+  {
+    id: "9",
     name: "Supplier workbook",
     fileName: "supplier.xlsx",
     mimetype:
@@ -82,7 +113,7 @@ const sharedPrefix =
   "Supplier reconciliation for the north distribution center ".repeat(4)
 files.push(
   {
-    id: "5",
+    id: "10",
     name: "Quarter-end evidence",
     fileName: `${sharedPrefix} signed.PDF`,
     mimetype: "application/pdf",
@@ -92,7 +123,7 @@ files.push(
     modifiedBy: "Synthetic viewer",
   },
   {
-    id: "6",
+    id: "11",
     name: "Quarter-end evidence",
     fileName: `${sharedPrefix} export.csv`,
     mimetype: "text/csv",

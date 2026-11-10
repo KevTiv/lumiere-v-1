@@ -91,14 +91,77 @@ def csv_delimiter(sample):
         return ","
 
 
-def csv_rows(data, delimiter=None):
-    encoding = "utf-16" if data.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8-sig"
+def managed_csv_rows(text, delimiter):
+    """Match the preview dialect and retain physical source lines for review."""
+    rows, coordinates = [], []
+    cells, field = [], []
+    state = "start"
+    line = row_start = 1
+    index = record_start = 0
+    while index < len(text):
+        character = text[index]
+        index += 1
+        if character == "\r" and index < len(text) and text[index] == "\n":
+            character = "\r\n"
+            index += 1
+        newline = character in {"\r", "\n", "\r\n"}
+        if state == "quoted":
+            if character == '"':
+                if index < len(text) and text[index] == '"':
+                    field.append('"')
+                    index += 1
+                else:
+                    state = "closed"
+            else:
+                field.append(character)
+            line += newline
+        elif character == delimiter or newline:
+            cells.append("".join(field))
+            field.clear()
+            state = "start"
+            if newline:
+                rows.append((row_start, cells))
+                coordinates.append((row_start, line))
+                cells = []
+                line += 1
+                row_start = line
+                record_start = index
+        elif state == "closed":
+            if character not in " \t":
+                fail(f"CSV record starting at line {row_start} has data after a closing quote.")
+        elif character == '"':
+            if state != "start":
+                fail(f"CSV record starting at line {row_start} has a quote in an unquoted cell.")
+            field.clear()
+            state = "quoted"
+        else:
+            field.append(character)
+            if character not in " \t":
+                state = "unquoted"
+        if len(cells) > MAX_COLUMNS or len(rows) > MAX_ROWS:
+            fail("The source exceeds the supported CSV row or column limit.")
+    if state == "quoted":
+        fail(f"CSV record starting at line {row_start} has an unterminated quote.")
+    if record_start < len(text):
+        rows.append((row_start, cells + ["".join(field)]))
+        coordinates.append((row_start, line))
+    return rows, coordinates
+
+
+def csv_rows(data, delimiter=None, selected_encoding=None):
+    encoding = selected_encoding or ("utf-16" if data.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8-sig")
+    if selected_encoding == "utf-8":
+        encoding = "utf-8-sig"
+    elif selected_encoding in {"utf-16le", "utf-16be"} and data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        encoding = "utf-16"
     try:
         text = data.decode(encoding)
     except UnicodeDecodeError as error:
         fail(f"CSV encoding is invalid at byte {error.start + 1}. Save the source as UTF-8 CSV and retry.")
     if "\x00" in text:
         fail("The CSV contains unsupported null characters.")
+    if selected_encoding is not None:
+        return managed_csv_rows(text, delimiter)
     try:
         reader = csv_reader(text, delimiter or csv_delimiter(text[:8192]))
         rows = []
@@ -138,7 +201,7 @@ def local_tag(element):
     return element.tag.rsplit("}", 1)[-1]
 
 
-def xlsx_rows(data):
+def xlsx_rows(data, selection=None):
     try:
         archive = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile:
@@ -151,8 +214,11 @@ def xlsx_rows(data):
             fail("The workbook exceeds safe expansion limits or is encrypted.")
         workbook = xml_document(archive, "xl/workbook.xml")
         sheets = [node for node in workbook.iter() if local_tag(node) == "sheet"]
+        if selection:
+            sheets = [sheet for sheet in sheets if sheet.attrib.get("name") == selection.sheet_name]
         if len(sheets) != 1:
-            fail("Import one worksheet at a time. Save each worksheet as its own XLSX or CSV file.")
+            fail("The selected worksheet is missing or ambiguous." if selection else
+                 "Import one worksheet at a time. Save each worksheet as its own XLSX or CSV file.")
         sheet = sheets[0]
         relationship = next((value for key, value in sheet.attrib.items() if key.endswith("}id")), None)
         relationships = xml_document(archive, "xl/_rels/workbook.xml.rels")
@@ -170,6 +236,7 @@ def xlsx_rows(data):
         document = xml_document(archive, sheet_path)
         rows = []
         previous_row = 0
+        max_column = 0
         for row in document.iter():
             if local_tag(row) != "row":
                 continue
@@ -177,7 +244,9 @@ def xlsx_rows(data):
             if not row_number.isdigit() or not previous_row < int(row_number) <= 1_048_576:
                 fail("The workbook has invalid or repeated worksheet row numbers.")
             previous_row = int(row_number)
+            selected_row = not selection or selection.includes_row(previous_row)
             cells = []
+            previous_column = 0
             for cell in row:
                 if local_tag(cell) != "c":
                     continue
@@ -188,8 +257,12 @@ def xlsx_rows(data):
                 index = 0
                 for letter in match[1]:
                     index = index * 26 + ord(letter) - 64
-                if not len(cells) < index <= MAX_COLUMNS:
-                    fail("Workbook cells must be ordered within the 200-column limit.")
+                if not previous_column < index <= (16_384 if selection else MAX_COLUMNS):
+                    fail("Workbook cells must be ordered within the column limit.")
+                previous_column = index
+                max_column = max(max_column, index)
+                if selection and (not selected_row or not selection.first_column <= index <= selection.last_column):
+                    continue
                 cells.extend([""] * (index - len(cells)))
                 if any(local_tag(node) == "f" for node in cell):
                     fail("Workbook formulas require review. Export calculated values as CSV and retry.")
@@ -205,9 +278,12 @@ def xlsx_rows(data):
                     # Preserve errors and booleans as literal source text, never numbers.
                     value = ("TRUE" if value == "1" else "FALSE") if kind == "b" else value
                 cells[-1] = value
-            rows.append((previous_row, cells))
+            if selected_row:
+                rows.append((previous_row, cells))
             if len(rows) > MAX_ROWS:
                 fail("The workbook exceeds the 25,000-row preparation limit.")
+        if selection and (previous_row < selection.last_row or max_column < selection.last_column):
+            fail("The selected cell range is outside the worksheet.")
         return rows, checked_value(sheet.attrib.get("name", "Worksheet"))
 
 
@@ -597,7 +673,41 @@ def reconcile_report_periods(files):
     return result
 
 
+def prepare_managed_selection(file, mode, duplicate):
+    selection = file["options"].managed_selection
+    rows = [(number, cells) for number, cells in file["rows"] if any(value.strip() for value in cells)]
+    header_number = file["selection_header"]
+    header = next((cells for number, cells in rows if number == header_number), [])
+    data = [(number, cells) for number, cells in rows if number != header_number]
+    if not data:
+        fail("The selected source cells contain no data rows to review.")
+    headers = header_keys(header)
+    target = None if mode == "inspect_only" or duplicate or not header else structured_target("", headers)
+    notes = ["Only the selected source cells were prepared for review."]
+    if target:
+        sections, issue = structured_sections(data, headers, target)
+        if sections and len(sections) == 1 and sections[0][0] == target:
+            items = standard_items(file, headers, target, sections[0][2])
+            section = automatic_section(file, "selected-range", target, items, headers)
+        else:
+            if issue:
+                notes.append(issue)
+            target = None
+    if not target:
+        target = "source_observation"
+        items = [raw_observation(file, number, cells,
+                                 issue="Review this source evidence; no business-record import was approved."
+                                 if mode == "inspect_only" else None)
+                 for number, cells in data]
+        section = automatic_section(file, "selected-range", target, items)
+    section.update({"firstColumn": selection.first_column, "lastColumn": selection.last_column})
+    file["sections"] = [section]
+    return [(target, items)], notes, len(file["rows"]) - len(rows), len(rows) - len(items)
+
+
 def prepare_file(file, mode, duplicate):
+    if file.get("options") and file["options"].managed_selection:
+        return prepare_managed_selection(file, mode, duplicate)
     if file.get("options") and file["options"].sections:
         return prepare_sections(file, mode, duplicate)
     visible = [(number, cells) for number, cells in file["rows"] if any(value.strip() for value in cells)]
@@ -782,22 +892,42 @@ def observation_items(file, blocks, *, inspection_only=False):
 def source_rows(name, data, options=None):
     suffix = Path(name).suffix.lower()
     sheet = None
+    selection = options.managed_selection if options else None
+    selection_header = None
     if suffix == ".csv":
-        rows, coordinates = csv_rows(data, options.delimiter if options else None)
+        if selection and (selection.encoding is None or options.delimiter is None):
+            fail("An exact CSV selection requires the viewer encoding and delimiter.")
+        rows, coordinates = csv_rows(data, options.delimiter if options else None,
+                                     selection.encoding if selection else None)
+        if selection:
+            if (selection.last_row > len(rows)
+                    or selection.last_column > max((len(cells) for _, cells in rows), default=0)):
+                fail("The selected cell range is outside the CSV.")
+            indices = [index for index in range(len(rows)) if selection.includes_row(index + 1)]
+            selection_header = rows[selection.header_row - 1][0] if selection.header_row else None
+            rows = [rows[index] for index in indices]
+            coordinates = [coordinates[index] for index in indices]
     elif suffix == ".xlsx":
         try:
-            rows, sheet = xlsx_rows(data)
+            if selection and (selection.encoding or options.delimiter):
+                fail("CSV parsing options cannot be applied to a worksheet.")
+            rows, sheet = xlsx_rows(data, selection)
             coordinates = [(number, number) for number, _ in rows]
+            selection_header = selection.header_row if selection else None
         except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OverflowError, EOFError, zlib.error):
             fail("The XLSX workbook could not be read safely. Save it as CSV and retry.")
     else:
-        fail("Only CSV and single-sheet XLSX sources are supported.")
+        fail("Only CSV and XLSX sources are supported.")
+    if selection:
+        start, end = selection.first_column - 1, selection.last_column
+        rows = [(number, (cells[start:end] + [""] * (end - start))[:end - start])
+                for number, cells in rows]
     for number, cells in rows:
         if len(cells) > MAX_COLUMNS:
             fail(f"Source row {number} exceeds the 200-column preparation limit.")
         for value in cells:
             checked_value(value)
-    return rows, sheet, coordinates
+    return rows, sheet, coordinates, selection_header
 
 
 def prepare(payload):
@@ -838,7 +968,7 @@ def prepare(payload):
             fail("Preparation options refer to different source bytes. Review this version before continuing.")
         originals.append({"fileName": name, "sourceSha256": digest, "byteCount": len(data)})
         try:
-            rows, sheet, coordinates = source_rows(name, data, options)
+            rows, sheet, coordinates, selection_header = source_rows(name, data, options)
         except PreparationError as error:
             errors[name] = str(error)
             continue
@@ -847,7 +977,7 @@ def prepare(payload):
         if total_rows > MAX_ROWS or total_cells > MAX_CELLS:
             fail("The source selection exceeds 25,000 rows or 100,000 cells. Split the selection and retry.")
         decoded.append({"name": name, "sha256": digest, "byte_count": len(data), "rows": rows,
-                        "sheet": sheet, "coordinates": coordinates, "options": options,
+                        "sheet": sheet, "coordinates": coordinates, "options": options, "selection_header": selection_header,
                         "record_numbers": {number: index for index, (number, _) in enumerate(rows, 1)},
                         "sections": [], "identities": []})
     if set(file_options) - names:
@@ -855,7 +985,8 @@ def prepare(payload):
 
     all_blocks = []
     for file in decoded:
-        file["blocks"] = farm.audit_blocks(file["name"], [cells for _, cells in file["rows"]])
+        file["blocks"] = ([] if file["options"] and file["options"].managed_selection else
+                          farm.audit_blocks(file["name"], [cells for _, cells in file["rows"]]))
         all_blocks.extend(file["blocks"])
     warnings = set()
     for index, block in enumerate(all_blocks):

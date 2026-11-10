@@ -22,6 +22,44 @@ export class DocumentViewerError extends Error {
   }
 }
 
+const CSV_DELIMITERS = [",", ";", "\t"] as const
+export type DocumentCsvDelimiter = (typeof CSV_DELIMITERS)[number]
+export type DocumentCsvEncoding =
+  | "utf-8"
+  | "utf-16le"
+  | "utf-16be"
+  | "windows-1252"
+export type DocumentCsvOptions = {
+  delimiter?: "auto" | DocumentCsvDelimiter
+  encoding?: "auto" | DocumentCsvEncoding
+}
+export type DocumentCsvDiagnostic =
+  | { code: "ambiguousDelimiter"; candidates: DocumentCsvDelimiter[] }
+  | { code: "unknownEncoding" | "invalidEncoding" }
+  | {
+      code: "unexpectedQuote" | "unterminatedQuote"
+      row: number
+      column: number
+    }
+  | {
+      code: "limitExceeded"
+      limit: "bytes" | "rows" | "columns" | "cellCharacters" | "matrixCells"
+      row?: number
+      column?: number
+    }
+
+export class DocumentCsvError extends DocumentViewerError {
+  constructor(
+    readonly diagnostic: Exclude<
+      DocumentCsvDiagnostic,
+      { code: "ambiguousDelimiter" }
+    >,
+  ) {
+    super(diagnostic.code === "limitExceeded" ? "tooLarge" : "invalid")
+    this.name = "DocumentCsvError"
+  }
+}
+
 export type DocumentViewerScope = {
   organizationId: bigint
   companyId: bigint | null
@@ -60,7 +98,14 @@ export type OfficeDocumentPreview =
   | { kind: "docx"; blocks: WordPreviewBlock[]; truncated: boolean }
 
 export type DocumentPreview =
-  | { kind: "csv"; rows: string[][]; columns: number }
+  | {
+      kind: "csv"
+      rows: string[][]
+      columns: number
+      delimiter: DocumentCsvDelimiter
+      encoding: DocumentCsvEncoding
+      diagnostics: DocumentCsvDiagnostic[]
+    }
   | { kind: "text"; text: string }
   | { kind: "image" }
   | { kind: "pdf" }
@@ -169,6 +214,7 @@ export function resolveDocumentViewerManifest(options: {
   const current = {
     ...source(document, documentId, scope.organizationId),
     isCurrent: true,
+    versionId: currentId ?? undefined,
     versionNumber: number(field(document, "versionCount", "version_count")),
   }
   const seen = new Set<string>()
@@ -228,7 +274,7 @@ export function resolveDocumentViewerManifest(options: {
   }
 }
 
-async function readBytes(
+export async function readBytes(
   response: Response,
   maximum: number,
   signal: AbortSignal,
@@ -278,7 +324,7 @@ async function readBytes(
   return bytes
 }
 
-const requestOptions = (signal: AbortSignal): RequestInit => ({
+export const requestOptions = (signal: AbortSignal): RequestInit => ({
   credentials: "include",
   cache: "no-store",
   redirect: "error",
@@ -481,88 +527,226 @@ export async function readDocumentOfficePreview(
   throw new DocumentViewerError("invalid")
 }
 
-/** Display report records verbatim; import header, formula and mapping rules do not rewrite evidence. */
-export function parseDocumentCsv(value: string): {
-  rows: string[][]
-  columns: number
-} {
-  if (new TextEncoder().encode(value).byteLength > CSV_IMPORT_LIMITS.bytes)
-    throw new DocumentViewerError("tooLarge")
-  const input = value.replace(/^\uFEFF/, "")
+type CsvLimit = Extract<
+  DocumentCsvDiagnostic,
+  { code: "limitExceeded" }
+>["limit"]
+
+function csvLimit(limit: CsvLimit, row?: number, column?: number): never {
+  throw new DocumentCsvError({ code: "limitExceeded", limit, row, column })
+}
+
+// Sample logical records with the same quoting rules used for the full preview.
+// Sampling tracks widths only, so a wrong delimiter cannot allocate a large cell.
+const CSV_SAMPLE_ROWS = 64
+function scanDocumentCsv(
+  input: string,
+  delimiter: DocumentCsvDelimiter,
+  sampleWidths?: number[],
+): { rows: string[][]; columns: number } {
   const rows: string[][] = []
   let row: string[] = []
+  let rowStart = 0
+  let rowNumber = 1
+  let width = 0
   let cell = ""
   let state: "start" | "unquoted" | "quoted" | "closed" = "start"
   let columns = 0
   let cells = 0
   const endCell = () => {
-    if (Array.from(cell).length > CSV_IMPORT_LIMITS.cellCharacters)
-      throw new DocumentViewerError("tooLarge")
-    row.push(cell)
+    width++
+    if (!sampleWidths) {
+      if (width > CSV_IMPORT_LIMITS.columns)
+        csvLimit("columns", rowNumber, width)
+      if (++cells > CSV_IMPORT_LIMITS.matrixCells)
+        csvLimit("matrixCells", rowNumber, width)
+      if (
+        cell.length > CSV_IMPORT_LIMITS.cellCharacters &&
+        Array.from(cell).length > CSV_IMPORT_LIMITS.cellCharacters
+      ) {
+        csvLimit("cellCharacters", rowNumber, width)
+      }
+      row.push(cell)
+    }
     cell = ""
     state = "start"
-    cells++
-    if (
-      row.length > CSV_IMPORT_LIMITS.columns ||
-      cells > CSV_IMPORT_LIMITS.matrixCells
-    )
-      throw new DocumentViewerError("tooLarge")
   }
   const endRow = () => {
     endCell()
-    columns = Math.max(columns, row.length)
-    rows.push(row)
+    columns = Math.max(columns, width)
+    if (sampleWidths) {
+      if (width > 1 && sampleWidths.length < CSV_SAMPLE_ROWS)
+        sampleWidths.push(width)
+    } else {
+      if (rowNumber > CSV_IMPORT_LIMITS.rows + 1) csvLimit("rows", rowNumber)
+      rows.push(row)
+    }
+    rowNumber++
     row = []
-    if (rows.length > CSV_IMPORT_LIMITS.rows + 1)
-      throw new DocumentViewerError("tooLarge")
+    width = 0
+  }
+  const malformed = (code: "unexpectedQuote" | "unterminatedQuote"): never => {
+    throw new DocumentCsvError({
+      code,
+      row: rowNumber,
+      column: width + 1,
+    })
   }
   for (let index = 0; index < input.length; index++) {
     const character = input[index]!
     if (state === "quoted") {
       if (character === '"') {
         if (input[index + 1] === '"') {
-          cell += '"'
+          if (!sampleWidths) cell += '"'
           index++
         } else state = "closed"
-      } else cell += character
-    } else if (character === ",") endCell()
+      } else if (!sampleWidths) cell += character
+    } else if (character === delimiter) endCell()
     else if (character === "\n" || character === "\r") {
       if (character === "\r" && input[index + 1] === "\n") index++
       endRow()
+      rowStart = index + 1
     } else if (state === "closed") {
-      if (character !== " " && character !== "\t")
-        throw new DocumentViewerError("invalid")
+      if (character !== " " && character !== "\t") malformed("unexpectedQuote")
     } else if (character === '"') {
-      if (state !== "start" || cell.trim().length > 0)
-        throw new DocumentViewerError("invalid")
+      if (state !== "start") malformed("unexpectedQuote")
       cell = ""
       state = "quoted"
     } else {
-      cell += character
+      if (!sampleWidths) cell += character
       if (character !== " " && character !== "\t") state = "unquoted"
     }
     if (cell.length > CSV_IMPORT_LIMITS.cellCharacters * 2)
-      throw new DocumentViewerError("tooLarge")
+      csvLimit("cellCharacters", rowNumber, width + 1)
   }
-  if (state === "quoted") throw new DocumentViewerError("invalid")
-  if (row.length || cell.length || state !== "start") endRow()
+  if (state === "quoted") malformed("unterminatedQuote")
+  if (rowStart < input.length) endRow()
   return { rows, columns }
+}
+
+function detectCsvDelimiter(input: string): {
+  delimiter: DocumentCsvDelimiter
+  diagnostics: DocumentCsvDiagnostic[]
+} {
+  const candidates = CSV_DELIMITERS.flatMap((delimiter) => {
+    const widths: number[] = []
+    try {
+      scanDocumentCsv(input, delimiter, widths)
+    } catch (error) {
+      if (!(error instanceof DocumentCsvError)) throw error
+      return []
+    }
+    const frequencies = new Map<number, number>()
+    let consistentRows = 0
+    for (const width of widths) {
+      const count = (frequencies.get(width) ?? 0) + 1
+      frequencies.set(width, count)
+      consistentRows = Math.max(consistentRows, count)
+    }
+    return widths.length
+      ? [{ delimiter, multiColumnRows: widths.length, consistentRows }]
+      : []
+  }).sort(
+    (first, second) =>
+      second.multiColumnRows - first.multiColumnRows ||
+      second.consistentRows - first.consistentRows,
+  )
+  return {
+    delimiter: candidates[0]?.delimiter ?? ",",
+    diagnostics:
+      candidates.length > 1
+        ? [
+            {
+              code: "ambiguousDelimiter",
+              candidates: candidates.map(({ delimiter }) => delimiter),
+            },
+          ]
+        : [],
+  }
+}
+
+/** Display report records verbatim; import header, formula and mapping rules do not rewrite evidence. */
+export function parseDocumentCsv(value: string): {
+  rows: string[][]
+  columns: number
+} {
+  if (
+    value.length > CSV_IMPORT_LIMITS.bytes ||
+    new TextEncoder().encode(value).byteLength > CSV_IMPORT_LIMITS.bytes
+  ) {
+    csvLimit("bytes")
+  }
+  return scanDocumentCsv(value.replace(/^\uFEFF/, ""), ",")
+}
+
+function decodeDocumentCsv(
+  bytes: Uint8Array,
+  selected?: DocumentCsvOptions["encoding"],
+) {
+  if (bytes.byteLength > CSV_IMPORT_LIMITS.bytes) csvLimit("bytes")
+  const [first, second, third, fourth] = bytes
+  const unsupportedBom =
+    (first === 0xff && second === 0xfe && third === 0 && fourth === 0) ||
+    (first === 0 && second === 0 && third === 0xfe && fourth === 0xff)
+  let bom: DocumentCsvEncoding | undefined
+  if (first === 0xef && second === 0xbb && third === 0xbf) bom = "utf-8"
+  else if (first === 0xff && second === 0xfe) bom = "utf-16le"
+  else if (first === 0xfe && second === 0xff) bom = "utf-16be"
+  const automatic = !selected || selected === "auto"
+  const encoding = automatic ? (bom ?? "utf-8") : selected
+  const failure = () =>
+    new DocumentCsvError({
+      code: automatic && !bom ? "unknownEncoding" : "invalidEncoding",
+    })
+  if (unsupportedBom || (bom && bom !== encoding)) throw failure()
+  let input: string
+  try {
+    input = new TextDecoder(encoding, { fatal: true }).decode(bytes)
+  } catch {
+    throw failure()
+  }
+  if (
+    encoding !== "utf-8" &&
+    new TextEncoder().encode(input).byteLength > CSV_IMPORT_LIMITS.bytes
+  ) {
+    csvLimit("bytes")
+  }
+  // Reject binary controls, including the NULs commonly left by BOM-less UTF-16.
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/u.test(input))
+    throw failure()
+  return { input, encoding }
 }
 
 export function documentPreview(
   mime: string,
   bytes: Uint8Array,
+  options?: DocumentCsvOptions,
 ): DocumentPreview {
   const kind = documentPreviewKind(mime)
   if (kind === "xlsx" || kind === "docx") return { kind: "unsupported" }
-  if (kind !== "csv" && kind !== "text") return { kind }
-  let content: string
+  if (kind === "csv") {
+    const { input, encoding } = decodeDocumentCsv(bytes, options?.encoding)
+    const selected = options?.delimiter
+    const { delimiter, diagnostics } =
+      !selected || selected === "auto"
+        ? detectCsvDelimiter(input)
+        : { delimiter: selected, diagnostics: [] }
+    return {
+      kind,
+      ...scanDocumentCsv(input, delimiter),
+      delimiter,
+      encoding,
+      diagnostics,
+    }
+  }
+  if (kind !== "text") return { kind }
   try {
-    content = new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+    return {
+      kind,
+      text: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+    }
   } catch {
     throw new DocumentViewerError("invalid")
   }
-  return kind === "csv"
-    ? { kind, ...parseDocumentCsv(content) }
-    : { kind, text: content }
 }

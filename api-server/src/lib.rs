@@ -32,6 +32,7 @@ pub mod routes;
 mod rwanda_vsdc;
 pub mod service_identity;
 pub mod session;
+mod spreadsheet;
 pub mod state;
 mod tenant_services;
 pub(crate) mod trusted_context;

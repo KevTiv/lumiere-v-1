@@ -9,6 +9,7 @@ use std::borrow::Cow;
 
 /// Reinspection is required when this policy changes.
 pub const INSPECTION_POLICY_VERSION: &str = "file-inspection-v1";
+pub const DOCUMENT_CSV_POLICY_VERSION: &str = "document-csv-inspection-v1";
 pub const MAX_CONTENT_BYTES: usize = 2_000_000;
 pub const MAX_ROWS: usize = 25_000;
 pub const MAX_COLUMNS: usize = 200;
@@ -195,7 +196,95 @@ pub struct InspectedCsvRecords {
 /// # Errors
 /// Rejects malformed CSV, unsupported controls and exceeded resource budgets.
 pub fn inspect_csv_records(text: &str) -> Result<InspectedCsvRecords, InspectionError> {
-    let records = parse_csv_records(text)?;
+    Ok(inspect_record_matrix(
+        parse_csv_records(text)?,
+        text.as_bytes(),
+    ))
+}
+
+/// Inspect the original document bytes without applying import header rules.
+/// Alternate dialects and encodings are available for manual viewing.
+/// # Errors
+/// Rejects invalid text, unsupported controls, and records outside inspection budgets.
+pub fn inspect_document_csv(bytes: &[u8]) -> Result<InspectedCsvRecords, InspectionError> {
+    let (text, utf8) = decode_document_csv(bytes, None)?;
+    let (records, unambiguous_comma) = csv::parse_document_csv(&text)?;
+    let mut inspected = inspect_record_matrix(records, bytes);
+    inspected.report.policy_version = DOCUMENT_CSV_POLICY_VERSION.into();
+    inspected.report.ai_allowed &= utf8 && unambiguous_comma;
+    Ok(inspected)
+}
+
+/// Resolve the precise CSV interpretation selected by the document viewer.
+/// # Errors
+/// Rejects unsupported options, mismatched BOMs, invalid text, and exceeded limits.
+pub fn parse_document_csv_with_options(
+    bytes: &[u8],
+    encoding: &str,
+    delimiter: char,
+) -> Result<Vec<Vec<String>>, InspectionError> {
+    use encoding_rs::{UTF_16BE, UTF_16LE, UTF_8, WINDOWS_1252};
+    let encoding = match encoding {
+        "utf-8" => UTF_8,
+        "utf-16le" => UTF_16LE,
+        "utf-16be" => UTF_16BE,
+        "windows-1252" => WINDOWS_1252,
+        _ => {
+            return Err(InspectionError::InvalidCsv(
+                "uses an unsupported text encoding",
+            ))
+        }
+    };
+    let (text, _) = decode_document_csv(bytes, Some(encoding))?;
+    csv::parse_document_csv_with_delimiter(&text, delimiter)
+}
+
+fn decode_document_csv<'a>(
+    bytes: &'a [u8],
+    selected: Option<&'static encoding_rs::Encoding>,
+) -> Result<(Cow<'a, str>, bool), InspectionError> {
+    use encoding_rs::{UTF_16BE, UTF_16LE, UTF_8, WINDOWS_1252};
+    validate_content_bytes(bytes.len())?;
+    let bom = match bytes {
+        [0xff, 0xfe, 0x00, 0x00, ..] | [0x00, 0x00, 0xfe, 0xff, ..] => {
+            return Err(InspectionError::InvalidCsv(
+                "has an unsupported UTF-32 byte order mark",
+            ));
+        }
+        [0xef, 0xbb, 0xbf, ..] => Some(UTF_8),
+        [0xff, 0xfe, ..] => Some(UTF_16LE),
+        [0xfe, 0xff, ..] => Some(UTF_16BE),
+        _ => None,
+    };
+    if let (Some(selected), Some(bom)) = (selected, bom) {
+        if selected != bom {
+            return Err(InspectionError::InvalidCsv(
+                "encoding does not match the byte order mark",
+            ));
+        }
+    }
+    // Inspect a lossless legacy interpretation for manual admission only.
+    // The viewer requires the user to select the encoding explicitly.
+    let encoding = match selected.or(bom) {
+        Some(encoding) => encoding,
+        None => match std::str::from_utf8(bytes) {
+            Ok(text) => return Ok((Cow::Borrowed(text), true)),
+            Err(_) => WINDOWS_1252,
+        },
+    };
+    if encoding == UTF_8 {
+        let text = std::str::from_utf8(bytes).map_err(|error| InspectionError::CsvEncoding {
+            byte: error.valid_up_to(),
+        })?;
+        return Ok((Cow::Borrowed(text), true));
+    }
+    let text = encoding
+        .decode_without_bom_handling_and_without_replacement(bytes)
+        .ok_or(InspectionError::InvalidCsv("contains invalid encoded text"))?;
+    Ok((text, false))
+}
+
+fn inspect_record_matrix(records: Vec<Vec<String>>, source: &[u8]) -> InspectedCsvRecords {
     let cells = records.iter().map(Vec::len).sum();
     let mut report = InspectionReport::new(records.len(), cells);
     for (row, record) in records.iter().enumerate() {
@@ -213,12 +302,12 @@ pub fn inspect_csv_records(text: &str) -> Result<InspectedCsvRecords, Inspection
             digest.update(value.as_bytes());
         }
     }
-    Ok(InspectedCsvRecords {
+    InspectedCsvRecords {
         records,
-        content_sha256: format!("{:x}", Sha256::digest(text.as_bytes())),
+        content_sha256: format!("{:x}", Sha256::digest(source)),
         dataset_sha256: format!("{:x}", digest.finalize()),
         report,
-    })
+    }
 }
 
 /// Inspect every accepted CSV cell and bind the result to the exact bytes and dataset.
