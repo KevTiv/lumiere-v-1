@@ -404,8 +404,8 @@ for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
     await setup(page)
     await page.getByTestId("file-browser-layout-grid").click()
-    const signed = page.getByTestId("file-browser-file-5")
-    const exported = page.getByTestId("file-browser-file-6")
+    const signed = page.getByTestId("file-browser-file-10")
+    const exported = page.getByTestId("file-browser-file-11")
     await expect(
       signed.getByRole("button", { name: "Quarter-end evidence", exact: true }),
     ).toBeVisible()
