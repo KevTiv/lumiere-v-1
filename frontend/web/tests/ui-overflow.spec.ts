@@ -9,14 +9,16 @@ async function expectContained(owner: Locator, children?: Locator) {
     })
     .toBeLessThanOrEqual(1)
   if (children) {
-    const bounds = await owner.boundingBox()
-    expect(bounds).not.toBeNull()
     for (const child of await children.all()) {
       if (!(await child.isVisible())) continue
-      const childBounds = await child.boundingBox()
-      expect(childBounds).not.toBeNull()
-      expect(childBounds!.x).toBeGreaterThanOrEqual(bounds!.x - 1)
-      expect(childBounds!.x + childBounds!.width).toBeLessThanOrEqual(bounds!.x + bounds!.width + 1)
+      // Sheets animate into place; compare fresh bounds until the layout settles.
+      await expect.poll(async () => {
+        const bounds = await owner.boundingBox()
+        const childBounds = await child.boundingBox()
+        return !!bounds && !!childBounds
+          && childBounds.x >= bounds.x - 1
+          && childBounds.x + childBounds.width <= bounds.x + bounds.width + 1
+      }, { message: `${child.toString()} must fit within ${owner.toString()}` }).toBe(true)
     }
   }
 }
