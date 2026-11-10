@@ -105,6 +105,43 @@ async function responseJson(response) {
   return response.json().catch(() => { throw new Error('server returned invalid JSON') })
 }
 
+const generationSurfaces = ['rag_generation', 'form_suggestion', 'action_draft_generation']
+
+// Read-only setup verification; custom/disabled bindings remain administrator-owned.
+async function missingSurfaceBindings(client, org, companyId) {
+  const rows = await client.sql(`SELECT * FROM ai_skill WHERE organization_id = ${org} OR organization_id = 0`)
+  const configs = await client.sql(`SELECT * FROM ai_skill_config WHERE organization_id = ${org}`)
+  const missing = []
+  const surfaces = []
+  for (const key of generationSurfaces) {
+    const candidates = rows.filter(row => row.skill_key === key)
+    const local = candidates.filter(row => Number(row.organization_id) === org)
+    const scoped = local.length ? local : candidates.filter(row => Number(row.organization_id) === 0)
+    requireValue(scoped.length <= 1, `ambiguous ${key} catalog`)
+    const skill = scoped[0]
+    if (!skill) { missing.push(`surface:${key}`); surfaces.push({ key, status: 'missing' }); continue }
+    if (skill.is_active === false) { surfaces.push({ key, status: 'disabled' }); continue }
+    const skillConfigs = configs.filter(row => Number(row.skill_id) === Number(skill.id))
+    const bindings = skillConfigs.filter(row => Number(unwrap(row.company_id)) === companyId)
+    const inherited = skillConfigs.filter(row => unwrap(row.company_id) == null)
+    requireValue(bindings.length <= 1 && inherited.length <= 1, `duplicate ${key} company binding`)
+    const binding = bindings[0] ?? inherited[0]
+    if (binding?.is_enabled === false) { surfaces.push({ key, status: 'disabled' }); continue }
+    const settings = binding ? JSON.parse(binding.config_json) : {}
+    requireValue(settings && typeof settings === 'object' && !Array.isArray(settings), `invalid ${key} settings`)
+    if (!(settings.defaultAgentId ?? settings.default_agent_id)) {
+      const overridden = ['defaultAgentId', 'default_agent_id', 'intelligencePolicyRef', 'intelligence_policy_ref'].some(field => Object.hasOwn(settings, field))
+      missing.push(`surface:${key}${overridden ? ':explicit-override-needs-review' : ''}`)
+      surfaces.push({ key, status: overridden ? 'blocked_override' : 'missing' })
+    } else {
+      // Configured is not execution readiness: dispatch still checks scope,
+      // actions, funding, provider and any required release.
+      surfaces.push({ key, status: 'configured' })
+    }
+  }
+  return { missing, surfaces }
+}
+
 // Check all immutable and scope prerequisites before the first write. An apply
 // may stop after an ambiguous write; rerun check rather than blindly retrying it.
 export async function provision(config, client, apply = false) {
@@ -121,7 +158,8 @@ export async function provision(config, client, apply = false) {
   // Promotion stays owned by the existing certification path. Provisioning
   // cannot invent a passed certificate or activate an unreviewed skill.
   const expectedProfiles = profilesFor(config)
-  const missing = []
+  const surfaceSetup = await missingSurfaceBindings(client, org, config.companyId)
+  const missing = surfaceSetup.missing
   for (const expected of expectedProfiles) {
     const existing = await client.sql(`SELECT * FROM ai_model_profile WHERE organization_id = ${org} AND profile_key = '${expected.profile_key}' AND profile_version = ${expected.profile_version}`)
     requireValue(existing.length <= 1, 'duplicate immutable model profile')
@@ -146,7 +184,12 @@ export async function provision(config, client, apply = false) {
     api_key_reference: some('MISTRAL_API_KEY'), system_prompt: none(), monthly_budget: none(),
     metadata: some(JSON.stringify({ provisioner: 'mistral-pilot-v1' })),
   }
-  if (agents.length) matches(agents[0], { ...agent, company_id: some(config.companyId) }, 'pilot agent')
+  if (agents.length) {
+    // Company setup may add built-in surface actions to the same funded agent.
+    const { allowed_actions: _actions, ...immutableAgent } = agent
+    matches(agents[0], { ...immutableAgent, company_id: some(config.companyId) }, 'pilot agent')
+    requireValue(Array.isArray(agents[0].allowed_actions) && agents[0].allowed_actions.includes('skill_run'), 'pilot agent lacks skill_run')
+  }
   else missing.push('pilot agent')
   const configs = await client.sql(`SELECT * FROM ai_skill_config WHERE organization_id = ${org} AND skill_id = ${skill.id}`)
   const scoped = configs.filter(row => Number(unwrap(row.company_id)) === config.companyId)
@@ -187,7 +230,7 @@ export async function provision(config, client, apply = false) {
   for (const role of ['primary', 'review']) if (!await priceFor(config[role])) missing.push(`price:${role}`)
   const calibration = await client.sql(`SELECT id FROM ai_calibration_profile WHERE organization_id = ${org} AND profile_name = 'report-attention' AND profile_version = 1`)
   if (calibration.length !== 1) missing.push('governed bootstrap')
-  const plan = { organizationId: org, companyId: config.companyId, agentId, skillId: Number(skill.id), policyRef: ref, billingPeriod: period, provider: 'mistral', models, apiKeyRequired: true }
+  const plan = { organizationId: org, companyId: config.companyId, agentId, skillId: Number(skill.id), policyRef: ref, billingPeriod: period, provider: 'mistral', models, apiKeyRequired: true, generationSurfaces: surfaceSetup.surfaces }
   if (!apply) {
     if (!missing.length) await client.runtime({ orgId: org, companyId: config.companyId, agentId, intelligencePolicyRef: ref }, models)
     return { ...plan, applied: false, readyForKey: missing.length === 0, missing }
@@ -217,6 +260,10 @@ export async function provision(config, client, apply = false) {
     config_json: JSON.stringify(settings), custom_instructions: previous?.custom_instructions ?? none(),
     tool_overrides: previous?.tool_overrides ?? [], metadata: previous?.metadata ?? none(),
   }])
+  // Bootstrap registered the bundled catalog. Bind all built-in surfaces to
+  // this already funded harness profile in one scoped, retry-safe reducer.
+  // The reducer preserves custom bindings and explicit disablement.
+  await client.call('provision_ai_company_defaults', [org, config.companyId, agentId, ref])
   const verified = await provision(config, client, false)
   requireValue(verified.readyForKey, `provisioning read-back incomplete: ${verified.missing.join(', ')}`)
   return { ...verified, applied: true }

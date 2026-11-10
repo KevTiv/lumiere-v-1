@@ -1,11 +1,13 @@
 //! AI domain test suite — invoke via `run_all_ai_tests` reducer.
 pub mod adversarial_drafts_test;
 pub mod capability_grants_test;
+pub mod company_defaults_test;
 pub mod decision_events_test;
 pub mod embedding_isolation_test;
 pub mod evidence_provenance_test;
 pub mod metered_spend_test;
 pub mod owner_configuration_test;
+pub mod platform_defaults_test;
 pub mod prepaid_test;
 pub mod relational_integrity_test;
 pub mod runtime_reads_test;
@@ -17,6 +19,8 @@ use spacetimedb::ReducerContext;
 #[spacetimedb::reducer]
 pub fn run_ai_owner_configuration_tests(ctx: &ReducerContext) -> Result<(), String> {
     owner_configuration_test::test_agent_action_preserves_configuration(ctx)?;
+    platform_defaults_test::test_platform_defaults(ctx)?;
+    company_defaults_test::test_company_defaults(ctx)?;
     owner_configuration_test::test_owner_configuration(ctx)?;
     owner_configuration_test::test_legacy_missing_period_and_recovery(ctx)
 }
@@ -219,6 +223,8 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_intelligence_events_tests(ctx)?;
     run_ai_spend_recovery_tests(ctx)?;
     run_ai_prepaid_tests(ctx)?;
+    platform_defaults_test::test_platform_defaults(ctx)?;
+    company_defaults_test::test_company_defaults(ctx)?;
     owner_configuration_test::test_owner_configuration(ctx)?;
     owner_configuration_test::test_legacy_missing_period_and_recovery(ctx)?;
     run_ai_evidence_provenance_tests(ctx)?;

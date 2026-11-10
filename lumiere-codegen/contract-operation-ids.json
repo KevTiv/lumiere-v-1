@@ -1522,6 +1522,12 @@
     "configure_ai_metered_price": "erp.configure_ai_metered_price",
     "reconcile_ai_metered_spend": "erp.reconcile_ai_metered_spend",
     "reserve_ai_metered_spend": "erp.reserve_ai_metered_spend",
-    "settle_ai_metered_spend": "erp.settle_ai_metered_spend"
+    "settle_ai_metered_spend": "erp.settle_ai_metered_spend",
+    "provision_ai_company_defaults": "erp.provision_ai_company_defaults",
+    "enroll_ai_company_defaults": "erp.enroll_ai_company_defaults",
+    "register_ai_platform_template": "erp.register_ai_platform_template",
+    "set_ai_platform_default": "erp.set_ai_platform_default",
+    "publish_ai_platform_skill": "erp.publish_ai_platform_skill",
+    "ensure_ai_managed_allowance": "erp.ensure_ai_managed_allowance"
   }
 }

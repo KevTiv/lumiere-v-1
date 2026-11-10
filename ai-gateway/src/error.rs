@@ -8,6 +8,11 @@ pub struct SurfaceSkillNotProvisioned {
     pub skill_key: String,
 }
 
+/// Managed setup has not installed a usable default for this request scope.
+#[derive(Error, Debug)]
+#[error("AI setup is incomplete. Ask an administrator to apply the harness AI profile for this company.")]
+pub struct DefaultAgentNotProvisioned;
+
 #[derive(Error, Debug)]
 pub enum AppError {
     #[error("Not found: {0}")]
@@ -39,6 +44,9 @@ pub enum AppError {
 
     #[error(transparent)]
     SkillNotProvisioned(#[from] SurfaceSkillNotProvisioned),
+
+    #[error(transparent)]
+    DefaultAgentNotProvisioned(#[from] DefaultAgentNotProvisioned),
 }
 
 impl AppError {
@@ -47,7 +55,10 @@ impl AppError {
     pub fn from_agent_resolution(error: anyhow::Error) -> Self {
         match error.downcast::<SurfaceSkillNotProvisioned>() {
             Ok(error) => Self::SkillNotProvisioned(error),
-            Err(error) => Self::BadRequest(error.to_string()),
+            Err(error) => match error.downcast::<DefaultAgentNotProvisioned>() {
+                Ok(error) => Self::DefaultAgentNotProvisioned(error),
+                Err(error) => Self::BadRequest(error.to_string()),
+            },
         }
     }
 }
@@ -64,6 +75,9 @@ impl IntoResponse for AppError {
             AppError::Embedding(m) => (StatusCode::BAD_GATEWAY, m.clone()),
             AppError::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m.clone()),
             AppError::Unavailable(m) => (StatusCode::SERVICE_UNAVAILABLE, m.clone()),
+            AppError::DefaultAgentNotProvisioned(error) => {
+                (StatusCode::SERVICE_UNAVAILABLE, error.to_string())
+            }
             AppError::SkillNotProvisioned(error) => {
                 (StatusCode::SERVICE_UNAVAILABLE, error.to_string())
             }
@@ -71,6 +85,10 @@ impl IntoResponse for AppError {
 
         tracing::error!("Request error: {}", message);
         let mut body = json!({ "error": message });
+        if matches!(&self, Self::DefaultAgentNotProvisioned(_)) {
+            body["code"] = json!("ai_default_agent_not_provisioned");
+            body["recovery_path"] = json!("/ai-skills");
+        }
         if let Self::SkillNotProvisioned(error) = self {
             body["code"] = json!("ai_surface_skill_not_provisioned");
             body["skill_key"] = json!(error.skill_key);
@@ -112,6 +130,19 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("Set up AI features"));
+    }
+
+    #[tokio::test]
+    async fn missing_default_returns_structured_setup_error() {
+        let error = anyhow::Error::new(DefaultAgentNotProvisioned).context("resolve surface");
+        let response = AppError::from_agent_resolution(error).into_response();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["code"], "ai_default_agent_not_provisioned");
+        assert_eq!(body["recovery_path"], "/ai-skills");
     }
 
     #[test]
