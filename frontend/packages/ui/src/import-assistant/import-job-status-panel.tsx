@@ -80,7 +80,7 @@ export function ImportJobStatusPanel({
   const showRollback = canRollbackImportJob(job) && onRollback
 
   return (
-    <div className="space-y-3 rounded-md border border-border p-4">
+    <section aria-label={t("common.importAssistant.jobStatusTitle")} className="space-y-3 rounded-md border border-border p-4">
       <div className="flex flex-wrap items-center gap-2">
         {isSuccess ? (
           <CheckCircle2 className="h-5 w-5 text-emerald-600" />
@@ -178,6 +178,6 @@ export function ImportJobStatusPanel({
           </Button>
         </div>
       ) : null}
-    </div>
+    </section>
   )
 }

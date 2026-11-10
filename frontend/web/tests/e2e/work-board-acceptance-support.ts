@@ -111,7 +111,7 @@ export async function openWorkReview(page: Page, scope: WorkBoardScope, taskId: 
   const row = await readWorkTask(page, scope, taskId)
   if (!row) throw new Error(`Task ${taskId} is not readable by the ordinary reviewer`)
   await page.goto("/purchasing?tab=work&workView=eligible&workLayout=list")
-  const board = page.getByRole("region", { name: "Kanban", exact: true })
+  const board = page.getByRole("region", { name: "Work queue", exact: true })
   await expect(board).toBeVisible()
   const title = row.workSourceTitle || `${row.subjectModel ?? row.subject_model ?? ""} #${row.subjectId ?? row.subject_id ?? row.id}`
   await board.getByRole("button", { name: title, exact: true }).click()
