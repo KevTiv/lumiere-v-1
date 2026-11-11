@@ -9,6 +9,7 @@
 
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useErpSession } from "@lumiere/erp-session"
 
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, rqBigIntKey, type QueryRows } from "../http"
 import { invalidateResourceQueries, useSubscriptionAwareQuery } from "../subscription-query"
@@ -65,6 +66,7 @@ import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u
 import type { CanonicalRecordRef } from "./operation-effect"
 import { resolveCompletedActivityEffect } from "./crm-activity-completion"
 import { useRecordCreationTransport } from "./record-creation-http"
+import { fetchOrganizationUserProfiles } from "./auth"
 
 import {
   finalizeCreateActivityParams,
@@ -212,11 +214,25 @@ export function useUsers(
   organizationId: bigint,
   initialData?: QueryRows,
 ) {
+  const session = useErpSession()
+  const orgKey = rqBigIntKey(organizationId)
+  const enabled =
+    !!session.identity &&
+    session.identity !== 'unknown' &&
+    organizationId > 0n &&
+    orgKey === String(session.organizationId)
+
   return useQuery<QueryRows>({
-    queryKey: ['users', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/users', 'Failed to fetch users'),
+    queryKey: ['users', orgKey, enabled ? session.identity : null],
+    queryFn: () => fetchOrganizationUserProfiles(),
+    enabled,
+    retry: (failureCount, error) => {
+      const status = 'status' in error ? error.status : undefined
+      if (status === 401 || status === 403) return false
+      return failureCount < 3
+    },
     staleTime: 60_000,
-    initialData,
+    initialData: enabled ? initialData : undefined,
   })
 }
 
