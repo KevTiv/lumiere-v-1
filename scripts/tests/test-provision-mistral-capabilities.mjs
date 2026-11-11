@@ -118,6 +118,19 @@ test('explicit apply is idempotent and preserves budget, settings, instructions 
   assert.deepEqual(state, after); assert.deepEqual(writes, [])
 })
 
+test('apply accepts an agent scoped to the requested company and preserves that scope', async () => {
+  const { config, state, client, writes } = fixture()
+  state.agent.company_id = { some: '3' }
+  const agent = structuredClone(state.agent)
+
+  const result = await provisionCapabilities(config, client, true, now)
+
+  assert.equal(result.ready, true)
+  assert.deepEqual(state.agent, agent)
+  assert.ok(writes.some(write => write.name === 'upsert_ai_skill_config'))
+  assert.ok(state.bindings.every(binding => binding.company_id.some === config.companyId))
+})
+
 test('structural and certification blockers make zero writes even when setup is missing', async () => {
   const cases = {
     writerMissing: f => { f.state.writers = [] },
@@ -128,7 +141,10 @@ test('structural and certification blockers make zero writes even when setup is 
     writerWrongIdentity: f => { f.state.writers[0].identity = ['c'.repeat(64)] },
     writerUnverified: f => { f.state.writerIdentity = '' },
     companyScope: f => { const sql = f.client.sql; f.client.sql = async (query, role) => query.includes('FROM company ') ? [{ id: 3, organization_id: 10 }] : sql(query, role) },
-    companyAgent: f => { f.state.agent.company_id = { some: 3 } },
+    foreignAgentCompany: f => { f.state.agent.company_id = { some: 4 } },
+    foreignAgentOrganization: f => { f.state.agent.organization_id = 10 },
+    missingAgentCompany: f => { delete f.state.agent.company_id },
+    malformedAgentCompany: f => { f.state.agent.company_id = { some: [3] } },
     provider: f => { f.state.agent.provider = 'ollama' },
     inactive: f => { f.state.agent.is_active = false },
     model: f => { f.state.agent.allowed_models = ['fixture-primary', 'fixture-review'] },

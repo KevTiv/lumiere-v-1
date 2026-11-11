@@ -75,7 +75,7 @@ export function planCapabilities(config) {
     surfaces: config.surfaces, meters: config.meters, billableCalls: 0, deploymentAcceptance: false,
     writes: ['missing configure_ai_metered_price', 'missing company upsert_ai_skill_config'],
     remainingGates: ['immutable contract release and aligned deployment', 'provider usage and billing acceptance', 'signed-in company isolation and recovery acceptance'],
-    prerequisites: ['existing shared agent and current-month monetary pool', 'reviewed model policy', 'exact platform-registered ai_spend_writer matching the gateway identity',
+    prerequisites: ['existing company-compatible agent and current-month monetary pool', 'reviewed model policy', 'exact platform-registered ai_spend_writer matching the gateway identity',
       'matching active certificates for generative surfaces', 'explicit existing infrastructure skill catalog entries'] }
 }
 
@@ -108,14 +108,16 @@ async function inspectCapabilities(config, client, now) {
     && writer.is_active === true && registeredIdentity === writerIdentity, 'platform spend writer binding does not match the gateway identity')
   const company = one(await client.sql(`SELECT id, organization_id FROM company WHERE id = ${companyId}`), 'company')
   check(number(company.id, 'company id') === companyId && number(company.organization_id, 'company organization') === org, 'company scope mismatch')
-  const agent = one(await client.sql(`SELECT * FROM ai_agent WHERE organization_id = ${org} AND id = ${agentId}`), 'shared agent')
+  const agent = one(await client.sql(`SELECT * FROM ai_agent WHERE organization_id = ${org} AND id = ${agentId}`), 'Mistral agent')
   check(number(agent.organization_id, 'agent organization') === org && number(agent.id, 'agent id') === agentId
     && agent.is_active === true && agent.provider === 'mistral', 'active Mistral agent required')
-  check(unwrap(agent.company_id) == null, 'agent must already use shared organization scope')
+  const agentCompanyId = unwrap(agent.company_id)
+  const matchesCompany = agentCompanyId === companyId || agentCompanyId === String(companyId)
+  check(agentCompanyId === null || matchesCompany, 'agent is outside the requested company scope')
   check(Array.isArray(agent.allowed_models) && agent.allowed_models.includes(agent.model)
     && agent.allowed_models.every(exactModel), 'agent model allowlist is invalid')
   check(Array.isArray(agent.allowed_actions), 'agent action allowlist is invalid')
-  for (const meter of config.meters) check(agent.allowed_models.includes(meter.model), 'metered model is not allowed for shared agent')
+  for (const meter of config.meters) check(agent.allowed_models.includes(meter.model), 'metered model is not allowed for the agent')
   for (const surface of config.surfaces) check(permits(agent.allowed_actions, requiredAction(surface.skillKey)), `agent action is not allowed for ${surface.skillKey}`)
   if (config.surfaces.some(surface => surface.skillKey === 'rag_generation')) {
     check(permits(agent.allowed_actions, 'embedding_query'), 'rag_generation requires the embedding_query agent action')
