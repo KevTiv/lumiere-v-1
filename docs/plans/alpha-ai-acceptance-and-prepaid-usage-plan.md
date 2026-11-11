@@ -1,22 +1,172 @@
 # Alpha AI acceptance and prepaid usage plan
 
-Status: planned. Updated 2026-11-01. No runtime or payment change is made by this plan.
+Status: planned; current-tenant activation blocked. Updated 2026-11-11.
+No runtime, allowance or payment change is made by this plan.
 
 Complete the owner's non-OCR AI workflow, then add prepaid usage with manual top-ups. Keep one shared monthly limit for Mugisha Farm and Farm UI acceptance. Extend the existing reservation and settlement system so funding and usage have one canonical owner.
 
+## Current alpha tenant activation — execute before broader expansion
+
+This section supersedes conflicting historical assumptions below for the
+current production repair. Source review base: `450987d21` on `main`.
+The target is Umunopfu Chicken Ltd, organization **4097**, company **4097**,
+existing agent **2** (`mistral-mugisha-usd5`) and policy
+**`mistral-mugisha-usd5@1`**. These are operator target selectors, not defaults
+to hard-code in application logic; every write must resolve and validate them.
+
+Preserve the existing allowance, funding mode, agent identity, spend history,
+settings and company scope. The historical USD 10/two-company and prepaid
+proposals below are not authorization to raise the current USD 5 cap, grant
+credit, enroll a replacement agent or enable payments. Sharing the same agent
+with another company remains a separately approved owner operation.
+
+### What the current tenant must be able to use
+
+The alpha boundary is governed assistance over authorized company data, not
+unrestricted autonomous ERP operation. Restore these supported journeys in
+order; record availability per surface rather than one global "AI ready" flag.
+
+| Surface | Current-alpha result and acceptance boundary |
+| --- | --- |
+| AI Skills setup and readiness | The signed-in owner can inspect the exact company agent/policy, missing capabilities and release blockers. Setup preserves explicit disablement, custom bindings and existing funds. A successful setup is not chat acceptance. |
+| Grounded chat and selected-record questions | Ask about a known authorized indexed source and receive an answer with a source/version-bound citation that opens. Also exercise the existing selected-record/live-read path; do not make ordinary ERP reads depend on a vector backfill. |
+| Text documents and bounded context indexing | Existing supported text/text-PDF extraction → current DMS evidence version → completed indexing → retrieval. Selected activity references remain actor-bound and bounded; no whole-tenant backfill. Saved/uploaded is not indexed. Scans/images report OCR unavailable. |
+| Form suggestions and native action drafts | Independently admitted `form_suggestion` and `action_draft_generation` prepare the correct native form/draft with selected-company context and provenance. Human confirmation uses the existing business owner; verify the exact saved record, not just draft approval. No autonomous posting, payment or stock mutation. |
+| Report analysis and run controls | Independently admitted `report_analysis` produces a supported answer with ordered durable steps, evidence and settled spend. Inspect/refresh/reconnect/cancel/recover through the existing lifecycle owner without duplicate dispatch. |
+| Saved guides and existing import/workspace references | Save/reopen the exact guide revision and resolve permitted saved import or spreadsheet selections through their existing owners. Draft guidance is not certified evidence; saved task status is not an executed import. Preserve dirty forms and current selection on navigation. |
+| Additional admitted non-OCR tools | Report composition, low-stock, the five Finance reviews, CSV mapping, insights and daily briefing retain the cohort gates below. Admit and prove each independently where exposed to this tenant; otherwise show the exact missing prerequisite, never imply availability from a catalog row or an admitted route. |
+
+OCR/vision, external research, automatic ERP effects, unbounded activity
+indexing, a second funded pool and payment/prepaid cutover remain outside this
+repair. Missing admission must be visible without blocking normal ERP use.
+
+### Evidence baseline and changes already on main
+
+The production readback from the preceding operator execution in this thread
+established the following. It has **not** been refreshed by pulling source;
+repeat private readback immediately before any write or paid acceptance.
+
+| Item | Recorded production state | Consequence |
+| --- | --- | --- |
+| Company/agent scope | Company 4097 belongs to organization 4097; active agent 2 has `company_id = 4097` | Keep this valid company scope for the immediate repair. |
+| Generation binding | `rag_generation` skill 3 is company-bound to agent 2 and policy `mistral-mugisha-usd5@1`; form/action skill IDs are 4097/4098 | Resolve the same live identities and independently verify source versions, certification and grants before dispatch. Binding existence alone is not readiness. |
+| Allowance | November budget 3: USD 5,000,000 microunits, 9,060 settled, zero held | Keep the cap and all counters; compare readback around activation. No funding or cap write. |
+| Agent capabilities | Models: `mistral-small-2603`, `mistral-medium-3-5`; actions: `skill_run`, `chat`, `form_suggest`, `action_draft` | Missing `mistral-embed`, `embedding_query` and indexing action require an in-place, authorized repair. |
+| Metering identities/prices | Dedicated reader matches its active registration; gateway writer has no org `ai_spend_writer` registration; embedding price absent | Register the existing verified writer and reviewed meter through platform authority, preserving reader/certification separation. |
+| Infrastructure catalog | No effective `embedding_query`, `document_embeddings` or `activity_indexing` entries | Add only required bounded infrastructure definitions through their canonical catalog owner, then discover actual IDs. Never invent IDs or certificates. |
+| Provider/index | Mistral embeddings selected; the 1,024-dimensional collection and worker were reported started | Check document and activity collections and completed source/version-bound indexing; query admission currently requires both stores ready. Startup does not prove source coverage. |
+| Platform pricing authority | No superuser records returned; SQL operator profile is inactive and not superuser | Operator SQL access is not pricing authority. Platform owners must supply the approved provisioning/recovery path; do not promote the tenant owner or reuse a writer as administrator. |
+| Chat | Gateway log: `admitted query embedding unavailable`; no new cited answer verified | Configuration repair, truthful degraded-state handling and signed-in live acceptance are all still required. |
+
+Latest main includes #399's setup lookup and client error recovery improvements.
+Reuse those changes rather than replacing the setup owner:
+[surface provisioning](../../ai-gateway/src/orchestrator/surface_provisioning.rs)
+and [company defaults](../../spacetimedb/src/ai/company_defaults.rs).
+The latter accepts shared or exact-company agents but configures only three
+generation surfaces; it does not repair embedding models, meters or actions.
+The [platform enrollment owner](../../spacetimedb/src/ai/platform_defaults.rs)
+deliberately leaves existing custom/funded agents alone. A new platform
+template or enrollment is therefore not a repair path for agent 2.
+The checked-in compatibility manifest currently pins contracts **0.3.178** and
+application catalog **40**; the activation guide's 0.3.166 is historical.
+Verify the actual coherent deployed release, not a presumed match to main.
+Current Kong configuration and the route fixture include `/api/ai/rag` and
+`/api/ai/rag/stream`. Earlier workbench-admission evidence excluded those paths
+from that particular change; verify the actual deployed method/path rules for
+every selected surface rather than treating either old evidence or current
+source as proof of deployed admission.
+
+### Ordered repair packets
+
+Only `Verified` with the listed evidence counts as done. The following are
+planned source/operator changes, not changes applied by this document.
+
+| ID / priority | Required change and owning paths | Completion gate | Status |
+| --- | --- | --- | --- |
+| T0 / P1 | Re-read served artifacts/schema, exact edge/BFF routes, company, agent, policy/profiles, effective bindings, releases/certificates/grants, budget/holds, meters and service identities through existing Railway private SSH/operator job. Check both vector stores and account-visible model access without generation. | Exact target and schema verified, reviewed missing-only change list, known source checksum/version and approved bounded test question; no secrets in logs/manifests. | Not started |
+| T1 / P1 | In `spacetimedb/src/ai/agents.rs`, add a narrow audited model-allowlist operation analogous to `set_ai_agent_action`; extend action validation for `embedding_query` and `embedding_index`. Prefer intent-shaped toggles over reconstructing the full private agent through `update_ai_agent`, whose nullable prompt/budget inputs can replace existing values. | On the same agent, add only `mistral-embed` and required actions; omission/unrelated values, scope, model settings and spend remain unchanged. Same request is a no-op; unauthorized/foreign-org edits fail. Review provider/model validation and audit exact changes. | Not started |
+| T2 / P1 | Align `scripts/provision-mistral-capabilities.mjs` and the activation runbook with existing company-compatible runtime semantics: agent must be in the same org and either organization-shared or scoped to exactly the requested company. Do not remove scope checks or require sharing merely to run provisioning. | Tests accept exact-company and shared agents, reject foreign-company/org agents, and retain single-pool, disabled/conflicting binding, allowlist and no-write-before-complete-inspection checks. Agent 2 remains company-scoped. | Not started |
+| T3 / P0 | Platform operator supplies the approved authority path, registers the existing server-verified gateway writer, verifies explicit metering/attempt/queue/evidence permissions, and creates only the required missing infrastructure catalog records. Owners: `core/cold_tier_identity.rs`, `ai/metered_spend.rs`, existing skill catalog. | Writer and reader readbacks match distinct runtime identities. Tenant owner/writer cannot configure meters, self-register trusted authority or manufacture certificates. No new pool or ERP write grant. Missing active platform authority remains a blocker, not a reason to weaken checks. | Blocked |
+| T4 / P1 | Release T1/T2 through the canonical contract/codegen lane; align module, generated bindings, Rust/frontend pins, durable projection/catalog and API/gateway/web/edge artifacts. | Exact deployed reducer schema and release hashes read back; regeneration/checks pass. Never edit generated bindings or old migrations by hand. Recheck whether a durable migration is needed rather than assume a command-only change needs a new table. | Not started |
+| T5 / P1 | With live skill IDs and source hashes, run `scripts/provision-mistral-capabilities.mjs --plan`, `--check`, `--apply`, then `--check` in the private operator runtime. Supply an explicitly reviewed `mistral-embed` token rate/date in integer USD microunits per 1,000 tokens. Include query and only required indexing surfaces; omit OCR. | All prerequisites checked before writes; only missing meter/company bindings written. Readback verifies agent/policy/scope/allowance unchanged and complete bindings. An uncertain response stops for durable reconciliation before retry. | Blocked |
+| T6 / P1 | Verify generation-surface source versions, independent certificates, capability grants and profile/price bindings individually. Use existing setup/registry owners; include report analysis and form/action surfaces in addition to chat. | Each enabled surface resolves the current source/release and actor/company authority, or displays a specific blocker before a paid call. No certifying one skill as a shortcut for another. | Not started |
+| T7 / P1 | In `ai-gateway/src/routes/rag.rs` and existing BFF/client error handling, distinguish healthy empty retrieval from unavailable embeddings/index/service. Preserve the supported authorized live-snapshot fallback. | Missing configuration/dependency plus no grounded fallback reports retrieval unavailable, not a healthy "no relevant information" result. A healthy no-match stays distinct; valid grounded fallback discloses degraded retrieval; normal ERP remains usable. | Not started |
+| T8 / P1 | Run the signed-in company-4097 workflow matrix below; retain exact source/run/reservation/attempt and saved-effect receipts privately. | Cited answer and independently admitted text surfaces work on the served release, with settled shared economics and fresh reload/recovery. Unaccepted additional cohorts remain explicitly unavailable. | Blocked |
+
+T1/T2/T7 can be implemented independently. T3 authority and reviewed pricing can
+be prepared alongside source work. T4 precedes activation; T5/T6 precede T8.
+The model-toggle operation is the preferred implementation, not an additional
+competing configuration authority: it mutates the existing agent under the
+same authorization/audit owner. A contract-reviewed optional allowlist patch is
+an alternative only if it also proves preservation of all unrelated fields.
+
+### Live acceptance and preservation gates
+
+1. **No-cost readiness first:** selected company, exact agent/policy, current
+   sources/releases, grants, reader/writer registration, meter prices and
+   available allowance. No status check silently reindexes or pays for a call.
+2. **Cited chat:** use a known, authorized text source with recorded DMS
+   version/checksum and completed index state. Ask a source-specific question
+   through the ordinary signed-in BFF; open the returned citation and compare
+   it with the actual current passage. Verify query-embedding and generation/
+   review attempts, unit-aware usage and settlement against the same agent-2
+   pool. A nonempty model answer or collection point count is not proof.
+3. **Indexing:** exercise existing supported text ingestion without OCR and
+   explicit bounded selected-record indexing where admitted. Recheck source
+   access/version at retrieval; changed, deleted or revoked sources are withheld.
+4. **Other current surfaces:** one new fully settled report; a form suggestion
+   preserving entered values; a reviewed action draft followed by exact native
+   saved-record readback; save/reload of a guide and authorized selected
+   import/workspace references. Verify independent source admission for each.
+   Finance/report-composition/low-stock and remaining input-assistance cohorts
+   get individual evidence before being advertised as available.
+5. **Recovery:** refresh/reconnect returns the same run/result and economics;
+   lost-response replay cannot redispatch or repeat a saved effect. Unknown
+   paid outcomes keep their holds and use the governed reconciliation owner.
+6. **Isolation/failure:** missing binding/model/action/meter/certificate,
+   disabled provider, unavailable retrieval and insufficient allowance block
+   the affected paid path with actionable limitations. Cross-company and
+   unauthorized access is rejected. Run revocation, exhaustion, races and
+   injected failures with a second authorized actor in an isolated lane;
+   never lower the live cap or revoke production access just to test.
+7. **Preservation:** read back agent 2, original company scope, policy, allowance,
+   historical reservations/usage and unrelated agent fields after activation.
+   Account for only the explicitly approved acceptance spend; no credit,
+   allowance increase, synthetic payment, second pool or OCR usage appears.
+
+Source tests to extend/run include `spacetimedb/tests/ai/company_defaults_test.rs`,
+`owner_configuration_test.rs` and `metered_spend_test.rs`,
+`scripts/tests/test-provision-mistral-capabilities.mjs`, the existing RAG tests,
+`frontend/web/lib/assistant-turn.test.ts`, and the authenticated browser owners
+listed in the [implementation ledger](../plan/alpha-ai-implementation-ledger.md).
+Add persisted positive/negative model-toggle tests and an authenticated
+company-4097-equivalent cited-chat scenario; fixture assertions are not live
+provider, billing or authorization acceptance. Run focused source tests before
+the coherent release, and keep local, hosted CI and production evidence separate.
+Reuse the stronger assertions in
+`frontend/web/tests/e2e/ai-rag-evidence-access.spec.ts`: source-bound passage
+citation, released verification, non-degraded retrieval, provider/model and
+persisted claim provenance. A skipped optional gateway test or a nonempty
+answer in `mvp-ai-rag.spec.ts` cannot close T8.
+
+This slice is complete only when the tenant can use the declared enabled
+surfaces through its normal signed-in UI, with independently verified admission,
+current evidence and settled usage. Unresolved core chat/configuration P1s block
+the claim. Deferred cohorts stay visibly restricted, not silently counted done.
+
 ## Decisions and release scope
 
-- The user selected **USD 10 total per UTC calendar month**, shared by both companies in the same organization. This replaces the earlier separate caps.
+- Historical broader target: **USD 10 total per UTC calendar month**, shared by both companies in the same organization. This is not the current-tenant repair allowance; preserve the existing USD 5 until a separate approved owner change.
 - The user selected **prepaid credits with manual top-ups**. Automatic charging and postpaid invoices are outside this plan.
 - Funding and the monthly limit are separate. A top-up adds credit; it does not raise the limit or grant AI capabilities.
 - Keep the existing signed-in owner. Do not create another platform administrator or wildcard grant.
-- Defer OCR and vision. Paid indexing, embeddings, RAG and external research need separate admission and cost coverage. The text workflows below do not depend on them.
+- Defer OCR, vision and external research. Query embeddings and bounded text indexing/RAG are required for the current cited-chat slice and need their own admission and cost coverage; non-semantic text workflows retain their existing independent paths.
 - AI changes remain proposals or drafts. Existing approval rules govern accounting posting and other consequential actions.
 - Preserve farm records, unresolved source facts, filenames, hashes and request identities. Use one writer for live UI acceptance.
 
 There are three release results: owner core acceptance, the declared non-OCR skill set, and prepaid payment acceptance. Passing one does not imply that the others passed.
 
-## Recorded live baseline
+## Historical live baseline — 2026-11-01
 
 The acceptance run on 2026-11-01 verified served revision `04d8541e4d4cfea61bcf5af4144ab054f33eb878`, contracts 0.3.163 and application catalog 32. Recheck the served release before execution.
 
@@ -166,7 +316,9 @@ Show separate blockers for exhausted credits, reached cap, stale release, missin
 
 Record served revision, contracts, catalog, actor/org/company scope, request/receipt IDs, created IDs, source hashes, prices, usage and balance readbacks privately. Keep source tests, hosted CI, payment test mode and actual live acceptance as distinct evidence classes.
 
-**Gate A:** owner core acceptance on Railway, with OCR/document AI outside scope.
+**Gate A:** owner core acceptance on Railway, with OCR outside scope. The current
+tenant's cited-chat/text-indexing checks above are required for semantic
+document chat; the earlier blanket exclusion of document AI no longer applies.
 **Gate B:** each declared non-OCR skill cohort passes its own release and live checks.
 **Gate C:** prepaid checkout passes concurrency, payment recovery, reversal and isolation checks, then controlled live payment reconciliation.
 
@@ -203,3 +355,25 @@ Before paid cutover, restrict price and sponsored-funding configuration to its
 reviewed trusted operator boundary and prove that owners cannot create cheaper
 price snapshots or sponsor their own credits through that legacy operation.
 The prepaid foundation is not a claim of paid-production readiness.
+
+## Plan refresh validation — 2026-11-11
+
+- Fast-forwarded local `main` to `origin/main` at `450987d21`; reviewed the
+  existing alpha scope, latest setup changes, native commands, provisioning
+  preconditions, RAG failure path and stronger authenticated evidence tests.
+- `node --test scripts/tests/test-provision-mistral-capabilities.mjs scripts/tests/configure-ai-platform.test.mjs scripts/tests/test_mistral_alpha_preflight.mjs`:
+  **31 passed, zero skipped**. These are existing offline baseline checks;
+  they do not implement or verify the planned company-scope/model-toggle changes.
+- `git diff --check` passed for this documentation update.
+- No new production readback, activation, paid request, cited-chat acceptance,
+  Rust/frontend build, browser suite or hosted CI was run for this plan refresh.
+  The earlier operator inspection remains baseline evidence, not a new result.
+
+## Current-tenant readiness verdict
+
+The current-tenant repair is planned, not implemented or accepted by this
+document. The earlier live inspection found missing model/action admission,
+writer registration and meter pricing; platform authority, coherent deployment,
+fresh cited-chat and independent surface acceptance remain unverified.
+
+Partially relational
