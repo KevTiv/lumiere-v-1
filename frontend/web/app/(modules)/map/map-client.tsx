@@ -1,5 +1,6 @@
 "use client"
 
+import { CanvasWorkspace } from "@lumiere/ui/composed/canvas-workspace"
 import { usePageCompositionActionSlot } from "@lumiere/ui/pages/page-composition-host"
 import { OperationalPageComposition } from "../../../components/operational-page-composition"
 
@@ -32,6 +33,8 @@ const MapView = dynamic(
   () => import("@lumiere/ui/map-components/map-view").then((m) => m.MapView),
   { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading map…</div> }
 )
+
+const MAP_CENTER: [number, number] = [30, 10]
 
 type FleetMapAction = "createVehicle" | "updatePosition"
 
@@ -329,156 +332,157 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
     )
   }
 
-  return (
-    <div className="flex h-full flex-col">
-      {/* Top bar */}
-      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <MapPin className="size-4 text-muted-foreground" />
-          <h1 className="text-sm font-semibold">{t("map.title")}</h1>
+  const controls = (
+    <div className="space-y-3">
+      <div className="space-y-2 rounded-lg border border-border p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {t("map.fleet.title")}
+        </p>
+        <button
+          type="button"
+          className="w-full rounded-md border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-60"
+          disabled={isFleetPending || !hasCompany}
+          onClick={() => setFleetAction("createVehicle")}
+        >
+          {t("map.fleet.create")}
+        </button>
+        <button
+          type="button"
+          className="w-full rounded-md border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-60"
+          disabled={isFleetPending || !hasCompany || vehicles.length === 0}
+          onClick={() => setFleetAction("updatePosition")}
+        >
+          {t("map.fleet.updatePosition")}
+        </button>
+        <div className="space-y-1 pt-1">
+          {vehicles.length === 0 ? (
+            <p className="text-xs text-muted-foreground">{t("map.fleet.empty")}</p>
+          ) : (
+            (vehicles as Record<string, unknown>[]).map((vehicle) => (
+              <button
+                key={String(vehicle.id)}
+                type="button"
+                className="flex min-h-9 w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
+                onClick={() => {
+                  setSelectedVehicleId(String(vehicle.id))
+                  setFleetAction("updatePosition")
+                }}
+              >
+                <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{String(vehicle.name ?? vehicle.id)}</span>
+                <span className="max-w-[45%] text-end text-muted-foreground">
+                  {String(vehicle.status ?? "idle")}
+                </span>
+              </button>
+            ))
+          )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-        {compositionSlot}
-        <MapLayerLegend
-          layers={defaultMapLayers}
-          visibleLayers={visibleLayers}
-          onToggle={toggleLayer}
-        />
-        </div>
-      </div>
-
-      <OperationalPageComposition moduleId="map" title={t("map.title")} actionTarget={compositionTarget}>
-      {/* Body */}
-      <div className="flex h-[calc(100dvh-12rem)] min-h-96 min-w-0">
-        {/* Map */}
-        <div className="relative min-h-0 flex-1" data-testid="map-view">
-          <MapView
-            pins={livePins}
-            layers={defaultMapLayers}
-            visibleLayers={visibleLayers}
-            defaultCenter={[30, 10]}
-            defaultZoom={2}
-            className="h-full w-full"
-          />
-        </div>
-
-        {/* Stats sidebar */}
-        <aside className="flex w-64 shrink-0 flex-col gap-3 overflow-y-auto border-l border-border bg-card p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {t("map.summary")}
+        {vehicleError ? (
+          <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive [overflow-wrap:anywhere]">
+            {vehicleError}
           </p>
-
-          <div className="space-y-2 rounded-lg border border-border p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {t("map.fleet.title")}
-            </p>
-            <button
-              type="button"
-              className="w-full rounded-md border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-60"
-              disabled={isFleetPending || !hasCompany}
-              onClick={() => setFleetAction("createVehicle")}
-            >
-              {t("map.fleet.create")}
-            </button>
-            <button
-              type="button"
-              className="w-full rounded-md border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-60"
-              disabled={isFleetPending || !hasCompany || vehicles.length === 0}
-              onClick={() => setFleetAction("updatePosition")}
-            >
-              {t("map.fleet.updatePosition")}
-            </button>
-            <div className="max-h-40 space-y-1 overflow-y-auto pt-1">
-              {vehicles.length === 0 ? (
-                <p className="text-xs text-muted-foreground">{t("map.fleet.empty")}</p>
-              ) : (
-                (vehicles as Record<string, unknown>[]).map((vehicle) => (
-                  <button
-                    key={String(vehicle.id)}
-                    type="button"
-                    className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
-                    onClick={() => {
-                      setSelectedVehicleId(String(vehicle.id))
-                      setFleetAction("updatePosition")
-                    }}
-                  >
-                    <span className="truncate font-medium">{String(vehicle.name ?? vehicle.id)}</span>
-                    <span className="ml-2 shrink-0 text-muted-foreground">
-                      {String(vehicle.status ?? "idle")}
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
-            {vehicleError ? (
-              <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
-                {vehicleError}
-              </p>
-            ) : null}
-          </div>
-
-          {/* Layer counts */}
-          <div className="space-y-2">
-            {stats.map(({ layer, total }) => {
-              const Icon = STAT_ICONS[layer.id]
-              return (
-                <div
-                  key={layer.id}
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="flex size-6 items-center justify-center rounded-md"
-                      style={{ backgroundColor: layer.color + "22" }}
-                    >
-                      {Icon && <Icon className="size-3.5" style={{ color: layer.color }} />}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{layer.label}</span>
-                  </div>
-                  <span className="text-sm font-semibold tabular-nums">{total}</span>
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="my-1 border-t border-border" />
-
-          {/* KPI cards */}
-          <div className="space-y-2">
-            <div className="rounded-lg border border-border px-3 py-2.5">
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                <Package className="size-3" />
-                {t("map.totalStockValue")}
-              </div>
-              <p className="mt-0.5 text-sm font-semibold">
-                {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(totalStockValue)}
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-border px-3 py-2.5">
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                <Truck className="size-3" />
-                {t("map.activeVehicles")}
-              </div>
-              <p className="mt-0.5 text-sm font-semibold">{activeVehicles} / {livePins.filter(p => p.layerId === "vehicle").length}</p>
-            </div>
-
-            <div className="rounded-lg border border-border px-3 py-2.5">
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                <TrendingUp className="size-3" />
-                {t("map.openPOS")}
-              </div>
-              <p className="mt-0.5 text-sm font-semibold">{openPos} / {livePins.filter(p => p.layerId === "pos").length}</p>
-            </div>
-          </div>
-
-          <div className="mt-auto rounded-md bg-muted/50 p-2.5 text-[10px] leading-relaxed text-muted-foreground">
-            {isLiveData
-              ? t("map.liveDataHint")
-              : t("map.emptyDataHint")}
-          </div>
-        </aside>
+        ) : null}
       </div>
+
+      {/* Layer counts */}
+      <div className="space-y-2">
+        {stats.map(({ layer, total }) => {
+          const Icon = STAT_ICONS[layer.id]
+          return (
+            <div
+              key={layer.id}
+              className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className="flex size-6 shrink-0 items-center justify-center rounded-md"
+                  style={{ backgroundColor: layer.color + "22" }}
+                >
+                  {Icon && <Icon className="size-3.5" style={{ color: layer.color }} />}
+                </span>
+                <span className="text-xs text-muted-foreground">{layer.label}</span>
+              </div>
+              <span className="text-sm font-semibold tabular-nums">{total}</span>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="my-1 border-t border-border" />
+
+      {/* KPI cards */}
+      <div className="space-y-2">
+        <div className="rounded-lg border border-border px-3 py-2.5">
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <Package className="size-3" />
+            {t("map.totalStockValue")}
+          </div>
+          <p className="mt-0.5 text-sm font-semibold">
+            {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(totalStockValue)}
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-border px-3 py-2.5">
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <Truck className="size-3" />
+            {t("map.activeVehicles")}
+          </div>
+          <p className="mt-0.5 text-sm font-semibold">{activeVehicles} / {livePins.filter(p => p.layerId === "vehicle").length}</p>
+        </div>
+
+        <div className="rounded-lg border border-border px-3 py-2.5">
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <TrendingUp className="size-3" />
+            {t("map.openPOS")}
+          </div>
+          <p className="mt-0.5 text-sm font-semibold">{openPos} / {livePins.filter(p => p.layerId === "pos").length}</p>
+        </div>
+      </div>
+
+      <div className="rounded-md bg-muted/50 p-2.5 text-[10px] leading-relaxed text-muted-foreground">
+        {isLiveData
+          ? t("map.liveDataHint")
+          : t("map.emptyDataHint")}
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="flex h-full min-h-0 min-w-0 flex-col">
+      <OperationalPageComposition moduleId="map" title={t("map.title")} actionTarget={compositionTarget}>
+        <CanvasWorkspace
+          className="h-[calc(100dvh-12rem)] min-h-96"
+          controlsLabel={t("map.controls", { defaultValue: "Map controls" })}
+          controlsTitle={t("map.summary")}
+          controls={controls}
+          toolbar={
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <MapPin className="size-4 shrink-0 text-muted-foreground" />
+                <h1 className="text-sm font-semibold [overflow-wrap:anywhere]">{t("map.title")}</h1>
+              </div>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                {compositionSlot}
+                <MapLayerLegend
+                  layers={defaultMapLayers}
+                  visibleLayers={visibleLayers}
+                  onToggle={toggleLayer}
+                />
+              </div>
+            </div>
+          }
+        >
+          <div className="relative min-h-0 min-w-0 flex-1" data-testid="map-view">
+            <MapView
+              pins={livePins}
+              layers={defaultMapLayers}
+              visibleLayers={visibleLayers}
+              defaultCenter={MAP_CENTER}
+              defaultZoom={2}
+              className="h-full w-full"
+            />
+          </div>
+        </CanvasWorkspace>
+      </OperationalPageComposition>
       {fleetAction && fleetFormConfig ? (
         <FormModal
           open
@@ -489,7 +493,6 @@ function MapClientLoaded({ organizationId }: { organizationId: number }) {
           onSubmit={handleFleetSubmit}
         />
       ) : null}
-      </OperationalPageComposition>
     </div>
   )
 }

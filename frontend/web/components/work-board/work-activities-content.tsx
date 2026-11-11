@@ -11,6 +11,7 @@ import { KanbanCardContent } from "@lumiere/ui/kanban/kanban-card"
 import { Badge } from "@lumiere/ui/components/badge"
 import {
   Sheet,
+  SheetBody,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -359,7 +360,7 @@ export function WorkActivitiesContent({
           if (!open && !complete.isPending) setReview(null)
         }}
       >
-        <SheetContent size="record">
+        <SheetContent size="record" layout="bounded">
           <SheetHeader>
             <SheetTitle>
               {current ? title(current) : t("workBoard.followUp")}
@@ -367,7 +368,7 @@ export function WorkActivitiesContent({
             <SheetDescription>{t("workBoard.followUpReview")}</SheetDescription>
           </SheetHeader>
           {review && current && (
-            <div className="space-y-4 p-4 [overflow-wrap:anywhere]">
+            <SheetBody className="space-y-4">
               <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 <span>{ownership(current)}</span>
                 <span aria-hidden="true">·</span>
@@ -414,7 +415,7 @@ export function WorkActivitiesContent({
                 </p>
               )}
               {!online && <p role="alert">{t("workBoard.offline")}</p>}
-            </div>
+            </SheetBody>
           )}
         </SheetContent>
       </Sheet>

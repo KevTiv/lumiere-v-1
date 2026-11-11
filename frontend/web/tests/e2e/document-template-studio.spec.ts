@@ -202,7 +202,7 @@ test.describe("Document template studio", { tag: ["@p0", "@document-templates"] 
   // Bound individual actions so a blocked control retains its locator/call log.
   test.use({ actionTimeout: 30_000, navigationTimeout: 45_000 })
 
-  test("ordinary staff author, manage and reuse formatted text in a persisted CRM modal", async ({ browser, page: owner }) => {
+  test("ordinary staff author, manage and reuse formatted text in a persisted CRM modal", { tag: "@aside-fit" }, async ({ browser, page: owner }) => {
     test.setTimeout(300_000)
     const companyId = await fetchDefaultCompanyId(owner)
     const author = await provisionActor(owner, "template-author", TEMPLATE_AUTHOR, companyId)
@@ -234,6 +234,23 @@ test.describe("Document template studio", { tag: ["@p0", "@document-templates"] 
       await editCanvasHeading(page, dialog, heading)
       await dialog.getByRole("button", { name: "Table", exact: true }).click()
       await expect(canvas.locator("table")).toHaveCount(1)
+      await canvas.locator("h2").click()
+      await page.setViewportSize({ width: 600, height: 800 })
+      const libraryToggle = dialog.getByRole("button", { name: "Toggle block library", exact: true })
+      await libraryToggle.press("Enter")
+      await expect(libraryToggle).toHaveAttribute("aria-expanded", "true")
+      await dialog.getByRole("button", { name: "Close block library", exact: true }).press("Enter")
+      await expect(libraryToggle).toBeFocused()
+
+      const propertiesToggle = dialog.getByRole("button", { name: "Toggle properties panel", exact: true })
+      await propertiesToggle.press("Enter")
+      await expect(propertiesToggle).toHaveAttribute("aria-expanded", "true")
+      await expect(dialog.getByRole("button", { name: "Edit text", exact: true })).toBeEnabled()
+      await dialog.getByRole("button", { name: "Close properties panel", exact: true }).press("Enter")
+      await expect(propertiesToggle).toBeFocused()
+      await expect(canvas.locator("h2")).toHaveText(heading)
+      await expect(canvas.locator("table")).toHaveCount(1)
+      await page.setViewportSize({ width: 1600, height: 1000 })
       await saveDesigner(page, dialog, "Save template", "create_document_template")
 
       const created = await templateNamed(page, name)

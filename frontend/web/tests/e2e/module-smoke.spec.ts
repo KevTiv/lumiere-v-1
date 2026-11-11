@@ -11,6 +11,7 @@ import {
   gotoModule,
   openEntityCreate,
   selectModuleTab,
+  scalarQueryId,
   smokeName,
   submitForm,
 } from "./helpers"
@@ -60,7 +61,7 @@ test.describe("ERP module smoke", () => {
     await expect(page.getByText(pricelistName)).toBeVisible()
   })
 
-  test("creates a Proposal and opens the proposal workspace route", async ({ page }) => {
+  test("creates a Proposal and opens the proposal workspace route", { tag: "@aside-fit" }, async ({ page }) => {
     const proposalTitle = smokeName("proposal")
     const orgId = await fetchSessionOrganizationId(page)
 
@@ -93,6 +94,50 @@ test.describe("ERP module smoke", () => {
     await expect(page.getByTestId("proposal-workspace-title")).toHaveText(proposalTitle, {
       timeout: 30_000,
     })
+
+    await page.setViewportSize({ width: 390, height: 760 })
+    const workspace = page.getByTestId("proposal-workspace")
+    const sections = workspace.getByRole("button", { name: "Sections", exact: true })
+    const ai = workspace.getByRole("button", { name: "AI Analysis", exact: true })
+    await sections.click()
+    await expect(workspace.getByRole("complementary", { name: "Sections", exact: true })).toBeVisible()
+    await ai.click()
+    const aiPanel = workspace.getByRole("complementary", { name: "AI Analysis", exact: true })
+    await expect(aiPanel).toBeVisible()
+    await expect(workspace.getByRole("complementary", { name: "Sections", exact: true })).toBeHidden()
+    await aiPanel.getByRole("button", { name: "Source docs", exact: true }).click()
+    await aiPanel.getByRole("button", { name: "Add Doc", exact: true }).click()
+    const sourceDraft = aiPanel.getByPlaceholder("Paste your RFP, tender brief, or source document here…")
+    await sourceDraft.fill("Local source document draft")
+    await aiPanel.getByRole("button", { name: "Hide AI panel", exact: true }).click()
+    await expect(ai).toBeFocused()
+    await ai.click()
+    await expect(sourceDraft).toHaveValue("Local source document draft")
+    const [saveSourceResponse] = await Promise.all([
+      page.waitForResponse((response) => matchesOperationResponse(response, "add_proposal_source_doc")),
+      aiPanel.getByRole("button", { name: "Save", exact: true }).click(),
+    ])
+    expect(saveSourceResponse.ok()).toBe(true)
+    const submittedSource = saveSourceResponse.request().postDataJSON() as {
+      name: string
+      content: string
+      wordCount: number
+    }
+    expect(submittedSource).toMatchObject({ content: "Local source document draft", wordCount: 4 })
+    // The list endpoint exposes source metadata, while the write carries the body.
+    await expect.poll(async () => {
+      const response = await page.request.get("/api/query/proposal-source-docs")
+      expect(response.ok()).toBe(true)
+      const body = await response.json() as {
+        data: Array<{ proposalId: unknown; name: string; wordCount: number }>
+      }
+      return body.data.filter((row) => String(scalarQueryId(row.proposalId)) === String(proposalId))
+        .map(({ name, wordCount }) => ({ name, wordCount }))
+    }).toEqual([{ name: submittedSource.name, wordCount: 4 }])
+    expect(await aiPanel.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
+    await workspace.getByRole("button", { name: "Version History", exact: true }).click()
+    await expect(workspace.getByRole("complementary", { name: "Version History", exact: true })).toBeVisible()
+    expect(await workspace.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
   })
 
   test("renders guarded workflow/action controls for CRM and Helpdesk", async ({ page }) => {

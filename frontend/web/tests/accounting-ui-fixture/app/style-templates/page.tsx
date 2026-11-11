@@ -65,7 +65,7 @@ function Templates() {
         entityConfig: { id: "synthetic-suppliers", title: "Supplier register", view: { mode: "table", rowKey: "id", searchable: true, searchKeys: ["reference", "name"], columns: [
           { key: "reference", label: "Reference" }, { key: "name", label: "Organisation" }, { key: "state", label: "Review state", type: "badge" },
         ] } } },
-      { id: "form", label: "Static form", type: "custom", customContent: <ModularForm config={{ ...form, id: "template-inline", layout: "card" }} onSubmit={() => setSaved(true)} /> },
+      { id: "form", label: "Static form", type: "custom", customContent: <ModularForm config={{ ...form, id: "template-inline", layout: "card" }} renderPreview={(values) => <output>{String(values.reference ?? "")}</output>} onSubmit={() => setSaved(true)} /> },
     ],
   }
   return <DashboardWorkspace userProfile={{ name: "Synthetic Designer" }} sidebar={<DashboardSidebar />} onOpenSearch={() => {}}>

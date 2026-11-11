@@ -1,8 +1,9 @@
 import { reviewInvoiceAccountingChoices } from "./invoice-accounting-choices"
 import { chooseSelectOptionByTriggerValue } from "./e2e/helpers-legacy"
 import { test, expect, type Page } from "@playwright/test"
-// Exact fixture asset allowlist; all other /api/ requests fail the isolation assertion.
-const syntheticLogoUrl = "/api/documents/blobs/object/7/synthetic/0123456789abcdef0123456789abcdef?sha256=f5438451863fbb1cb2224cbd6a823fa594b429dd3ce2f26c8c0f05bd3f971429"
+import { syntheticLogoBase64, syntheticLogoUrl } from "./invoice-personalization-fixture"
+
+const syntheticLogo = Buffer.from(syntheticLogoBase64, "base64")
 
 const unexpectedRequests = new WeakMap<Page, string[]>()
 async function noOverflow(page: Page) {
@@ -12,7 +13,10 @@ async function noOverflow(page: Page) {
 for (const width of [320, 390, 768, 1440]) {
   test.describe(`${width}px real invoice personalization with synthetic persistence`, () => {
     test.use({ viewport: { width, height: width < 768 ? 844 : 1000 }, hasTouch: width < 1024 })
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page, context, baseURL }) => {
+      // Serve the exact synthetic logo in every tab without waiting on the Next dev server.
+      await context.route(new URL(syntheticLogoUrl, baseURL).href, (route) =>
+        route.fulfill({ contentType: "image/png", body: syntheticLogo }))
       const requests: string[] = []
       unexpectedRequests.set(page, requests)
       page.on("request", (request) => {
@@ -32,7 +36,7 @@ for (const width of [320, 390, 768, 1440]) {
     test("publishing preserves rejected edits and reconciles an exact unconfirmed save without redispatch", async ({ page }) => {
       const settings = page.getByTestId("invoice-profile-settings")
       await settings.getByTestId("invoice-profile-notice").fill("Company A revised notice")
-      await settings.getByTestId("invoice-profile-logoUrl").setInputFiles({ name: "synthetic-logo.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAFAAAAAgCAYAAACFM/9sAAAAZElEQVR4nO3QwQ3AIAwEQYpIe7zSfw1JBXwshDlpLO3fN+N556d6o/uB9AACBBgdwNOAq+seAjA0gAABRgcQIMDoAAIEGB1AgACj2wZYue7xAC8IIECA0QE8DSiAAG8KIECA0f2kEerU8nt7HQAAAABJRU5ErkJggg==", "base64") })
+      await settings.getByTestId("invoice-profile-logoUrl").setInputFiles({ name: "synthetic-logo.png", mimeType: "image/png", buffer: syntheticLogo })
       await expect(page.getByText("Synthetic PNG upload callback for company 11", { exact: true })).toBeVisible()
       await page.getByRole("button", { name: "Reject next synthetic save", exact: true }).click()
       await settings.getByTestId("invoice-profile-save").click()
@@ -99,6 +103,7 @@ for (const width of [320, 390, 768, 1440]) {
       await page.getByTestId("create-invoice-line-description").fill("Synthetic retained line")
       await page.getByTestId("create-invoice-line-unit-price").fill("1250")
       await reviewInvoiceAccountingChoices(page)
+      await dialog.getByTestId("create-invoice-content-toggle").click()
       await dialog.getByRole("textbox", { name: "Terms", exact: true }).fill("Retained invoice-specific terms")
       await expect(page.getByTestId("create-invoice-save-draft")).toBeEnabled()
       const publisher = await context.newPage()
@@ -122,10 +127,18 @@ for (const width of [320, 390, 768, 1440]) {
       } finally { await publisher.close() }
     })
 
-    test("long content, managed logo and light paper remain usable and issued snapshots ignore later defaults", async ({ page }, testInfo) => {
+    test("long content, managed logo and light paper remain usable and issued snapshots ignore later defaults", { tag: "@aside-fit" }, async ({ page }, testInfo) => {
       await page.getByRole("button", { name: "Load long synthetic content", exact: true }).click()
       const settings = page.getByTestId("invoice-profile-settings")
       await expect(settings.getByTestId("invoice-profile-notice")).toHaveText(/LONG-UNBROKEN-REFERENCE/)
+      if (width === 1440) {
+        await settings.evaluate((node) => { node.style.maxWidth = "40rem" })
+      }
+      const [fields, settingsPreview] = await Promise.all([
+        settings.locator("fieldset").boundingBox(),
+        settings.locator("aside").boundingBox(),
+      ])
+      expect(settingsPreview!.y).toBeGreaterThanOrEqual(fields!.y + fields!.height - 1)
       await noOverflow(page)
       await page.getByRole("button", { name: "Dark workspace", exact: true }).click()
       await expect(page.locator("html")).toHaveClass(/dark/)
@@ -153,6 +166,7 @@ for (const width of [320, 390, 768, 1440]) {
       await page.getByTestId("create-invoice-line-description").fill("Synthetic international support")
       await page.getByTestId("create-invoice-line-unit-price").fill("1250")
       await reviewInvoiceAccountingChoices(page)
+      await dialog.getByTestId("create-invoice-content-toggle").click()
       await dialog.getByRole("textbox", { name: "Terms", exact: true }).fill("Explicit invoice-only terms")
       await dialog.getByRole("textbox", { name: "Footer", exact: true }).fill("")
       if (width < 1024) await page.getByTestId("create-invoice-preview-toggle").click()
@@ -196,6 +210,7 @@ for (const width of [320, 390, 768, 1440]) {
       await issued.scrollIntoViewIfNeeded()
       await noOverflow(page)
       await page.getByRole("button", { name: "Compose synthetic invoice", exact: true }).click()
+      await dialog.getByTestId("create-invoice-content-toggle").click()
       await expect(dialog.getByRole("textbox", { name: "Notice", exact: true })).toHaveText("Newer company notice")
       await expect(dialog.getByRole("textbox", { name: "Footer", exact: true })).toHaveText("Newer company footer")
       if (width < 1024) expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true)

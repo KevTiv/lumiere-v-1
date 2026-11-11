@@ -13,13 +13,21 @@ interface DocumentInputPanelProps {
   dispatch: React.Dispatch<WorkspaceAction>
   onAnalyze: () => void
   isAnalyzing: boolean
+  onRenameSource: (source: SourceDocument, name: string) => void
+  onSaveSource: (source: SourceDocument) => void
+  savingSourceId: string | null
+  dirtySourceIds: string[]
+  saveError: string | null
 }
 
 function countWords(text: string): number {
   return text.trim() === "" ? 0 : text.trim().split(/\s+/).length
 }
 
-export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }: DocumentInputPanelProps) {
+export function DocumentInputPanel({
+  sources, dispatch, onAnalyze, isAnalyzing, onRenameSource, onSaveSource,
+  savingSourceId, dirtySourceIds, saveError,
+}: DocumentInputPanelProps) {
   const { t } = useTranslation()
   const [activeSourceId, setActiveSourceId] = useState<string | null>(
     sources.length > 0 ? sources[0].id : null
@@ -28,9 +36,10 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const activeSource = sources.find((s) => s.id === activeSourceId) ?? null
+  const isSavingActiveSource = savingSourceId !== null && savingSourceId === activeSourceId
 
   const addBlankSource = () => {
-    const id = `src-${Date.now()}`
+    const id = `src-${crypto.randomUUID()}`
     const newSource: SourceDocument = {
       id,
       name: t("proposalWorkspace.documentInputPanel.documentName", { count: sources.length + 1 }),
@@ -47,7 +56,7 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
     try {
       const text = await navigator.clipboard.readText()
       if (!activeSourceId) {
-        const id = `src-${Date.now()}`
+        const id = `src-${crypto.randomUUID()}`
         dispatch({
           type: "ADD_SOURCE",
           source: { id, name: t("proposalWorkspace.documentInputPanel.documentName", { count: sources.length + 1 }), content: text, type: "pasted", wordCount: countWords(text), addedAt: new Date() },
@@ -83,7 +92,7 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
       const reader = new FileReader()
       reader.onload = (ev) => {
         const content = ev.target?.result as string
-        const id = `src-${Date.now()}`
+        const id = `src-${crypto.randomUUID()}`
         dispatch({
           type: "ADD_SOURCE",
           source: { id, name: file.name, content, type: "uploaded", wordCount: countWords(content), addedAt: new Date() },
@@ -101,7 +110,7 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
     const reader = new FileReader()
     reader.onload = (ev) => {
       const content = ev.target?.result as string
-      const id = `src-${Date.now()}`
+      const id = `src-${crypto.randomUUID()}`
       dispatch({
         type: "ADD_SOURCE",
         source: { id, name: file.name, content, type: "uploaded", wordCount: countWords(content), addedAt: new Date() },
@@ -115,10 +124,10 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
   const totalWords = sources.reduce((sum, s) => sum + s.wordCount, 0)
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex min-w-0 flex-col rounded-md border border-border">
       {/* Panel header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-background px-4 py-3">
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold text-foreground">{t("proposalWorkspace.documentInputPanel.sourceDocuments")}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             {sources.length === 0
@@ -138,25 +147,35 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
       {sources.length > 0 && (
         <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border bg-muted/30 overflow-x-auto shrink-0">
           {sources.map((src) => (
-            <button
+            <div
               key={src.id}
-              onClick={() => setActiveSourceId(src.id)}
               className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium shrink-0 transition-colors",
+                "flex shrink-0 items-center rounded text-xs font-medium transition-colors",
                 activeSourceId === src.id
                   ? "bg-background border border-border text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground hover:bg-background/60"
               )}
             >
-              <FileText className="h-3 w-3" />
-              <span className="max-w-20 truncate">{src.name}</span>
               <button
-                onClick={(e) => { e.stopPropagation(); handleRemoveSource(src.id) }}
-                className="ml-0.5 rounded hover:text-destructive"
+                type="button"
+                aria-pressed={activeSourceId === src.id}
+                onClick={() => setActiveSourceId(src.id)}
+                className="flex min-h-9 items-center gap-1.5 rounded px-2"
               >
-                <X className="h-3 w-3" />
+                <FileText className="h-3 w-3" aria-hidden="true" />
+                <span className="max-w-28 truncate">{src.name}</span>
               </button>
-            </button>
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                aria-label={`${t("common.delete")} ${src.name}`}
+                onClick={() => handleRemoveSource(src.id)}
+                disabled={savingSourceId === src.id}
+              >
+                <X aria-hidden="true" />
+              </Button>
+            </div>
           ))}
         </div>
       )}
@@ -170,11 +189,11 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
             onDragLeave={() => setIsDragging(false)}
             className={cn(
-              "flex-1 flex flex-col items-center justify-center gap-4 m-4 rounded-lg border-2 border-dashed transition-colors",
+              "m-3 flex flex-1 flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed p-3 transition-colors",
               isDragging ? "border-primary bg-primary/5" : "border-border bg-muted/20"
             )}
           >
-            <div className="text-center space-y-2 px-6">
+            <div className="space-y-2 text-center">
               <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
                 <FileText className="h-6 w-6 text-muted-foreground" />
               </div>
@@ -183,12 +202,12 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
                 {t("proposalWorkspace.documentInputPanel.supportedFormats")}
               </p>
             </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={handlePasteFromClipboard} className="gap-1.5 text-xs">
+            <div className="flex min-w-0 flex-wrap justify-center gap-2">
+              <Button size="sm" variant="outline" onClick={handlePasteFromClipboard} className="h-auto min-h-8 max-w-full gap-1.5 whitespace-normal text-xs">
                 <Clipboard className="h-3.5 w-3.5" />
                 {t("proposalWorkspace.documentInputPanel.pasteFromClipboard")}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-1.5 text-xs">
+              <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} className="h-auto min-h-8 max-w-full gap-1.5 whitespace-normal text-xs">
                 <Plus className="h-3.5 w-3.5" />
                 {t("proposalWorkspace.documentInputPanel.uploadFile")}
               </Button>
@@ -199,41 +218,49 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
           /* Active document editor */
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Doc name + word count */}
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
+            <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
               <input
                 value={activeSource.name}
-                onChange={(e) => {
-                  const updated = { ...activeSource, name: e.target.value }
-                  dispatch({ type: "UPDATE_SOURCE_CONTENT", id: activeSource.id, content: activeSource.content })
-                  // Update name via a workaround — re-add with same id
-                  dispatch({ type: "REMOVE_SOURCE", id: activeSource.id })
-                  dispatch({ type: "ADD_SOURCE", source: { ...updated, name: e.target.value } })
-                  setActiveSourceId(activeSource.id)
-                }}
-                className="flex-1 text-xs font-medium bg-transparent border-0 outline-none text-foreground"
+                onChange={(e) => onRenameSource(activeSource, e.target.value)}
+                disabled={isSavingActiveSource}
+                className="min-w-0 flex-1 border-0 bg-transparent text-xs font-medium text-foreground outline-none"
               />
               <span className="text-xs text-muted-foreground shrink-0">
                 {t("proposalWorkspace.documentInputPanel.wordCount", { count: activeSource.wordCount })}
               </span>
-              <Button size="sm" variant="ghost" onClick={handlePasteFromClipboard} className="h-6 w-6 p-0" title={t("proposalWorkspace.documentInputPanel.pasteFromClipboard")}>
+              <Button size="sm" variant="ghost" disabled={isSavingActiveSource} onClick={handlePasteFromClipboard} className="h-6 w-6 p-0" title={t("proposalWorkspace.documentInputPanel.pasteFromClipboard")}>
                 <Clipboard className="h-3.5 w-3.5" />
               </Button>
             </div>
             <Textarea variant="plain"
               value={activeSource.content}
+              disabled={isSavingActiveSource}
               onChange={(e) => handleContentChange(e.target.value)}
               placeholder={t("proposalWorkspace.documentInputPanel.pasteRfp")}
-              className="field-sizing-fixed min-h-0 flex-1 resize-none rounded-none border-0 p-3 font-mono text-xs leading-relaxed text-foreground shadow-none focus-visible:ring-0 md:text-xs"
+              className="field-sizing-fixed min-h-32 flex-1 resize-none rounded-none border-0 p-3 font-mono text-xs leading-relaxed text-foreground shadow-none focus-visible:ring-0 md:text-xs"
               spellCheck={false}
             />
           </div>
         )}
       </div>
 
-      {/* Analyze button */}
-      <div className="px-4 py-3 border-t border-border bg-background shrink-0">
+      {saveError && <p role="alert" className="px-4 py-2 text-sm text-destructive">{saveError}</p>}
+
+      {/* Saving a draft and analysing its contents are separate actions. */}
+      <div className="flex shrink-0 flex-wrap gap-2 border-t border-border bg-background px-4 py-3">
+        {activeSource && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-auto min-h-8 w-full whitespace-normal"
+            disabled={savingSourceId !== null || !dirtySourceIds.includes(activeSource.id)}
+            onClick={() => onSaveSource(activeSource)}
+          >
+            {isSavingActiveSource ? t("common.saving") : t("common.save")}
+          </Button>
+        )}
         <Button
-          className="w-full gap-2"
+          className="h-auto min-h-8 w-full gap-2 whitespace-normal"
           size="sm"
           onClick={onAnalyze}
           disabled={isAnalyzing || sources.every((s) => s.content.trim() === "")}

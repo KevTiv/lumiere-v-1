@@ -26,6 +26,34 @@ import { AIChatPanel } from "./ai-chat-panel"
 afterEach(cleanup)
 
 describe("AI chat workspace", () => {
+  it("keeps the shell composer mounted when a dock becomes a modal", async () => {
+    const host = document.createElement("div")
+    document.body.append(host)
+    try {
+      const onClose = vi.fn()
+      const { rerender, unmount } = render(
+        <AIChatPanel open docked workspaceHost={host} onClose={onClose} />,
+      )
+      const input = await screen.findByTestId("erp-ai-chat-input") as HTMLTextAreaElement
+      fireEvent.change(input, { target: { value: "Keep the unsent draft" } })
+      rerender(<AIChatPanel open workspaceHost={host} onClose={onClose} />)
+      const dialog = screen.getByRole("dialog", { name: "aiChat.title" })
+      expect(within(dialog).getByTestId("erp-ai-chat-input")).toBe(input)
+      expect(input.value).toBe("Keep the unsent draft")
+      fireEvent.change(input, { target: { value: "Keep the unsent draft /no-such-skill" } })
+      expect(within(dialog).getByText("aiChat.deck.noMatches")).toBeTruthy()
+      fireEvent.keyDown(input, { key: "Escape" })
+      expect(within(dialog).queryByText("aiChat.deck.noMatches")).toBeNull()
+      expect(input.value).toBe("Keep the unsent draft /no-such-skill")
+      expect(onClose).not.toHaveBeenCalled()
+      fireEvent.keyDown(input, { key: "Escape" })
+      expect(onClose).toHaveBeenCalledOnce()
+      unmount()
+    } finally {
+      host.remove()
+    }
+  })
+
   it("updates starters with page context and preserves an unsent question without sending", () => {
     const onSendMessage = vi.fn()
     const { rerender } = render(<AIChatPanel open onClose={vi.fn()} onSendMessage={onSendMessage} context={{ module: "settings", activeTab: "imports" }} />)
@@ -383,7 +411,7 @@ describe("AI chat workspace", () => {
       "module:inventory",
     )
     expect(onContextChange).toHaveBeenCalledWith("module:inventory")
-    fireEvent.click(screen.getByRole("button", { name: "Dock beside ERP" }))
+    fireEvent.click(screen.getByRole("button", { name: "aiChat.workspace.dockBesideErp" }))
     expect(onDockToggle).toHaveBeenCalledOnce()
 
     fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "Show my stock" } })

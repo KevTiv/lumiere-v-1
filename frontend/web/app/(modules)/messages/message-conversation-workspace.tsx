@@ -90,6 +90,25 @@ export function MessageConversationWorkspace({
   const [errors, setErrors] = useState<{ [thread: string]: string }>({})
   const [busy, setBusy] = useState(false)
   const [isHydrated, setIsHydrated] = useState(false)
+  const searchInput = useRef<HTMLInputElement>(null)
+  const backButton = useRef<HTMLButtonElement>(null)
+  const threadOpener = useRef<HTMLButtonElement | null>(null)
+  const focusAfterSelection = useRef<"detail" | "list" | null>(null)
+  useEffect(() => {
+    if (focusAfterSelection.current === "detail" && selectedMessageId) {
+      focusAfterSelection.current = null
+      backButton.current?.focus()
+    } else if (focusAfterSelection.current === "list" && !selectedMessageId) {
+      focusAfterSelection.current = null
+      const opener = threadOpener.current
+      if (opener?.isConnected) opener.focus()
+      else searchInput.current?.focus()
+    }
+  }, [selectedMessageId])
+  const backToConversations = () => {
+    focusAfterSelection.current = "list"
+    onSelectMessage(null)
+  }
   const busyRef = useRef(false)
   const active = useRef(true)
   useEffect(() => {
@@ -214,7 +233,7 @@ export function MessageConversationWorkspace({
 
   return (
     <section
-      className="min-w-0 space-y-4"
+      className="@container/conversations min-w-0 space-y-4"
       data-testid="message-conversation-workspace"
       aria-label={t("messages.workspace.title", {
         defaultValue: "Conversations",
@@ -241,17 +260,18 @@ export function MessageConversationWorkspace({
           </Button>
         )}
       </header>
-      <div className="grid min-w-0 overflow-hidden rounded-xl border lg:grid-cols-[minmax(16rem,1fr)_minmax(0,2fr)]">
+      <div className="grid min-w-0 overflow-hidden rounded-xl border @min-[56rem]/conversations:grid-cols-[minmax(16rem,1fr)_minmax(0,2fr)]">
         <aside
           className={cn(
-            "min-w-0 space-y-3 border-border p-3 lg:border-r",
-            selectedMessageId && "hidden lg:block",
+            "min-w-0 space-y-3 border-border p-3 @min-[56rem]/conversations:border-r",
+            selectedMessageId && "hidden @min-[56rem]/conversations:block",
           )}
           aria-label={t("messages.workspace.list", {
             defaultValue: "Conversation list",
           })}
         >
           <Input
+            ref={searchInput}
             aria-label={t("messages.workspace.search", {
               defaultValue: "Search loaded conversations",
             })}
@@ -286,7 +306,13 @@ export function MessageConversationWorkspace({
                     aria-current={
                       selected?.id === thread.id ? "true" : undefined
                     }
-                    onClick={() => onSelectMessage(thread.id)}
+                    onClick={(event) => {
+                      if (selected?.id !== thread.id) {
+                        threadOpener.current = event.currentTarget
+                        focusAfterSelection.current = "detail"
+                      }
+                      onSelectMessage(thread.id)
+                    }}
                   >
                     <span className="block truncate text-sm font-medium">
                       {messageTitle(thread.root)}
@@ -307,7 +333,7 @@ export function MessageConversationWorkspace({
           )}
         </aside>
         <div
-          className={cn("min-w-0 p-4", !selectedMessageId && "hidden lg:block")}
+          className={cn("min-w-0 p-4", !selectedMessageId && "hidden @min-[56rem]/conversations:block")}
         >
           {!selected ? (
             <div className="flex min-h-80 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
@@ -323,7 +349,7 @@ export function MessageConversationWorkspace({
                     })}
               </p>
               {selectedMessageId && (
-                <Button className="min-h-11 sm:min-h-8" variant="outline" onClick={() => onSelectMessage(null)}>
+                <Button className="min-h-11 sm:min-h-8" variant="outline" ref={backButton} onClick={backToConversations}>
                   {t("messages.workspace.back", {
                     defaultValue: "Back to conversations",
                   })}
@@ -335,8 +361,9 @@ export function MessageConversationWorkspace({
               <header className="space-y-3 border-b pb-4">
                 <Button
                   variant="ghost"
-                  className="min-h-11 sm:min-h-8 lg:hidden"
-                  onClick={() => onSelectMessage(null)}
+                  className="min-h-11 sm:min-h-8 @min-[56rem]/conversations:hidden"
+                  ref={backButton}
+                  onClick={backToConversations}
                 >
                   <ArrowLeft />
                   {t("messages.workspace.back", {

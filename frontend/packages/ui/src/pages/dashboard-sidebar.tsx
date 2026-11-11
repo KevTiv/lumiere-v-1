@@ -178,6 +178,7 @@ function DashboardSidebarContent({
                     <HoverCard key={item.href}>
                       <HoverCardTrigger render={link} delay={250} closeDelay={100} />
                       <HoverCardContent side="right" align="start" alignOffset={0} sideOffset={8}
+                        positionerClassName="pointer-events-none"
                         className="w-80 overflow-hidden p-0" data-testid="sidebar-page-preview">
                         <div className="flex items-center gap-2 px-3 py-2.5">
                           <Icon className="size-4 shrink-0 text-muted-foreground" />

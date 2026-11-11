@@ -33,7 +33,12 @@ test("sidebar edge resizes, snaps both ways, and restores saved width", async ({
   await dragEdge(page, -180)
   await expect(container(page)).toHaveCSS("width", "48px")
   await page.reload()
+  await expect(page.getByTestId("fixture-disclosure")).toHaveAttribute("data-hydrated", "true")
   await expect(container(page)).toHaveCSS("width", "48px")
+  await page.getByTestId("sidebar-link-overview").hover()
+  const preview = page.getByTestId("sidebar-page-preview")
+  await expect(preview).toBeVisible()
+  await expect(preview).toHaveCSS("pointer-events", "none")
   await dragEdge(page, 200)
   await expect(container(page)).toHaveCSS("width", "248px")
   await dragEdge(page, 250)
@@ -66,6 +71,28 @@ test("sidebar categories persist and every destination remains accessible in ico
   await finance.focus()
   await page.keyboard.press("Enter")
   await expect(accounting).toBeVisible()
+})
+
+test("sidebar preserves the preferred width while the ERP workspace is narrow", { tag: "@aside-fit" }, async ({ page }) => {
+  await openWorkspace(page)
+  const edge = page.getByTestId("sidebar-resize-handle")
+  await edge.press("End")
+  await expect(container(page)).toHaveCSS("width", "400px")
+
+  await page.setViewportSize({ width: 800, height: 950 })
+  await expect(edge).toHaveAttribute("aria-valuemax", "256")
+  await expect(container(page)).toHaveCSS("width", "256px")
+  await edge.press("End")
+  expect(await page.evaluate(() => localStorage.getItem("lumiere-sidebar-width"))).toBe("400")
+
+  await page.setViewportSize({ width: 980, height: 950 })
+  await page.evaluate(() => { document.documentElement.style.fontSize = "20px" })
+  await expect(edge).toHaveAttribute("aria-valuemax", "300")
+  await expect(container(page)).toHaveCSS("width", "300px")
+
+  await page.evaluate(() => { document.documentElement.style.fontSize = "" })
+  await page.setViewportSize({ width: 1440, height: 950 })
+  await expect(container(page)).toHaveCSS("width", "400px")
 })
 
 test("sidebar highlights the active module for a nested record and leaves AI neutral", async ({ page }) => {

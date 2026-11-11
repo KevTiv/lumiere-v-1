@@ -4,7 +4,8 @@ import { Suspense, useRef, useCallback } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Loader } from '@react-three/drei'
 import type { OrbitControls as OrbitControlsType } from 'three-stdlib'
-import { cn } from '../lib/utils'
+import { useTranslation } from '@lumiere/i18n'
+import { CanvasWorkspace } from '../composed/canvas-workspace'
 import { Warehouse3DProvider } from './warehouse-3d-context'
 import { WarehouseScene } from './warehouse-scene'
 import { StockSidebar } from './stock-sidebar'
@@ -35,6 +36,7 @@ export function WarehouseViewer({
   onUpdateQuantity,
   onRemoveItem,
 }: WarehouseViewerProps) {
+  const { t } = useTranslation()
   const controlsRef = useRef<OrbitControlsType | null>(null)
 
   const flyToItem = useCallback(
@@ -97,40 +99,35 @@ export function WarehouseViewer({
       onUpdateQuantity={onUpdateQuantity}
       onRemoveItem={onRemoveItem}
     >
-      <div className={cn('flex h-full w-full overflow-hidden', className)}>
-        {/* Sidebar */}
-        <StockSidebar className="w-64 shrink-0" />
-
-        {/* Main area */}
-        <div className="flex flex-col flex-1 min-w-0">
-          {/* Toolbar */}
-          <div className="flex items-center gap-3 p-3 border-b border-border bg-card">
-            <StockSearchBar className="flex-1 max-w-md" onNavigateToItem={flyToItem} />
-          </div>
-
-          {/* 3D Canvas */}
-          <div className="flex-1 relative">
-            <Canvas
-              shadows
-              gl={{ antialias: true, alpha: false }}
-              dpr={[1, 2]}
-              style={{ background: '#0f172a' }}
-            >
-              <Suspense fallback={null}>
-                <WarehouseScene
-                  onCameraRef={handleCameraRef}
-                  warehouseName={warehouseName}
-                  warehouseDimensions={warehouseDimensions}
-                />
-              </Suspense>
-            </Canvas>
-            <Loader />
-          </div>
-
-          {/* Item details panel (shown when an item is selected) */}
-          <ItemDetailsPanel />
+      <CanvasWorkspace
+        className={className}
+        side="left"
+        controlsLabel={t('ui.stock3d.sidebar.controls', { defaultValue: 'Stock controls' })}
+        controlsTitle={t('ui.stock3d.sidebar.title')}
+        controlsDescription={t('ui.stock3d.sidebar.subtitle')}
+        controls={<StockSidebar />}
+        toolbar={<StockSearchBar className="max-w-md" onNavigateToItem={flyToItem} />}
+      >
+        <div className="relative min-h-0 flex-1" data-testid="warehouse-3d-canvas">
+          <Canvas
+            shadows
+            gl={{ antialias: true, alpha: false }}
+            dpr={[1, 2]}
+            style={{ background: '#0f172a' }}
+          >
+            <Suspense fallback={null}>
+              <WarehouseScene
+                onCameraRef={handleCameraRef}
+                warehouseName={warehouseName}
+                warehouseDimensions={warehouseDimensions}
+              />
+            </Suspense>
+          </Canvas>
+          <Loader />
         </div>
-      </div>
+
+        <ItemDetailsPanel className="max-h-[45%] min-w-0 shrink-0 overflow-y-auto overscroll-contain" />
+      </CanvasWorkspace>
     </Warehouse3DProvider>
   )
 }

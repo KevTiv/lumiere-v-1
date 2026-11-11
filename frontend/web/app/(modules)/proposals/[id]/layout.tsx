@@ -4,7 +4,7 @@
  */
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="-m-6 lg:-m-8 flex flex-col overflow-hidden" style={{ height: "calc(100vh)" }}>
+    <div className="-mx-4 -my-5 flex h-dvh min-w-0 flex-col overflow-hidden sm:-mx-6 lg:-mx-8 lg:-my-7">
       {children}
     </div>
   )

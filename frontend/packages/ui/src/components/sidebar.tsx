@@ -29,13 +29,15 @@ import { readPreference, writePreference } from "../lib/theme-storage"
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
-const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 const SIDEBAR_WIDTH_KEY = "lumiere-sidebar-width"
 const SIDEBAR_MIN_WIDTH = 208
 const SIDEBAR_MAX_WIDTH = 400
 const SIDEBAR_SNAP_WIDTH = 160
+const SIDEBAR_ICON_WIDTH_REM = 3
+const WORKSPACE_MIN_WIDTH_REM = 32.5
+const DEFAULT_ROOT_FONT_PX = 16
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -46,6 +48,9 @@ type SidebarContextProps = {
   isMobile: boolean
   toggleSidebar: () => void
   width: number
+  preferredWidth: number
+  maxWidth: number
+  iconWidth: number
   setWidth: (width: number) => void
   setResizing: (resizing: boolean) => void
 }
@@ -69,6 +74,7 @@ function SidebarProvider({
   style,
   children,
   resizable = false,
+  ref,
   ...props
 }: React.ComponentProps<"div"> & {
   defaultOpen?: boolean
@@ -76,15 +82,50 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void
   resizable?: boolean
 }) {
-  const isMobile = useIsMobile()
+  const viewportIsMobile = useIsMobile()
+  const wrapperRef = React.useRef<HTMLDivElement>(null)
+  const setWrapperRef = React.useCallback((node: HTMLDivElement | null) => {
+    wrapperRef.current = node
+    if (typeof ref === "function") {
+      const cleanup = ref(node)
+      if (cleanup) return () => {
+        wrapperRef.current = null
+        cleanup()
+      }
+    } else if (ref) {
+      ref.current = node
+    }
+  }, [ref])
   const [openMobile, setOpenMobile] = React.useState(false)
-  const [width, setWidth] = React.useState(256)
+  const [preferredWidth, setWidth] = React.useState(256)
+  const [{ maxWidth, iconWidth }, setWidthBudget] = React.useState({
+    maxWidth: SIDEBAR_MAX_WIDTH,
+    iconWidth: SIDEBAR_ICON_WIDTH_REM * DEFAULT_ROOT_FONT_PX,
+  })
   const [resizing, setResizing] = React.useState(false)
+  const isMobile = viewportIsMobile || (resizable && maxWidth < SIDEBAR_MIN_WIDTH)
+  const width = Math.min(preferredWidth, maxWidth)
 
   React.useEffect(() => {
     if (!resizable) return
     const saved = Number(readPreference(SIDEBAR_WIDTH_KEY))
     if (Number.isFinite(saved) && saved >= SIDEBAR_MIN_WIDTH && saved <= SIDEBAR_MAX_WIDTH) setWidth(saved)
+  }, [resizable])
+
+  React.useEffect(() => {
+    const wrapper = wrapperRef.current
+    if (!resizable || !wrapper || typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return
+      const rootFont = parseFloat(getComputedStyle(document.documentElement).fontSize) || DEFAULT_ROOT_FONT_PX
+      const availableWidth = entry.contentRect.width - WORKSPACE_MIN_WIDTH_REM * rootFont
+      const nextMax = Math.max(0, Math.min(SIDEBAR_MAX_WIDTH, Math.floor(availableWidth)))
+      const nextIcon = SIDEBAR_ICON_WIDTH_REM * rootFont
+      setWidthBudget((current) => current.maxWidth === nextMax && current.iconWidth === nextIcon
+        ? current : { maxWidth: nextMax, iconWidth: nextIcon })
+    })
+    observer.observe(wrapper)
+    return () => observer.disconnect()
   }, [resizable])
 
   React.useEffect(() => {
@@ -152,15 +193,19 @@ function SidebarProvider({
       setOpenMobile,
       toggleSidebar,
       width,
+      preferredWidth,
+      maxWidth,
+      iconWidth,
       setWidth,
       setResizing,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, width]
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, width, preferredWidth, maxWidth, iconWidth]
   )
 
   return (
     <SidebarContext.Provider value={contextValue}>
       <div
+        ref={setWrapperRef}
         data-slot="sidebar-wrapper"
         style={
           {
@@ -185,10 +230,10 @@ function SidebarProvider({
 
 /** Desktop edge resizing preserves the last expanded width when snapped closed. */
 function SidebarResizeHandle({ className, ...props }: React.ComponentProps<"div">) {
-  const { open, setOpen, width, setWidth, setResizing, isMobile } = useSidebar()
+  const { open, setOpen, width, preferredWidth, maxWidth, iconWidth, setWidth, setResizing, isMobile } = useSidebar()
   const drag = React.useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null)
-  const latestWidth = React.useRef(width)
-  latestWidth.current = width
+  const latestWidth = React.useRef(preferredWidth)
+  latestWidth.current = preferredWidth
 
   React.useEffect(() => () => setResizing(false), [setResizing])
 
@@ -196,8 +241,11 @@ function SidebarResizeHandle({ className, ...props }: React.ComponentProps<"div"
     const expanded = next >= SIDEBAR_SNAP_WIDTH
     if (expanded !== open) setOpen(expanded)
     if (expanded) {
-      latestWidth.current = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, next))
-      setWidth(latestWidth.current)
+      const resizedWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxWidth, next))
+      if (!open || resizedWidth !== width) {
+        latestWidth.current = resizedWidth
+        setWidth(resizedWidth)
+      }
     }
   }
   const persist = () => writePreference(SIDEBAR_WIDTH_KEY, String(latestWidth.current))
@@ -213,9 +261,9 @@ function SidebarResizeHandle({ className, ...props }: React.ComponentProps<"div"
     role="separator"
     aria-label="Resize navigation"
     aria-orientation="vertical"
-    aria-valuemin={64}
-    aria-valuemax={SIDEBAR_MAX_WIDTH}
-    aria-valuenow={open ? width : 64}
+    aria-valuemin={iconWidth}
+    aria-valuemax={maxWidth}
+    aria-valuenow={open ? width : iconWidth}
     tabIndex={0}
     data-testid="sidebar-resize-handle"
     className={cn("absolute inset-y-0 -right-1 z-30 w-2 cursor-col-resize touch-none select-none after:absolute after:inset-y-0 after:left-1/2 after:w-0.5 hover:after:bg-sidebar-primary/50 focus-visible:outline-none focus-visible:after:bg-sidebar-primary", className)}
@@ -225,7 +273,7 @@ function SidebarResizeHandle({ className, ...props }: React.ComponentProps<"div"
       event.currentTarget.focus()
       event.currentTarget.setPointerCapture(event.pointerId)
       const container = event.currentTarget.closest('[data-slot="sidebar-container"]')
-      drag.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: container?.getBoundingClientRect().width ?? (open ? width : 64) }
+      drag.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: container?.getBoundingClientRect().width ?? (open ? width : iconWidth) }
       setResizing(true)
     }}
     onPointerMove={(event) => {
@@ -238,12 +286,12 @@ function SidebarResizeHandle({ className, ...props }: React.ComponentProps<"div"
     onKeyDown={(event) => {
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return
       event.preventDefault()
-      const next = event.key === "Home" ? 64 : event.key === "End" ? SIDEBAR_MAX_WIDTH
-        : !open ? (event.key === "ArrowRight" ? SIDEBAR_MIN_WIDTH : 64)
-        : width <= SIDEBAR_MIN_WIDTH && event.key === "ArrowLeft" ? 64
+      const next = event.key === "Home" ? 0 : event.key === "End" ? maxWidth
+        : !open ? (event.key === "ArrowRight" ? SIDEBAR_MIN_WIDTH : 0)
+        : width <= SIDEBAR_MIN_WIDTH && event.key === "ArrowLeft" ? 0
         : width + (event.key === "ArrowRight" ? 16 : -16)
       resize(next)
-      if (next >= SIDEBAR_SNAP_WIDTH) writePreference(SIDEBAR_WIDTH_KEY, String(Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, next))))
+      if (next >= SIDEBAR_SNAP_WIDTH) persist()
     }}
     {...props}
   />
@@ -287,19 +335,16 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
-          style={
-            {
-              "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
-            } as React.CSSProperties
-          }
+          className="gap-0 overflow-hidden bg-sidebar p-0 text-sidebar-foreground"
+          showCloseButton={false}
+          size="navigation"
           side={side}
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Sidebar</SheetTitle>
             <SheetDescription>Displays the mobile sidebar.</SheetDescription>
           </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
         </SheetContent>
       </Sheet>
     )

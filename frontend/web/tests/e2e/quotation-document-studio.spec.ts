@@ -73,7 +73,7 @@ async function renameTemplate(page: Page, companyId: number, templateId: number,
 }
 
 test.describe("Visual quotation document output", { tag: ["@p0", "@document-studio"] }, () => {
-  test("a normal staff member previews and saves a quotation, stale previews fail, and saved bytes survive template edits", async ({ page, browser }) => {
+  test("a normal staff member previews and saves a quotation, stale previews fail, and saved bytes survive template edits", { tag: "@aside-fit" }, async ({ page, browser }) => {
     test.setTimeout(360_000)
     const organizationId = await fetchSessionOrganizationId(page)
     const companyId = await fetchDefaultCompanyId(page)
@@ -117,6 +117,7 @@ test.describe("Visual quotation document output", { tag: ["@p0", "@document-stud
       "document_template:read", "document:read", "document:create", "document_version:read",
     ], companyId)
     await withActor(browser, staff, async (staffPage) => {
+      await staffPage.setViewportSize({ width: 1440, height: 900 })
       await gotoModule(staffPage, "/sales?tab=orders", "sales")
       await selectModuleTab(staffPage, "sales", "orders")
       await selectEntityRowById(staffPage, orderId)
@@ -141,6 +142,27 @@ test.describe("Visual quotation document output", { tag: ["@p0", "@document-stud
       await expect(frame.locator(".quotation-lines tbody tr")).toHaveCount(1)
       await expect(frame.locator(".quotation-lines")).toContainText("Lumiere Dev Laptop")
       expect(await dialog.locator("iframe").getAttribute("sandbox")).toBe("")
+
+      const controls = dialog.locator("aside")
+      const preview = dialog.locator("iframe")
+      const [wideControls, widePreview] = await Promise.all([controls.boundingBox(), preview.boundingBox()])
+      expect(widePreview!.x).toBeGreaterThanOrEqual(wideControls!.x + wideControls!.width - 1)
+
+      await staffPage.setViewportSize({ width: 768, height: 640 })
+      const [stackedControls, stackedPreview] = await Promise.all([controls.boundingBox(), preview.boundingBox()])
+      expect(stackedPreview!.y).toBeGreaterThanOrEqual(stackedControls!.y + stackedControls!.height - 1)
+      await expect(frame.locator(".quotation-lines")).toContainText("Lumiere Dev Laptop")
+
+      await staffPage.setViewportSize({ width: 390, height: 340 })
+      const saveQuotation = dialog.getByRole("button", { name: "Save quotation PDF", exact: true })
+      // Chromium can finish the resize after the first scroll. Recheck the
+      // reachable action against the settled layout, including the whole button.
+      await expect(async () => {
+        await saveQuotation.scrollIntoViewIfNeeded()
+        await expect(saveQuotation).toBeInViewport({ ratio: 1, timeout: 1_000 })
+      }).toPass({ timeout: 10_000 })
+      await expect(saveQuotation).toBeEnabled()
+      await staffPage.setViewportSize({ width: 1440, height: 900 })
 
       // A real concurrent author edit invalidates the exact reviewed revision.
       const changedName = `${name} revised`

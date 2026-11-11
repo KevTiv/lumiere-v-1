@@ -34,13 +34,14 @@ export const reconciliationFixture: ReconciliationSource = {
   moves: [
     { ...scope, id: "9007199254740993", name: "INV/SYNTHETIC/9007199254740993", state: "Posted", moveType: "OutInvoice", partnerId: "601", invoicePartnerDisplayName: "Synthetic customer A" },
     { ...scope, id: "9007199254740992", name: "INV/SYNTHETIC/9007199254740992", state: "Posted", moveType: "OutInvoice", partnerId: "601", invoicePartnerDisplayName: "Synthetic customer B" },
+    { ...scope, id: "997", name: "INV/SYNTHETIC/FOREIGN-CURRENCY", state: "Posted", moveType: "OutInvoice", partnerId: "601" },
     { ...scope, companyId: "22", id: "999", name: "FOREIGN RECONCILIATION RECORD", state: "Posted" },
   ],
   moveLines: [
     { ...scope, id: "501", moveId: "9007199254740993", accountId: "401", partnerId: "601", name: "Synthetic first installment", parentState: "Posted", companyCurrencyId: "1", currencyId: "1", balance: 600, debit: 600, credit: 0, amountResidual: 600, blocked: false },
     { ...scope, id: "502", moveId: "9007199254740992", accountId: "401", partnerId: "601", name: "Synthetic second installment", parentState: "Posted", companyCurrencyId: "1", currencyId: "1", balance: 400, debit: 400, credit: 0, amountResidual: 400, blocked: false },
     { ...scope, companyId: "22", id: "599", moveId: "999", accountId: "401", partnerId: "601", name: "FOREIGN COMPANY MATCH MUST STAY HIDDEN", parentState: "Posted", companyCurrencyId: "1", currencyId: "1", balance: 1000, debit: 1000, credit: 0, amountResidual: 1000, blocked: false },
-    { ...scope, id: "598", moveId: "9007199254740992", accountId: "401", partnerId: "601", name: "FOREIGN CURRENCY MATCH MUST STAY HIDDEN", parentState: "Posted", companyCurrencyId: "1", currencyId: "2", balance: 1000, debit: 1000, credit: 0, amountResidual: 1000, blocked: false },
+    { ...scope, id: "598", moveId: "997", accountId: "401", partnerId: "601", name: "FOREIGN CURRENCY MATCH MUST STAY HIDDEN", parentState: "Posted", companyCurrencyId: "1", currencyId: "2", balance: 1000, debit: 1000, credit: 0, amountResidual: 1000, blocked: false },
   ],
   suggestions: [{ organizationId: "7", statementLineId: "301", entityId: "501" }],
 }

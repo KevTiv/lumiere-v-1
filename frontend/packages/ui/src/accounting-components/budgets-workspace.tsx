@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table"
 import {
   Sheet,
+  SheetBody,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -495,7 +496,7 @@ export function BudgetsWorkspace({
       </Card>
 
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <SheetContent size="form" className="overflow-y-auto">
+        <SheetContent size="form" layout="bounded">
           {selected && (
             <>
               <SheetHeader>
@@ -504,7 +505,7 @@ export function BudgetsWorkspace({
                   {t("accounting.budgets.workspace.detailHint")}
                 </SheetDescription>
               </SheetHeader>
-              <div className="mt-4 space-y-4">
+              <SheetBody className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary">{selectedState}</Badge>
                   <span className="text-sm text-muted-foreground">
@@ -665,7 +666,7 @@ export function BudgetsWorkspace({
                     <TablePager {...budgetLinesPager} />
                   </div>
                 </div>
-              </div>
+              </SheetBody>
             </>
           )}
         </SheetContent>

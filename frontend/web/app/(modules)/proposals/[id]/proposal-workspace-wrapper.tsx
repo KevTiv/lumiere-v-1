@@ -102,7 +102,7 @@ function createHttpHooks(
     useAddProposalSourceDoc: () => {
       const mutation = useAddProposalSourceDoc(organizationId, companyId)
       return {
-        mutate: (params) => mutation.mutate(params),
+        mutateAsync: (params) => mutation.mutateAsync(params),
         isPending: mutation.isPending,
       }
     },
@@ -116,7 +116,7 @@ function createHttpHooks(
     useUpdateProposalSourceDoc: () => {
       const mutation = useUpdateProposalSourceDoc(organizationId, companyId)
       return {
-        mutate: (params) => mutation.mutate(params),
+        mutateAsync: (params) => mutation.mutateAsync(params),
         isPending: mutation.isPending,
       }
     },

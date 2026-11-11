@@ -57,8 +57,10 @@ for (const owner of ["modal", "page"] as const) describe(`${owner} guide revalid
     : <AssistantGuidePageClient guideId="42" />
 
   it("retains title, Markdown and question after transient failure, then retries the exact revision", async () => {
-    render(tree())
-    fireEvent.click(await screen.findByRole("button", { name: "Edit guide" }))
+    await act(async () => { render(tree()) })
+    const edit = screen.getByRole("button", { name: "Edit guide" })
+    expect(edit).toHaveProperty("disabled", false)
+    fireEvent.click(edit)
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Retain my title" } })
     fireEvent.change(screen.getByLabelText("Guide content (Markdown)"), { target: { value: "Retain my edits" } })
     fireEvent.change(screen.getByLabelText("Ask about this document"), { target: { value: "Retain my question" } })

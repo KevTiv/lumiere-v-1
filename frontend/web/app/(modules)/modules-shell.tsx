@@ -153,11 +153,13 @@ function dateFromStored(raw: unknown): Date {
 
 function ErpAiChatPanel({
   firstOrgProfile,
+  onRevealWorkspace,
   selectionDraft,
   registerSelectionImport,
   ...props
 }: Omit<ComponentProps<typeof AIChatPanel>, "onSendMessage" | "context"> & {
   firstOrgProfile: boolean
+  onRevealWorkspace: () => void
   selectionDraft: DocumentSelectionDraft | null
   registerSelectionImport: (handler?: SelectionImportHandler) => () => void
 }) {
@@ -200,6 +202,8 @@ function ErpAiChatPanel({
   const [openGuide, setOpenGuide] = useState<{ scope: string; request: OpenGuideRequest } | null>(null)
   const guideConversation = useAssistantGuideConversation()
   const errorQuestion = useErpAiErrorQuestion()
+  const revealWorkspace = useRef(onRevealWorkspace)
+  revealWorkspace.current = onRevealWorkspace
   const activeScope = useRef<string | null>(null)
   activeScope.current = actorHistoryScope
   const currentActionContext = useRef({ actionScope, actorHistoryScope, checkPermission, permissionsReady, allowedActionModules, pageComposition })
@@ -463,7 +467,7 @@ function ErpAiChatPanel({
               if (result !== "pending") throw new Error(i18n.t(result === "busy" ? "aiChat.native.formBusy" : "aiChat.native.scopeChanged"))
             }
             if (!isAssistantPageAction(action)) router.push(href)
-            if (!props.docked) props.onDockToggle?.()
+            revealWorkspace.current()
           } catch (error) { toast.error(error instanceof Error ? error.message : i18n.t("aiChat.native.openFailed")) }
         }
         if (changesPage && navigationGuard) navigationGuard.proceed(open)
@@ -504,8 +508,6 @@ function ErpAiChatPanel({
       nativeForms,
       navigationGuard,
       router,
-      props.docked,
-      props.onDockToggle,
     ],
   )
 
@@ -682,7 +684,7 @@ function ErpAiChatPanel({
 
   useEffect(() => guideConversation.register(askAboutGuide), [guideConversation.register, askAboutGuide])
 
-  return <>
+  return (
     <AIChatPanel
       key={JSON.stringify([identity, organizationId, operatingCompanyId])}
       {...props}
@@ -692,6 +694,14 @@ function ErpAiChatPanel({
       composerRequest={errorQuestion ?? scopedSelectionDraft}
       modal={Boolean(errorQuestion)}
       historySaveFailed={failedHistoryScope === historyScope}
+      overlayContent={<>
+        <AssistantGuideHost request={guideRequestInScope(openGuide, actorHistoryScope)} organizationId={orgId} companyId={operatingCompanyId ?? undefined}
+          onClose={() => setOpenGuide(null)} onSaved={onGuideSaved} onAsk={askAboutGuide} />
+        {sourcePreview?.scope === actorHistoryScope && organizationId ? (
+          <DocumentViewerDialog organizationId={BigInt(organizationId)} documentId={sourcePreview.documentId}
+            versionId={sourcePreview.versionId} onOpenChange={open => { if (!open) setSourcePreview(null) }} />
+        ) : null}
+      </>}
       contextOptions={AI_WORKSPACE_SCOPES}
       selectedContext={selectedScope}
       onContextChange={setSelectedScope}
@@ -713,13 +723,7 @@ function ErpAiChatPanel({
       importCompanyLabel={importCompany?.name ?? (operatingCompanyId ? `Company ${operatingCompanyId}` : undefined)}
       importScopeKey={JSON.stringify([identity, organizationId, operatingCompanyId, sessionKey])}
     />
-    {sourcePreview?.scope === actorHistoryScope && organizationId ? (
-      <DocumentViewerDialog organizationId={BigInt(organizationId)} documentId={sourcePreview.documentId}
-        versionId={sourcePreview.versionId} onOpenChange={open => { if (!open) setSourcePreview(null) }} />
-    ) : null}
-    <AssistantGuideHost request={guideRequestInScope(openGuide, actorHistoryScope)} organizationId={orgId} companyId={operatingCompanyId ?? undefined}
-      onClose={() => setOpenGuide(null)} onSaved={onGuideSaved} onAsk={askAboutGuide} />
-  </>
+  )
 }
 
 /** Header bell: unread notifications addressed to the signed-in user. */
@@ -752,15 +756,20 @@ function ModulesContent({
   children: ReactNode
   firstOrgProfile: boolean
 }) {
-  const [isAIChatOpen, setIsAIChatOpen] = useState(false)
+  const [workspaceTool, setWorkspaceTool] = useState<"assistant" | "notebook" | null>(null)
   const [isAIChatDocked, setIsAIChatDocked] = useState(true)
-  const [isNotebookOpen, setIsNotebookOpen] = useState(false)
+  const [isNotebookDocked, setIsNotebookDocked] = useState(true)
   const [isJournalOpen, setIsJournalOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const workspaceProfile = useWorkspaceProfile()
   const messagesVisible = isWorkspaceSurfaceVisible(workspaceProfile, "messages")
   const journalVisible = isWorkspaceSurfaceVisible(workspaceProfile, "journal")
   const notebookVisible = isWorkspaceSurfaceVisible(workspaceProfile, "notebook")
+  const isAIChatOpen = workspaceTool === "assistant"
+  const isNotebookOpen = notebookVisible && workspaceTool === "notebook"
+  const dockRequest = isAIChatOpen && isAIChatDocked
+    ? "assistant"
+    : isNotebookOpen && isNotebookDocked ? "notebook" : null
   const { organizationId, identity } = useErpSession()
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
@@ -786,8 +795,11 @@ function ModulesContent({
 
   const openAiChat = useCallback(() => {
     setIsAIChatDocked(true)
-    setIsAIChatOpen(true)
+    setWorkspaceTool("assistant")
   }, [])
+  const openNotebook = () => setWorkspaceTool("notebook")
+  const closeTool = (tool: "assistant" | "notebook") =>
+    setWorkspaceTool((current) => current === tool ? null : current)
 
   const [selectionDraft, setSelectionDraft] = useState<DocumentSelectionDraft | null>(null)
   const selectionImport = useRef<SelectionImportHandler | undefined>(undefined)
@@ -832,35 +844,38 @@ function ModulesContent({
     <DocumentSelectionActionsContext.Provider value={onDocumentSelectionAction}>
     <ErpAiChatControllerProvider open={openAiChat}>
       <DashboardWorkspace
-        forceCollapsed={(isAIChatOpen && isAIChatDocked) || isNotebookOpen}
+        dockRequest={dockRequest}
         onOpenSearch={() => setIsSearchOpen(true)}
         onSignOut={performSignOut}
         userProfile={currentUserProfile.data}
         headerTools={<ModuleActivity />}
         notifications={orgReady && messagesVisible ? <HeaderNotificationBell organizationId={orgId} /> : null}
-        sidebar={
+        sidebar={(collapsed) => (
           <DashboardSidebar
             firstOrgProfile={firstOrgProfile}
-            forceCollapsed={(isAIChatOpen && isAIChatDocked) || isNotebookOpen}
+            forceCollapsed={collapsed}
             navBadges={navBadges}
             onOpenJournal={journalVisible ? () => setIsJournalOpen(true) : undefined}
-            onOpenNotebook={notebookVisible ? () => setIsNotebookOpen(true) : undefined}
+            onOpenNotebook={notebookVisible ? openNotebook : undefined}
             onOpenAIChat={openAiChat}
             aiChatOpen={isAIChatOpen}
           />
-        }
-        overlays={
+        )}
+        overlays={({ container, docked, canDock }) => (
           <>
             <ErpAiChatPanel
               firstOrgProfile={firstOrgProfile}
               selectionDraft={selectionDraft}
               registerSelectionImport={registerSelectionImport}
               open={isAIChatOpen}
-              onClose={() => {
-                setIsAIChatOpen(false)
+              onClose={() => closeTool("assistant")}
+              workspaceHost={container}
+              docked={docked === "assistant"}
+              onDockToggle={canDock("assistant") ? () => setIsAIChatDocked((prev) => !prev) : undefined}
+              onRevealWorkspace={() => {
+                setIsAIChatDocked(true)
+                if (!canDock("assistant")) closeTool("assistant")
               }}
-              docked={isAIChatDocked}
-              onDockToggle={() => setIsAIChatDocked((prev) => !prev)}
               config={{
                 title: "Lumière Assistant",
                 welcomeMessage: "Explore your business, prepare a draft, or turn an insight into a report.",
@@ -871,8 +886,11 @@ function ModulesContent({
             {notebookVisible && (
               <NotebookPanel
                 open={isNotebookOpen}
-                onClose={() => setIsNotebookOpen(false)}
+                onClose={() => closeTool("notebook")}
                 onAIChat={openAiChat}
+                workspaceHost={container}
+                docked={docked === "notebook"}
+                onDockToggle={canDock("notebook") ? () => setIsNotebookDocked((prev) => !prev) : undefined}
                 dataContext={{}}
               />
             )}
@@ -885,11 +903,11 @@ function ModulesContent({
               firstOrgProfile={firstOrgProfile}
               recordHref={recordPageHref}
               onOpenAIChat={openAiChat}
-              onOpenNotebook={notebookVisible ? () => setIsNotebookOpen(true) : undefined}
+              onOpenNotebook={notebookVisible ? openNotebook : undefined}
               onOpenJournal={journalVisible ? () => setIsJournalOpen(true) : undefined}
             />
           </>
-        }
+        )}
       >
         {children}
       </DashboardWorkspace>

@@ -15,11 +15,68 @@ test.afterEach(({ page }) => {
 
 async function ready(page: Page, href: string) {
   await page.goto(href, { waitUntil: "domcontentloaded" })
-  await expect(page.getByTestId("productivity-disclosure")).toHaveAttribute("data-hydrated", "true")
+  await expect(page.getByTestId("productivity-disclosure")).toHaveAttribute("data-hydrated", "true", { timeout: test.info().timeout })
 }
 async function contained(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1)
 }
+
+test("conversation selection and reply survive a narrow container at desktop width", { tag: "@aside-fit" }, async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await ready(page, "/productivity?panel=messages")
+  const workspace = page.getByTestId("message-conversation-workspace")
+  const list = workspace.getByRole("complementary", { name: "Conversation list" })
+  await workspace.evaluate((element) => { element.style.maxWidth = "560px" })
+
+  const search = list.getByRole("textbox", { name: "Search loaded conversations" })
+  await search.fill("INV-0041")
+  await expect(search).toHaveValue("INV-0041")
+  const thread = list.getByRole("button", { name: /Please review invoice INV-0041/ })
+  await thread.click()
+  const back = workspace.getByRole("button", { name: "Back to conversations", exact: true })
+  await expect(list).toBeHidden()
+  await expect(back).toBeFocused()
+
+  const reply = workspace.getByRole("textbox", { name: /^Reply to this conversation/ })
+  await reply.fill("Draft from the narrow layout")
+  await workspace.evaluate((element) => { element.style.maxWidth = "" })
+  await expect(list).toBeVisible()
+  await expect(reply).toHaveText("Draft from the narrow layout")
+
+  await workspace.evaluate((element) => { element.style.maxWidth = "560px" })
+  await expect(back).toBeVisible()
+  await back.click()
+  await expect(thread).toBeFocused()
+  await expect(search).toHaveValue("INV-0041")
+  await thread.click()
+  await expect(reply).toHaveText("Draft from the narrow layout")
+  await contained(page)
+})
+
+test("blanket detail stacks in a narrow host without discarding release quantities", { tag: "@aside-fit" }, async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto("/blanket-layout", { waitUntil: "domcontentloaded" })
+  const fixture = page.getByTestId("blanket-layout-fixture")
+  await expect(fixture.getByRole("heading", { name: "Standard agreement", exact: true })).toBeVisible()
+  const agreement = fixture.getByRole("button", { name: /Replacement agreement/ })
+  await agreement.click()
+  const detail = fixture.getByRole("heading", { name: "Replacement agreement", exact: true })
+  await expect(detail).toBeVisible()
+  await fixture.getByRole("button", { name: "Release to PO", exact: true }).click()
+  const form = fixture.getByTestId("purchasing-blanket-release-form")
+  const quantity = form.getByRole("spinbutton")
+  await quantity.fill("3")
+
+  await fixture.evaluate((element) => { element.style.maxWidth = "560px" })
+  await expect.poll(async () => {
+    const [listBox, detailBox] = await Promise.all([agreement.boundingBox(), detail.boundingBox()])
+    return listBox != null && detailBox != null && detailBox.y >= listBox.y + listBox.height
+  }).toBe(true)
+  await expect(agreement).toHaveAttribute("aria-pressed", "true")
+  await expect(quantity).toHaveValue("3")
+  await expect(form.getByRole("button", { name: "Release to purchase order", exact: true })).toBeEnabled()
+  await contained(page)
+})
 
 for (const width of [390, 1440]) {
   test(`files retain folder, search and exact selection at ${width}px`, async ({ page }) => {
@@ -41,7 +98,7 @@ for (const width of [390, 1440]) {
     await expect(page.getByRole("textbox", { name: /^Search files/ })).toHaveValue("October")
     await expect(page.getByTestId("file-browser-list")).toBeVisible()
     await page.reload({ waitUntil: "domcontentloaded" })
-    await expect(page.getByTestId("productivity-disclosure")).toHaveAttribute("data-hydrated", "true")
+    await expect(page.getByTestId("productivity-disclosure")).toHaveAttribute("data-hydrated", "true", { timeout: test.info().timeout })
     await expect(page.getByTestId("file-browser-row-91")).toBeVisible()
     await page.getByTestId("file-browser-input").setInputFiles({ name: "receipt.pdf", mimeType: "application/pdf", buffer: Buffer.from("synthetic receipt") })
     await expect(page.getByTestId("file-browser-upload-results")).toContainText("receipt.pdf")
@@ -83,7 +140,7 @@ for (const width of [390, 1440]) {
     await expect(page).toHaveURL(/view=month/)
     await expect(page.locator("button button")).toHaveCount(0)
     await page.reload({ waitUntil: "domcontentloaded" })
-    await expect(page.getByTestId("productivity-disclosure")).toHaveAttribute("data-hydrated", "true")
+    await expect(page.getByTestId("productivity-disclosure")).toHaveAttribute("data-hydrated", "true", { timeout: test.info().timeout })
     await expect(page.getByRole("button", { name: "Month", exact: true })).toHaveAttribute("aria-pressed", "true")
     await page.getByRole("button", { name: "Agenda", exact: true }).click()
     await contained(page)
@@ -189,4 +246,33 @@ test.describe("account calendar timezone on narrow screens", () => {
       await contained(page)
     })
   }
+})
+
+test("Journal geometry and a working draft survive a short viewport", { tag: "@aside-fit" }, async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 950 })
+  await ready(page, "/productivity?panel=journal")
+  const panel = page.getByTestId("journal-panel")
+  const geometry = panel.getByRole("button", { name: "Move or resize Journal" })
+  await geometry.press("ArrowLeft")
+  await geometry.press("Shift+ArrowRight")
+  await expect(panel).toHaveCSS("width", "496px")
+  await panel.getByRole("button", { name: "Other", exact: true }).click()
+  const editor = panel.getByRole("textbox", { name: "Working note" })
+  await editor.fill("Retain this draft while resizing")
+
+  await page.setViewportSize({ width: 390, height: 340 })
+  await expect(panel).toHaveCSS("left", "8px")
+  await expect(panel).toHaveCSS("width", "374px")
+  await expect(panel).toHaveCSS("height", "324px")
+  await expect(panel.getByRole("button", { name: "Close", exact: true })).toBeInViewport()
+  const save = panel.getByRole("button", { name: "Save Note", exact: true })
+  await save.scrollIntoViewIfNeeded()
+  await expect(save).toBeInViewport()
+  await expect(editor).toHaveText("Retain this draft while resizing")
+
+  await panel.getByRole("button", { name: "Maximize", exact: true }).click()
+  await panel.getByRole("button", { name: "Restore", exact: true }).click()
+  await page.setViewportSize({ width: 1440, height: 950 })
+  await expect(panel).toHaveCSS("width", "496px")
+  await expect(editor).toHaveText("Retain this draft while resizing")
 })

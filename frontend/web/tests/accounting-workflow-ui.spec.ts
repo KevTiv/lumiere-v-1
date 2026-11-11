@@ -130,7 +130,7 @@ for (const width of [320, 390, 768, 1440]) {
       await noOverflow(page)
     })
 
-    test("bank matching requires exact complete records and explicit review before one scoped settlement", async ({ page }) => {
+    test("bank matching requires exact complete records and explicit review before one scoped settlement", { tag: "@aside-fit" }, async ({ page }) => {
       await page.getByRole("tab", { name: "Bank matching", exact: true }).click()
       const desk = page.getByTestId("reconciliation-workbench")
       await expect(desk.getByTestId("reconciliation-candidate-599")).toHaveCount(0)
@@ -141,13 +141,14 @@ for (const width of [320, 390, 768, 1440]) {
       await expect(desk.getByTestId("reconciliation-confirm")).toBeDisabled()
       await page.getByRole("button", { name: "Toggle synthetic action permission", exact: true }).click()
       await touchTargets(page, width, [desk.getByRole("textbox", { name: "Search matching records" }), desk.getByTestId("reconciliation-candidate-501").getByRole("checkbox").locator(".."), desk.getByTestId("reconciliation-confirm")])
-      if (width < 1024) {
-        const bank = await desk.getByRole("region", { name: "Current bank line" }).boundingBox()
-        const candidates = await desk.getByRole("region", { name: "Eligible journal items" }).boundingBox()
-        const review = await desk.getByRole("region", { name: "Review selected matches" }).boundingBox()
-        expect(candidates!.y).toBeGreaterThanOrEqual(bank!.y + bank!.height)
-        expect(review!.y).toBeGreaterThanOrEqual(candidates!.y + candidates!.height)
+      if (width >= 1024) {
+        await desk.evaluate((node) => { node.style.maxWidth = "42rem" })
       }
+      const bank = await desk.getByRole("region", { name: "Current bank line" }).boundingBox()
+      const candidates = await desk.getByRole("region", { name: "Eligible journal items" }).boundingBox()
+      const review = await desk.getByRole("region", { name: "Review selected matches" }).boundingBox()
+      expect(candidates!.y).toBeGreaterThanOrEqual(bank!.y + bank!.height)
+      expect(review!.y).toBeGreaterThanOrEqual(candidates!.y + candidates!.height)
       await selectBank(page)
       await expect(desk.getByTestId("reconciliation-confirm")).toBeEnabled()
       await desk.getByTestId("reconciliation-confirm").click()

@@ -55,6 +55,7 @@ import { assistantStarterIds, assistantStarters } from "./assistant-starters"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "../components/select"
 import { ActionSkillList } from "./action-skill-list"
 import { matchingChatSkills, slashSkillToken } from "../lib/chat-skill-search"
+import { WorkspaceToolSurface } from "../pages/workspace-tool-surface"
 
 interface ChatReply {
   content: string
@@ -72,6 +73,10 @@ interface AIChatPanelProps {
   /** Side chat shares the same mounted conversation as the full workspace. */
   docked?: boolean
   onDockToggle?: () => void
+  /** A stable shell mount for the dock and its narrow dialog presentation. */
+  workspaceHost?: HTMLElement | null
+  /** Guide dialogs use the panel's focus stack when the panel itself is modal. */
+  overlayContent?: React.ReactNode
   contextOptions?: readonly { value: string; label: string; group: string }[]
   selectedContext?: string
   onContextChange?: (value: string) => void
@@ -165,6 +170,8 @@ export function AIChatPanel({
   onClose,
   docked: requestedDocked = false,
   onDockToggle,
+  workspaceHost,
+  overlayContent,
   contextOptions,
   selectedContext,
   onContextChange,
@@ -188,6 +195,7 @@ export function AIChatPanel({
 }: AIChatPanelProps) {
   const { t } = useTranslation()
   const docked = requestedDocked && !modal
+  const managedPlacement = workspaceHost !== undefined && !modal
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [openTools, setOpenTools] = useState<"files" | "skills" | null>(null)
@@ -276,7 +284,10 @@ export function AIChatPanel({
   const slash = dismissedSlash === slashSignature ? null : slashSkillToken(input, composerCaret)
   const showSkills = openTools === "skills" || slash !== null
   const showFiles = openTools === "files" && slash === null
-  const moduleLabel = contextOptions?.find(option => option.value === selectedContext)?.label ?? contextOptions?.[0]?.label
+  const activeContext = contextOptions?.find(option => option.value === selectedContext) ?? contextOptions?.[0]
+  const moduleLabel = activeContext?.value === "current"
+    ? context?.activeView ?? activeContext.label
+    : activeContext?.label
   const showContext = !docked && !modal && contextVisible
   const matchingSkills = slash ? matchingChatSkills(skills, slash.query) : skills
   const focusedSkillId = matchingSkills.some(skill => skill.id === activeSkillId) ? activeSkillId : matchingSkills[0]?.id
@@ -367,10 +378,10 @@ export function AIChatPanel({
     }
   }, [messages])
 
-  // Focus the composer on entering either workspace mode.
+  // The shell surface handles focus on open and preserves it during responsive changes.
   useEffect(() => {
-    if (open) inputRef.current?.focus()
-  }, [open, docked])
+    if (open && !managedPlacement) inputRef.current?.focus()
+  }, [open, docked, managedPlacement])
 
   // Handle @ command detection
   useEffect(() => {
@@ -415,6 +426,7 @@ export function AIChatPanel({
         if (focusedSkillId) toggleSkill(focusedSkillId)
       } else if (e.key === "Escape") {
         e.preventDefault()
+        e.stopPropagation()
         if (focusedSkillId) setActiveSkillId(focusedSkillId)
         setDismissedSlash(slashSignature)
       }
@@ -435,6 +447,8 @@ export function AIChatPanel({
         e.preventDefault()
         insertCommand(filteredCommands[selectedCommandIndex])
       } else if (e.key === "Escape") {
+        e.preventDefault()
+        e.stopPropagation()
         setShowCommands(false)
       }
     } else if (e.key === "Enter" && !e.shiftKey) {
@@ -690,9 +704,13 @@ export function AIChatPanel({
     }
   }
 
-  if (!open) return null
+  if (!open || (managedPlacement && !workspaceHost)) return null
 
   const contextTitle = t("aiChat.workspace.context")
+  const panelTitle = config?.title || t("aiChat.title")
+  const dockLabel = docked
+    ? t("aiChat.workspace.openFull", { defaultValue: "Open full workspace" })
+    : t("aiChat.workspace.dockBesideErp", { defaultValue: "Dock beside ERP" })
   const contextDetails = (
     <>
       <section className="space-y-2 border-b px-4 py-3">
@@ -745,10 +763,10 @@ export function AIChatPanel({
         setDraggingFiles(false)
         void handleImportFiles(Array.from(event.dataTransfer.files))
       }}
-      aria-label={config?.title || t("aiChat.title")}
+      aria-label={managedPlacement ? undefined : panelTitle}
       className={cn(
-        "relative z-50 flex min-h-0 min-w-0 flex-col overflow-hidden bg-background text-foreground",
-        docked
+        "@container/chat-workspace relative z-50 flex min-h-0 min-w-0 flex-col overflow-hidden bg-background text-foreground",
+        managedPlacement ? "h-full w-full" : docked
           ? "fixed inset-0 h-dvh w-full lg:relative lg:inset-auto lg:h-full lg:w-[360px] lg:shrink-0 lg:bg-transparent xl:w-[380px] 2xl:w-[420px]"
           : modal ? "h-full w-full" : "fixed inset-0 h-dvh w-full",
       )}
@@ -765,7 +783,7 @@ export function AIChatPanel({
         </div>
         <div className="flex min-w-0 items-center gap-1.5">
           {!docked && !modal ? (
-            <Button variant="ghost" size="icon" className="hidden size-9 lg:inline-flex"
+            <Button variant="ghost" size="icon" className="hidden size-9 @min-[58rem]/chat-workspace:inline-flex"
               aria-label={contextTitle} aria-expanded={showContext} aria-controls={contextId}
               onClick={() => setContextVisible(visible => !visible)}>
               <SlidersHorizontal className="size-4" aria-hidden="true" />
@@ -773,7 +791,7 @@ export function AIChatPanel({
           ) : null}
           {!modal ? (
             <Popover>
-              <PopoverTrigger render={<Button variant="ghost" size="icon" className={cn("size-9", !docked && "lg:hidden")} />} aria-label={contextTitle}>
+              <PopoverTrigger render={<Button variant="ghost" size="icon" className={cn("size-9", !docked && "@min-[58rem]/chat-workspace:hidden")} />} aria-label={contextTitle}>
                 <SlidersHorizontal className="size-4" aria-hidden="true" />
               </PopoverTrigger>
               <PopoverContent align="end" className="max-h-[70dvh] w-72 max-w-[calc(100vw-2rem)] overflow-auto p-0">
@@ -782,8 +800,11 @@ export function AIChatPanel({
               </PopoverContent>
             </Popover>
           ) : null}
-          {onDockToggle ? (
-            <Button variant="ghost" size="icon" onClick={onDockToggle} className="size-9 shrink-0" title={docked ? "Open full workspace" : "Dock beside ERP"} aria-label={docked ? "Open full workspace" : "Dock beside ERP"}>
+          {!modal && onDockToggle ? (
+            <Button variant="ghost" size="icon" onClick={() => {
+              onDockToggle()
+              inputRef.current?.focus()
+            }} className="size-9 shrink-0" title={dockLabel} aria-label={dockLabel}>
               {docked ? <PanelRightClose className="size-4" /> : <PanelRight className="size-4" />}
             </Button>
           ) : null}
@@ -1259,17 +1280,23 @@ export function AIChatPanel({
         <aside
           id={contextId}
           aria-label={contextTitle}
-          className={cn("hidden w-72 shrink-0 overflow-y-auto border-l border-border bg-muted/30 xl:w-80", showContext && "lg:block")}
+          className={cn("hidden w-72 shrink-0 overflow-y-auto overscroll-contain border-l border-border bg-muted/30 @min-[75rem]/chat-workspace:w-80", showContext && "@min-[58rem]/chat-workspace:block")}
         >
           <h3 className="border-b px-4 py-3 text-sm font-semibold">{contextTitle}</h3>
           {contextDetails}
         </aside>
       ) : null}
       </div>
+      {overlayContent}
     </section>
   )
   // Error help covers the viewport while leaving the original editor mounted.
-  return modal ? <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}><DialogContent showCloseButton={false} className="left-0 top-0 h-dvh max-h-none w-full max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none p-0 ring-0 sm:max-w-none"><DialogTitle className="sr-only">{config?.title || t("aiChat.title")}</DialogTitle>{panel}</DialogContent></Dialog> : panel
+  if (modal) return <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}><DialogContent showCloseButton={false} className="left-0 top-0 h-dvh max-h-none w-full max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none p-0 ring-0 sm:max-w-none"><DialogTitle className="sr-only">{panelTitle}</DialogTitle>{panel}</DialogContent></Dialog>
+  return workspaceHost ? (
+    <WorkspaceToolSurface container={workspaceHost} docked={docked} label={panelTitle} onClose={onClose} initialFocus={() => inputRef.current}>
+      {panel}
+    </WorkspaceToolSurface>
+  ) : panel
 }
 
 function ChatFileNames({ names }: { names?: readonly string[] }) {

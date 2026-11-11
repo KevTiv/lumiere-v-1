@@ -11,7 +11,7 @@ export const fixtureGuide: GuideDraft = {
   module: "accounting",
   workflow: "vendor-bills",
   companyId: "7",
-  sources: [{ kind: "live", trust: "authoritative", entity_type: "account_move", entity_id: "1042", label: "Vendor bill VB-1042", href: "/accounting/invoices/1042", snapshot_at: "2026-10-28T12:00:00Z" }],
+  sources: [{ kind: "live", trust: "authoritative", entity_type: "account_move", entity_id: "1042", label: "Vendor bill VB-1042", href: "/accounting/invoices/1042", source_version: "revision-" + "a".repeat(96), snapshot_at: "2026-10-28T12:00:00Z" }],
 }
 
 interface FixtureState {
@@ -43,6 +43,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       guideId: "42",
       revision: (expectedRevision ?? 0) + 1,
       reviewState: "draft",
+      compatibility: "unknown",
       canWrite: true,
       updatedAt: "2026-10-28T12:01:00Z",
     }

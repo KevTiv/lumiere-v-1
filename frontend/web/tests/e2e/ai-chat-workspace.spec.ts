@@ -13,7 +13,7 @@ test.describe("AI chat workspace", { tag: ["@p0", "@ai-workspace"] }, () => {
       await openErpAiChat(page)
       const panel = page.getByTestId("erp-ai-chat-panel")
       const input = page.getByTestId("erp-ai-chat-input")
-      await expect(panel).toHaveAttribute("data-mode", "side")
+      await expect(panel).toHaveAttribute("data-mode", width === 1440 ? "side" : "full")
       await expect(input).toBeFocused()
       const question = "Preserve this question while changing context. " + "long-token-".repeat(100)
       await input.fill(question)
@@ -22,18 +22,24 @@ test.describe("AI chat workspace", { tag: ["@p0", "@ai-workspace"] }, () => {
         panel.getByRole("combobox", { name: "Assistant context" }),
         "module:inventory",
       )
-      await panel.getByRole("button", { name: "Open full workspace" }).click()
+      if (width === 1440) {
+        await panel.getByRole("button", { name: "Open full workspace" }).click()
+      }
       await expect(panel).toHaveAttribute("data-mode", "full")
       await expect(input).toHaveValue(question)
-      await expect(input).toBeFocused()
+      if (width === 1440) await expect(input).toBeFocused()
       await expect(panel.getByRole("combobox", { name: "Assistant context" })).toContainText("Inventory")
       const bounds = await panel.boundingBox()
       expect(bounds).not.toBeNull()
       expect(bounds!.x).toBeGreaterThanOrEqual(0)
       expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width + 1)
       expect(await panel.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
-      await panel.getByRole("button", { name: "Dock beside ERP" }).click()
-      await expect(panel).toHaveAttribute("data-mode", "side")
+      if (width === 1440) {
+        await panel.getByRole("button", { name: "Dock beside ERP" }).click()
+        await expect(panel).toHaveAttribute("data-mode", "side")
+      } else {
+        await expect(panel.getByRole("button", { name: "Dock beside ERP" })).toHaveCount(0)
+      }
       await expect(input).toHaveValue(question)
       await panel.getByRole("button", { name: "Close", exact: true }).focus()
       await page.keyboard.press("Enter")

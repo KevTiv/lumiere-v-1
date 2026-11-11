@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useEffect, useState, type ReactNode } from "react"
+import { createContext, useEffect, useRef, useState, type ReactNode } from "react"
 import { LogOut, Monitor, Moon, Search, Sun, UserRound } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "../components/button"
@@ -18,6 +18,16 @@ export const DashboardWorkspaceContext = createContext(false)
 
 const CONTENT_WIDTH_KEY = "lumiere-content-width"
 type ContentWidth = "centered" | "full"
+type WorkspaceTool = "assistant" | "notebook"
+interface WorkspaceDock {
+  container: HTMLElement | null
+  docked: WorkspaceTool | null
+  canDock: (tool: WorkspaceTool) => boolean
+}
+
+const DOCK_MIN_REM: Record<WorkspaceTool, number> = { assistant: 22.5, notebook: 25 }
+// Leave 32rem for work, 4rem for its gutters, 3rem for icon navigation, and .75rem for the gap.
+const WORKSPACE_MIN_REM = 32 + 4 + 3 + 0.75
 
 function WorkspaceNavigationTrigger() {
   const { isMobile, openMobile, open } = useSidebar()
@@ -111,10 +121,11 @@ function WorkspaceAccountMenu({ userProfile, onSignOut }: DashboardAccountProps)
 }
 
 /** Shared shell composition, inspired by Studio Admin's compact header and inset workspace. */
-export function DashboardWorkspace({ sidebar, children, overlays, notifications, headerTools, onOpenSearch, forceCollapsed = false, userProfile, onSignOut }: {
-  sidebar: ReactNode
+export function DashboardWorkspace({ sidebar, children, overlays, dockRequest, notifications, headerTools, onOpenSearch, forceCollapsed = false, userProfile, onSignOut }: {
+  sidebar: ReactNode | ((collapsed: boolean) => ReactNode)
   children: ReactNode
-  overlays?: ReactNode
+  overlays?: ReactNode | ((dock: WorkspaceDock) => ReactNode)
+  dockRequest?: WorkspaceTool | null
   notifications?: ReactNode
   headerTools?: ReactNode
   onOpenSearch: () => void
@@ -123,6 +134,34 @@ export function DashboardWorkspace({ sidebar, children, overlays, notifications,
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const { t } = useTranslation()
   const [width, setWidth] = useState<ContentWidth>("centered")
+  const shell = useRef<HTMLDivElement>(null)
+  const [dockContainer, setDockContainer] = useState<HTMLDivElement | null>(null)
+  const [availableRem, setAvailableRem] = useState(0)
+  const managesTools = typeof overlays === "function"
+
+  useEffect(() => {
+    const element = shell.current
+    if (!managesTools || !element) return
+    const measure = () => {
+      const styles = getComputedStyle(element)
+      const rootSize = parseFloat(getComputedStyle(document.documentElement).fontSize)
+      const contentWidth = element.clientWidth - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight)
+      // The two workspace borders are outside its content width.
+      setAvailableRem((contentWidth - 2) / rootSize)
+    }
+    measure()
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure)
+    observer?.observe(element)
+    if (!observer) window.addEventListener("resize", measure)
+    return () => {
+      observer?.disconnect()
+      if (!observer) window.removeEventListener("resize", measure)
+    }
+  }, [managesTools])
+
+  const canDock = (tool: WorkspaceTool) => availableRem >= WORKSPACE_MIN_REM + DOCK_MIN_REM[tool]
+  const docked = dockRequest && canDock(dockRequest) ? dockRequest : null
+  const collapseNavigation = forceCollapsed || docked !== null
 
   useEffect(() => {
     // SidebarProvider already owns the sidebar cookie; read the same preference.
@@ -134,11 +173,11 @@ export function DashboardWorkspace({ sidebar, children, overlays, notifications,
 
   return (
     <DashboardWorkspaceContext value={true}>
-      <SidebarProvider resizable open={forceCollapsed ? false : sidebarOpen} onOpenChange={setSidebarOpen}
+      <SidebarProvider ref={shell} resizable open={collapseNavigation ? false : sidebarOpen} onOpenChange={setSidebarOpen}
         className="h-svh min-h-0 overflow-hidden bg-muted/20 text-foreground md:gap-3 md:p-3"
         style={{ "--sidebar-width-icon": "3rem" } as React.CSSProperties}>
         <div data-testid="erp-workspace-stack" className="relative isolate flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background md:rounded-2xl md:border md:border-border/70 md:shadow-sm [&_[data-slot=sidebar-container]]:absolute [&_[data-slot=sidebar-container]]:h-full">
-          {sidebar}
+          {typeof sidebar === "function" ? sidebar(collapseNavigation) : sidebar}
           <SidebarInset className="min-h-0 min-w-0 overflow-auto scroll-smooth bg-background">
             <header data-testid="workspace-header" className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 px-3 backdrop-blur-sm sm:px-5">
               <div className="flex min-w-0 items-center gap-2">
@@ -166,7 +205,17 @@ export function DashboardWorkspace({ sidebar, children, overlays, notifications,
             </HeaderTrailingProvider>
           </SidebarInset>
         </div>
-        {overlays}
+        {managesTools && <div
+          ref={setDockContainer}
+          data-testid="workspace-tool-host"
+          data-docked={docked ?? undefined}
+          className={cn(
+            "min-h-0 min-w-0",
+            docked ? "relative flex-none overflow-hidden bg-background md:rounded-2xl md:border md:border-border/70" : "contents",
+          )}
+          style={docked ? { width: `${DOCK_MIN_REM[docked]}rem` } : undefined}
+        />}
+        {typeof overlays === "function" ? overlays({ container: dockContainer, docked, canDock }) : overlays}
       </SidebarProvider>
     </DashboardWorkspaceContext>
   )

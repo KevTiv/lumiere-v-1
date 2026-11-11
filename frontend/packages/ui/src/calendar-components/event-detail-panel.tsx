@@ -10,6 +10,7 @@ import { eventTypeConfig } from "../lib/calendar-types"
 import { useTranslation } from "@lumiere/i18n"
 import {
   Sheet,
+  SheetBody,
   SheetContent,
   SheetDescription,
   SheetFooter,
@@ -55,8 +56,8 @@ export function EventDetailPanel({
         if (!open) onClose()
       }}
     >
-      <SheetContent size="record" className="gap-0">
-        <SheetHeader className="shrink-0 border-b">
+      <SheetContent size="record" layout="bounded">
+        <SheetHeader className="border-b">
           <SheetTitle className="text-xl [overflow-wrap:anywhere]">
             {event.title}
           </SheetTitle>
@@ -87,7 +88,7 @@ export function EventDetailPanel({
             )}
           </div>
         </SheetHeader>
-        <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 text-sm [overflow-wrap:anywhere]">
+        <SheetBody className="space-y-4 p-4 text-sm">
           <div className="flex items-center gap-2">
             <Clock
               className="size-4 shrink-0 text-muted-foreground"
@@ -149,8 +150,8 @@ export function EventDetailPanel({
               <p>{event.relatedTo.id}</p>
             </div>
           )}
-        </div>
-        <SheetFooter className="shrink-0 flex-row flex-wrap items-center border-t">
+        </SheetBody>
+        <SheetFooter className="flex-row flex-wrap items-center border-t">
           {openHref && (
             <Button
               size="sm"

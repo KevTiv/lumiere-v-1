@@ -138,7 +138,7 @@ test.describe("Finance review workspace", { tag: ["@p0", "@finance-review"] }, (
   }
 
   for (const kind of ["png", "pdf"] as const) {
-    test(`reviews a saved bill's real source ${kind} after upload and refresh`, async ({ page }) => {
+    test(`reviews a saved bill's real source ${kind} after upload and refresh`, { tag: "@aside-fit" }, async ({ page }) => {
       const companyId = String(await fetchDefaultCompanyId(page))
       const bill = (await queryRows(page, "account-moves")).find((row) => String(row.companyId ?? row.company_id) === companyId
         && String(typeof row.moveType === "object" && row.moveType ? (row.moveType as { tag: string }).tag : row.moveType) === "InInvoice")
@@ -158,6 +158,12 @@ test.describe("Finance review workspace", { tag: ["@p0", "@finance-review"] }, (
       // appears only after registration, when it is safe to leave the upload tab.
       await expect(attachment.getByRole("button", { name, exact: true })).toBeVisible({ timeout: 30_000 })
       await page.goto(`/accounting/invoices/${id}`)
+      const review = workspace(page)
+      await expect(review.getByRole("tab", { name: "Saved details", exact: true })).toHaveAttribute("aria-selected", "true")
+      await review.evaluate((node) => { node.style.maxWidth = "34rem" })
+      const details = review.locator('aside[aria-label="Record details"]')
+      await expect(details).toBeVisible()
+      expect(await details.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true)
       await expectSavedBillSource(page, name, kind, bytes)
       await page.reload()
       await expectSavedBillSource(page, name, kind, bytes)

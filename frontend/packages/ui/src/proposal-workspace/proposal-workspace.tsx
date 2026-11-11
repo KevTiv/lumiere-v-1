@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useCallback, useRef, useEffect, useMemo } from "react"
-import { ArrowLeft, Download, ChevronDown, Upload } from "lucide-react"
+import { useState, useCallback, useRef, useEffect, useMemo, useId } from "react"
+import { ArrowLeft, Download, ChevronDown, Upload, X } from "lucide-react"
 import Link from "next/link"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@/components/ui/button"
@@ -169,7 +169,7 @@ export interface ProposalWorkspaceHooks {
     aiSuggestion?: string | null
   }>
   useDeleteProposalSection: () => MutationResult<{ sectionId: bigint | number | string }>
-  useAddProposalSourceDoc: () => MutationResult<{
+  useAddProposalSourceDoc: () => AsyncMutationResult<{
     proposalId: bigint | number | string
     name: string
     content: string
@@ -177,7 +177,7 @@ export interface ProposalWorkspaceHooks {
     wordCount: number
   }>
   useDeleteProposalSourceDoc: () => MutationResult<{ docId: bigint | number | string }>
-  useUpdateProposalSourceDoc: () => MutationResult<{
+  useUpdateProposalSourceDoc: () => AsyncMutationResult<{
     docId: bigint | number | string
     name?: string
     content?: string
@@ -363,6 +363,11 @@ export function ProposalWorkspace({
   // ── Local UI state ──────────────────────────────────────────────────────────
   const [activeSectionId, setActiveSectionId] = useState<bigint | null>(null)
   const [aiPanelCollapsed, setAiPanelCollapsed] = useState(false)
+  const [compactPane, setCompactPane] = useState<"sections" | "ai" | "history" | null>(null)
+  const layoutId = useId()
+  const editorRegion = useRef<HTMLDivElement>(null)
+  const aiPaneToggle = useRef<HTMLButtonElement>(null)
+  const desktopAiToggle = useRef<HTMLButtonElement>(null)
   const [showDocInput, setShowDocInput] = useState(false)
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -476,11 +481,48 @@ export function ProposalWorkspace({
     [procurementScoreList, proposalId],
   )
 
-  const [draftSources, setDraftSources] = useState<SourceDocument[]>([])
+  // Keep editable drafts separate from query snapshots. Creating a source has no
+  // returned ID, so a new draft is saved explicitly and never guessed onto a row.
+  const sourceScope = `${organizationId}:${_companyId}:${proposalId}`
+  const currentSourceScope = useRef(sourceScope)
+  currentSourceScope.current = sourceScope
+  const [sourceDraftState, setSourceDraftState] = useState<{
+    scope: string
+    drafts: Record<string, { source: SourceDocument; saved: boolean; contentEdited: boolean }>
+  }>({ scope: sourceScope, drafts: {} })
+  const [savingSource, setSavingSource] = useState<{ scope: string; id: string } | null>(null)
+  const sourceSaveInFlight = useRef(false)
+  const [sourceSaveError, setSourceSaveError] = useState<{ scope: string; message: string } | null>(null)
+  const persistedSources = useMemo(() => proposalSourceDocs.map(mapSourceDocRow), [proposalSourceDocs])
+  const sourceDrafts = useMemo(
+    () => sourceDraftState.scope === sourceScope ? sourceDraftState.drafts : {},
+    [sourceDraftState, sourceScope],
+  )
+  const draftSources = useMemo(() => [
+    ...persistedSources.map((source) => sourceDrafts[source.id]?.source ?? source),
+    ...Object.values(sourceDrafts)
+      .filter(({ source }) => !persistedSources.some((row) => row.id === source.id))
+      .map(({ source }) => source),
+  ], [persistedSources, sourceDrafts])
 
   useEffect(() => {
-    setDraftSources(proposalSourceDocs.map(mapSourceDocRow))
-  }, [proposalSourceDocs])
+    // A successful update can finish before the refreshed query arrives. Keep its
+    // content until the saved row is read back, without clearing newer local edits.
+    const acknowledged = persistedSources.filter((row) => {
+      const draft = sourceDrafts[row.id]
+      return draft?.saved && draft.source.name === row.name
+        && draft.source.content === row.content && draft.source.type === row.type
+    })
+    if (acknowledged.length === 0) return
+    setSourceDraftState((previous) => {
+      if (previous.scope !== sourceScope) return previous
+      const drafts = { ...previous.drafts }
+      for (const row of acknowledged) {
+        if (drafts[row.id] === sourceDrafts[row.id]) delete drafts[row.id]
+      }
+      return { scope: sourceScope, drafts }
+    })
+  }, [persistedSources, sourceDrafts, sourceScope])
 
   // Active section data
   const activeSection = activeSectionId
@@ -571,59 +613,79 @@ export function ProposalWorkspace({
     [templatesList, _companyId],
   )
 
-  const sourceDispatch = useCallback(
-    (action: WorkspaceAction) => {
-      switch (action.type) {
-        case "ADD_SOURCE":
-          addSourceDoc.mutate({
-            proposalId: proposalIdBig,
-            name: action.source.name,
-            content: action.source.content,
-            docType: action.source.type,
-            wordCount: action.source.wordCount,
-          })
-          break
-        case "REMOVE_SOURCE": {
-          const id = action.id
-          if (/^\d+$/.test(id)) {
-            deleteSourceDoc.mutate({ docId: BigInt(id) })
-          }
-          break
-        }
-        case "UPDATE_SOURCE_CONTENT": {
-          const id = action.id
-          if (/^\d+$/.test(id)) {
-            updateSourceDoc.mutate({
-              docId: BigInt(id),
-              content: action.content,
-              wordCount: countWords(action.content),
-            })
-          }
-          break
-        }
-        default:
-          break
-      }
+  const editSource = useCallback((source: SourceDocument, contentEdited = false) => {
+    setSourceDraftState((previous) => ({
+      scope: sourceScope,
+      drafts: {
+        ...(previous.scope === sourceScope ? previous.drafts : {}),
+        [source.id]: {
+          source,
+          saved: false,
+          contentEdited: contentEdited || (previous.scope === sourceScope && previous.drafts[source.id]?.contentEdited === true),
+        },
+      },
+    }))
+  }, [sourceScope])
 
-      setDraftSources((prev) => {
-        switch (action.type) {
-          case "ADD_SOURCE":
-            return [...prev, action.source]
-          case "REMOVE_SOURCE":
-            return prev.filter((s) => s.id !== action.id)
-          case "UPDATE_SOURCE_CONTENT":
-            return prev.map((s) =>
-              s.id === action.id
-                ? { ...s, content: action.content, wordCount: countWords(action.content) }
-                : s,
-            )
-          default:
-            return prev
-        }
+  const sourceDispatch = useCallback((action: WorkspaceAction) => {
+    if (action.type === "ADD_SOURCE") {
+      editSource(action.source)
+    } else if (action.type === "REMOVE_SOURCE") {
+      if (/^\d+$/.test(action.id)) deleteSourceDoc.mutate({ docId: BigInt(action.id) })
+      setSourceDraftState((previous) => {
+        if (previous.scope !== sourceScope) return previous
+        const drafts = { ...previous.drafts }
+        delete drafts[action.id]
+        return { scope: sourceScope, drafts }
       })
-    },
-    [addSourceDoc, deleteSourceDoc, updateSourceDoc, proposalIdBig],
-  )
+    } else if (action.type === "UPDATE_SOURCE_CONTENT") {
+      const source = draftSources.find((row) => row.id === action.id)
+      if (source) editSource({ ...source, content: action.content, wordCount: countWords(action.content) }, true)
+    }
+  }, [deleteSourceDoc, draftSources, editSource, sourceScope])
+
+  const handleSaveSource = useCallback(async (source: SourceDocument) => {
+    if (sourceSaveInFlight.current) return
+    sourceSaveInFlight.current = true
+    setSavingSource({ scope: sourceScope, id: source.id })
+    setSourceSaveError(null)
+    const isPersisted = /^\d+$/.test(source.id)
+    const params = {
+      name: source.name,
+      content: source.content,
+      docType: source.type,
+      wordCount: source.wordCount,
+    }
+    try {
+      if (isPersisted) {
+        const contentEdited = sourceDrafts[source.id]?.contentEdited
+        await updateSourceDoc.mutateAsync({
+          docId: BigInt(source.id),
+          name: source.name,
+          ...(contentEdited ? { content: source.content, wordCount: source.wordCount } : {}),
+        })
+      } else {
+        await addSourceDoc.mutateAsync({ proposalId: proposalIdBig, ...params })
+      }
+      setSourceDraftState((previous) => {
+        if (previous.scope !== sourceScope || previous.drafts[source.id]?.source !== source) return previous
+        const drafts = { ...previous.drafts }
+        if (isPersisted) drafts[source.id] = { source, saved: true, contentEdited: false }
+        else delete drafts[source.id]
+        return { scope: sourceScope, drafts }
+      })
+      if (currentSourceScope.current === sourceScope) {
+        showWorkflowToast({ kind: "success", title: t("common.actionCompleted", { action: t("common.save") }) })
+      }
+    } catch (error) {
+      if (currentSourceScope.current === sourceScope) {
+        setSourceSaveError({ scope: sourceScope, message: error instanceof Error ? error.message : t("common.error.generic") })
+      }
+    } finally {
+      sourceSaveInFlight.current = false
+      setSavingSource(null)
+    }
+  }, [addSourceDoc, updateSourceDoc, proposalIdBig, sourceDrafts, sourceScope, t])
 
   // ── Presence cleanup on unmount ─────────────────────────────────────────────
   const clearPresenceMutateRef = useRef(clearPresence.mutate)
@@ -1221,6 +1283,20 @@ export function ProposalWorkspace({
     }
   })
 
+  const compactPanels = [
+    { id: "sections", label: t("proposalWorkspace.sectionSidebar.sections") },
+    { id: "ai", label: t("proposalWorkspace.aiPanel.aiAnalysis") },
+    { id: "history", label: t("proposalWorkspace.versionHistoryBar.title") },
+  ] as const
+
+  function closeAiPane() {
+    setAiPanelCollapsed(true)
+    setCompactPane(null)
+    // Both controls are mounted. Only the control for the current layout can receive focus.
+    desktopAiToggle.current?.focus()
+    aiPaneToggle.current?.focus()
+  }
+
   return (
     <>
       {/* Print styles */}
@@ -1248,16 +1324,16 @@ export function ProposalWorkspace({
         ))}
       </div>
 
-      <div className="flex flex-col h-full bg-background no-print">
+      <div className="@container/proposal flex h-full min-h-0 min-w-0 flex-col bg-background no-print" data-testid="proposal-workspace">
         {/* ── Top bar ─────────────────────────────────────────────────────── */}
-        <header className="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-background shrink-0 z-10">
+        <header className="z-10 flex max-h-[45dvh] shrink-0 flex-wrap items-center gap-3 overflow-y-auto border-b border-border bg-background px-4 py-2.5">
           <Link href="/proposals" className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-4 w-4" />
           </Link>
 
-          <h1 data-testid="proposal-workspace-title" className="text-sm font-medium text-foreground truncate">{proposalTitle}</h1>
+          <h1 data-testid="proposal-workspace-title" className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{proposalTitle}</h1>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">
             <PresenceBar
               presenceRows={proposalPresence as ProposalPresence[]}
               sections={proposalSections as Record<string, unknown>[]}
@@ -1353,48 +1429,100 @@ export function ProposalWorkspace({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button variant="default" size="sm" onClick={() => setAiPanelCollapsed((v) => !v)}>
+            <Button
+              ref={desktopAiToggle}
+              variant="default"
+              size="sm"
+              className="hidden @min-[80rem]/proposal:inline-flex"
+              aria-expanded={!aiPanelCollapsed}
+              aria-controls={`${layoutId}-ai`}
+              onClick={() => setAiPanelCollapsed((value) => !value)}
+            >
               {aiPanelCollapsed ? t("proposalWorkspace.showAiPanel") : t("proposalWorkspace.hideAiPanel")}
             </Button>
           </div>
         </header>
 
-        {/* ── Main workspace ─────────────────────────────────────────────────── */}
-        <div className="flex flex-1 overflow-hidden">
-          <SectionSidebar
-            sections={proposalSections as Record<string, unknown>[]}
-            sourceDocs={proposalSourceDocs as ProposalSourceDoc[]}
-            activeSectionId={effectiveActiveSectionId}
-            presenceBySection={presenceBySection}
-            totalValue={totalValue}
-            libraryTemplates={libraryTemplates}
-            onSelectSection={handleSelectSection}
-            onAddSection={handleAddSection}
-            onApplyLibraryTemplate={(templateId) =>
-              applyTemplate.mutate({ proposalId: proposalIdBig, templateId })
-            }
-            onDeleteSection={(id) => deleteSection.mutate({ sectionId: id })}
-            onAddSourceDoc={() => setShowDocInput(true)}
-            onDeleteSourceDoc={(id) => deleteSourceDoc.mutate({ docId: id })}
-            complianceSlot={
-              <>
-                <ComplianceChecklist
-                  rows={proposalCompliance as Record<string, unknown>[]}
-                  proposalId={proposalIdBig}
-                  onToggleComplete={handleToggleCompliance}
-                />
-                <ProcurementScoresPanel
-                  scores={procurementScores}
-                  canEdit={canManageProcurementScores}
-                  disabled={upsertProcurementScore.isPending || proposalIdBig === 0n}
-                  onAdd={() => void handleEditProcurementScore()}
-                  onEdit={(score) => void handleEditProcurementScore(score)}
-                />
-              </>
-            }
-          />
+        <div className="flex shrink-0 flex-wrap gap-1 border-b border-border px-3 py-2 @min-[80rem]/proposal:hidden">
+          {compactPanels.map(({ id, label }) => (
+            <Button
+              key={id}
+              ref={id === "ai" ? aiPaneToggle : undefined}
+              type="button"
+              size="sm"
+              variant={compactPane === id ? "secondary" : "ghost"}
+              className="h-auto min-h-9 max-w-full whitespace-normal"
+              aria-expanded={compactPane === id}
+              aria-controls={`${layoutId}-${id}`}
+              onClick={() => setCompactPane((current) => current === id ? null : id)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
 
-          <div className="flex-1 flex overflow-hidden">
+        {/* Keep the editor and its auxiliary panels mounted across layout changes. */}
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div
+            id={`${layoutId}-sections`}
+            className={cn(
+              "min-h-0 min-w-0 flex-1 flex-col overflow-hidden @min-[80rem]/proposal:flex @min-[80rem]/proposal:w-56 @min-[80rem]/proposal:flex-none @min-[80rem]/proposal:border-r",
+              compactPane === "sections" ? "flex" : "hidden",
+            )}
+          >
+            <SectionSidebar
+              sections={proposalSections as Record<string, unknown>[]}
+              sourceDocs={proposalSourceDocs as ProposalSourceDoc[]}
+              activeSectionId={effectiveActiveSectionId}
+              presenceBySection={presenceBySection}
+              totalValue={totalValue}
+              libraryTemplates={libraryTemplates}
+              onSelectSection={(id) => {
+                handleSelectSection(id)
+                if (compactPane === "sections") {
+                  setCompactPane(null)
+                  requestAnimationFrame(() => editorRegion.current?.focus())
+                }
+              }}
+              onAddSection={handleAddSection}
+              onApplyLibraryTemplate={(templateId) =>
+                applyTemplate.mutate({ proposalId: proposalIdBig, templateId })
+              }
+              onDeleteSection={(id) => deleteSection.mutate({ sectionId: id })}
+              onAddSourceDoc={() => {
+                setShowDocInput(true)
+                setAiPanelCollapsed(false)
+                setCompactPane("ai")
+                requestAnimationFrame(() => aiPaneToggle.current?.focus())
+              }}
+              onDeleteSourceDoc={(id) => deleteSourceDoc.mutate({ docId: id })}
+              complianceSlot={
+                <>
+                  <ComplianceChecklist
+                    rows={proposalCompliance as Record<string, unknown>[]}
+                    proposalId={proposalIdBig}
+                    onToggleComplete={handleToggleCompliance}
+                  />
+                  <ProcurementScoresPanel
+                    scores={procurementScores}
+                    canEdit={canManageProcurementScores}
+                    disabled={upsertProcurementScore.isPending || proposalIdBig === 0n}
+                    onAdd={() => void handleEditProcurementScore()}
+                    onEdit={(score) => void handleEditProcurementScore(score)}
+                  />
+                </>
+              }
+            />
+          </div>
+
+          <div
+            ref={editorRegion}
+            tabIndex={-1}
+            className={cn(
+              "min-h-0 min-w-0 flex-1 overflow-hidden outline-none @min-[80rem]/proposal:flex",
+              compactPane ? "hidden" : "flex",
+            )}
+          >
             <SectionEditor
               section={activeSection as unknown as TenderSection | null}
               lineItems={activeSectionLineItems as unknown as { id: string; productName: string; quantity: number; priceUnit: number; discount: number; subtotal: number }[]}
@@ -1451,72 +1579,92 @@ export function ProposalWorkspace({
               }}
               onResolveComment={(id) => resolveComment.mutate(id)}
             />
-
-            {aiPanelCollapsed ? null : (
-              <div className="w-80 border-l border-border bg-muted/20 flex flex-col">
-                <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-                  <span className="text-sm font-medium">{t("proposalWorkspace.aiPanel.aiAnalysis")}</span>
-                  <Button variant="ghost" size="sm" onClick={() => setAiPanelCollapsed(true)}>✕</Button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1"
-                      onClick={() => setShowDocInput((v) => !v)}
-                    >
-                      <Upload className="h-4 w-4" />
-                      {showDocInput ? t("proposalWorkspace.hideSourceDocs") : t("proposalWorkspace.sourceDocs")}
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={handleAnalyze}
-                      disabled={isAnalyzing || proposalSourceDocs.length === 0}
-                    >
-                      {isAnalyzing ? t("proposalWorkspace.analyzing") : t("proposalWorkspace.analyze")}
-                    </Button>
-                  </div>
-
-                  {showDocInput && (
-                    <DocumentInputPanel
-                      sources={draftSources}
-                      dispatch={sourceDispatch}
-                      onAnalyze={handleAnalyze}
-                      isAnalyzing={isAnalyzing}
-                    />
-                  )}
-
-                  {analyzeError && (
-                    <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
-                      {analyzeError}
-                    </div>
-                  )}
-
-                  <AIPanel
-                    analysis={analysis}
-                    isAnalyzing={isAnalyzing}
-                    analyzeError={analyzeError}
-                    onApplyStructure={handleApplyStructure}
-                    collapsed={false}
-                    onToggleCollapse={() => setAiPanelCollapsed(true)}
-                  />
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* ── Version history (right sidebar) ───────────────────────────── */}
-          <div className="w-64 border-l border-border bg-muted/10 flex flex-col">
+          <aside
+            id={`${layoutId}-ai`}
+            aria-label={t("proposalWorkspace.aiPanel.aiAnalysis")}
+            className={cn(
+              "min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-muted/20 @min-[80rem]/proposal:w-80 @min-[80rem]/proposal:flex-none @min-[80rem]/proposal:border-l",
+              compactPane === "ai" ? "flex" : "hidden",
+              aiPanelCollapsed ? "@min-[80rem]/proposal:hidden" : "@min-[80rem]/proposal:flex",
+            )}
+          >
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
+              <span className="text-sm font-medium">{t("proposalWorkspace.aiPanel.aiAnalysis")}</span>
+              <Button variant="ghost" size="icon-sm" aria-label={t("proposalWorkspace.hideAiPanel")} onClick={closeAiPane}>
+                <X aria-hidden="true" />
+              </Button>
+            </div>
+
+            <div className="min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 [overflow-wrap:anywhere]">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-auto min-h-8 max-w-full gap-1 whitespace-normal"
+                  onClick={() => setShowDocInput((v) => !v)}
+                >
+                  <Upload className="h-4 w-4" />
+                  {showDocInput ? t("proposalWorkspace.hideSourceDocs") : t("proposalWorkspace.sourceDocs")}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-auto min-h-8 max-w-full whitespace-normal"
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing || proposalSourceDocs.length === 0}
+                >
+                  {isAnalyzing ? t("proposalWorkspace.analyzing") : t("proposalWorkspace.analyze")}
+                </Button>
+              </div>
+
+              {showDocInput && (
+                <DocumentInputPanel
+                  sources={draftSources}
+                  dispatch={sourceDispatch}
+                  onAnalyze={handleAnalyze}
+                  isAnalyzing={isAnalyzing}
+                  onRenameSource={(source, name) => editSource({ ...source, name })}
+                  onSaveSource={(source) => void handleSaveSource(source)}
+                  savingSourceId={savingSource?.scope === sourceScope ? savingSource.id : null}
+                  dirtySourceIds={Object.keys(sourceDrafts).filter((id) => !sourceDrafts[id].saved)}
+                  saveError={sourceSaveError?.scope === sourceScope ? sourceSaveError.message : null}
+                />
+              )}
+
+              {analyzeError && (
+                <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
+                  {analyzeError}
+                </div>
+              )}
+
+              <AIPanel
+                analysis={analysis}
+                isAnalyzing={isAnalyzing}
+                analyzeError={analyzeError}
+                onApplyStructure={handleApplyStructure}
+                collapsed={false}
+                onToggleCollapse={closeAiPane}
+              />
+            </div>
+          </aside>
+
+          <aside
+            id={`${layoutId}-history`}
+            aria-label={t("proposalWorkspace.versionHistoryBar.title")}
+            className={cn(
+              "min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-muted/10 @min-[80rem]/proposal:flex @min-[80rem]/proposal:w-64 @min-[80rem]/proposal:flex-none @min-[80rem]/proposal:border-l",
+              compactPane === "history" ? "flex" : "hidden",
+            )}
+          >
             <VersionHistoryBar
               versions={localVersions}
               activeVersionId={null}
               currentSections={proposalSections as unknown as TenderSection[]}
               onRestoreVersion={handleRestoreVersion}
             />
-          </div>
+          </aside>
         </div>
       </div>
     </>

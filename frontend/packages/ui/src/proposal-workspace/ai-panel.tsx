@@ -140,7 +140,7 @@ export function AIPanel({ analysis, isAnalyzing, analyzeError, onApplyStructure,
   }
 
   return (
-    <div className="w-72 shrink-0 border-l border-border flex flex-col overflow-hidden bg-background">
+    <div className="flex w-full min-w-0 flex-col overflow-hidden rounded-md border border-border bg-background">
       {/* Panel header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
         <div className="flex items-center gap-1.5">

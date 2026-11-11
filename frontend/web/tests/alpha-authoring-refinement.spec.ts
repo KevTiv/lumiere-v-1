@@ -67,7 +67,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 720 
     test.use({ viewport })
 
     for (const kind of ["invoice", "bill"] as const) {
-      test(`${kind} starts with commercial details and retains the draft after a rejected save`, async ({ page }, testInfo) => {
+      test(`${kind} starts with commercial details and retains the draft after a rejected save`, { tag: "@aside-fit" }, async ({ page }, testInfo) => {
         await page.getByRole("button", { name: `New ${kind}`, exact: true }).click()
         const modal = page.getByTestId("create-invoice-modal")
         const documentDetails = modal.getByRole("region", { name: "Document details", exact: true })
@@ -98,6 +98,13 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 720 
           await expect(modal.getByTestId("create-invoice-content-summary")).toContainText("Please include the commercial reference with payment.")
         }
         const workspace = modal.getByTestId("finance-review-workspace")
+        const preview = workspace.getByTestId("finance-review-document")
+        await expect(preview).toHaveCSS("position", viewport.width >= 1440 ? "sticky" : "static")
+        if (viewport.width >= 1440) {
+          await workspace.evaluate((node) => { node.style.maxWidth = "36rem" })
+          await expect(preview).toHaveCSS("position", "static")
+          await expect(modal.getByTestId("create-invoice-line-description")).toHaveValue("Alpha task review service")
+        }
         await workspace.getByRole("tab", { name: "Document preview", exact: true }).click()
         await expect(modal.getByTestId("invoice-document")).toContainText("Alpha task review service")
         await workspace.getByRole("tab", { name: "Edit document", exact: true }).click()

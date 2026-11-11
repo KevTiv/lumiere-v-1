@@ -43,11 +43,15 @@ import type { Notebook, NotebookCell, KernelState } from "@/lib/notebook-types"
 import { mlSnippets, reportTemplates } from "@/lib/notebook-types"
 import { downloadTextFile } from "@/lib/ui-exports"
 import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
+import { WorkspaceToolSurface } from "../pages/workspace-tool-surface"
 
 interface NotebookPanelProps {
   open: boolean
   onClose: () => void
   onAIChat?: (message: string) => void
+  workspaceHost?: HTMLElement | null
+  docked?: boolean
+  onDockToggle?: () => void
   dataContext?: {
     sales?: unknown[]
     inventory?: unknown[]
@@ -79,7 +83,7 @@ export function NotebookPanel(props: NotebookPanelProps) {
   return <ScopedNotebookPanel key={scope ?? "no-scope"} {...props} scope={scope} />
 }
 
-function ScopedNotebookPanel({ open, onClose, onAIChat, scope }: NotebookPanelProps & { scope: string | null }) {
+function ScopedNotebookPanel({ open, onClose, onAIChat, scope, workspaceHost, docked = false, onDockToggle }: NotebookPanelProps & { scope: string | null }) {
   const { t } = useTranslation()
   const [notebook, setNotebook] = useState<Notebook>(newNotebook)
 
@@ -90,7 +94,6 @@ function ScopedNotebookPanel({ open, onClose, onAIChat, scope }: NotebookPanelPr
     variables: {},
     imports: [],
   })
-  const [isFullscreen, setIsFullscreen] = useState(false)
   const [activeTab, setActiveTab] = useState<"notebook" | "files" | "variables">("notebook")
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [savedNotebook, setSavedNotebook] = useState<Notebook | null>(null)
@@ -256,18 +259,22 @@ function ScopedNotebookPanel({ open, onClose, onAIChat, scope }: NotebookPanelPr
     }
   }, [onAIChat])
 
-  if (!open) return navigationGuard
+  const managedPlacement = workspaceHost !== undefined
+  if (!open || (managedPlacement && !workspaceHost)) return navigationGuard
+  const label = t("ui.notebook.title", { defaultValue: "Notebook" })
+  const toggleLabel = !docked
+    ? t("ui.notebook.dock", { defaultValue: "Dock notebook beside ERP" })
+    : t("ui.notebook.fullscreen", { defaultValue: "Open notebook full screen" })
 
-  return (
+  const panel = (
     <div
-      role="region"
-      aria-label={t("ui.notebook.title", { defaultValue: "Notebook" })}
+      role={managedPlacement ? undefined : "region"}
+      aria-label={managedPlacement ? undefined : label}
       data-testid="notebook-panel"
+      data-placement={managedPlacement ? docked ? "dock" : "overlay" : undefined}
       className={cn(
-        "flex min-h-0 min-w-0 flex-col bg-background border-l border-border",
-        isFullscreen
-          ? "fixed inset-0 z-50"
-          : "fixed inset-0 z-50 h-dvh w-full sm:relative sm:inset-auto sm:h-screen sm:w-[32vw] sm:min-w-[400px] sm:shrink-0"
+        "flex min-h-0 min-w-0 flex-col overflow-hidden bg-background",
+        managedPlacement ? "h-full w-full" : "fixed inset-0 z-50 h-dvh w-full"
       )}
     >
       {navigationGuard}
@@ -325,16 +332,17 @@ function ScopedNotebookPanel({ open, onClose, onAIChat, scope }: NotebookPanelPr
             <Download className="h-3.5 w-3.5" />
           </Button>
           <div className="w-px h-4 bg-border mx-1" />
-          <Button
+          {onDockToggle && <Button
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            onClick={onDockToggle}
+            title={toggleLabel}
+            aria-label={toggleLabel}
           >
-            {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} title="Close">
+            {docked ? <Maximize2 className="h-3.5 w-3.5" /> : <Minimize2 className="h-3.5 w-3.5" />}
+          </Button>}
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} title={t("common.close")} aria-label={t("common.close")}>
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -533,7 +541,7 @@ function ScopedNotebookPanel({ open, onClose, onAIChat, scope }: NotebookPanelPr
       </div>
 
       {/* Status bar */}
-      <div className="flex items-center justify-between px-3 py-1 border-t border-border bg-muted/30 text-[10px] text-muted-foreground">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border bg-muted/30 px-3 py-1 text-[10px] text-muted-foreground">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
             <div className={cn("w-1.5 h-1.5 rounded-full", kernel.status === "idle" ? "bg-success" : "bg-info")} />
@@ -550,4 +558,9 @@ function ScopedNotebookPanel({ open, onClose, onAIChat, scope }: NotebookPanelPr
       </div>
     </div>
   )
+  return workspaceHost ? (
+    <WorkspaceToolSurface container={workspaceHost} docked={docked} label={label} onClose={onClose}>
+      {panel}
+    </WorkspaceToolSurface>
+  ) : panel
 }

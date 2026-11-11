@@ -74,6 +74,16 @@ export function MapView({
     mapRef.current.setView(defaultCenter, defaultZoom)
   }, [defaultCenter, defaultZoom])
 
+  useEffect(() => {
+    const element = mapDivRef.current
+    const map = mapRef.current
+    if (!mapReady || !element || !map || typeof ResizeObserver === "undefined") return
+
+    const observer = new ResizeObserver(() => map.invalidateSize({ animate: false }))
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [mapReady])
+
   // Sync circle markers whenever pins/layers/visibility change (or map becomes ready)
   useEffect(() => {
     if (!mapReady) return

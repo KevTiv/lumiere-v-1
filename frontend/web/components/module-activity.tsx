@@ -7,7 +7,7 @@ import { History } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import { Button } from "@lumiere/ui/components/button"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@lumiere/ui/components/sheet"
+import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@lumiere/ui/components/sheet"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { ModuleBusinessHistory, RecordBusinessHistory } from "@lumiere/ui/entity-views/record-business-history"
 import { historyActivityHref, historyActivityModule } from "../lib/history-activity-navigation"
@@ -39,12 +39,12 @@ export function ModuleActivity() {
       <History aria-hidden="true" className="size-4" />
     </Button>
     <Sheet open={open} onOpenChange={navigate}>
-      <SheetContent size="record">
+      <SheetContent size="record" layout="bounded">
         <SheetHeader>
           <SheetTitle>{t("businessHistory.activity", { defaultValue: "Activity" })}</SheetTitle>
           <SheetDescription>{t("businessHistory.activityDescription", { defaultValue: "Inspect recorded changes and follow their business records." })}</SheetDescription>
         </SheetHeader>
-        {open ? <div className="min-w-0 px-4 pb-6"><ModuleBusinessHistory
+        {open ? <SheetBody className="pb-6"><ModuleBusinessHistory
           key={scopeKey}
           moduleId={moduleId}
           renderRecordLink={(entry) => {
@@ -58,18 +58,18 @@ export function ModuleActivity() {
               </Button> : null}
             </div>
           }}
-        /></div> : null}
+        /></SheetBody> : null}
       </SheetContent>
     </Sheet>
     <Sheet open={open && selected?.scopeKey === scopeKey} onOpenChange={(next) => { if (!next) setSelected(null) }}>
-      <SheetContent size="record">
+      <SheetContent size="record" layout="bounded">
         <SheetHeader>
           <SheetTitle>{t("businessHistory.title", { defaultValue: "History & sources" })}</SheetTitle>
           <SheetDescription>{t("businessHistory.activityDescription", { defaultValue: "Inspect recorded changes and follow their business records." })}</SheetDescription>
         </SheetHeader>
-        {open && selected?.scopeKey === scopeKey ? <div className="min-w-0 px-4 pb-6">
+        {open && selected?.scopeKey === scopeKey ? <SheetBody className="pb-6">
           <RecordBusinessHistory key={`${scopeKey}:${selected.resource}:${selected.recordId}`} tableName={selected.resource} recordId={selected.recordId} />
-        </div> : null}
+        </SheetBody> : null}
       </SheetContent>
     </Sheet>
   </>

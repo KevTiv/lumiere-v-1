@@ -3,6 +3,48 @@ import { writeFile } from "node:fs/promises";
 
 const expect = baseExpect.configure({ timeout: 15_000 });
 
+test("canvas controls fit their container and retain stock state", { tag: "@aside-fit" }, async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 850 });
+  await page.goto("/canvas-controls");
+
+  const panel = page.getByRole("complementary", { name: "Stock Overview" });
+  const trigger = page.getByRole("button", { name: "Stock controls" });
+  const canvas = page.getByTestId("canvas-placeholder");
+  const fixture = page.getByTestId("canvas-fixture");
+  const search = page.getByPlaceholder("Search items by name or SKU...");
+  await expect(panel).toBeVisible();
+  await expect(trigger).toBeHidden();
+  const canvasNode = await canvas.elementHandle();
+
+  await search.fill("Coffee");
+  await page.getByRole("button", { name: /Coffee beans.*COF-001/ }).click();
+  await expect(page.getByRole("heading", { name: "Coffee beans" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Narrow workspace" }).click();
+  await expect(trigger).toBeVisible();
+  await expect(panel).toBeHidden();
+  expect((await canvas.boundingBox())!.width).toBeGreaterThan((await fixture.boundingBox())!.width - 4);
+
+  await trigger.press("Enter");
+  await expect(panel.getByRole("heading", { name: "Stock Overview" })).toBeFocused();
+  await expect(canvas).toBeHidden();
+  await panel.getByRole("button", { name: "Low Stock Only" }).click();
+  const body = panel.locator('[data-slot="canvas-controls-body"]');
+  expect(await body.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+  await expect(panel.getByRole("button", { name: "Close" })).toBeInViewport();
+
+  await page.getByRole("button", { name: "Widen workspace" }).click();
+  await expect(canvas).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Low Stock Only" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Narrow workspace" }).click();
+  await panel.getByRole("button", { name: "Low Stock Only" }).press("Escape");
+  await expect(trigger).toBeFocused();
+  await expect(canvas).toBeVisible();
+  await expect(search).toHaveValue("Coffee");
+  await expect(page.getByRole("heading", { name: "Coffee beans" })).toBeVisible();
+  expect(await canvasNode?.evaluate((element) => element.isConnected)).toBe(true);
+});
+
 async function openWorkspace(page: Page, module: string, query = "") {
   await page.goto(`/product-fleet?module=${module}${query}`);
   await expect(page.getByTestId(`module-view-${module}`)).toHaveAttribute(

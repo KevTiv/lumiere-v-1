@@ -67,6 +67,23 @@ for (const width of [320, 390, 768, 1440]) {
       await page.screenshot({ path: testInfo.outputPath(`templates-default-${width}.png`), fullPage: true })
     })
 
+    if (width === 1440) {
+      test("an inline form keeps its preview and draft when its host narrows", { tag: "@aside-fit" }, async ({ page }) => {
+        await page.getByTestId("module-workspace-style-templates-form").click()
+        const preview = page.getByTestId("form-preview-template-inline")
+        const form = page.locator("form").filter({ has: preview })
+        const reference = form.getByTestId("form-field-reference")
+        await reference.fill("SUPPLIER-SYNTHETIC-002")
+        await expect(preview).toHaveCSS("position", "sticky")
+
+        await form.evaluate((node) => { node.style.maxWidth = "36rem" })
+        await expect(preview).toHaveCSS("position", "static")
+        await expect(reference).toHaveValue("SUPPLIER-SYNTHETIC-002")
+        await expect(preview).toContainText("SUPPLIER-SYNTHETIC-002")
+        await expectNoOverflow(page)
+      })
+    }
+
     test("coarse controls, modal footer and keyboard interactions remain usable", async ({ page }, testInfo) => {
       await page.getByTestId("module-create-style-templates-records").click()
       const modal = page.getByTestId("form-modal-template-record")

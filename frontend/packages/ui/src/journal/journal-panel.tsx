@@ -16,7 +16,7 @@ interface WebkitSpeechRecognitionResultEvent {
   results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }>
 }
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type PointerEvent } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import { browserWorkScope } from "../notebook/browser-notebooks"
@@ -26,7 +26,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { useRBAC } from "@/lib/rbac-context"
 import {
   X,
@@ -80,20 +79,57 @@ import {
 import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
 import { runtimeFormRoleId } from "@/lib/runtime-form-role"
 
-interface Position {
+interface Bounds {
   x: number
   y: number
-}
-
-interface Size {
   width: number
   height: number
 }
 
+type ResizeEdge = "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw"
+
 const MIN_WIDTH = 360
 const MIN_HEIGHT = 320
-const DEFAULT_WIDTH = 480
-const DEFAULT_HEIGHT = 580
+const PANEL_MARGIN = 8
+const INITIAL_BOUNDS: Bounds = { x: -1, y: -1, width: 480, height: 580 }
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(value, max))
+}
+
+function fitBounds(bounds: Bounds, viewport: Bounds): Bounds {
+  const width = clamp(bounds.width, 0, viewport.width - PANEL_MARGIN * 2)
+  const height = clamp(bounds.height, 0, viewport.height - PANEL_MARGIN * 2)
+  const left = viewport.x + PANEL_MARGIN
+  const top = viewport.y + PANEL_MARGIN
+  const right = viewport.x + viewport.width - PANEL_MARGIN
+  const bottom = viewport.y + viewport.height - PANEL_MARGIN
+  return {
+    x: clamp(bounds.x < 0 ? right - width - 16 : bounds.x, left, right - width),
+    y: clamp(bounds.y < 0 ? viewport.y + 80 : bounds.y, top, bottom - height),
+    width,
+    height,
+  }
+}
+
+function resizeBounds(bounds: Bounds, viewport: Bounds, edge: ResizeEdge, dx: number, dy: number): Bounds {
+  const left = viewport.x + PANEL_MARGIN
+  const top = viewport.y + PANEL_MARGIN
+  const right = viewport.x + viewport.width - PANEL_MARGIN
+  const bottom = viewport.y + viewport.height - PANEL_MARGIN
+  let { x, y, width, height } = bounds
+  if (edge.includes("w")) {
+    x = clamp(x + dx, left, x + width - Math.min(MIN_WIDTH, width))
+    width -= x - bounds.x
+  }
+  if (edge.includes("e")) width = clamp(width + dx, Math.min(MIN_WIDTH, width), right - x)
+  if (edge.includes("n")) {
+    y = clamp(y + dy, top, y + height - Math.min(MIN_HEIGHT, height))
+    height -= y - bounds.y
+  }
+  if (edge.includes("s")) height = clamp(height + dy, Math.min(MIN_HEIGHT, height), bottom - y)
+  return fitBounds({ x, y, width, height }, viewport)
+}
 
 interface JournalPanelProps {
   open: boolean
@@ -175,17 +211,12 @@ function ScopedJournalPanel({ open, onClose, scope }: JournalPanelProps & { scop
   const recognitionRef = useRef<WebkitSpeechRecognitionInstance | null>(null)
 
   // Floating panel state
-  const [position, setPosition] = useState<Position>({ x: -1, y: -1 })
-  const [size, setSize] = useState<Size>({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT })
+  const [preferredBounds, setPreferredBounds] = useState(INITIAL_BOUNDS)
+  const [viewport, setViewport] = useState<Bounds | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [isResizing, setIsResizing] = useState<string | null>(null)
   const [isMinimized, setIsMinimized] = useState(false)
   const [isMaximized, setIsMaximized] = useState(false)
-  const [prevState, setPrevState] = useState<{ position: Position; size: Size } | null>(null)
-
-  const panelRef = useRef<HTMLDivElement>(null)
-  const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number }>({ x: 0, y: 0, posX: 0, posY: 0 })
-  const resizeStartRef = useRef<{ x: number; y: number; width: number; height: number; posX: number; posY: number }>({ x: 0, y: 0, width: 0, height: 0, posX: 0, posY: 0 })
+  const gesture = useRef<{ pointerId: number; x: number; y: number; bounds: Bounds; edge?: ResizeEdge } | null>(null)
 
   // Get role-based config
   const userRoleId = runtimeFormRoleId(currentUser) || "default"
@@ -266,119 +297,79 @@ function ScopedJournalPanel({ open, onClose, scope }: JournalPanelProps & { scop
     return true
   })
 
-  // Keep this domain panel inside the viewport on open, resize, and restore.
+  // Clamping the rendered bounds keeps the user's preferred size and position
+  // available when the viewport grows again or the panel is restored.
   useEffect(() => {
     if (!open) return
-    const fit = () => {
-      const width = Math.min(size.width, Math.max(0, window.innerWidth - 16))
-      const height = Math.min(size.height, Math.max(0, window.innerHeight - 16))
-      setSize((current) => current.width === width && current.height === height ? current : { width, height })
-      setPosition((current) => {
-        const x = Math.max(8, Math.min(current.x < 0 ? window.innerWidth - width - 24 : current.x, window.innerWidth - (isMinimized ? Math.min(320, width) : width) - 8))
-        const y = Math.max(8, Math.min(current.y < 0 ? 80 : current.y, window.innerHeight - (isMinimized ? 44 : height) - 8))
-        return current.x === x && current.y === y ? current : { x, y }
-      })
+    const visual = window.visualViewport
+    const update = () => setViewport({
+      x: visual?.offsetLeft ?? 0,
+      y: visual?.offsetTop ?? 0,
+      width: visual?.width ?? window.innerWidth,
+      height: visual?.height ?? window.innerHeight,
+    })
+    update()
+    window.addEventListener("resize", update)
+    visual?.addEventListener("resize", update)
+    visual?.addEventListener("scroll", update)
+    return () => {
+      window.removeEventListener("resize", update)
+      visual?.removeEventListener("resize", update)
+      visual?.removeEventListener("scroll", update)
     }
-    fit()
-    window.addEventListener("resize", fit)
-    return () => window.removeEventListener("resize", fit)
-  }, [open, size.width, size.height, isMinimized])
+  }, [open])
 
-  // Drag handlers
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
-    if (isMaximized) return
-    e.preventDefault()
+  const desiredBounds = viewport && isMaximized
+    ? { x: viewport.x, y: viewport.y, width: viewport.width, height: viewport.height }
+    : isMinimized ? { ...preferredBounds, width: 320, height: 46 } : preferredBounds
+  const bounds = viewport ? fitBounds(desiredBounds, viewport) : desiredBounds
+
+  function startGesture(event: PointerEvent<HTMLElement>, edge?: ResizeEdge) {
+    if (!viewport || isMaximized || !event.isPrimary || event.button !== 0) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    gesture.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, bounds, edge }
     setIsDragging(true)
-    dragStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      posX: position.x,
-      posY: position.y,
-    }
-  }, [position, isMaximized])
+  }
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging) {
-        const dx = e.clientX - dragStartRef.current.x
-        const dy = e.clientY - dragStartRef.current.y
-        const newX = Math.max(0, Math.min(window.innerWidth - size.width, dragStartRef.current.posX + dx))
-        const newY = Math.max(0, Math.min(window.innerHeight - 60, dragStartRef.current.posY + dy))
-        setPosition({ x: newX, y: newY })
-      }
+  function movePanel(start: Bounds, visibleViewport: Bounds, dx: number, dy: number) {
+    const next = fitBounds({
+      ...start,
+      x: Math.max(visibleViewport.x, start.x + dx),
+      y: Math.max(visibleViewport.y, start.y + dy),
+    }, visibleViewport)
+    setPreferredBounds((previous) => ({ ...previous, x: next.x, y: next.y }))
+  }
 
-      if (isResizing) {
-        const dx = e.clientX - resizeStartRef.current.x
-        const dy = e.clientY - resizeStartRef.current.y
+  function moveGesture(event: PointerEvent<HTMLDivElement>) {
+    const current = gesture.current
+    if (!viewport || !current || current.pointerId !== event.pointerId) return
+    const dx = event.clientX - current.x
+    const dy = event.clientY - current.y
+    if (current.edge) setPreferredBounds(resizeBounds(current.bounds, viewport, current.edge, dx, dy))
+    else movePanel(current.bounds, viewport, dx, dy)
+  }
 
-        let newWidth = resizeStartRef.current.width
-        let newHeight = resizeStartRef.current.height
-        let newX = position.x
-        let newY = position.y
+  function endGesture(event: PointerEvent<HTMLDivElement>) {
+    if (gesture.current?.pointerId !== event.pointerId) return
+    gesture.current = null
+    setIsDragging(false)
+  }
 
-        if (isResizing.includes("e")) newWidth = Math.max(MIN_WIDTH, resizeStartRef.current.width + dx)
-        if (isResizing.includes("w")) {
-          const widthDelta = Math.min(dx, resizeStartRef.current.width - MIN_WIDTH)
-          newWidth = resizeStartRef.current.width - widthDelta
-          newX = resizeStartRef.current.posX + widthDelta
-        }
-        if (isResizing.includes("s")) newHeight = Math.max(MIN_HEIGHT, resizeStartRef.current.height + dy)
-        if (isResizing.includes("n")) {
-          const heightDelta = Math.min(dy, resizeStartRef.current.height - MIN_HEIGHT)
-          newHeight = resizeStartRef.current.height - heightDelta
-          newY = resizeStartRef.current.posY + heightDelta
-        }
-
-        setSize({ width: newWidth, height: newHeight })
-        if (isResizing.includes("w") || isResizing.includes("n")) {
-          setPosition({ x: newX, y: newY })
-        }
-      }
-    }
-
-    const handleMouseUp = () => {
-      setIsDragging(false)
-      setIsResizing(null)
-    }
-
-    if (isDragging || isResizing) {
-      document.addEventListener("mousemove", handleMouseMove)
-      document.addEventListener("mouseup", handleMouseUp)
-      return () => {
-        document.removeEventListener("mousemove", handleMouseMove)
-        document.removeEventListener("mouseup", handleMouseUp)
-      }
-    }
-  }, [isDragging, isResizing, size.width, position.x, position.y])
-
-  const handleResizeStart = useCallback((direction: string) => (e: React.MouseEvent) => {
-    if (isMaximized) return
-    e.preventDefault()
-    e.stopPropagation()
-    setIsResizing(direction)
-    resizeStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      width: size.width,
-      height: size.height,
-      posX: position.x,
-      posY: position.y,
-    }
-  }, [size, position, isMaximized])
+  function handleGeometryKey(event: KeyboardEvent<HTMLButtonElement>) {
+    if (!viewport || isMaximized) return
+    const step = 16
+    const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0
+    const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0
+    if (!dx && !dy) return
+    event.preventDefault()
+    if (event.shiftKey) {
+      if (!isMinimized) setPreferredBounds(resizeBounds(bounds, viewport, "se", dx, dy))
+    } else movePanel(bounds, viewport, dx, dy)
+  }
 
   const toggleMaximize = () => {
-    if (isMaximized) {
-      if (prevState) {
-        setPosition(prevState.position)
-        setSize(prevState.size)
-      }
-      setIsMaximized(false)
-    } else {
-      setPrevState({ position, size })
-      setPosition({ x: 20, y: 20 })
-      setSize({ width: window.innerWidth - 40, height: window.innerHeight - 40 })
-      setIsMaximized(true)
-    }
+    setIsMaximized(!isMaximized)
     setIsMinimized(false)
   }
 
@@ -492,36 +483,38 @@ function ScopedJournalPanel({ open, onClose, scope }: JournalPanelProps & { scop
 
   return (
     <div
-      ref={panelRef}
       role="region"
       aria-label={t("ui.journal.title")}
       data-testid="journal-panel"
       className={cn(
         "fixed bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden",
         "transition-shadow duration-200",
-        isDragging && "shadow-2xl shadow-amber-500/20",
-        isMinimized && "!h-auto"
+        isDragging && "shadow-2xl shadow-amber-500/20"
       )}
+      onPointerMove={moveGesture}
+      onPointerUp={endGesture}
+      onPointerCancel={endGesture}
+      onLostPointerCapture={endGesture}
       style={{
-        left: Math.max(8, position.x),
-        top: Math.max(8, position.y),
-        maxWidth: "calc(100vw - 16px)",
-        maxHeight: "calc(100dvh - 16px)",
-        width: isMinimized ? 320 : size.width,
-        height: isMinimized ? "auto" : size.height,
+        left: viewport ? bounds.x : PANEL_MARGIN,
+        top: viewport ? bounds.y : PANEL_MARGIN,
+        maxWidth: viewport ? undefined : "calc(100vw - 16px)",
+        maxHeight: viewport ? undefined : "calc(100dvh - 16px)",
+        width: bounds.width,
+        height: bounds.height,
       }}
     >
       {/* Resize handles */}
       {!isMinimized && !isMaximized && (
         <>
-          <div className="absolute top-0 left-0 w-3 h-3 cursor-nw-resize z-10" onMouseDown={handleResizeStart("nw")} />
-          <div className="absolute top-0 right-0 w-3 h-3 cursor-ne-resize z-10" onMouseDown={handleResizeStart("ne")} />
-          <div className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize z-10" onMouseDown={handleResizeStart("sw")} />
-          <div className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize z-10" onMouseDown={handleResizeStart("se")} />
-          <div className="absolute top-0 left-3 right-3 h-1 cursor-n-resize" onMouseDown={handleResizeStart("n")} />
-          <div className="absolute bottom-0 left-3 right-3 h-1 cursor-s-resize" onMouseDown={handleResizeStart("s")} />
-          <div className="absolute left-0 top-3 bottom-3 w-1 cursor-w-resize" onMouseDown={handleResizeStart("w")} />
-          <div className="absolute right-0 top-3 bottom-3 w-1 cursor-e-resize" onMouseDown={handleResizeStart("e")} />
+          <div className="absolute top-0 left-0 w-3 h-3 touch-none cursor-nw-resize z-10" onPointerDown={(event) => startGesture(event, "nw")} />
+          <div className="absolute top-0 right-0 w-3 h-3 touch-none cursor-ne-resize z-10" onPointerDown={(event) => startGesture(event, "ne")} />
+          <div className="absolute bottom-0 left-0 w-3 h-3 touch-none cursor-sw-resize z-10" onPointerDown={(event) => startGesture(event, "sw")} />
+          <div className="absolute bottom-0 right-0 w-3 h-3 touch-none cursor-se-resize z-10" onPointerDown={(event) => startGesture(event, "se")} />
+          <div className="absolute top-0 left-3 right-3 h-1 touch-none cursor-n-resize" onPointerDown={(event) => startGesture(event, "n")} />
+          <div className="absolute bottom-0 left-3 right-3 h-1 touch-none cursor-s-resize" onPointerDown={(event) => startGesture(event, "s")} />
+          <div className="absolute left-0 top-3 bottom-3 w-1 touch-none cursor-w-resize" onPointerDown={(event) => startGesture(event, "w")} />
+          <div className="absolute right-0 top-3 bottom-3 w-1 touch-none cursor-e-resize" onPointerDown={(event) => startGesture(event, "e")} />
         </>
       )}
 
@@ -535,11 +528,15 @@ function ScopedJournalPanel({ open, onClose, scope }: JournalPanelProps & { scop
         <div className="flex min-w-0 items-center gap-1.5">
           {/* Drag handle */}
           <button
-            title={t("ui.journal.actions.dragToMove")}
-            aria-label={t("ui.journal.actions.dragToMove")}
-            onMouseDown={handleDragStart}
+            type="button"
+            disabled={isMaximized}
+            title={t("ui.journal.actions.geometryHelp", { defaultValue: "Use arrow keys to move. Hold Shift to resize." })}
+            aria-label={t("ui.journal.actions.adjustPosition", { defaultValue: "Move or resize Journal" })}
+            aria-description={t("ui.journal.actions.geometryHelp", { defaultValue: "Use arrow keys to move. Hold Shift to resize." })}
+            onPointerDown={(event) => startGesture(event)}
+            onKeyDown={handleGeometryKey}
             className={cn(
-              "flex items-center justify-center h-7 w-7 rounded-md transition-colors shrink-0",
+              "flex items-center justify-center h-7 w-7 rounded-md transition-colors shrink-0 touch-none focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-default disabled:opacity-50",
               "hover:bg-muted text-muted-foreground hover:text-foreground",
               isDragging ? "bg-primary/10 text-primary cursor-grabbing" : "cursor-grab"
             )}
@@ -556,7 +553,7 @@ function ScopedJournalPanel({ open, onClose, scope }: JournalPanelProps & { scop
             )}
           </div>
         </div>
-        <div className="flex items-center gap-0.5">
+        <div className="flex shrink-0 items-center gap-0.5">
           <Button variant="ghost" size="icon" onClick={toggleMinimize} className="h-7 w-7" title={t("ui.journal.actions.minimize")} aria-label={t("ui.journal.actions.minimize")}>
             <Minus className="h-3.5 w-3.5" />
           </Button>
@@ -572,14 +569,14 @@ function ScopedJournalPanel({ open, onClose, scope }: JournalPanelProps & { scop
       {navigationGuard}
       {/* Panel body — hidden when minimized */}
       {!isMinimized && (
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain [overflow-wrap:anywhere]" data-testid="journal-scroll-body">
           <p className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground">{scope
             ? t("ui.journal.browserHint", { defaultValue: "Personal working notes are saved in this browser for this company and user. They do not sync to your account and are not accounting journal entries." })
             : t("ui.journal.scopeRequired", { defaultValue: "Select an authorized operating company to save personal browser notes. These notes are not accounting journal entries." })}</p>
           {storageError ? <p role="alert" className="shrink-0 break-words px-4 py-2 text-xs text-destructive">{storageError}</p> : null}
           {/* Quick action bar */}
           <div className="px-4 py-3 border-b border-border bg-muted/30">
-            <div className="flex items-center gap-2 mb-3">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">{t("ui.journal.quickAdd")}</span>
               <div className="flex flex-wrap gap-1.5">
                 {config.quickTemplates.map((template) => (
@@ -608,7 +605,7 @@ function ScopedJournalPanel({ open, onClose, scope }: JournalPanelProps & { scop
 
             {/* Search and filter */}
             <div className="flex items-center gap-2">
-              <div className="relative flex-1">
+              <div className="relative min-w-0 flex-1">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
                   value={searchQuery}
@@ -669,7 +666,7 @@ function ScopedJournalPanel({ open, onClose, scope }: JournalPanelProps & { scop
                     {noteTypeIcons[selectedType]}
                   </span>
                 </div>
-                <div className="flex-1 space-y-2">
+                <div className="min-w-0 flex-1 space-y-2">
                   {/* Type selector */}
                   <div className="flex items-center gap-2 flex-wrap">
                     {Object.entries(noteTypeConfig).map(([type, typeConfig]) => (
@@ -740,18 +737,18 @@ function ScopedJournalPanel({ open, onClose, scope }: JournalPanelProps & { scop
                     </div>
 
                     {/* Tags */}
-                    <div className="flex items-center gap-1.5 flex-1">
-                      <Tag className="h-3 w-3 text-muted-foreground" />
-                      <div className="flex items-center gap-1 flex-wrap">
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <Tag className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      <div className="flex min-w-0 flex-wrap items-center gap-1">
                         {tags.map((tag) => (
                           <Badge
                             key={tag}
                             variant="secondary"
-                            className="text-[10px] px-1.5 py-0 h-5 gap-1 cursor-pointer hover:bg-destructive/20"
+                            className="h-auto min-h-5 max-w-full cursor-pointer gap-1 whitespace-normal px-1.5 py-0 text-[10px] hover:bg-destructive/20"
                             onClick={() => handleRemoveTag(tag)}
                           >
                             #{tag}
-                            <X className="h-2 w-2" />
+                            <X className="h-2 w-2 shrink-0" />
                           </Badge>
                         ))}
                         <Input
@@ -770,7 +767,7 @@ function ScopedJournalPanel({ open, onClose, scope }: JournalPanelProps & { scop
                     </div>
 
                     {/* Suggested tags */}
-                    <div className="flex items-center gap-1">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1">
                       {config.suggestedTags.slice(0, 4).map((tag) => (
                         !tags.includes(tag) && (
                           <button
@@ -799,7 +796,7 @@ function ScopedJournalPanel({ open, onClose, scope }: JournalPanelProps & { scop
                   )}
 
                   {/* Actions */}
-                  <div className="flex items-center justify-end gap-2 pt-1">
+                  <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
                     <Button variant="ghost" size="sm" onClick={resetForm} className="h-7 text-xs">
                       {t("common.cancel")}
                     </Button>
@@ -814,109 +811,107 @@ function ScopedJournalPanel({ open, onClose, scope }: JournalPanelProps & { scop
           )}
 
           {/* Notes list */}
-          <ScrollArea className="flex-1 min-h-0">
-            <div className="p-4 space-y-2">
-              {filteredNotes.length === 0 ? (
-                <div className="text-center py-12">
-                  <StickyNote className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
-                  <p className="text-sm text-muted-foreground">{t("ui.journal.empty.title")}</p>
-                  <p className="text-xs text-muted-foreground/70">{t("ui.journal.empty.description")}</p>
-                </div>
-              ) : (
-                filteredNotes.map((note) => (
-                  <div
-                    key={note.id}
-                    className={cn(
-                      "p-3 rounded-lg border transition-colors",
-                      note.status === "resolved" && "opacity-60",
-                      note.status === "archived" && "opacity-40",
-                      noteTypeConfig[note.type].bgColor
-                    )}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={cn("mt-0.5", noteTypeConfig[note.type].color)}>
-                        {noteTypeIcons[note.type]}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                            {noteTypeLabels[note.type]}
-                          </Badge>
-                          {note.priority !== "normal" && (
-                            <span className={cn("flex items-center gap-1 text-[10px]", notePriorityConfig[note.priority].color)}>
-                              <span className={cn("w-1.5 h-1.5 rounded-full", notePriorityConfig[note.priority].dotColor)} />
-                              {notePriorityLabels[note.priority]}
-                            </span>
-                          )}
-                          {note.linkedTaskId && (
-                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                              <Link2 className="h-2.5 w-2.5" />
-                              {note.linkedTaskId}
-                            </span>
-                          )}
-                          <span className="text-[10px] text-muted-foreground ml-auto flex items-center gap-1">
-                            <Clock className="h-2.5 w-2.5" />
-                            {formatTimeAgo(note.createdAt, t, i18n.resolvedLanguage ?? i18n.language)}
-                          </span>
-                        </div>
-                        <p className={cn(
-                          "text-sm leading-relaxed",
-                          note.status === "resolved" && "line-through"
-                        )}>
-                          {note.content}
-                        </p>
-                        {note.tags.length > 0 && (
-                          <div className="flex items-center gap-1 mt-2">
-                            {note.tags.map((tag) => (
-                              <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
-                                #{tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
-                            <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
-                            <span className="sr-only">{t("ui.journal.actions.noteMenu")}</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
-                          {note.status === "active" && (
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(note.id, "resolved")}>
-                              <CheckCircle2 className="h-3.5 w-3.5 mr-2" />
-                              {t("ui.journal.actions.markResolved")}
-                            </DropdownMenuItem>
-                          )}
-                          {note.status === "resolved" && (
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(note.id, "active")}>
-                              <Circle className="h-3.5 w-3.5 mr-2" />
-                              {t("ui.journal.actions.reopen")}
-                            </DropdownMenuItem>
-                          )}
-                          {note.status !== "archived" && (
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(note.id, "archived")}>
-                              <Archive className="h-3.5 w-3.5 mr-2" />
-                              {t("ui.journal.actions.archive")}
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteNote(note.id)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="h-3.5 w-3.5 mr-2" />
-                            {t("common.delete")}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+          <div className="space-y-2 p-4">
+            {filteredNotes.length === 0 ? (
+              <div className="text-center py-12">
+                <StickyNote className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
+                <p className="text-sm text-muted-foreground">{t("ui.journal.empty.title")}</p>
+                <p className="text-xs text-muted-foreground/70">{t("ui.journal.empty.description")}</p>
+              </div>
+            ) : (
+              filteredNotes.map((note) => (
+                <div
+                  key={note.id}
+                  className={cn(
+                    "p-3 rounded-lg border transition-colors",
+                    note.status === "resolved" && "opacity-60",
+                    note.status === "archived" && "opacity-40",
+                    noteTypeConfig[note.type].bgColor
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={cn("mt-0.5", noteTypeConfig[note.type].color)}>
+                      {noteTypeIcons[note.type]}
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="h-auto min-h-4 max-w-full whitespace-normal px-1.5 py-0 text-[10px]">
+                          {noteTypeLabels[note.type]}
+                        </Badge>
+                        {note.priority !== "normal" && (
+                          <span className={cn("flex items-center gap-1 text-[10px]", notePriorityConfig[note.priority].color)}>
+                            <span className={cn("w-1.5 h-1.5 rounded-full", notePriorityConfig[note.priority].dotColor)} />
+                            {notePriorityLabels[note.priority]}
+                          </span>
+                        )}
+                        {note.linkedTaskId && (
+                          <span className="flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
+                            <Link2 className="h-2.5 w-2.5 shrink-0" />
+                            {note.linkedTaskId}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-muted-foreground ml-auto flex items-center gap-1">
+                          <Clock className="h-2.5 w-2.5" />
+                          {formatTimeAgo(note.createdAt, t, i18n.resolvedLanguage ?? i18n.language)}
+                        </span>
+                      </div>
+                      <p className={cn(
+                        "text-sm leading-relaxed",
+                        note.status === "resolved" && "line-through"
+                      )}>
+                        {note.content}
+                      </p>
+                      {note.tags.length > 0 && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1">
+                          {note.tags.map((tag) => (
+                            <Badge key={tag} variant="secondary" className="h-auto min-h-4 max-w-full whitespace-normal px-1.5 py-0 text-[10px]">
+                              #{tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
+                          <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span className="sr-only">{t("ui.journal.actions.noteMenu")}</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        {note.status === "active" && (
+                          <DropdownMenuItem onClick={() => handleUpdateStatus(note.id, "resolved")}>
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-2" />
+                            {t("ui.journal.actions.markResolved")}
+                          </DropdownMenuItem>
+                        )}
+                        {note.status === "resolved" && (
+                          <DropdownMenuItem onClick={() => handleUpdateStatus(note.id, "active")}>
+                            <Circle className="h-3.5 w-3.5 mr-2" />
+                            {t("ui.journal.actions.reopen")}
+                          </DropdownMenuItem>
+                        )}
+                        {note.status !== "archived" && (
+                          <DropdownMenuItem onClick={() => handleUpdateStatus(note.id, "archived")}>
+                            <Archive className="h-3.5 w-3.5 mr-2" />
+                            {t("ui.journal.actions.archive")}
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteNote(note.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-2" />
+                          {t("common.delete")}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                ))
-              )}
-            </div>
-          </ScrollArea>
+                </div>
+              ))
+            )}
+          </div>
 
           {/* Footer stats */}
           <div className="px-4 py-2 border-t border-border bg-muted/30 flex items-center justify-between text-xs text-muted-foreground shrink-0">

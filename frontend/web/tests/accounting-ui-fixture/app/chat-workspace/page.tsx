@@ -7,6 +7,7 @@ import { ErpSessionProvider } from "@lumiere/erp-session"
 import { AIChatPanel } from "../../../../../packages/ui/src/ai-chat/ai-chat-panel"
 import { DashboardWorkspace } from "../../../../../packages/ui/src/pages/dashboard-workspace"
 import { DashboardSidebar } from "../../../../../packages/ui/src/pages/dashboard-sidebar"
+import { NotebookPanel } from "../../../../../packages/ui/src/notebook/notebook-panel"
 import { ThemeProvider } from "@lumiere/ui/components/theme-provider"
 import { RBACProvider } from "@lumiere/ui/lib/rbac-context"
 import { Button } from "@lumiere/ui/components/button"
@@ -17,12 +18,17 @@ import { WorkspaceProfileProvider } from "@lumiere/ui/lib/workspace-profile-cont
 
 // Production layout and chat, with a local draft and simulated answers only.
 function Workspace() {
-  const [open, setOpen] = useState(false)
+  const [tool, setTool] = useState<"assistant" | "notebook" | null>(null)
   const [docked, setDocked] = useState(true)
+  const [notebookDocked, setNotebookDocked] = useState(true)
   const [context, setContext] = useState("current")
-  return <DashboardWorkspace forceCollapsed={open && docked} onOpenSearch={() => undefined}
-    sidebar={<DashboardSidebar forceCollapsed={open && docked} aiChatOpen={open} onOpenAIChat={() => { setDocked(true); setOpen(true) }} />}
-    overlays={<AIChatPanel open={open} docked={docked} onClose={() => setOpen(false)} onDockToggle={() => setDocked(value => !value)}
+  const openAssistant = () => { setDocked(true); setTool("assistant") }
+  const dockRequest = tool === "assistant" ? docked ? tool : null : notebookDocked ? tool : null
+  return <DashboardWorkspace dockRequest={dockRequest} onOpenSearch={() => undefined}
+    sidebar={(collapsed) => <DashboardSidebar forceCollapsed={collapsed} aiChatOpen={tool === "assistant"} onOpenAIChat={openAssistant} />}
+    overlays={({ container, docked: placement, canDock }) => <>
+      <AIChatPanel open={tool === "assistant"} workspaceHost={container} docked={placement === "assistant"}
+      onClose={() => setTool(null)} onDockToggle={canDock("assistant") ? () => setDocked(value => !value) : undefined}
       contextOptions={[{ value: "current", label: "Current page", group: "Context" }, { value: "module:inventory", label: "Inventory", group: "Modules" }]}
       selectedContext={context} onContextChange={setContext}
       context={{ module: "accounting", activeView: "Accounting", companyId: 7 }}
@@ -30,9 +36,17 @@ function Workspace() {
         { id: "reconcile", label: "Reconcile accounts", description: "Compare bank activity with ledger entries.", icon: "check-square", keywords: ["bank", "match"], prompt: "Review reconciliation differences and prepare suggestions for review." },
       ] }}
       onSendMessage={async (text) => ({ content: "Review the customer, invoice date, and line items before posting.\n\nThe invoice stays a draft until you confirm the action." + (text.includes("overflow") ? "\n\n" + "long-record-reference-".repeat(45) : "") })}
-    />}>
+    />
+      <NotebookPanel open={tool === "notebook"} workspaceHost={container} docked={placement === "notebook"}
+        onClose={() => setTool(null)} onDockToggle={canDock("notebook") ? () => setNotebookDocked(value => !value) : undefined} />
+    </>}>
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm text-muted-foreground">Accounting / Invoices</p><h1 className="mt-2 text-2xl font-semibold">New invoice</h1></div><Button onClick={() => { setDocked(true); setOpen(true) }}><Sparkles className="size-4" />Ask Lumière</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm text-muted-foreground">Accounting / Invoices</p><h1 className="mt-2 text-2xl font-semibold">New invoice</h1></div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setTool("notebook")}>Open notebook</Button>
+          <Button onClick={openAssistant}><Sparkles className="size-4" />Ask Lumière</Button>
+        </div>
+      </div>
       <div className="space-y-5 rounded-xl border bg-card p-6">
         <h2 className="font-semibold">Invoice details</h2>
         <div className="grid gap-5 xl:grid-cols-2"><label className="space-y-2 text-sm">Customer<Input aria-label="Customer" placeholder="Choose a customer" /></label><label className="space-y-2 text-sm">Reference<Input aria-label="Invoice reference" placeholder="Your reference" /></label></div>

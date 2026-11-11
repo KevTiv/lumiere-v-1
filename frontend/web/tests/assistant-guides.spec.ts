@@ -105,3 +105,20 @@ for (const width of [320, 390]) test(`mobile guide actions and content stay with
   await expect(dialog).toHaveCount(0);
   await expectPageToFit();
 });
+
+
+test('guide sources and verification stay in reading order on a short phone', { tag: '@aside-fit' }, async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 480 });
+  await page.getByTestId('assistant-guide-card').click();
+  const guide = page.getByTestId('assistant-guide-viewer');
+  const sources = guide.getByRole('complementary', { name: 'Sources used', exact: true });
+  await expect(sources.getByRole('link', { name: 'Vendor bill VB-1042' })).toBeVisible();
+  await guide.getByRole('button', { name: 'Save guide', exact: true }).click();
+  const verification = guide.getByRole('complementary', { name: 'Guide verification', exact: true });
+  await expect(verification).toContainText('Product and workflow compatibility have not been established.');
+  await expect(guide.getByRole('complementary').first()).toHaveAttribute('aria-label', 'Sources used');
+  for (const aside of [sources, verification]) {
+    expect(await aside.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+  }
+  await expect(guide.getByRole('textbox', { name: 'Ask about this document' })).toBeInViewport();
+});

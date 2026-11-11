@@ -15,6 +15,7 @@ vi.mock("@lumiere/ui/lib/rbac-context", () => ({ useRBAC: () => ({ permissionsRe
 vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }));
 vi.mock("@lumiere/ui/components/sheet", () => ({
   Sheet: ({ open, onOpenChange, children }: { open: boolean; onOpenChange: (value: boolean) => void; children: ReactNode }) => open ? <section><button onClick={() => onOpenChange(false)}>Close drawer</button>{children}</section> : null,
+  SheetBody: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   SheetContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   SheetHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   SheetTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,

@@ -41,6 +41,24 @@ test.describe("ERP phase-0 settings smoke @phase-0", () => {
     await expectNoAppError(page)
   })
 
+  test("uses compact settings navigation in a narrow desktop workspace", { tag: "@aside-fit" }, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await openSettingsSection(page, "users")
+    const settings = page.getByTestId("settings-module")
+    const users = settings.getByTestId("settings-section-users")
+    await expect(users).toBeVisible()
+    await settings.evaluate((element) => { element.style.maxWidth = "560px" })
+    const picker = settings.getByRole("combobox", { name: "Settings section", exact: true })
+    await expect(picker).toBeVisible()
+    await expect(picker).toHaveText("User Management")
+    await expect(users).toBeHidden()
+    await expect(page).toHaveURL(/[?&]section=users(?:&|$)/)
+    await settings.evaluate((element) => { element.style.maxWidth = "" })
+    await expect(users).toHaveAttribute("aria-current", "page")
+    await expect(users).toBeVisible()
+    await expectNoAppError(page)
+  })
+
   test("invite user dialog opens and cancels without submitting", async ({ page }) => {
     await openSettingsSection(page, "users")
 

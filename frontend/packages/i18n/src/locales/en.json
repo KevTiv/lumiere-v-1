@@ -13764,7 +13764,9 @@
       "noFiles": "No files attached.",
       "noSkills": "No skills selected.",
       "noModule": "No active module",
-      "contextSelect": "Assistant context"
+      "contextSelect": "Assistant context",
+      "openFull": "Open full workspace",
+      "dockBesideErp": "Dock beside ERP"
     },
     "deck": {
       "hint": "Type / to find skills",
@@ -14802,7 +14804,8 @@
           "attentionRequired": "Attention required"
         }
       }
-    }
+    },
+    "controls": "Map controls"
   },
   "fleet": {
     "workspace": {
@@ -18460,7 +18463,9 @@
         "restore": "Restore",
         "saveNote": "Save Note",
         "startRecording": "Start voice recording",
-        "stopRecording": "Stop voice recording"
+        "stopRecording": "Stop voice recording",
+        "adjustPosition": "Move or resize Journal",
+        "geometryHelp": "Use arrow keys to move. Hold Shift to resize."
       },
       "addTagPlaceholder": "add tag",
       "allStatuses": "All Status",
@@ -18667,7 +18672,8 @@
           "emptySlots": "Empty Slots",
           "lowStock": "Low Stock Only"
         },
-        "zones": "Zones"
+        "zones": "Zones",
+        "controls": "Stock controls"
       },
       "zoneTypes": {
         "bin": "Bin",
@@ -18709,7 +18715,9 @@
       "importFile": "Notebook JSON file",
       "noSavedNotebooks": "No saved notebooks in this scope. Save a notebook to reopen it here.",
       "noRuntime": "No runtime is connected. Variables and execution results are unavailable.",
-      "editorMode": "Local notebook editor"
+      "editorMode": "Local notebook editor",
+      "dock": "Dock notebook beside ERP",
+      "fullscreen": "Open notebook full screen"
     }
   },
   "workspace": {
