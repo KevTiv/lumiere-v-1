@@ -9,14 +9,16 @@ async function expectContained(owner: Locator, children?: Locator) {
     })
     .toBeLessThanOrEqual(1)
   if (children) {
-    const bounds = await owner.boundingBox()
-    expect(bounds).not.toBeNull()
     for (const child of await children.all()) {
       if (!(await child.isVisible())) continue
-      const childBounds = await child.boundingBox()
-      expect(childBounds).not.toBeNull()
-      expect(childBounds!.x).toBeGreaterThanOrEqual(bounds!.x - 1)
-      expect(childBounds!.x + childBounds!.width).toBeLessThanOrEqual(bounds!.x + bounds!.width + 1)
+      // Sheets animate into place; compare fresh bounds until the layout settles.
+      await expect.poll(async () => {
+        const bounds = await owner.boundingBox()
+        const childBounds = await child.boundingBox()
+        return !!bounds && !!childBounds
+          && childBounds.x >= bounds.x - 1
+          && childBounds.x + childBounds.width <= bounds.x + bounds.width + 1
+      }, { message: `${child.toString()} must fit within ${owner.toString()}` }).toBe(true)
     }
   }
 }
@@ -33,6 +35,39 @@ async function openFixture(page: Page, width: number) {
   await page.goto("/overflow", { waitUntil: "domcontentloaded" })
   await expect(page.getByTestId("overflow-fixture-ready")).toHaveAttribute("data-hydrated", "true", { timeout: test.info().timeout })
   await expect(page.getByTestId("entity-action-Create")).toBeVisible()
+}
+
+for (const scenario of [
+  { viewport: 320, panel: "240", fontSize: "100%" },
+  { viewport: 390, panel: "320", fontSize: "100%" },
+  { viewport: 1280, panel: "560", fontSize: "100%" },
+  { viewport: 1280, panel: "240", fontSize: "200%" },
+]) {
+  test(`card content fits ${scenario.panel}px panels at ${scenario.fontSize} text on ${scenario.viewport}px screens`, { tag: "@card-fit" }, async ({ page }) => {
+    await openFixture(page, scenario.viewport)
+    await page.getByLabel("Panel width").selectOption(scenario.panel)
+    await page.evaluate((size) => { document.documentElement.style.fontSize = size }, scenario.fontSize)
+    const sample = page.getByTestId("card-stress-sample")
+    // Check descendants too: overflow-hidden on a parent must not conceal a broken layout.
+    for (const owner of await sample.locator('[data-slot="card"], [data-slot="card-header"], [data-slot="card-action"], [data-slot="card-content"], [data-slot="card-footer"], [data-testid^="stress-"], [data-testid="kpi-tile-stress"], [data-testid^="kanban-card-"]').all()) {
+      await expectContained(owner, owner.locator("p, h4, button, [data-slot=badge]"))
+    }
+    for (const text of await sample.locator("p:not(.truncate), h4, [data-slot=card-title], [data-slot=card-description], [data-slot=empty-title], [data-slot=empty-description]").all()) {
+      await expectContained(text)
+    }
+    const label = page.getByTestId("kpi-tile-stress").locator("span").first()
+    await expect(label).toHaveAttribute("title", /unbroken/)
+    expect(await label.evaluate((el) => getComputedStyle(el).textOverflow)).toBe("ellipsis")
+    expect(await label.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
+    await expect(sample.locator('[data-slot=card-description]')).toHaveText(/unbroken/)
+    const description = sample.locator('[data-slot=card-description]')
+    expect(await description.evaluate((el) => el.clientHeight > parseFloat(getComputedStyle(el).lineHeight))).toBe(true)
+    await page.getByTestId("stress-card").getByRole("button").press("Enter")
+    await expect(page.getByTestId("last-action")).toHaveText("card-action")
+    await page.getByTestId("kpi-tile-stress").press("Enter")
+    await expect(page.getByTestId("last-action")).toHaveText("kpi-tile")
+    await sample.screenshot({ path: test.info().outputPath("card-content.png") })
+  })
 }
 
 for (const width of [320, 390, 768, 1280]) {
@@ -85,15 +120,13 @@ for (const width of [320, 390, 768, 1280]) {
     await openFixture(page, width)
     const opener = page.getByRole("button", { name: "Open record sheet", exact: true })
     await opener.click()
-    const tabs = page.getByRole("dialog").locator('[data-slot="tabs-scroll-container"]')
     const dialog = page.getByRole("dialog")
+    const tabs = dialog.getByRole("tablist", { name: "Record views" })
     await expectContained(dialog)
-    await expect
-      .poll(() => tabs.evaluate((element) => element.scrollWidth > element.clientWidth))
-      .toBe(true)
+    await expectContained(tabs, tabs.getByRole("tab"))
     await page.getByRole("tab", { name: "Overview", exact: true }).focus()
     await page.keyboard.press("End")
-    const audit = page.getByRole("tab", { name: "Audit", exact: true })
+    const audit = tabs.getByRole("tab", { name: "History & sources", exact: true })
     await expect(audit).toBeFocused()
     await page.keyboard.press("Enter")
     await expect(audit).toHaveAttribute("aria-selected", "true")

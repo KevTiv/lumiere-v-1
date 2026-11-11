@@ -6,14 +6,15 @@ import { useTranslation } from "@lumiere/i18n"
 import { Button } from "../components/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/collapsible"
 import { cn } from "../lib/utils"
+import { workspaceStyles } from "../lib/workspace-styles"
 
 /** Presentation only: lists retain their own filtering, selection and persistence. */
 export function ListToolbar({ className, ...props }: Omit<ComponentProps<typeof Collapsible>, "className"> & { className?: string }) {
-  return <Collapsible className={cn("flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-3 shadow-xs [&_button]:min-h-11 [&_input]:min-h-11", className)} {...props} />
+  return <Collapsible className={cn("flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-3 shadow-xs [overflow-wrap:anywhere] [&_button]:min-h-11 [&_input]:min-h-11", className)} {...props} />
 }
 
 export function ListToolbarFields({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(10rem,1fr))]", className)} {...props} />
+  return <div className={cn("grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] items-end gap-3", className)} {...props} />
 }
 
 export function ListToolbarField({ label, children, className }: { label: ReactNode; children: ReactNode; className?: string }) {
@@ -24,7 +25,7 @@ export function ListToolbarField({ label, children, className }: { label: ReactN
 }
 
 export function ListToolbarActions({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2", className)} {...props} />
+  return <div className={cn(workspaceStyles.actions, "max-w-full justify-end", className)} {...props} />
 }
 
 export function ListToolbarSettingsTrigger() {

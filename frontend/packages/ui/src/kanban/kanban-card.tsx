@@ -108,11 +108,11 @@ export function KanbanCardContent({
   const pct = progress == null || !Number.isFinite(progress) ? null : Math.max(0, Math.min(100, progress))
   const hasMeta = dueLabel || commentCount > 0 || attachmentCount > 0 || assignees.length > 0
   return (
-    <div className="space-y-2.5">
+    <div className="min-w-0 max-w-full [overflow-wrap:anywhere] space-y-2.5">
       {priority || topRight ? (
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           {priority ? (
-            <Badge variant={PRIORITY_BADGE[priority.tone]} className="h-5 px-1.5 text-[10px]">
+            <Badge variant={PRIORITY_BADGE[priority.tone]} className="h-auto min-h-5 max-w-full whitespace-normal px-1.5 text-[10px]">
               {priority.label}
             </Badge>
           ) : null}
@@ -121,13 +121,13 @@ export function KanbanCardContent({
       ) : null}
 
       <div className="space-y-0.5">
-        <h4 className="line-clamp-2 text-sm font-medium leading-snug text-foreground">{title}</h4>
-        {subtitle ? <p className="truncate text-xs text-muted-foreground">{subtitle}</p> : null}
+        <h4 title={title} className="line-clamp-2 text-sm font-medium leading-snug text-foreground">{title}</h4>
+        {subtitle ? <p title={subtitle} className="truncate text-xs text-muted-foreground">{subtitle}</p> : null}
       </div>
 
       {pct != null ? (
         <div className="space-y-1">
-          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-muted-foreground">
             <span>{labels?.progress ?? "Progress"}</span>
             <span className="tabular-nums">{Math.round(pct)}%</span>
           </div>
@@ -136,26 +136,26 @@ export function KanbanCardContent({
       ) : null}
 
       {hasMeta ? (
-        <div className="flex items-center justify-between gap-2 border-t border-border pt-2">
-          <div className="flex min-w-0 items-center gap-3 text-[11px] text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2">
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
             {dueLabel ? (
               <span
-                className={cn("flex items-center gap-1", overdue && "font-medium text-destructive")}
+                className={cn("flex min-w-0 max-w-full items-center gap-1", overdue && "font-medium text-destructive")}
                 data-overdue={overdue ? "true" : undefined}
               >
-                <CalendarDays className="h-3 w-3" />
+                <CalendarDays className="h-3 w-3 shrink-0" />
                 {dueLabel}
               </span>
             ) : null}
             {commentCount > 0 ? (
               <span className="flex items-center gap-1" title={labels?.comments?.(commentCount)}>
-                <MessageSquare className="h-3 w-3" />
+                <MessageSquare className="h-3 w-3 shrink-0" />
                 {commentCount}
               </span>
             ) : null}
             {attachmentCount > 0 ? (
               <span className="flex items-center gap-1" title={labels?.attachments?.(attachmentCount)}>
-                <Paperclip className="h-3 w-3" />
+                <Paperclip className="h-3 w-3 shrink-0" />
                 {attachmentCount}
               </span>
             ) : null}

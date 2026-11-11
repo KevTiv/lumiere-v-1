@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 
 import { cn } from "@lumiere/ui/lib/utils"
+import { workspaceStyles } from "../lib/workspace-styles"
 import { Button } from "./button"
 import {
   Empty,
@@ -65,7 +66,7 @@ export function EmptyStateCard({
       {hasButtons || hint || readOnlyMessage ? (
         <EmptyContent>
           {hasButtons ? (
-            <div className="flex flex-wrap items-center justify-center gap-2">
+            <div className={cn(workspaceStyles.actions, "w-full justify-center")}>
               {primaryAction ? (
                 <Button
                   size="sm"

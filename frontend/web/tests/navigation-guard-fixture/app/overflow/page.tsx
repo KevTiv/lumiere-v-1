@@ -6,6 +6,15 @@ import { I18nProvider, i18n } from "@lumiere/i18n"
 import { createLumiereApiClient, LumiereApiProvider } from "@lumiere/api-client"
 import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
 import { Button } from "../../../../../packages/ui/src/components/button"
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../../../../packages/ui/src/components/card"
+import { StatCard, StatCardGrid } from "../../../../../packages/ui/src/components/stat-card"
+import { KpiStrip } from "../../../../../packages/ui/src/components/kpi-strip"
+import { KPIWidget } from "../../../../../packages/ui/src/pages/widgets/kpi-widget"
+import { EmptyStateCard } from "../../../../../packages/ui/src/components/empty-state-card"
+import { KanbanCardContent } from "../../../../../packages/ui/src/kanban/kanban-card"
+import { KanbanDraggableCard } from "../../../../../packages/ui/src/kanban/kanban-draggable-card"
+import { TaskCardContent } from "../../../../../packages/ui/src/tasks/task-card"
+import { Package } from "lucide-react"
 import { Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../../../../packages/ui/src/components/dialog"
 import { ImportAssistantWizard } from "../../../../../packages/ui/src/import-assistant/import-assistant-wizard"
 import { FormModal } from "../../../../../packages/ui/src/forms/form-modal"
@@ -32,6 +41,7 @@ const rows = [
     name: longValue,
     state: "open",
     amount: 123456789012.34,
+    currency: "RWF",
     owner: longValue,
     external: longValue,
   },
@@ -111,7 +121,7 @@ export default function OverflowFixture() {
     columns: [
       { key: "name", label: "Reference" },
       { key: "state", label: "Status" },
-      { key: "amount", label: "Amount", type: "currency" },
+      { key: "amount", label: "Amount", type: "currency", currencyKey: "currency" },
     ],
     filters: [
       {
@@ -177,6 +187,29 @@ export default function OverflowFixture() {
                   className="space-y-4"
                   style={{ width: `min(100%, ${width}px)` }}
                 >
+                  <Sample id="card-stress-sample">
+                    <Card data-testid="stress-card">
+                      <CardHeader>
+                        <CardTitle>{longValue}</CardTitle>
+                        <CardDescription>{longValue}</CardDescription>
+                        <CardAction><Button onClick={() => setLastAction("card-action")}>{longValue}</Button></CardAction>
+                      </CardHeader>
+                      <CardContent><p>{longValue}</p></CardContent>
+                      <CardFooter><p>{longValue}</p></CardFooter>
+                    </Card>
+                    <StatCardGrid>
+                      {[0, 1].map((id) => <StatCard key={id} testId={`stress-stat-${id}`} label={longValue} value="RWF 123,456,789,012,345.67" icon={Package} change={12.4} changeLabel={longValue} footer={longValue} onClick={() => setLastAction("stat-card")} />)}
+                    </StatCardGrid>
+                    <KpiStrip tiles={[{ key: "stress", label: longValue, value: longValue, hint: longValue, active: false, onSelect: () => setLastAction("kpi-tile") }]} />
+                    <div data-testid="stress-kpi-widget"><KPIWidget data={{ label: longValue, value: "RWF 123,456,789,012,345.67", icon: "package", change: 12.4, changeLabel: longValue }} /></div>
+                    <EmptyStateCard data-testid="stress-empty" compact title={longValue} description={longValue} hint={longValue} primaryAction={{ label: longValue, onClick: () => setLastAction("empty-action") }} />
+                    <KanbanDraggableCard id="stress" disabled onClick={() => setLastAction("kanban-card")}>
+                      <KanbanCardContent title={longValue} subtitle={longValue} priority={{ label: longValue, tone: "warning" }} dueLabel={longValue} commentCount={12} attachmentCount={3} assignees={[{ id: "1", name: "Example Owner" }]} progress={40} labels={{ progress: longValue }} />
+                    </KanbanDraggableCard>
+                    <KanbanDraggableCard id="stress-task" disabled>
+                      <TaskCardContent task={{ id: "stress-task", key: longValue, title: longValue, type: "task", priority: "urgent", status: "todo", reporterId: "1", reporterName: "Example Owner", createdAt: "2020-01-01", updatedAt: "2020-01-01", attachments: [], labels: [longValue], comments: [], assigneeName: "Example Owner", storyPoints: 123456789, dueDate: "2020-01-01" }} />
+                    </KanbanDraggableCard>
+                  </Sample>
                   <Sample id="toolbar-sample">
                     <EntityTable
                       config={table}

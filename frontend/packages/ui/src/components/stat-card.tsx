@@ -65,24 +65,24 @@ export function StatCard({
           : undefined
       }
       className={cn(
-        "rounded-xl border border-border bg-card p-4 shadow-xs",
+        "min-w-0 max-w-full [overflow-wrap:anywhere] rounded-xl border border-border bg-card p-4 shadow-xs",
         clickable && "cursor-pointer transition-colors hover:bg-muted/40",
         className,
       )}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <span className="truncate pt-0.5 text-xs font-medium text-muted-foreground">{label}</span>
+        <span title={typeof label === "string" ? label : undefined} className="min-w-0 truncate pt-0.5 text-xs font-medium text-muted-foreground">{label}</span>
         {Icon ? (
           <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", toneIconClass[tone])}>
             <Icon className="h-4 w-4" />
           </span>
         ) : null}
       </div>
-      <p className="truncate text-2xl font-semibold tabular-nums tracking-tight text-foreground">{value}</p>
+      <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">{value}</p>
       {change !== undefined && Number.isFinite(change) ? (
         <StatDelta change={change} label={changeLabel} invert={invertChange} />
       ) : null}
-      {footer ? <div className="mt-1">{footer}</div> : null}
+      {footer ? <div className="mt-1 min-w-0">{footer}</div> : null}
     </div>
   )
 }
@@ -96,22 +96,22 @@ export function StatDelta({ change, label, invert = false }: { change: number; l
     <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
       <span
         className={cn(
-          "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium tabular-nums",
+          "inline-flex min-w-0 max-w-full flex-wrap items-center gap-1 rounded-md px-1.5 py-0.5 font-medium tabular-nums",
           good && "bg-success/10 text-success",
           bad && "bg-destructive/10 text-destructive",
           !good && !bad && "bg-muted text-muted-foreground",
         )}
       >
-        {change !== 0 ? <Icon className="h-3 w-3" /> : null}
+        {change !== 0 ? <Icon className="h-3 w-3 shrink-0" /> : null}
         {change > 0 ? "+" : ""}
         {change.toFixed(1)}%
       </span>
-      {label ? <span className="text-muted-foreground">{label}</span> : null}
+      {label ? <span className="min-w-0 text-muted-foreground">{label}</span> : null}
     </div>
   )
 }
 
-/** Responsive grid for a row of stat cards (2 → 4 columns, no orphan stretching). */
+/** Cards respond to their panel's width, including nested dashboards and enlarged text. */
 export function StatCardGrid({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("grid grid-cols-2 gap-4 lg:grid-cols-4", className)}>{children}</div>
+  return <div className={cn("grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-4", className)}>{children}</div>
 }

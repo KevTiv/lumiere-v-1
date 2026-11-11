@@ -53,7 +53,7 @@ export function TaskCardContent({ task }: { task: Task }) {
         <span className={cn("shrink-0", taskTypeIconClass[task.type] ?? "text-muted-foreground")}>
           {typeIcons[task.type]}
         </span>
-        <span className="text-xs font-mono text-muted-foreground">{task.key}</span>
+        <span title={task.key} className="min-w-0 truncate text-xs font-mono text-muted-foreground">{task.key}</span>
         <span
           className={cn(
             "ml-auto shrink-0",
@@ -64,27 +64,27 @@ export function TaskCardContent({ task }: { task: Task }) {
         </span>
       </div>
 
-      <h4 className="text-sm font-medium text-foreground line-clamp-2 mb-2">{task.title}</h4>
+      <h4 title={task.title} className="[overflow-wrap:anywhere] text-sm font-medium text-foreground line-clamp-2 mb-2">{task.title}</h4>
 
       {task.labels.length > 0 ? (
         <div className="flex flex-wrap gap-1 mb-2">
           {task.labels.slice(0, 3).map((label) => (
-            <Badge key={label} variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+            <Badge key={label} variant="secondary" className="text-[10px] max-w-full whitespace-normal px-1.5 py-0 h-auto min-h-4">
               {label}
             </Badge>
           ))}
           {task.labels.length > 3 ? (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+            <Badge variant="outline" className="text-[10px] max-w-full whitespace-normal px-1.5 py-0 h-auto min-h-4">
               +{task.labels.length - 3}
             </Badge>
           ) : null}
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 mt-2 pt-2 border-t border-border">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
           {task.storyPoints ? (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-mono">
+            <Badge variant="outline" className="text-[10px] max-w-full whitespace-normal px-1.5 py-0 h-auto min-h-4 font-mono">
               {t("tasks.card.storyPoints", { count: task.storyPoints })}
             </Badge>
           ) : null}
