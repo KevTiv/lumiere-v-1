@@ -2,8 +2,10 @@
 
 This runbook accompanies the Mistral capability implementation. A merged PR,
 provider key, successful health probe or saved upload does not establish tenant
-activation. Use one existing shared Mistral agent and its existing monetary pool;
-this procedure does not create credit or increase the monthly allowance.
+activation. Use the existing Mistral agent and its monetary pool. The agent must
+belong to the requested organization and can be shared within that organization
+or scoped to the requested company. This procedure does not create credit or
+increase the monthly allowance.
 Recorded local checks and generated-candidate hashes are in the
 [validation report](mistral-alpha-validation.md).
 
