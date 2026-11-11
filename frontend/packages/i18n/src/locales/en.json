@@ -4960,6 +4960,9 @@
     },
     "kpi": {
       "expectedRevenue": "Expected revenue",
+      "expectedRevenueLoading": "Revenue or currency data is loading.",
+      "expectedRevenueUnavailable": "Required revenue or currency data is unavailable.",
+      "deadlineUnavailable": "Required opportunity deadlines are unavailable.",
       "open": "Open opportunities",
       "overdue": "Past deadline"
     },
@@ -7367,6 +7370,8 @@
     "kpi": {
       "late": "Late",
       "ready": "Ready to ship",
+      "sourceUnavailable": "Transfer data is unavailable.",
+      "deadlineUnavailable": "Required transfer dates are unavailable.",
       "waiting": "Waiting"
     },
     "stockPackageActions": {
@@ -14922,7 +14927,9 @@
         "done": "Done",
         "overdue": "Overdue",
         "summary": "Project task summary",
-        "scope": "Counts cover loaded project tasks, before board filters."
+        "scope": "Counts cover loaded project tasks, before board filters.",
+        "incompleteFields": "Some required task fields are unavailable.",
+        "unavailable": "Unavailable"
       },
       "columns": {
         "InProgress": "In Progress",
@@ -15091,6 +15098,7 @@
       "confirmedOrderTrend": "Confirmed orders · last six months",
       "orders": "Confirmed orders",
       "incompleteSource": "Required financial fields unavailable",
+      "incompleteTasks": "Required task fields unavailable",
       "meaning": "Confirmed order values are shown separately by transaction currency; they are not accounting revenue. Overdue invoices are posted customer invoices with an unpaid balance and a known due date before today.",
       "noOverdueBalance": "No known overdue balance",
       "selectedOrderTrend": "Confirmed orders · selected period",

@@ -1,7 +1,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useQueries } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
+import { useErpSession } from '@lumiere/erp-session'
+import { currenciesQueryOptions } from '@lumiere/query-hooks/hooks/settings-currencies'
 import {
   RESOURCE_REGISTRY,
   type QueryResourceKey,
@@ -28,6 +30,8 @@ import {
   storedDashboardSourceState,
   type StoredDashboardSourceIssue,
 } from './stored-dashboard-source-state'
+
+const CURRENCY_SOURCE_KEYS = ['currency', 'currencies', 'res_currency']
 
 function indexRowsForResource(
   sources: StoredDashboardDataSources,
@@ -94,12 +98,19 @@ export function useStoredDashboardDataSources(
   retry: () => Promise<void>
 } {
   const { subscriptionReady } = useSubscriptionCache()
+  const session = useErpSession()
   const [isManualRetrying, setIsManualRetrying] = useState(false)
   const resourceKeys = useMemo(
     () => resourceKeysForDashboardModels(models),
     [models],
   )
   const enabled = options?.enabled !== false && organizationId > 0n
+  const currencies = useQuery({
+    // Currency IDs are tenant-local. Never reuse the legacy unscoped currency cache.
+    ...currenciesQueryOptions({ organizationId, identity: options?.identity ?? session.identity }),
+    enabled: enabled && resourceKeys.length > 0,
+    retry: shouldRetryStoredDashboardSource,
+  })
 
   useModuleSubscription(enabled ? resourceKeys : [])
 
@@ -127,6 +138,7 @@ export function useStoredDashboardDataSources(
 
   const dataSources = useMemo(() => {
     const sources: StoredDashboardDataSources = {}
+    for (const key of CURRENCY_SOURCE_KEYS) sources[key] = !enabled || currencies.error ? [] : currencies.data ?? []
 
     resourceKeys.forEach((resourceKey, index) => {
       indexRowsForResource(
@@ -148,10 +160,14 @@ export function useStoredDashboardDataSources(
     }
 
     return sources
-  }, [enabled, resourceKeys, queries, models])
+  }, [enabled, resourceKeys, queries, models, currencies.data, currencies.error])
 
   const sourceStates = useMemo(() => {
     const states: StoredDashboardSourceStates = {}
+    const currencyState = !enabled || resourceKeys.length === 0
+      ? { status: 'unavailable' as const, rowCount: 0 }
+      : storedDashboardSourceState({ isLoading: currencies.isLoading, error: currencies.error, rowCount: currencies.error ? 0 : currencies.data?.length ?? 0 })
+    for (const key of CURRENCY_SOURCE_KEYS) states[key] = currencyState
 
     resourceKeys.forEach((resourceKey, index) => {
       if (!enabled) {
@@ -200,14 +216,16 @@ export function useStoredDashboardDataSources(
     }
 
     return states
-  }, [enabled, resourceKeys, queries, models])
+  }, [enabled, resourceKeys, queries, models, currencies.isLoading, currencies.error, currencies.data])
 
-  const isLoading = Object.values(sourceStates).some(
-    (state) => state.status === 'loading',
+  // Reference-data readiness belongs to each monetary widget. It must not hide
+  // unrelated counts or tables while their own source is already available.
+  const isLoading = resourceKeys.some(
+    (resource) => sourceStates[tableNameForResourceKey(resource)]?.status === 'loading',
   )
   const isRefreshing =
     isManualRetrying ||
-    (!isLoading && queries.some((query) => query.isFetching))
+    (!isLoading && (queries.some((query) => query.isFetching) || currencies.isFetching))
   const issue = storedDashboardSourceIssue(
     queries.find((query) => query.error != null)?.error,
   )
@@ -215,7 +233,7 @@ export function useStoredDashboardDataSources(
     if (!enabled) return
     setIsManualRetrying(true)
     try {
-      await Promise.all(queries.map((query) => query.refetch()))
+      await Promise.all([...queries.map((query) => query.refetch()), currencies.refetch()])
     } finally {
       setIsManualRetrying(false)
     }

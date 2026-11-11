@@ -49,6 +49,7 @@ import { DailyWorkWorkspace } from "../../../components/daily-work-workspace"
 import { overviewResourceStatus, resourceStatusLabel, combinedResourceStatus, type OverviewInitialStates } from "./resource-state"
 import type { StockQuant, Product } from "@lumiere/stdb/types"
 import { confirmedOrder, confirmedOrderTrend, orderDate, overviewFinancialInputsComplete, overviewMoneySummary } from "./financial-summary"
+import { overviewTaskMetrics } from "./task-metrics"
 
 interface OverviewClientProps {
   organizationId?: number
@@ -240,19 +241,13 @@ function OverviewClientLoaded({
   const salesTrendValues = useMemo(() => confirmedOrderTrend(scopedOrders, new Date(), i18n.language, timeRange), [scopedOrders, i18n.language, timeRange])
 
   const liveSections = useMemo(() => {
-    const openTasks = scopedTasks.filter((task) => !task.isClosed).length
+    const taskMetrics = overviewTaskMetrics(scopedTasks, resourceStates.tasks)
+    const incompleteTaskData = t("overview.financial.incompleteTasks", { defaultValue: "Required task fields unavailable" })
     const { currentOrders, currentOpenOrders, openOrdersChange } = periodMetrics
-    const nowMs = Date.now()
     const overdueInvoices = overduePostedInvoices(scopedMoves)
     const unavailableMoney = t("overview.financial.incompleteMoney", { defaultValue: "Amount or currency unavailable" })
     const orderTotal = overviewMoneySummary(currentOrders, currencyCodes, "amountTotal", i18n.language)
     const overdueTotal = overviewMoneySummary(overdueInvoices, currencyCodes, "amountResidual", i18n.language)
-
-    const overdueTaskCount = scopedTasks.filter((task) => {
-      if (task.isClosed) return false
-      const deadlineMs = Number(task.dateDeadline ?? 0) / 1000
-      return deadlineMs > 0 && deadlineMs < nowMs
-    }).length
 
     const needsAttentionRows = [
       {
@@ -267,7 +262,7 @@ function OverviewClientLoaded({
       },
       {
         reference: t("projects.dashboard.overdueTasks"),
-        amount: tasksState ?? String(overdueTaskCount),
+        amount: tasksState ?? (taskMetrics.overdueCount == null ? incompleteTaskData : String(taskMetrics.overdueCount)),
         status: t("overview.dashboard.actions.projects"),
       },
     ]
@@ -278,7 +273,7 @@ function OverviewClientLoaded({
           value: salesState ?? currencyState ?? (!ordersComplete ? incompleteFinancialData : orderTotal == null ? unavailableMoney : orderTotal || t("overview.financial.noConfirmedOrders", { defaultValue: "No confirmed orders" })),
         },
         "open-sales-orders": { value: salesState ?? (!ordersComplete ? incompleteFinancialData : String(currentOpenOrders)), change: salesState || !ordersComplete ? undefined : openOrdersChange },
-        "open-tasks": { value: tasksState ?? String(openTasks) },
+        "open-tasks": { value: tasksState ?? (taskMetrics.openCount == null ? incompleteTaskData : String(taskMetrics.openCount)) },
         contacts: { value: contactsState ?? String(scopedContacts.length) },
       },
       series: {
@@ -298,7 +293,7 @@ function OverviewClientLoaded({
       ? t("overview.financial.confirmedOrderValue", { defaultValue: "Confirmed order value · by currency" })
       : key === "overview.dashboard.widgets.salesTrend"
         ? t("overview.financial.selectedOrderTrend", { defaultValue: "Confirmed orders · selected period" }) : t(key), overviewDashboardWebOptions)
-  }, [scopedMoves, scopedTasks, scopedContacts, pendingAiDrafts, salesTrendValues, periodMetrics, salesState, tasksState, contactsState, movesState, aiState, currencyState, currencyCodes, i18n.language, ordersComplete, invoicesComplete, incompleteFinancialData, t])
+  }, [scopedMoves, scopedTasks, resourceStates.tasks, scopedContacts, pendingAiDrafts, salesTrendValues, periodMetrics, salesState, tasksState, contactsState, movesState, aiState, currencyState, currencyCodes, i18n.language, ordersComplete, invoicesComplete, incompleteFinancialData, t])
 
   const ownerControlLoop = useMemo(() => {
     const reconciledTransactionIds = new Set(paymentReconciliations.map((row) => String((row as Record<string, unknown>).paymentTransactionId ?? "")))

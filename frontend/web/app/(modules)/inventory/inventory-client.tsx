@@ -3544,11 +3544,11 @@ function InventoryClientLoaded({
   const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
     () => ({
       transfers: {
-        tiles: transferKpis(data.transfers, { t, now: new Date(), currencyCodeById: new Map() }),
+        tiles: transferKpis(data.transfers, { t, now: new Date(), currencyCodeById: new Map(), sourceState: transfersRead.state }),
         loading: transfersLoading,
       },
     }),
-    [data.transfers, transfersLoading, t],
+    [data.transfers, transfersLoading, transfersRead.state, t],
   );
 
   const sourceDataState = {

@@ -450,3 +450,14 @@ test("scope and team helpers accept only supported explicit selectors", () => {
     assert.equal(isWorkTeamKey(key), false)
   }
 })
+
+
+test("explicit incomplete work-board sources cannot populate loaded counts", () => {
+  for (const complete of [false, null, "false", 0]) {
+    assert.throws(() => parseWorkBoardPage({ ...page([task()]), complete }, scope), /incomplete/)
+    assert.throws(() => parseWorkBoardPage({ ...page([]), complete }, scope), /incomplete/)
+  }
+  assert.doesNotThrow(() => parseWorkBoardPage({ ...page([]), complete: true }, scope))
+  // A successful page with more records to fetch still describes its loaded rows.
+  assert.equal(parseWorkBoardPage(page([task()], "next-page"), scope).data.length, 1)
+})

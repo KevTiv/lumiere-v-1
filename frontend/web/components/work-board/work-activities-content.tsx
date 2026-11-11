@@ -1,5 +1,7 @@
 "use client"
 
+import { WorkLoadedCount } from "./work-loaded-count"
+
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useTranslation } from "@lumiere/i18n"
@@ -199,9 +201,7 @@ export function WorkActivitiesContent({
           </Select>
         </label>
         <div className="flex items-center gap-3">
-          <p role="status" className="text-xs text-muted-foreground">
-            {t("workBoard.loaded", { count: rows.length })}
-          </p>
+          <WorkLoadedCount count={rows.length} isError={query.isError} isPending={query.isPending} />
           <Button
             variant="outline"
             size="sm"
