@@ -54,15 +54,15 @@
     "generated_contract_release": "0.3.178"
   },
   "deployment": {
-    "config_generation": 8,
+    "config_generation": 9,
     "config_sources": [
       {
         "path": ".env.docker.example",
-        "sha256": "610b3f090a5eea9c10ca5ce53ef6e56a1d4ad009b8dda929b08597b44ecdac25"
+        "sha256": "a2dc989b8da134cb7fcd97f76b7b1a9d366fc4014790ba1759fab051265ae5bd"
       },
       {
         "path": "frontend/web/.env.example",
-        "sha256": "428dbfae049111962c2bb0adf8c260bc61f4665ce2d0d5d95e02f904cbf98556"
+        "sha256": "e4925df40a50c75b5db9aec3716517fa2bd0c586315e3332cfe613141c217888"
       }
     ]
   }
