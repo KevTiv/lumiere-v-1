@@ -11,7 +11,7 @@ import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { CompanyModuleInsights, type InsightPeriodRange } from "../../../components/module-insights"
 import { withDetailInlineEdits, withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
-import { currencyCodeMap, type KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
+import type { KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
 import { opportunityKpis } from "./opportunity-kpis"
 import { inlineNumberAtLeast, requiredInlineEmail, requiredInlineText } from "@/lib/inline-edit-params"
 
@@ -2325,12 +2325,15 @@ function CrmClientLoaded({
           t,
           now: new Date(),
           locale,
-          currencyCodeById: currencyCodeMap(kpiCurrencies as Record<string, unknown>[]),
+          currencyRows: kpiCurrencies,
+          sourceState: opportunitiesRead.state,
+          currencyState: moduleQueryState(currenciesQuery),
+          scope: { organizationId: orgId, companyId: operatingCompanyId },
         }),
         loading: opportunitiesLoading,
       },
     }),
-    [enrichedOpportunities, kpiCurrencies, opportunitiesLoading, t, locale],
+    [enrichedOpportunities, kpiCurrencies, opportunitiesLoading, opportunitiesRead.state, currenciesQuery, orgId, operatingCompanyId, t, locale],
   )
 
   const dataState = {

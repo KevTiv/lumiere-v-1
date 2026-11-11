@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { HttpResponseError } from "@lumiere/api-client/response-error"
-import { assistantAnswer, assistantAnswerMetadata, coordinateAssistantTurn, readAssistantStream, turnFailure } from "./assistant-turn"
+import { HttpResponseError, httpResponseError } from "@lumiere/api-client/response-error"
+import { assistantAnswer, assistantAnswerMetadata, coordinateAssistantTurn, parseStoredAssistantRecovery, readAssistantStream, turnFailure, withAssistantRecoveryMetadata } from "./assistant-turn"
 
 const metadata = (raw: string): { sources: string[]; run_id: number } => {
   const parsed = JSON.parse(raw)
@@ -19,6 +19,54 @@ test("a failed stream never retries either dispatch and retains prepared drafts"
   })
   assert.deepEqual(result, { answer: { kind: "unavailable" }, drafts: { kind: "ready", value: [42] } })
   assert.equal(answers, 1); assert.equal(drafts, 1)
+})
+
+test("chat preserves setup recovery in both streaming and JSON failures", async () => {
+  const codes = [
+    "ai_default_agent_not_provisioned",
+    "ai_surface_skill_not_provisioned",
+  ] as const
+  for (const code of codes) {
+    for (const stream of [true, false]) {
+      const response = Response.json({ code, error: "Setup is required", recovery_path: "/ai-skills" }, { status: 503 })
+      const result = await coordinateAssistantTurn({
+        answer: async () => {
+          if (stream) return readAssistantStream(response, metadata)
+          throw await httpResponseError(response)
+        },
+        isCurrent: () => true,
+      })
+      assert.deepEqual(result, {
+        answer: { kind: "unavailable", setup: { code, message: "Setup is required", recoveryPath: "/ai-skills" } },
+        drafts: { kind: "not_requested" },
+      })
+    }
+  }
+})
+
+test("chat ignores unrecognized setup errors and external recovery paths", async () => {
+  const request = (code: string) => coordinateAssistantTurn({
+    answer: () => readAssistantStream(Response.json({
+      code, error: "Internal detail", recovery_path: "https://example.com/ai-skills",
+    }, { status: 503 }), metadata),
+    isCurrent: () => true,
+  })
+  assert.deepEqual(await request("unrecognized"), {
+    answer: { kind: "unavailable" },
+    drafts: { kind: "not_requested" },
+  })
+  assert.deepEqual(await request("ai_default_agent_not_provisioned"), {
+    answer: { kind: "unavailable", setup: { code: "ai_default_agent_not_provisioned", message: "Internal detail", recoveryPath: undefined } },
+    drafts: { kind: "not_requested" },
+  })
+})
+
+test("only the AI Skills route is restored as chat recovery metadata", () => {
+  const saved = withAssistantRecoveryMetadata('{"runId":42}', "/ai-skills")
+  assert.deepEqual(JSON.parse(saved!), { runId: 42, assistantRecoveryPath: "/ai-skills" })
+  assert.equal(parseStoredAssistantRecovery(saved), "/ai-skills")
+  assert.equal(parseStoredAssistantRecovery('{"assistantRecoveryPath":"//example.com"}'), undefined)
+  assert.equal(parseStoredAssistantRecovery("not JSON"), undefined)
 })
 
 test("failed draft preparation is explicit without hiding an admitted answer", async () => {

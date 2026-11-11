@@ -64,3 +64,13 @@ test("completion preflight rejects stale, denied, missing, finished and rebound 
   assert.throws(() => requireCurrentWorkActivity([{ ...row, updatedAt: "new" }], { ...row, updatedAt: "old" }), /changed/)
   assert.equal(sameWorkActivity({ ...row, resModel: "sale_order", workModule: "sales" }, row), false)
 })
+
+
+test("explicit incomplete follow-up sources cannot populate loaded counts", () => {
+  for (const complete of [false, null, "false", 0]) {
+    assert.throws(() => parseWorkActivitiesPage({ data: [row], nextCursor: null, complete }, scope), /incomplete/)
+    assert.throws(() => parseWorkActivitiesPage({ data: [], nextCursor: null, complete }, scope), /incomplete/)
+  }
+  assert.deepEqual(parseWorkActivitiesPage({ data: [], complete: true }, scope).data, [])
+  assert.equal(parseWorkActivitiesPage({ data: [row], nextCursor: "next-page" }, scope).data.length, 1)
+})

@@ -384,8 +384,13 @@ mod tests {
             .into_response();
         }
         if statement.contains("FROM company ") {
-            return Json(json!([{"schema":{"elements":[{"name":{"some":"id"}}]},"rows":[[7]]}]))
-                .into_response();
+            assert!(statement.contains("organization_id = 9 AND id = 7"));
+            assert!(!statement.contains("deleted_at IS NULL"));
+            return Json(json!([{
+                "schema": {"elements": [{"name": {"some": "deleted_at"}}]},
+                "rows": [[{"none": []}]],
+            }]))
+            .into_response();
         }
         if statement.contains("FROM ai_agent ") {
             if database.chat_agent_unavailable {
@@ -416,17 +421,29 @@ mod tests {
         }
         if statement.contains("FROM ai_skill_config ") {
             assert!(statement.contains("organization_id = 9"));
-            assert!(statement.contains("company_id = 7"));
-            if statement.contains("skill_id = 66") {
-                return Json(json!([{"schema":{"elements":[{"name":{"some":"is_enabled"}},{"name":{"some":"config_json"}}]},"rows":[[true,"{\"defaultAgentId\":42,\"intelligencePolicyRef\":\"pilot@1\"}"]]}])).into_response();
-            }
-            assert!(statement.contains("skill_id = 55"));
-            let rows: Vec<_> = database
-                .company_config
-                .iter()
-                .map(|c| vec![c["is_enabled"].clone(), c["config_json"].clone()])
+            assert!(!statement.contains("company_id ="));
+            let config = if statement.contains("skill_id = 66") {
+                Some(json!({
+                    "is_enabled": true,
+                    "config_json": r#"{"defaultAgentId":42,"intelligencePolicyRef":"pilot@1"}"#,
+                }))
+            } else {
+                assert!(statement.contains("skill_id = 55"));
+                database.company_config.clone()
+            };
+            let rows: Vec<_> = config
+                .into_iter()
+                .map(|config| json!([{"some": 7}, config["is_enabled"], config["config_json"]]))
                 .collect();
-            return Json(json!([{"schema":{"elements":[{"name":{"some":"is_enabled"}},{"name":{"some":"config_json"}}]},"rows":rows}])).into_response();
+            return Json(json!([{
+                "schema": {"elements": [
+                    {"name": {"some": "company_id"}},
+                    {"name": {"some": "is_enabled"}},
+                    {"name": {"some": "config_json"}},
+                ]},
+                "rows": rows,
+            }]))
+            .into_response();
         }
         if statement.contains("FROM ai_intelligence_policy ") {
             assert!(statement.contains("organization_id = 9"));

@@ -32,7 +32,7 @@ export interface WorkActivityRow {
 }
 export interface WorkActivitiesPage { data: WorkActivityRow[]; nextCursor: string | null }
 
-interface WorkActivitiesWirePage { data?: unknown; nextCursor?: unknown }
+interface WorkActivitiesWirePage { data?: unknown; nextCursor?: unknown; complete?: unknown }
 interface WorkActivityWire {
   id?: unknown; organizationId?: unknown; companyId?: unknown; workModule?: unknown
   summary?: unknown; resModel?: unknown; resId?: unknown; state?: unknown; isDone?: unknown
@@ -63,6 +63,7 @@ export function workActivitiesQueryPath(scope: WorkBoardScope, cursor?: string |
 export function parseWorkActivitiesPage(value: unknown, scope: WorkBoardScope): WorkActivitiesPage {
   if (!object(value)) throw new Error("Invalid follow-up response")
   const envelope = value as WorkActivitiesWirePage
+  if (envelope.complete !== undefined && envelope.complete !== true) throw new Error("Follow-up source is incomplete")
   if (!Array.isArray(envelope.data) || (envelope.nextCursor != null && typeof envelope.nextCursor !== "string")) throw new Error("Invalid follow-up response")
   const seen = new Set<number>()
   const data = envelope.data.map((input: unknown): WorkActivityRow => {

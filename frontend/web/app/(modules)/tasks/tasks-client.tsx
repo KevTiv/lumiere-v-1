@@ -6,6 +6,10 @@ import { OperationalPageComposition } from "../../../components/operational-page
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useTranslation } from "@lumiere/i18n"
+import { moduleCollection } from "@lumiere/ui/lib/module-data-state"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
+import { Skeleton } from "@lumiere/ui/components/skeleton"
+import { TaskSummary } from "./task-summary"
 import {
   DashboardHeader,
   EntityView,
@@ -46,7 +50,7 @@ import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { Ban, CheckCheck, CircleCheck, ExternalLink, Pencil, Plus, RotateCcw, Users } from "lucide-react"
 import { TASK_BOARD_STATES, taskBoardState, type TaskBoardState } from "../projects/project-record"
-import { taskAttachmentCounts, toTaskBoardItem } from "./task-board-items"
+import { taskAttachmentCounts, taskBoardItemInState, toTaskBoardItem } from "./task-board-items"
 import { TaskAssigneesDialog } from "./task-assignees-dialog"
 
 const TASK_COLUMN_COLORS = ["bg-info", "bg-warning", "bg-category-3", "bg-success", "bg-destructive"] as const
@@ -106,10 +110,11 @@ function TasksClientLoaded({
   const [modal, setModal] = useState<ModalState>({ type: null })
   const [assignmentTaskId, setAssignmentTaskId] = useState<string | null>(null)
   const { permissionsReady, checkPermission } = useRBAC()
-  const canAssign = permissionsReady !== false && checkPermission("project_task", "write").allowed
   const canCreate = permissionsReady !== false && checkPermission("project_task", "create").allowed
 
-  const { data: tasks = [] } = useTasks(orgId, initialTasks)
+  const tasksRead = moduleCollection(useTasks(orgId, initialTasks))
+  const tasks = tasksRead.rows
+  const canAssign = tasksRead.state.status === "ready" && permissionsReady !== false && checkPermission("project_task", "write").allowed
   const { data: projects = [] } = useProjects(orgId, initialProjects)
   const createTask = useCreateTask(orgId, operatingCompanyId)
   const updateTask = useUpdateTask(orgId, operatingCompanyId)
@@ -176,7 +181,7 @@ function TasksClientLoaded({
       tasks.map((task) => {
         const item = toTaskBoardItem(task, { projectNames, identityLabels, attachmentCounts })
         const pending = pendingMoves.get(item.id)
-        return pending ? { ...item, columnId: pending } : item
+        return pending ? taskBoardItemInState(item, pending) : item
       }),
     [tasks, projectNames, identityLabels, attachmentCounts, pendingMoves],
   )
@@ -201,16 +206,6 @@ function TasksClientLoaded({
       })),
     [t],
   )
-
-  const stats = useMemo(() => {
-    const nowMs = Date.now()
-    return {
-      total: boardItems.length,
-      inProgress: boardItems.filter((item) => item.columnId === "InProgress").length,
-      done: boardItems.filter((item) => item.columnId === "Done").length,
-      overdue: boardItems.filter((item) => !item.isClosed && item.dueAt != null && item.dueAt < nowMs).length,
-    }
-  }, [boardItems])
 
   const handleMoveTask = async (taskId: string, toColumnId: string) => {
     if (!canAssign) return
@@ -322,7 +317,9 @@ function TasksClientLoaded({
       <OperationalPageComposition moduleId="tasks" title={t("tasks.page.title")} actionTarget={compositionTarget}>
         <div className="flex min-h-[calc(100dvh-12rem)] min-w-0 flex-col gap-4">
 
-          <TaskBoardView
+          <ModuleDataNotice state={tasksRead.state} />
+          {tasksRead.state.status === "loading" ? <Skeleton className="h-96 w-full" /> : null}
+          {(tasksRead.state.status === "ready" || tasksRead.state.status === "partial") && <TaskBoardView
             className="min-h-0 flex-1"
             items={boardItems}
             columns={boardColumns}
@@ -340,7 +337,7 @@ function TasksClientLoaded({
                 onRowClick={canAssign ? (row) => openEditTask(String(row.id)) : undefined}
               />
             )}
-          />
+          />}
 
           <FormModal
             open={modal.type === "create" ? canCreate : modal.type === "edit" && canAssign}
@@ -362,23 +359,7 @@ function TasksClientLoaded({
           {assignmentTask && canAssign ? (
             <TaskAssigneesDialog key={`${organizationId}:${assignmentTask.companyId}:${assignmentTask.id}`} organizationId={orgId} task={assignmentTask} onClose={() => setAssignmentTaskId(null)} />
           ) : null}
-          <details className="border-t pt-3">
-            <summary className="w-fit cursor-pointer rounded-sm text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">
-              {t("tasks.board.stats.summary", { defaultValue: "Project task summary" })}
-            </summary>
-            <p className="mt-2 text-sm text-muted-foreground">{t("tasks.board.stats.scope", { defaultValue: "Counts cover loaded project tasks, before board filters." })}</p>
-            <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {([
-                ["total", stats.total],
-                ["inProgress", stats.inProgress],
-                ["done", stats.done],
-                ["overdue", stats.overdue],
-              ] as const).map(([key, value]) => <div key={key} className="min-w-0">
-                <dt className="text-sm text-muted-foreground">{t(`tasks.board.stats.${key}`)}</dt>
-                <dd className="mt-1 text-xl font-semibold tabular-nums">{value}</dd>
-              </div>)}
-            </dl>
-          </details>
+          <TaskSummary items={boardItems} state={tasksRead.state} />
         </div>
       </OperationalPageComposition>
     </div>

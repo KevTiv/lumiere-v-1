@@ -102,7 +102,7 @@ export function KanbanDraggableCard({
       data-draggable={!dragDisabled}
       data-testid={isDragOverlay ? undefined : `kanban-card-${id}`}
       className={cn(
-        "bg-card border border-border rounded-xl p-3 shadow-xs transition-all",
+        "min-w-0 max-w-full [overflow-wrap:anywhere] bg-card border border-border rounded-xl p-3 shadow-xs transition-all",
         !dragDisabled &&
           "cursor-grab active:cursor-grabbing select-none touch-none",
         (onClick || !dragDisabled) && "hover:border-primary/50 hover:shadow-md",

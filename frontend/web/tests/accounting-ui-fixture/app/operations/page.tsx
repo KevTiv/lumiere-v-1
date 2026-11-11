@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { LumiereApiProvider } from "@lumiere/api-client"
 import { I18nProvider } from "@lumiere/i18n"
 import { ErpSessionProvider, useErpSession } from "@lumiere/erp-session"
+import { currenciesQueryKey } from "@lumiere/query-hooks/hooks/settings-currencies"
 import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
 import { ThemeProvider } from "../../../../../packages/ui/src/components/theme-provider"
 import { Button } from "../../../../../packages/ui/src/components/button"
@@ -64,7 +65,7 @@ function queryClient() {
     for (const [resource, rows] of Object.entries(paymentRows)) client.setQueryData(["typed-stdb", resource, "7", "company", company], company === 11 ? rows : [])
     client.setQueryData(["bank-statement-imports", "7", String(company)], { imports: [], lines: [] })
   }
-  client.setQueryData(["currencies"], [{ id: "1", name: "EUR", code: "EUR", decimalPlaces: 2 }, { id: "2", name: "USD", code: "USD", decimalPlaces: 2 }])
+  client.setQueryData(currenciesQueryKey({ organizationId: 7, identity: null }), [{ id: "1", name: "EUR", code: "EUR", decimalPlaces: 2 }, { id: "2", name: "USD", code: "USD", decimalPlaces: 2 }])
   return client
 }
 

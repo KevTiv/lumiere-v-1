@@ -290,9 +290,17 @@ async fn company_chat_bound(
     agent_id: u64,
 ) -> anyhow::Result<bool> {
     let companies = reader.query_sql(&format!(
-        "SELECT id FROM company WHERE organization_id = {org_id} AND id = {company_id} AND deleted_at IS NULL LIMIT 2"
+        "SELECT deleted_at FROM company WHERE organization_id = {org_id} AND id = {company_id} LIMIT 2"
     )).await?;
-    if companies.len() != 1 {
+    let [company] = companies.as_slice() else {
+        return Ok(false);
+    };
+    // SpacetimeDB SQL does not support IS NULL on optional columns.
+    if !company
+        .get("deletedAt")
+        .or_else(|| company.get("deleted_at"))
+        .is_some_and(serde_json::Value::is_null)
+    {
         return Ok(false);
     }
     let agents = reader.query_sql(&format!(
@@ -348,9 +356,21 @@ async fn company_harness_binding(
         return Ok(None);
     };
     let configs = reader.query_sql(&format!(
-        "SELECT is_enabled, config_json FROM ai_skill_config WHERE organization_id = {org_id} AND company_id = {company_id} AND skill_id = {skill_id} LIMIT 2"
+        "SELECT company_id, is_enabled, config_json FROM ai_skill_config WHERE organization_id = {org_id} AND skill_id = {skill_id}"
     )).await?;
-    let [config] = configs.as_slice() else {
+    exact_company_harness_binding(&configs, company_id)
+}
+
+fn exact_company_harness_binding(
+    configs: &[serde_json::Value],
+    company_id: u64,
+) -> anyhow::Result<Option<(u64, String)>> {
+    // The optional company ID cannot be compared with a scalar in SpacetimeDB SQL.
+    // Enrollment only reuses an explicit binding for this company.
+    let mut matches = configs.iter().filter(|row| {
+        crate::wire_decode::row_u64(row, "companyId", "company_id") == Some(company_id)
+    });
+    let (Some(config), None) = (matches.next(), matches.next()) else {
         return Ok(None);
     };
     if config
@@ -445,6 +465,34 @@ mod tests {
                 serde_json::json!({"org_id": 1, "company_id": 7, "stdb_token": "session"});
             payload[key] = serde_json::json!("untrusted override");
             assert!(serde_json::from_value::<GatewayProvisionSurfacesRequest>(payload).is_err());
+        }
+    }
+
+    #[test]
+    fn harness_binding_requires_one_enabled_config_for_the_exact_company() {
+        let config = |company_id, is_enabled| {
+            serde_json::json!({
+                "companyId": company_id,
+                "isEnabled": is_enabled,
+                "configJson": r#"{"defaultAgentId":42,"intelligencePolicyRef":"reviewed@1"}"#
+            })
+        };
+        let inherited = config(serde_json::Value::Null, true);
+        let sibling = config(serde_json::json!(8), true);
+        let exact = config(serde_json::json!("7"), true);
+        let disabled = config(serde_json::json!(7), false);
+
+        assert_eq!(
+            exact_company_harness_binding(&[inherited.clone(), sibling.clone(), exact.clone()], 7)
+                .unwrap(),
+            Some((42, "reviewed@1".into()))
+        );
+        for rows in [
+            vec![inherited, sibling],
+            vec![disabled],
+            vec![exact.clone(), exact],
+        ] {
+            assert_eq!(exact_company_harness_binding(&rows, 7).unwrap(), None);
         }
     }
 

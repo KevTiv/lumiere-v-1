@@ -561,11 +561,10 @@ jobs:
           accounting-guided-actions.spec.ts alpha-authoring-refinement.spec.ts harness-inspector-ui.spec.ts list-toolbar-ui.spec.ts accounting-ui.spec.ts accounting-workflow-ui.spec.ts invoice-personalization-ui.spec.ts style-templates-ui.spec.ts page-composition-ui.spec.ts
           --grep 'accounting-guided-actions\.spec\.ts|alpha-authoring-refinement\.spec\.ts|harness-inspector-ui\.spec\.ts|list-toolbar-ui\.spec\.ts|@dialog-fit|@aside-fit'
 
-      - name: Dialog and aside layout browser regressions
+      - name: Shared overflow and dialog layout browser regressions
         working-directory: frontend/web
         run: >-
           pnpm exec playwright test --config playwright.overflow.config.ts
-          --grep '@dialog-fit|@aside-fit|record sheet tabs'
 
       - name: Assistant document modal and dedicated-page browser regressions
         run: pnpm --dir web test:e2e:assistant-guides

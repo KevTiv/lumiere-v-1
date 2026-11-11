@@ -130,6 +130,20 @@ custom panel has adopted the common composition.
 
 #### Small-screen acceptance is part of the style
 
+- Card containment is owned by shared primitives and renderers. Use `min-width: 0`
+  on flex/grid text owners and `overflow-wrap: anywhere` for descriptions, record
+  values and long identifiers. Card headers constrain grid tracks; header actions
+  move below the title in narrow containers. Summary grids follow their panel's
+  available width rather than only the viewport breakpoint.
+- Use ellipsis only for compact labels with a constrained width and the complete
+  label retained in the DOM and `title`. Stat-card and standalone KPI amounts wrap
+  so their digits remain available. Board titles may clamp to two lines when opening the card
+  exposes the complete record. Do not use parent clipping to conceal a layout bug.
+- Extend `frontend/web/tests/ui-overflow.spec.ts` when adding a card composition.
+  Its shared fixture exercises long unspaced content, narrow nested panels,
+  200% text, and keyboard actions. Assert child bounds and local overflow, not
+  only document width. The full overflow suite runs in frontend CI; tables and
+  boards retain their intentional local scrolling.
 - Test the shared templates at 320, 390, 768 and 1440 CSS pixels. Small phones are
   a design target, not a scaled desktop screenshot.
 - Titles and action rows wrap without hiding record identity. Fields become full

@@ -68,7 +68,7 @@ const object = (value: unknown): value is object =>
   value != null && typeof value === "object" && !Array.isArray(value)
 
 type WorkTaskWire = { [K in keyof WorkTaskRow]?: unknown }
-type WorkBoardWire = { [K in keyof WorkBoardPage]?: unknown }
+type WorkBoardWire = { [K in keyof WorkBoardPage]?: unknown } & { complete?: unknown }
 
 function validTeam(value: unknown): value is WorkTeamRef {
   if (!object(value)) return false
@@ -184,6 +184,9 @@ export function parseWorkBoardPage(
   scope: WorkBoardScope,
 ): WorkBoardPage {
   const page: WorkBoardWire = object(value) ? value : {}
+  if (object(value) && page.complete !== undefined && page.complete !== true) {
+    throw new Error("Work board source is incomplete")
+  }
   if (
     !object(value) ||
     !Array.isArray(page.data) ||
