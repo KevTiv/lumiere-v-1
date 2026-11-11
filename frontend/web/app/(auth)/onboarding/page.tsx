@@ -26,7 +26,7 @@ import {
 } from "@/lib/onboarding-config"
 import { POST_AUTH_PATHS } from "@/lib/post-auth-destination"
 import { performSignOut } from "@/lib/auth-sign-out"
-import { phCapture, phCaptureException } from "@/lib/posthog-browser"
+import { phCapture } from "@/lib/posthog-browser"
 
 type BootstrapCurrency = {
   id: number
@@ -77,7 +77,6 @@ export default function OnboardingPage() {
         if (activeCurrencies.length === 0) setError(t("auth.onboarding.errors.failedToCreate"))
       } catch (err) {
         if (!controller.signal.aborted) {
-          phCaptureException(err)
           setError(err instanceof Error ? err.message : t("auth.onboarding.errors.failedToCreate"))
         }
       } finally {
@@ -140,16 +139,10 @@ export default function OnboardingPage() {
         const json = (await r.json().catch(() => ({}))) as Record<string, unknown>
         throw new Error((json.error as string | undefined) ?? t("auth.onboarding.errors.failedToCreate"))
       }
-      phCapture("onboarding_completed", {
-        organization_name: name,
-        organization_code: code,
-        timezone,
-        currency_id: selectedCurrencyId,
-      })
+      phCapture("onboarding_completed")
       router.push(POST_AUTH_PATHS.overview)
       router.refresh()
     } catch (err) {
-      phCaptureException(err)
       setError(err instanceof Error ? err.message : t("auth.onboarding.errors.failedToCreate"))
     } finally {
       setLoading(false)

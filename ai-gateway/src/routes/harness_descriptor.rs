@@ -483,6 +483,7 @@ pub(crate) mod test_support {
             stdb,
             spend_read_stdb: None,
             http: Arc::new(http),
+            analytics: lumiere_product_analytics::ProductAnalytics::default(),
             activity_watermarks: Arc::new(dashmap::DashMap::new()),
             download_jobs: Arc::new(dashmap::DashMap::new()),
             kaggle_search_cache: Arc::new(dashmap::DashMap::new()),

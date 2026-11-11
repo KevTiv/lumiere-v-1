@@ -174,7 +174,6 @@ function AiActionDraftsLoaded({ organizationId }: { organizationId: number }) {
               if (currentScope.current !== scopeKey) return
               if (observed.status === "approved") phCapture("ai_action_draft_approved", {
                 reducer: nextDraft.reducerName,
-                draft_id: nextDraft.draftId,
               })
               patchDraft(nextDraft.draftId, observed)
             }}

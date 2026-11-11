@@ -137,20 +137,20 @@ Set `NEXT_PUBLIC_REALTIME_WS_URL` for an explicit websocket URL, or `NEXT_PUBLIC
 
 ## PostHog (product analytics)
 
-Client and server use the **same project API key** (from [Project settings](https://eu.posthog.com/settings/project)). The Next.js app reverse-proxies ingestion through `/ingest/*` (see `next.config.mjs`); set hosts to match your PostHog region (EU vs US).
+Use the same public `phc_` project token from [PostHog project settings](https://eu.posthog.com/settings/project) for web and Rust. Use a separate project for local or staging events.
 
-| Variable | Where | Purpose |
-|----------|--------|---------|
-| `NEXT_PUBLIC_POSTHOG_TOKEN` | Browser + Next server | Project API key (required for any analytics in non-local builds that should report). |
-| `NEXT_PUBLIC_POSTHOG_HOST` | Build-time rewrites + browser | Ingestion API origin, e.g. `https://eu.i.posthog.com` or `https://us.i.posthog.com`. Defaults to EU in `next.config.mjs` when unset. |
-| `NEXT_PUBLIC_POSTHOG_ASSETS_HOST` | Build-time rewrites only | Static/array CDN, e.g. `https://eu-assets.i.posthog.com`. Inferred from `NEXT_PUBLIC_POSTHOG_HOST` when unset (eu vs us). |
-| `NEXT_PUBLIC_POSTHOG_UI_HOST` | Client init | PostHog **app** URL for toolbar/session links, e.g. `https://eu.posthog.com`. Defaults to `https://eu.posthog.com`. |
-| `POSTHOG_KEY` or `POSTHOG_API_KEY` | Server only (optional) | Overrides `NEXT_PUBLIC_POSTHOG_TOKEN` for `posthog-node` in API routes so you can keep one public key for the client and a separate key only on the server—omit to reuse the public token. |
-| `POSTHOG_HOST` | Server only (optional) | Overrides `NEXT_PUBLIC_POSTHOG_HOST` for server-side capture. |
+| Variable | Railway service | Purpose |
+| --- | --- | --- |
+| `POSTHOG_WEB_TOKEN` | `web` | Public project token. Next.js validates it and passes it to the browser at runtime. Leave unset to disable browser capture. |
+| `POSTHOG_KEY` | `api-server`, `ai-gateway` | Project token for background server capture. Leave unset to disable capture on that service. |
+| `POSTHOG_HOST` | `web`, `api-server`, `ai-gateway` | Optional HTTPS ingestion origin. Defaults to `https://eu.i.posthog.com`. Use `https://us.i.posthog.com` for a US project. |
+| `POSTHOG_ASSETS_HOST` | `web` | Optional HTTPS asset origin. Defaults to the asset CDN for the ingestion region. |
+| `POSTHOG_UI_HOST` | `web` | Optional PostHog app origin. Defaults to the app for the ingestion region. |
+| `LUMIERE_POSTHOG_INGEST_ENABLED` | `api-gateway` | Set to `true` to let Kong forward `/ingest/*` to Next.js. Defaults to `false`. |
 
-If `NEXT_PUBLIC_POSTHOG_TOKEN` is unset, the web app skips PostHog initialization and event helpers no-op (useful for local dev without a token).
+Configure these as Railway runtime variables before releasing the corresponding code. The immutable web image reads them when it serves the app. The existing `NEXT_PUBLIC_POSTHOG_*` variables are local-development fallbacks.
 
-Server routes call `captureServerEvent` in `lib/posthog-server.ts`, which flushes after each event (serverless-safe).
+The Next.js proxy forwards supported analytics requests and strips ERP credentials. Confirm a successful `/ingest` POST from the browser and check for `assistant_turn_submitted` and `assistant_turn_completed` on the same distinct ID in PostHog. A setup-blocked turn produces `assistant_setup_blocked` instead.
 
 ## Backup and export
 

@@ -18,6 +18,15 @@ case "$rate_limit_scope" in
     ;;
 esac
 
+case "${LUMIERE_POSTHOG_INGEST_ENABLED:-false}" in
+  true) blocked_ingestion_paths="'/_vercel/insights'" ;;
+  false) blocked_ingestion_paths="'/ingest', '/_vercel/insights'" ;;
+  *)
+    echo 'render-kong-config: LUMIERE_POSTHOG_INGEST_ENABLED must be true or false' >&2
+    exit 1
+    ;;
+esac
+
 umask 077
 
 validate_host() {
@@ -68,6 +77,7 @@ sed \
   -e "s|__API_SERVER_UPSTREAM_PORT__|$api_port|g" \
   -e "s|__CORS_ORIGIN__|$cors_origin_escaped|g" \
   -e "s|limit_by: ip|limit_by: $rate_limit_scope|g" \
+  -e "s|paths: \['/ingest', '/_vercel/insights'\]|paths: [$blocked_ingestion_paths]|" \
   "$template" > "$config"
 
 if [ "${1:-}" = "--render-only" ]; then

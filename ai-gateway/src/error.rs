@@ -50,6 +50,14 @@ pub enum AppError {
 }
 
 impl AppError {
+    pub(crate) fn setup_code(&self) -> Option<&'static str> {
+        match self {
+            Self::DefaultAgentNotProvisioned(_) => Some("ai_default_agent_not_provisioned"),
+            Self::SkillNotProvisioned(_) => Some("ai_surface_skill_not_provisioned"),
+            _ => None,
+        }
+    }
+
     /// Missing catalog setup is unavailable, while other agent validation
     /// failures retain their existing bad-request behavior.
     pub fn from_agent_resolution(error: anyhow::Error) -> Self {
@@ -85,14 +93,12 @@ impl IntoResponse for AppError {
 
         tracing::error!("Request error: {}", message);
         let mut body = json!({ "error": message });
-        if matches!(&self, Self::DefaultAgentNotProvisioned(_)) {
-            body["code"] = json!("ai_default_agent_not_provisioned");
+        if let Some(code) = self.setup_code() {
+            body["code"] = json!(code);
             body["recovery_path"] = json!("/ai-skills");
         }
         if let Self::SkillNotProvisioned(error) = self {
-            body["code"] = json!("ai_surface_skill_not_provisioned");
             body["skill_key"] = json!(error.skill_key);
-            body["recovery_path"] = json!("/ai-skills");
         }
         (status, Json(body)).into_response()
     }

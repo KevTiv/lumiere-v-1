@@ -6,6 +6,7 @@ use axum::{
     Json,
 };
 use futures::stream;
+use lumiere_product_analytics::ProductEvent;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::convert::Infallible;
@@ -686,7 +687,20 @@ pub async fn post_rag(
         state.config.ollama_supports_tool_calling,
     )
     .await
-    .map_err(AppError::from_agent_resolution)?;
+    .map_err(|error| {
+        let error = AppError::from_agent_resolution(error);
+        if let Some(code) = error.setup_code() {
+            state.analytics.capture(
+                &actor.identity_hex,
+                ProductEvent::AssistantSetupBlocked {
+                    organization_id: org_id,
+                    company_id: req.company_id,
+                    code,
+                },
+            );
+        }
+        error
+    })?;
 
     // Authorize and meter one query vector, then reuse it across both indexes.
     // No provider charge is made for a missing or incompatible collection.
@@ -1213,6 +1227,16 @@ pub async fn post_rag(
     )
     .await
     .map_err(|e| AppError::Internal(e.to_string()))?;
+    if release.answer_released && run_status == "completed" && !release.answer.trim().is_empty() {
+        state.analytics.capture(
+            &actor.identity_hex,
+            ProductEvent::AssistantTurnCompleted {
+                organization_id: org_id,
+                company_id: req.company_id,
+                run_id: run.run_id,
+            },
+        );
+    }
     let RagRelease {
         answer,
         verification,

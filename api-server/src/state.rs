@@ -9,6 +9,7 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub stdb: StdbClient,
     pub http: reqwest::Client,
+    pub analytics: lumiere_product_analytics::ProductAnalytics,
     pub workos_auth_gate: Arc<tokio::sync::Semaphore>,
     pub workos_jwks:
         Arc<tokio::sync::RwLock<Option<(std::time::Instant, jsonwebtoken::jwk::JwkSet)>>>,
@@ -30,6 +31,7 @@ impl AppState {
             config: Arc::new(config),
             stdb,
             http: reqwest::Client::new(),
+            analytics: lumiere_product_analytics::ProductAnalytics::from_env(),
             workos_auth_gate: Arc::new(tokio::sync::Semaphore::new(32)),
             workos_jwks: Arc::new(tokio::sync::RwLock::new(None)),
             organization_placements,

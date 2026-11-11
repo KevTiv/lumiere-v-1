@@ -12,7 +12,7 @@ import { Label } from "@lumiere/ui/components/label"
 import {
   redirectToWorkOsSignIn,
 } from "@/app/actions/workos-auth"
-import { phCapture, phCaptureException, phIdentify } from "@/lib/posthog-browser"
+import { phCapture } from "@/lib/posthog-browser"
 
 import { safeAuthReturnTo } from '@/lib/auth-mode'
 import { useWorkOsAuthMode } from '@/lib/auth-mode-context'
@@ -47,11 +47,10 @@ export default function SignInPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        phCapture("user_sign_in_failed", { error: data.error ?? "unknown" })
+        phCapture("user_sign_in_failed", { method: "email" })
         setError(data.error ?? t("auth.errors.signInFailed"))
         return
       }
-      phIdentify(email)
       phCapture("user_signed_in", { method: "email" })
       const redirectTo = data.redirectTo === "/overview" ? callbackUrl : (data.redirectTo ?? callbackUrl)
       // Authentication changes the cookie-backed identity, organization, and
@@ -59,8 +58,8 @@ export default function SignInPage() {
       // transition preserves the anonymous root providers from `/sign-in`, so
       // the newly signed-in user can retain stale RBAC state until a reload.
       window.location.assign(redirectTo)
-    } catch (err) {
-      phCaptureException(err)
+    } catch {
+      phCapture("user_sign_in_failed", { method: "email" })
       setError(t("auth.errors.generic"))
     } finally {
       setLoading(false)

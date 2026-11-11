@@ -545,6 +545,8 @@ The web Docker image runs `pnpm --filter web build` without build-args today. Fo
 
 Realtime WebSocket: Kong/same-origin deployments use `wss://<host>/v1/realtime/ws` by default. Override with `NEXT_PUBLIC_REALTIME_WS_URL` or `NEXT_PUBLIC_API_GATEWAY_URL` if the browser should connect elsewhere (see `docs/ENVIRONMENT.md`).
 
+PostHog uses runtime variables on `web`, `api-server`, and `ai-gateway`, plus an opt-in on the Kong `api-gateway` service. Configure them together for the target PostHog project before the first release with this integration. See [PostHog environment variables](ENVIRONMENT.md#posthog-product-analytics).
+
 ## Service: ai-gateway
 
 | Variable | Required | Notes |

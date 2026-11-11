@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { GeistMono } from 'geist/font/mono'
 import { GeistSans } from 'geist/font/sans'
 import { Providers } from './providers'
+import { readPostHogBrowserConfig } from '@/lib/posthog-config'
 import './globals.css'
 
 import { getBrowserStdbSession, hasAuthenticatedIdentity } from '@/lib/browser-session'
@@ -102,6 +103,7 @@ export default async function RootLayout({
       <body className="font-sans antialiased">
         <AuthModeProvider enabled={isWorkOsEnabled()}>
         <Providers
+          posthog={readPostHogBrowserConfig()}
           serverIdentity={identityHex}
           serverRoleNames={serverRoleNames}
           serverRoleIds={serverRoleIds}

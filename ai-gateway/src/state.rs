@@ -24,6 +24,7 @@ pub struct AppState {
     /// from `AI_SPEND_READ_STDB_TOKEN`. Absent disables run-correlated drafts.
     pub spend_read_stdb: Option<Arc<StdbClient>>,
     pub http: Arc<reqwest::Client>,
+    pub analytics: lumiere_product_analytics::ProductAnalytics,
     /// In-memory activity ingestion watermarks keyed by `org_id:company_id:table_name`.
     pub activity_watermarks: Arc<DashMap<String, i64>>,
     /// In-flight and completed Kaggle download jobs (job_id → status).

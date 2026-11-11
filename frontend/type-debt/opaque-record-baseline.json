@@ -358,8 +358,6 @@
   "web/lib/manufacturing-row-action-submit.ts": 2,
   "web/lib/manufacturing-tracking-intent.ts": 3,
   "web/lib/persist-record-custom-fields.ts": 7,
-  "web/lib/posthog-browser.ts": 2,
-  "web/lib/posthog-server.ts": 1,
   "web/lib/prefill-form-config.ts": 1,
   "web/lib/projects-coverage-create-params.ts": 11,
   "web/lib/projects-create-params.ts": 18,

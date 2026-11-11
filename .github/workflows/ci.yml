@@ -166,6 +166,9 @@ jobs:
       - name: Query authorization and field projection tests
         run: cargo test --locked -p stdb-auth --lib
 
+      - name: Product analytics event delivery tests
+        run: cargo test --locked -p lumiere-product-analytics
+
       - name: WorkOS session and profile synchronization regressions
         run: |
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib session::workos::tests
