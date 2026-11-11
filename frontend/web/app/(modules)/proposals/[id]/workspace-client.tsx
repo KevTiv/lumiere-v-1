@@ -28,7 +28,7 @@ export function WorkspaceClient({ proposalId, proposalTitle, organizationId }: W
   const applyAnalysis = useApplyProposalAnalysis(orgId, companyId)
 
   const handleAnalyze = async (text: string): Promise<AIAnalysis> => {
-    phCapture("proposal_analysis_requested", { proposal_id: proposalId, organization_id: organizationId })
+    phCapture("proposal_analysis_requested", { organization_id: organizationId })
     const response = await apiFetch("/api/proposals/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

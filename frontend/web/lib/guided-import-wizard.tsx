@@ -699,7 +699,6 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
         rows_imported: importJson.rowsImported ?? 0,
         ai_mapped: true,
         duplicates_skipped: skipRows.size,
-        template_id: appliedTemplateId,
       })
     } catch (e) {
       if (mounted.current) setError(e instanceof Error ? e.message : String(e))

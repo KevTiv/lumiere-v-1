@@ -4,6 +4,7 @@ import {
   analyticsDistinctId,
   filterAnalyticsEvent,
   type BrowserAnalyticsEvent,
+  type BrowserAnalyticsProperties,
 } from "./posthog-events"
 
 let enabled = false
@@ -33,7 +34,10 @@ export function initializeBrowserAnalytics(config: PostHogBrowserConfig | undefi
   }
 }
 
-export function phCapture(event: BrowserAnalyticsEvent, properties?: Record<string, unknown>) {
+export function phCapture<E extends BrowserAnalyticsEvent>(
+  event: E,
+  properties?: BrowserAnalyticsProperties<NoInfer<E>>,
+) {
   if (!enabled) return
   try {
     posthog.capture(event, properties)

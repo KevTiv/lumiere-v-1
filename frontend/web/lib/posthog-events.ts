@@ -35,6 +35,12 @@ const eventProperties = {
 } as const
 
 export type BrowserAnalyticsEvent = Exclude<keyof typeof eventProperties, "$identify">
+type AnalyticsValue = string | number | boolean
+type EventProperty<E extends keyof typeof eventProperties> = (typeof eventProperties)[E][number]
+
+export type BrowserAnalyticsProperties<E extends BrowserAnalyticsEvent> = Partial<
+  Record<EventProperty<E>, AnalyticsValue | bigint | null>
+>
 
 const pages = new Set([
   "overview",
@@ -87,7 +93,9 @@ const sdkProperties = [
   "$is_identified",
 ] as const
 
-function safeAnalyticsProperty(key: string, value: unknown): string | number | boolean | undefined {
+type AnalyticsProperty = EventProperty<keyof typeof eventProperties> | (typeof sdkProperties)[number]
+
+function safeAnalyticsProperty(key: AnalyticsProperty, value: unknown): AnalyticsValue | undefined {
   if (key === "organization_id" || key === "company_id") {
     if (typeof value === "number" && (!Number.isSafeInteger(value) || value <= 0)) return
     if (typeof value !== "string" && typeof value !== "number" && typeof value !== "bigint") return
@@ -117,7 +125,7 @@ function safeAnalyticsProperty(key: string, value: unknown): string | number | b
 
 type EventEnvelope = {
   event: string
-  properties?: Record<string, unknown>
+  properties?: object
   $set?: unknown
   $set_once?: unknown
 }
@@ -125,9 +133,13 @@ type EventEnvelope = {
 export function filterAnalyticsEvent<T extends EventEnvelope>(event: T): T | null {
   if (!Object.hasOwn(eventProperties, event.event)) return null
   const eventKeys = eventProperties[event.event as keyof typeof eventProperties]
-  const properties: Record<string, string | number | boolean> = { $geoip_disable: true }
+  const properties: Partial<Record<AnalyticsProperty | "$geoip_disable", AnalyticsValue>> = {
+    $geoip_disable: true,
+  }
   for (const key of [...sdkProperties, ...eventKeys]) {
-    const value = safeAnalyticsProperty(key, event.properties?.[key])
+    const input: unknown =
+      event.properties && Object.getOwnPropertyDescriptor(event.properties, key)?.value
+    const value = safeAnalyticsProperty(key, input)
     if (value !== undefined) properties[key] = value
   }
   // SDK default properties include full URLs, referrers, and initial attribution.

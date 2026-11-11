@@ -86,8 +86,15 @@ export function useWorkflowSurface(options: { organizationId?: number | bigint }
   const record = useCallback(
     (event: TransitionEvent) => {
       phCapture('workflow_transition', {
-        ...event,
-        ...(organizationId != null ? { organization_id: String(organizationId) } : {}),
+        organization_id: organizationId != null ? String(organizationId) : undefined,
+        transitionId: event.transitionId,
+        attempt: event.attempt,
+        status: event.status,
+        errorKind: event.errorKind,
+        httpStatus: event.httpStatus,
+        refreshed: event.refreshed,
+        durationMs: event.durationMs,
+        dispatch: event.dispatch,
       });
     },
     [organizationId],
