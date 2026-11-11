@@ -124,6 +124,7 @@ function invalidateSettingsQueries(
   return [
     qc.invalidateQueries({ queryKey: ['settings-roles', org] }),
     qc.invalidateQueries({ queryKey: ['settings-users', org] }),
+    qc.invalidateQueries({ queryKey: ['users', org] }),
     qc.invalidateQueries({ queryKey: ['user-role-assignments', org] }),
     qc.invalidateQueries({ queryKey: ['user-organizations', org] }),
     qc.invalidateQueries({ queryKey: ['auth-access'] }),
@@ -507,17 +508,22 @@ type SettingsMembershipProjection = {
   job_title?: unknown
 }
 
+export function fetchOrganizationUserProfiles(searchTerm = ''): Promise<QueryRows> {
+  const searchQuery = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : ''
+  return collectSettingsRows((offset, limit) =>
+    fetchQueryList(
+      `/api/settings/users?limit=${limit}&offset=${offset}${searchQuery}`,
+      'Failed to fetch organization users',
+    ),
+  )
+}
+
 export function useSettingsUsers(organizationId: bigint, search?: string) {
   const searchTerm = search?.trim() ?? ''
   return useQuery<SettingsUserRecord[]>({
     queryKey: ['settings-users', rqBigIntKey(organizationId), searchTerm],
     queryFn: async () => {
-      const searchQuery = searchTerm
-        ? `&search=${encodeURIComponent(searchTerm)}`
-        : ''
-      const profiles = await collectSettingsRows((offset, limit) => fetchSettingsList(
-        `/api/settings/users?limit=${limit}&offset=${offset}${searchQuery}`, 'Failed to fetch settings users',
-      ))
+      const profiles = await fetchOrganizationUserProfiles(searchTerm)
       const memberships = profiles.flatMap(row => row.membership && typeof row.membership === 'object' ? [row.membership as SettingsMembershipProjection] : [])
       const assignments = profiles.flatMap(row => Array.isArray(row.roleAssignments) ? row.roleAssignments as QueryRows : [])
       return mapSettingsUsers(profiles, memberships, assignments)
