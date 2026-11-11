@@ -8,7 +8,7 @@ pub mod reviews;
 
 pub const MAX_ROWS: usize = 1_000;
 pub const MAX_BYTES: usize = 262_144;
-pub const VERSION: &str = "1.0.3";
+pub const VERSION: &str = "1.0.4";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Skill {

@@ -36,7 +36,7 @@ fn require_metered_writer(ctx: &ReducerContext, organization_id: u64) -> Result<
     }
     Ok(())
 }
-fn require_platform_superuser(ctx: &ReducerContext) -> Result<(), String> {
+pub(super) fn require_platform_superuser(ctx: &ReducerContext) -> Result<(), String> {
     let user = find_user_profile_for_identity(ctx, ctx.sender()).ok_or("User not found")?;
     if !user.is_active || !user.is_superuser {
         return Err(

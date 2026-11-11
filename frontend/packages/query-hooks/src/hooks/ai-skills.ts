@@ -237,7 +237,9 @@ type AiSurfaceSkillKey = (typeof AI_SURFACE_SKILL_KEYS)[number]
 export type AiSurfaceProvisioningResult = {
   company_setup?: {
     company_id: number
-    status: "configured" | "profile_required" | "preserved"
+    status: "bindings_applied" | "profile_required" | "preserved"
+    stage: "platform_activation_required"
+    execution_readiness: "not_verified"
     message: string
   }
   skills: {
@@ -277,11 +279,14 @@ export function parseAiSurfaceProvisioningResult(value: unknown): AiSurfaceProvi
   if (!setup || typeof setup !== "object"
     || !("company_id" in setup) || typeof setup.company_id !== "number"
     || !Number.isSafeInteger(setup.company_id) || setup.company_id <= 0
-    || !("status" in setup) || (setup.status !== "configured" && setup.status !== "profile_required" && setup.status !== "preserved")
+    || !("status" in setup) || (setup.status !== "bindings_applied" && setup.status !== "profile_required" && setup.status !== "preserved")
+    || !("stage" in setup) || setup.stage !== "platform_activation_required"
+    || !("execution_readiness" in setup) || setup.execution_readiness !== "not_verified"
     || !("message" in setup) || typeof setup.message !== "string") throw invalid()
-  if (setup.status === "configured" && result.length !== AI_SURFACE_SKILL_KEYS.length) throw invalid()
+  if (setup.status === "bindings_applied" && result.length !== AI_SURFACE_SKILL_KEYS.length) throw invalid()
   return { skills: result, company_setup: {
     company_id: setup.company_id, status: setup.status, message: setup.message,
+    stage: setup.stage, execution_readiness: setup.execution_readiness,
   } }
 }
 

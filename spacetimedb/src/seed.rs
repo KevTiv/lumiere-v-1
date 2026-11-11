@@ -646,12 +646,12 @@ fn seed_active_release_for_skill(
     // Development fixture only. Keep exact adapter bindings aligned with
     // `gateway certification-bundles`; these rows are not production certificates.
     let source_hash = if skill_key == "report_analysis" {
-        "sha256:1af5aa28863fb65544e7163a80e1e3473567a454b4d28669352de1d315868e0e".to_string()
+        "sha256:e1709d409390f8f0d5b159ee7251cf536467fa8d6c4c3d942a4cc57a49ce1c81".to_string()
     } else {
         format!("sha256:{}", source_hash_char.to_string().repeat(64))
     };
     let version = if skill_key == "report_analysis" {
-        "1.0.9"
+        "1.0.10"
     } else {
         "1.0.0"
     };
@@ -8201,18 +8201,18 @@ Prioritize high-severity findings and cite related records."#,
     );
 
     let report_composer_source_hash =
-        "sha256:c94724332d82909ac2e46e79dee3784b18bb7236a01cc663093c973d3bf154aa";
+        "sha256:fe4ceeb1d3f3426f7efc175806d42228971b40d99fafa4b49748b5c7c1584f2f";
     let report_composer_manifest = format!(
-        r#"{{"limits":{{"max_steps":1,"max_tool_calls":1}},"output_types":["reports.daily_business_summary.summary.v1"],"permissions":["report:read"],"resources":["reports.daily_business_summary.v1"],"risk":"green","schema_version":1,"skill_key":"report_composer","source_hash":"{report_composer_source_hash}","version":"1.0.0"}}"#
+        r#"{{"limits":{{"max_steps":1,"max_tool_calls":1}},"output_types":["reports.daily_business_summary.summary.v1"],"permissions":["report:read"],"resources":["reports.daily_business_summary.v1"],"risk":"green","schema_version":1,"skill_key":"report_composer","source_hash":"{report_composer_source_hash}","version":"1.0.1"}}"#
     );
 
     let report_composer_version = ctx.db.ai_skill_version().insert(AiSkillVersion {
         id: 0,
-        version_key: format!("{}:{}:1.0.0", org_id, report_composer.id),
+        version_key: format!("{}:{}:1.0.1", org_id, report_composer.id),
         organization_id: org_id,
         skill_id: report_composer.id,
         skill_key: "report_composer".to_string(),
-        version: "1.0.0".to_string(),
+        version: "1.0.1".to_string(),
         manifest_schema_version: 1,
         manifest_json: report_composer_manifest,
         source_hash: report_composer_source_hash.to_string(),
@@ -8362,18 +8362,18 @@ Prioritize high-severity findings and cite related records."#,
     );
 
     let low_stock_source_hash =
-        "sha256:ff2a8646b891a17be112434ffabd3b44e61f91e0682675301c16050b4f6fd520";
+        "sha256:d399fe5d20282ce3a940a5c0a248692df69df0795af3c583ba0b940a385f062b";
     let low_stock_manifest = format!(
-        r#"{{"limits":{{"max_steps":1,"max_tool_calls":1}},"output_types":["inventory.low_stock.result.v1"],"permissions":["inventory:read"],"resources":["inventory.low_stock.v1"],"risk":"green","schema_version":1,"skill_key":"low_stock","source_hash":"{low_stock_source_hash}","version":"1.0.0"}}"#
+        r#"{{"limits":{{"max_steps":1,"max_tool_calls":1}},"output_types":["inventory.low_stock.result.v1"],"permissions":["inventory:read"],"resources":["inventory.low_stock.v1"],"risk":"green","schema_version":1,"skill_key":"low_stock","source_hash":"{low_stock_source_hash}","version":"1.0.1"}}"#
     );
 
     let low_stock_version = ctx.db.ai_skill_version().insert(AiSkillVersion {
         id: 0,
-        version_key: format!("{}:{}:1.0.0", org_id, low_stock.id),
+        version_key: format!("{}:{}:1.0.1", org_id, low_stock.id),
         organization_id: org_id,
         skill_id: low_stock.id,
         skill_key: "low_stock".to_string(),
-        version: "1.0.0".to_string(),
+        version: "1.0.1".to_string(),
         manifest_schema_version: 1,
         manifest_json: low_stock_manifest,
         source_hash: low_stock_source_hash.to_string(),

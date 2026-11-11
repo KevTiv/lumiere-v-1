@@ -46,7 +46,7 @@ pub(crate) enum ApiSurfaceError {
     InvalidOrigin,
     #[error("AI skill setup organization does not match the authenticated session")]
     ScopeMismatch,
-    #[error("AI skill setup requires ai_skill:create permission for this organization")]
+    #[error("AI skill setup requires ai_skill:create and company binding setup requires ai_agent:write and ai_skill:write for this organization")]
     PermissionDenied,
     #[error("AI skill setup {stage} was rejected by the API (HTTP {status})")]
     Rejected { stage: ApiStage, status: u16 },
@@ -119,9 +119,17 @@ pub(crate) struct ApiSurfaceWriter<'a> {
     identity: String,
     organization_id: u64,
     is_superuser: bool,
+    can_setup_company: bool,
 }
 
 impl<'a> ApiSurfaceWriter<'a> {
+    pub(crate) fn require_company_setup(&self) -> Result<()> {
+        if !self.can_setup_company {
+            return Err(ApiSurfaceError::PermissionDenied.into());
+        }
+        Ok(())
+    }
+
     pub(crate) fn require_platform_admin(&self) -> Result<()> {
         if !self.is_superuser {
             anyhow::bail!("platform administrator required");
@@ -142,6 +150,7 @@ impl<'a> ApiSurfaceWriter<'a> {
         agent_id: u64,
         intelligence_policy_ref: &str,
     ) -> Result<()> {
+        self.require_company_setup()?;
         self.company_operation(
             "erp.provision_ai_company_defaults",
             json!({
@@ -155,6 +164,7 @@ impl<'a> ApiSurfaceWriter<'a> {
 
     /// Enrollment selects the platform-approved template inside the reducer.
     pub(crate) async fn enroll_company_defaults(&self, company_id: u64) -> Result<()> {
+        self.require_company_setup()?;
         self.company_operation(
             "erp.enroll_ai_company_defaults",
             json!({"companyId": company_id}),
@@ -263,6 +273,8 @@ impl<'a> ApiSurfaceWriter<'a> {
             identity: session.identity_hex,
             organization_id,
             is_superuser: session.field_access.is_superuser,
+            can_setup_company: permission_allowed(&session.field_access, "ai_agent", "write")
+                && permission_allowed(&session.field_access, "ai_skill", "write"),
         })
     }
 }
@@ -420,7 +432,12 @@ mod platform_authority_tests {
             identity: "test-actor".into(),
             organization_id: 7,
             is_superuser: false,
+            can_setup_company: false,
         };
+        assert!(writer.require_platform_admin().is_err());
+        assert!(writer.require_company_setup().is_err());
+        writer.can_setup_company = true;
+        assert!(writer.require_company_setup().is_ok());
         assert!(writer.require_platform_admin().is_err());
         writer.is_superuser = true;
         assert!(writer.require_platform_admin().is_ok());

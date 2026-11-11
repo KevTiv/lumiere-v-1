@@ -268,6 +268,7 @@ mod tests {
         SessionWrongFieldScope,
         SessionWrongIdentity,
         SessionMissingCreatePermission,
+        SessionCreateOnly,
         SessionOrganizationDeniesCreate,
         SessionMalformed,
         OperationScopeChanged,
@@ -600,7 +601,11 @@ mod tests {
         }
         let mut access = stdb_auth::FieldAccessContext {
             organization_id: 9,
-            role_permissions: vec!["ai_skill:create".into()],
+            role_permissions: vec![
+                "ai_skill:create".into(),
+                "ai_skill:write".into(),
+                "ai_agent:write".into(),
+            ],
             identity_hex: "a".repeat(64),
             ..Default::default()
         };
@@ -611,6 +616,9 @@ mod tests {
             Behavior::SessionWrongIdentity => access.identity_hex = "b".repeat(64),
             Behavior::SessionMissingCreatePermission => {
                 access.role_permissions = vec!["ai_skill:read".into()];
+            }
+            Behavior::SessionCreateOnly => {
+                access.role_permissions = vec!["ai_skill:create".into()];
             }
             Behavior::SessionOrganizationDeniesCreate => {
                 access.org_permissions = vec![stdb_auth::ActionPermission {
@@ -769,7 +777,7 @@ mod tests {
                 Some(
                     json!({"is_enabled":true,"config_json":"{\"defaultAgentId\":42,\"intelligencePolicyRef\":\"pilot@1\"}"}),
                 ),
-                "configured",
+                "bindings_applied",
                 1,
             ),
             (
@@ -802,7 +810,11 @@ mod tests {
                 writes
             );
         }
-        for (company_id, behavior) in [(0, Behavior::Success), (7, Behavior::SessionDenied)] {
+        for (company_id, behavior) in [
+            (0, Behavior::Success),
+            (7, Behavior::SessionDenied),
+            (7, Behavior::SessionCreateOnly),
+        ] {
             let fixture = api_fixture(Vec::new(), behavior).await;
             let result = post_provision_surfaces(
                 State(fixture.state().await),
@@ -849,7 +861,7 @@ mod tests {
             .unwrap();
             assert_eq!(
                 serde_json::to_value(result.0).unwrap()["company_setup"]["status"],
-                "configured"
+                "bindings_applied"
             );
         }
         fixture
@@ -885,7 +897,7 @@ mod tests {
     async fn report_binding_respects_system_fallback_and_inactive_local_shadow() {
         use crate::routes::skills::{post_provision_surfaces, GatewayProvisionSurfacesRequest};
         for (catalog, system_reads, expected) in [
-            (vec![], 1, "configured"),
+            (vec![], 1, "bindings_applied"),
             (vec![json!([55, false])], 0, "profile_required"),
             (
                 vec![json!([55, true]), json!([56, true])],

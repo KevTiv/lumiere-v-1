@@ -32,7 +32,7 @@ pub(super) const RAG_MAX_EVIDENCE_ROWS: u64 = 20;
 pub(super) const RAG_MAX_EVIDENCE_BYTES: u64 = 64 * 1024;
 
 #[derive(Debug, Clone, PartialEq)]
-pub(super) struct ResolvedPassage {
+pub(crate) struct ResolvedPassage {
     pub passage_id: u64,
     pub source_kind: String,
     pub source_key: String,
@@ -59,7 +59,7 @@ impl ResolvedPassage {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct EvidenceScope {
+pub(crate) struct EvidenceScope {
     pub organization_id: u64,
     pub company_id: u64,
 }
@@ -91,7 +91,7 @@ impl PassageBudget {
 
 /// The three persisted rows a passage resolves through.
 #[derive(Debug, Clone)]
-pub(super) struct PassageChain {
+pub(crate) struct PassageChain {
     pub passage: Value,
     pub version: Value,
     pub source: Value,
@@ -100,7 +100,7 @@ pub(super) struct PassageChain {
 /// The two authorities RAG evidence depends on. Both are read fresh on every
 /// call; implementations must not cache.
 #[async_trait]
-pub(super) trait EvidenceAccess: Send + Sync {
+pub(crate) trait EvidenceAccess: Send + Sync {
     /// The acting user's current `ai.evidence.retrieve` bounds.
     async fn grant_bounds(&self, scope: EvidenceScope) -> AppResult<CapabilityGrantBounds>;
     /// The current persisted passage → source version → source rows.
@@ -189,7 +189,7 @@ impl EvidenceAccess for LiveEvidenceAccess<'_> {
 
 /// Passages an actor is authorized to see for one answer.
 #[derive(Debug, Clone)]
-pub(super) struct AuthorizedEvidence {
+pub(crate) struct AuthorizedEvidence {
     pub passages: Vec<ResolvedPassage>,
     /// Some qualifying passage did not fit the actor's row or byte limit and
     /// was left out (and never loaded into an answer).
@@ -214,7 +214,7 @@ impl AuthorizedEvidence {
 }
 
 #[derive(Debug)]
-pub(super) enum EvidenceError {
+pub(crate) enum EvidenceError {
     /// The actor's grant is missing, malformed, mismatched or unreachable.
     Authority(AppError),
     /// The persisted evidence graph could not be read.
@@ -239,7 +239,7 @@ impl std::fmt::Display for EvidenceError {
 /// stops at the first passage that would exceed the byte budget, so the
 /// answer never rests on a lower-ranked passage while a better one was
 /// dropped for size.
-pub(super) async fn authorize_and_resolve(
+pub(crate) async fn authorize_and_resolve(
     access: &dyn EvidenceAccess,
     scope: EvidenceScope,
     hits: &[SearchResult],

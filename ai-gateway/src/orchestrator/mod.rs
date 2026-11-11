@@ -7,6 +7,7 @@ mod decision_graph;
 mod decision_type;
 pub mod evidence_inspector;
 mod evidence_recorder;
+pub(crate) mod generation_surface_certification;
 pub(crate) mod governed_bootstrap;
 mod governed_program;
 pub(crate) mod governed_programs;

@@ -18,6 +18,9 @@ const hash = value => typeof value === 'string' && /^(sha256:)?[a-f0-9]{64}$/.te
 const sameHash = (a, b) => hash(a) && hash(b) && a.replace(/^sha256:/, '') === b.replace(/^sha256:/, '')
 const integer = value => Number.isSafeInteger(Number(value)) && Number(value) >= 0
 const number = (value, name) => { check(integer(value), `invalid ${name}`); return Number(value) }
+const budgetSnapshot = rows => [...rows].sort((a, b) =>
+  number(a.agent_id, 'budget agent') - number(b.agent_id, 'budget agent')
+  || number(a.id, 'budget id') - number(b.id, 'budget id'))
 const one = (rows, name) => { check(rows.length === 1, `${name} must resolve exactly once`); return rows[0] }
 const none = () => ({ none: [] })
 const some = value => ({ some: value })
@@ -28,11 +31,24 @@ const parsedObject = (raw, name) => {
   return value
 }
 const passed = value => typeof value === 'string' ? value.toLowerCase() === 'passed'
+  // Raw SpacetimeDB SQL encodes AiSkillTestRunStatus::Passed as [0, []].
+  : Array.isArray(value) ? value.length === 2 && value[0] === 0
+    && Array.isArray(value[1]) && value[1].length === 0
   : plain(value) && Object.keys(value).length === 1 && ['Passed', 'passed'].some(key => Array.isArray(value[key]) && value[key].length === 0)
 
 export function validateManifest(config) {
   fields(config, ['version', 'organizationId', 'companyId', 'agentId', 'intelligencePolicyRef',
-    'currency', 'pricesReviewedAt', 'surfaces', 'meters'], 'manifest')
+    'currency', 'pricesReviewedAt', 'surfaces', 'meters', 'agentCapabilities'], 'manifest')
+  if (config.agentCapabilities !== undefined) {
+    fields(config.agentCapabilities, ['addModels', 'addActions'], 'agentCapabilities')
+    for (const [key, allowed] of Object.entries({ addModels: ['mistral-embed'], addActions: ['embedding_query', 'embedding_index'] })) {
+      const items = config.agentCapabilities[key] ?? []
+      check(Array.isArray(items) && items.every(item => allowed.includes(item)) && new Set(items).size === items.length,
+        `unknown or duplicate reviewed ${key}`)
+    }
+    check(!config.surfaces?.some(surface => surface.skillKey === 'document_ocr')
+      && !config.meters?.some(meter => meter.unit === 'pages'), 'reviewed capability additions are limited to non-OCR repair')
+  }
   check(config.version === 1, 'unsupported manifest version')
   for (const key of ['organizationId', 'companyId', 'agentId']) id(config[key], key)
   check(typeof config.intelligencePolicyRef === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}@[1-9][0-9]{0,9}$/.test(config.intelligencePolicyRef), 'exact intelligencePolicyRef is required')
@@ -73,7 +89,9 @@ export function planCapabilities(config) {
   return { organizationId: config.organizationId, companyId: config.companyId, agentId: config.agentId,
     intelligencePolicyRef: config.intelligencePolicyRef, currency: config.currency, pricesReviewedAt: config.pricesReviewedAt,
     surfaces: config.surfaces, meters: config.meters, billableCalls: 0, deploymentAcceptance: false,
-    writes: ['missing configure_ai_metered_price', 'missing company upsert_ai_skill_config'],
+    agentCapabilities: config.agentCapabilities,
+    writes: [...(config.agentCapabilities ? ['missing reviewed set_ai_agent_model', 'missing reviewed set_ai_agent_action'] : []),
+      'missing configure_ai_metered_price', 'missing company upsert_ai_skill_config'],
     remainingGates: ['immutable contract release and aligned deployment', 'provider usage and billing acceptance', 'signed-in company isolation and recovery acceptance'],
     prerequisites: ['existing company-compatible agent and current-month monetary pool', 'reviewed model policy', 'exact platform-registered ai_spend_writer matching the gateway identity',
       'matching active certificates for generative surfaces', 'explicit existing infrastructure skill catalog entries'] }
@@ -108,7 +126,7 @@ async function inspectCapabilities(config, client, now) {
     && writer.is_active === true && registeredIdentity === writerIdentity, 'platform spend writer binding does not match the gateway identity')
   const company = one(await client.sql(`SELECT id, organization_id FROM company WHERE id = ${companyId}`), 'company')
   check(number(company.id, 'company id') === companyId && number(company.organization_id, 'company organization') === org, 'company scope mismatch')
-  const agent = one(await client.sql(`SELECT * FROM ai_agent WHERE organization_id = ${org} AND id = ${agentId}`), 'Mistral agent')
+  const agent = structuredClone(one(await client.sql(`SELECT * FROM ai_agent WHERE organization_id = ${org} AND id = ${agentId}`), 'Mistral agent'))
   check(number(agent.organization_id, 'agent organization') === org && number(agent.id, 'agent id') === agentId
     && agent.is_active === true && agent.provider === 'mistral', 'active Mistral agent required')
   const agentCompanyId = unwrap(agent.company_id)
@@ -117,6 +135,17 @@ async function inspectCapabilities(config, client, now) {
   check(Array.isArray(agent.allowed_models) && agent.allowed_models.includes(agent.model)
     && agent.allowed_models.every(exactModel), 'agent model allowlist is invalid')
   check(Array.isArray(agent.allowed_actions), 'agent action allowlist is invalid')
+  const originalAgent = structuredClone(agent)
+  const capabilityWrites = []
+  for (const [key, column, reducer] of [['addModels', 'allowed_models', 'set_ai_agent_model'], ['addActions', 'allowed_actions', 'set_ai_agent_action']]) {
+    for (const item of config.agentCapabilities?.[key] ?? []) {
+      if (!agent[column].includes(item)) capabilityWrites.push({ reducer, item })
+    }
+  }
+  // Never modify the read snapshot (including clients backed by an in-memory cache).
+  agent.allowed_models = [...agent.allowed_models]
+  agent.allowed_actions = [...agent.allowed_actions]
+  for (const { reducer, item } of capabilityWrites) agent[reducer === 'set_ai_agent_model' ? 'allowed_models' : 'allowed_actions'].push(item)
   for (const meter of config.meters) check(agent.allowed_models.includes(meter.model), 'metered model is not allowed for the agent')
   for (const surface of config.surfaces) check(permits(agent.allowed_actions, requiredAction(surface.skillKey)), `agent action is not allowed for ${surface.skillKey}`)
   if (config.surfaces.some(surface => surface.skillKey === 'rag_generation')) {
@@ -216,7 +245,12 @@ async function inspectCapabilities(config, client, now) {
     check(!latest || number(latest.units_per_1_k, 'metered rate') === meter.unitsPer1k, 'metered price differs; review a separate immutable price update')
     if (!latest) { priceWrites.push({ model: meter.model, unit: meter.unit, currency: config.currency, units_per_1_k: meter.unitsPer1k }); missing.push(`meter:${meter.model}:${meter.unit}`) }
   }
-  return { bindingWrites, priceWrites, missing, billingPeriod: period }
+  missing.unshift(...capabilityWrites.map(write => `${write.reducer}:${write.item}`))
+  if (capabilityWrites.length) {
+    check(typeof client.verifyActivationAuthority === 'function', 'native operator authority and deployed toggle schema probe required before capability writes')
+    await client.verifyActivationAuthority(org, agentId, priceWrites.length > 0)
+  }
+  return { bindingWrites, priceWrites, capabilityWrites, originalAgent, budgets: structuredClone(budgets), missing, billingPeriod: period }
 }
 
 export async function provisionCapabilities(config, client, apply = false, now = new Date()) {
@@ -225,10 +259,21 @@ export async function provisionCapabilities(config, client, apply = false, now =
   if (apply) {
     // Every structural prerequisite was checked before the first mutation.
     // An uncertain response stops immediately; check durable state before retry.
+    for (const toggle of inspection.capabilityWrites) await client.call(toggle.reducer, [config.organizationId, config.agentId, toggle.item, true])
+    if (inspection.capabilityWrites.length) {
+      const actual = one(await client.sql(`SELECT * FROM ai_agent WHERE organization_id = ${config.organizationId} AND id = ${config.agentId}`), 'updated agent')
+      const expected = structuredClone(inspection.originalAgent)
+      for (const { reducer, item } of inspection.capabilityWrites) expected[reducer === 'set_ai_agent_model' ? 'allowed_models' : 'allowed_actions'].push(item)
+      for (const key of Object.keys(expected).filter(key => !['write_uid', 'write_date'].includes(key))) {
+        check(JSON.stringify(actual[key]) === JSON.stringify(expected[key]), 'agent readback differs; inspect durable state before retry')
+      }
+    }
     for (const price of inspection.priceWrites) await client.call('configure_ai_metered_price', [config.organizationId, config.agentId, price])
     for (const binding of inspection.bindingWrites) await client.call('upsert_ai_skill_config', [config.organizationId, binding])
     const verified = await inspectCapabilities(config, client, now)
     check(verified.missing.length === 0, 'provisioned capability readback differs; inspect durable state before retry')
+    check(JSON.stringify(budgetSnapshot(verified.budgets)) === JSON.stringify(budgetSnapshot(inspection.budgets)),
+      'pool readback changed during provisioning; inspect durable state before retry')
   }
   return { organizationId: config.organizationId, companyId: config.companyId, agentId: config.agentId,
     billingPeriod: inspection.billingPeriod, applied: apply, ready: apply || inspection.missing.length === 0,

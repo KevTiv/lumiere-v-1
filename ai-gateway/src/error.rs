@@ -13,6 +13,11 @@ pub struct SurfaceSkillNotProvisioned {
 #[error("AI setup is incomplete. Ask an administrator to apply the harness AI profile for this company.")]
 pub struct DefaultAgentNotProvisioned;
 
+/// Platform activation is authoritative; never expose release SQL or source errors.
+#[derive(Error, Debug, Clone)]
+#[error("AI generation is unavailable pending platform activation of its current source release. Contact platform support to activate this AI feature.")]
+pub struct GenerationSourceUnavailable;
+
 #[derive(Error, Debug)]
 pub enum AppError {
     #[error("Not found: {0}")]
@@ -42,17 +47,36 @@ pub enum AppError {
     #[error("Unavailable: {0}")]
     Unavailable(String),
 
+    /// Static guidance only: provider failures must never enter the public body.
+    #[error("AI retrieval is unavailable and no authorized grounding was found. A platform administrator needs to check this company's AI service. You can instead open a permitted record or provide authorized live context before asking again.")]
+    RetrievalUnavailable,
+
     #[error(transparent)]
     SkillNotProvisioned(#[from] SurfaceSkillNotProvisioned),
 
     #[error(transparent)]
     DefaultAgentNotProvisioned(#[from] DefaultAgentNotProvisioned),
+
+    #[error(transparent)]
+    GenerationSourceUnavailable(#[from] GenerationSourceUnavailable),
 }
 
 impl AppError {
+    /// Preserve platform source failures even when a release changes after setup.
+    pub fn from_generation(error: anyhow::Error) -> Self {
+        if error.is::<GenerationSourceUnavailable>() {
+            Self::from_agent_resolution(error)
+        } else {
+            Self::Internal(error.to_string())
+        }
+    }
+
     /// Missing catalog setup is unavailable, while other agent validation
     /// failures retain their existing bad-request behavior.
     pub fn from_agent_resolution(error: anyhow::Error) -> Self {
+        if error.is::<GenerationSourceUnavailable>() {
+            return Self::GenerationSourceUnavailable(GenerationSourceUnavailable);
+        }
         match error.downcast::<SurfaceSkillNotProvisioned>() {
             Ok(error) => Self::SkillNotProvisioned(error),
             Err(error) => match error.downcast::<DefaultAgentNotProvisioned>() {
@@ -75,6 +99,10 @@ impl IntoResponse for AppError {
             AppError::Embedding(m) => (StatusCode::BAD_GATEWAY, m.clone()),
             AppError::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m.clone()),
             AppError::Unavailable(m) => (StatusCode::SERVICE_UNAVAILABLE, m.clone()),
+            AppError::RetrievalUnavailable => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
+            AppError::GenerationSourceUnavailable(_) => {
+                (StatusCode::SERVICE_UNAVAILABLE, self.to_string())
+            }
             AppError::DefaultAgentNotProvisioned(error) => {
                 (StatusCode::SERVICE_UNAVAILABLE, error.to_string())
             }
@@ -85,6 +113,12 @@ impl IntoResponse for AppError {
 
         tracing::error!("Request error: {}", message);
         let mut body = json!({ "error": message });
+        if matches!(&self, Self::GenerationSourceUnavailable(_)) {
+            body["code"] = json!("ai_generation_source_unavailable");
+        }
+        if matches!(&self, Self::RetrievalUnavailable) {
+            body["code"] = json!("ai_retrieval_unavailable");
+        }
         if matches!(&self, Self::DefaultAgentNotProvisioned(_)) {
             body["code"] = json!("ai_default_agent_not_provisioned");
             body["recovery_path"] = json!("/ai-skills");
@@ -109,6 +143,49 @@ impl From<lumiere_auth_context::ActorContextError> for AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn source_unavailable_is_typed_sanitized_and_platform_actionable() {
+        for during_generation in [false, true] {
+            let error =
+                anyhow::Error::new(GenerationSourceUnavailable).context("private SQL detail");
+            let response = if during_generation {
+                AppError::from_generation(error)
+            } else {
+                AppError::from_agent_resolution(error)
+            }
+            .into_response();
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+            let body = axum::body::to_bytes(response.into_body(), 4096)
+                .await
+                .unwrap();
+            let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(body["code"], "ai_generation_source_unavailable");
+            assert_eq!(body["error"], GenerationSourceUnavailable.to_string());
+            assert!(body["error"]
+                .as_str()
+                .unwrap()
+                .contains("platform activation"));
+            assert!(!body.to_string().contains("private SQL"));
+            assert!(body.get("recovery_path").is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn retrieval_unavailable_returns_static_safe_recovery() {
+        let response = AppError::RetrievalUnavailable.into_response();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["code"], "ai_retrieval_unavailable");
+        assert!(body.get("recovery_path").is_none());
+        assert_eq!(body["error"], AppError::RetrievalUnavailable.to_string());
+        assert!(body["error"].as_str().unwrap().contains("administrator"));
+        assert!(body["error"].as_str().unwrap().contains("permitted record"));
+        assert!(!body["error"].as_str().unwrap().contains("Retry"));
+    }
 
     #[tokio::test]
     async fn missing_surface_returns_actionable_service_unavailable() {

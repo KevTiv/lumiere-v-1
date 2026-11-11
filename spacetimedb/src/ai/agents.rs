@@ -9,6 +9,17 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
+fn require_agent_delegated_scope(ctx: &ReducerContext, agent: &AiAgent) -> Result<(), String> {
+    if let Some(company_id) =
+        crate::core::permissions::caller_delegated_company_scope(ctx, agent.organization_id)
+    {
+        if agent.company_id != Some(company_id) {
+            return Err("AI agent is outside the delegated company scope".into());
+        }
+    }
+    Ok(())
+}
+
 // ============================================================================
 // PARAMS TYPES
 // ============================================================================
@@ -321,7 +332,12 @@ pub fn set_ai_agent_action(
     check_permission(ctx, organization_id, "ai_agent", "write")?;
     if !matches!(
         action.as_str(),
-        "chat" | "analytics_read" | "analytics_run" | "web_search"
+        "chat"
+            | "analytics_read"
+            | "analytics_run"
+            | "web_search"
+            | "embedding_query"
+            | "embedding_index"
     ) {
         return Err("Unsupported AI agent action".to_string());
     }
@@ -334,6 +350,7 @@ pub fn set_ai_agent_action(
     if agent.organization_id != organization_id {
         return Err("AI agent does not belong to this organization".to_string());
     }
+    require_agent_delegated_scope(ctx, &agent)?;
     if agent.allowed_actions.contains(&action) == enabled {
         return Ok(());
     }
@@ -359,6 +376,133 @@ pub fn set_ai_agent_action(
                 serde_json::json!({ "action": action, "enabled": enabled }).to_string(),
             ),
             changed_fields: vec!["allowed_actions".to_string()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
+
+/// Validate operator activation authority without changing application state.
+/// The reviewed operator workflow calls this before any capability, price or binding write.
+#[reducer]
+pub fn check_ai_agent_activation(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    agent_id: u64,
+    configure_meter: bool,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_agent", "write")?;
+    check_permission(ctx, organization_id, "ai_skill", "write")?;
+    let agent = ctx
+        .db
+        .ai_agent()
+        .id()
+        .find(agent_id)
+        .ok_or("AI agent not found")?;
+    if agent.organization_id != organization_id || !agent.is_active {
+        return Err("AI agent is unavailable for this organization".into());
+    }
+    require_agent_delegated_scope(ctx, &agent)?;
+    if configure_meter {
+        super::metered_spend::require_platform_superuser(ctx)?;
+        check_permission(ctx, organization_id, "ai_spend", "configure_meter")?;
+    }
+    Ok(())
+}
+
+/// Change one exact model binding without replacing configuration, scope or usage.
+#[reducer]
+pub fn set_ai_agent_model(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    agent_id: u64,
+    model: String,
+    enabled: bool,
+) -> Result<(), String> {
+    use super::model_configuration::ai_model_profile;
+
+    check_permission(ctx, organization_id, "ai_agent", "write")?;
+    let mut agent = ctx
+        .db
+        .ai_agent()
+        .id()
+        .find(agent_id)
+        .ok_or("AI agent not found")?;
+    if agent.organization_id != organization_id {
+        return Err("AI agent does not belong to this organization".into());
+    }
+    require_agent_delegated_scope(ctx, &agent)?;
+    let lower = model.to_ascii_lowercase();
+    if enabled
+        && (model.is_empty()
+            || model.len() > 128
+            || !model
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"-_./:".contains(&b))
+            || !model.as_bytes()[0].is_ascii_alphanumeric()
+            || model.split(['-', '_', '.', '/', ':']).any(|part| {
+                matches!(
+                    part.to_ascii_lowercase().as_str(),
+                    "latest"
+                        | "rolling"
+                        | "default"
+                        | "auto"
+                        | "placeholder"
+                        | "unknown"
+                        | "test"
+                        | "todo"
+                )
+            })
+            || lower == "none")
+    {
+        return Err("A bounded exact model identifier is required".into());
+    }
+    if !enabled && model == agent.model {
+        return Err("Cannot remove the selected generation model".into());
+    }
+    if agent.allowed_models.contains(&model) == enabled {
+        return Ok(());
+    }
+    // Profiles are the existing provider/model authority. Embedding uses the
+    // separately metered Mistral model rather than a generation-role profile.
+    if enabled
+        && !((model == "mistral-embed" && agent.provider.eq_ignore_ascii_case("mistral"))
+            || (model != "mistral-embed"
+                && ctx
+                    .db
+                    .ai_model_profile()
+                    .ai_model_profile_by_org()
+                    .filter(organization_id)
+                    .any(|p| {
+                        p.is_active
+                            && p.model == model
+                            && p.provider.eq_ignore_ascii_case(&agent.provider)
+                    })))
+    {
+        return Err("Model is not configured for the AI agent provider".into());
+    }
+    let old_models = agent.allowed_models.clone();
+    if enabled {
+        agent.allowed_models.push(model);
+    } else {
+        agent.allowed_models.retain(|existing| existing != &model);
+    }
+    let company_id = agent.company_id;
+    let new_models = agent.allowed_models.clone();
+    agent.write_uid = ctx.sender();
+    agent.write_date = ctx.timestamp;
+    ctx.db.ai_agent().id().update(agent);
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id,
+            table_name: "ai_agent",
+            record_id: agent_id,
+            action: "write",
+            old_values: Some(serde_json::json!({"allowed_models": old_models}).to_string()),
+            new_values: Some(serde_json::json!({"allowed_models": new_models}).to_string()),
+            changed_fields: vec!["allowed_models".into()],
             metadata: None,
         },
     );

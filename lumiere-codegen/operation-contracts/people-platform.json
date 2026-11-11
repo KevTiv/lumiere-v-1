@@ -5091,6 +5091,26 @@
       },
       "evidence": "spacetimedb/src/ai/agents.rs: updates one authorized action binding and preserves other agent configuration; exact retries return without a write"
     },
+    "set_ai_agent_model": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/agents.rs: updates one provider-compatible model binding after authorization and organization/company scope checks; exact retries return without a write"
+    },
+    "check_ai_agent_activation": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/agents.rs: validates the actual native agent, skill and optional meter authority through existing authorization owners without writing application state"
+    },
     "set_ai_agent_run_wait_state": {
       "semantic_kind": "internal",
       "client_facing": false,

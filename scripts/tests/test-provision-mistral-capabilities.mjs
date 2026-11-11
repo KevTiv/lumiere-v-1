@@ -93,12 +93,125 @@ test('offline plan validates exact meters and declares separate release and acce
   assert.ok(plan.remainingGates.some(gate => gate.includes('contract')))
 })
 
+function reviewedRepair() {
+  const f = fixture()
+  f.config.surfaces = f.config.surfaces.filter(s => s.skillKey !== 'document_ocr')
+  f.config.meters = f.config.meters.filter(m => m.unit !== 'pages')
+  f.state.agent.allowed_models = f.state.agent.allowed_models.filter(m => m !== 'mistral-embed')
+  f.state.agent.allowed_actions = ['chat', 'ocr']
+  f.config.agentCapabilities = { addModels: ['mistral-embed'], addActions: ['embedding_query', 'embedding_index'] }
+  f.probes = []
+  f.client.verifyActivationAuthority = async (...args) => { f.probes.push(args) }
+  const call = f.client.call.bind(f.client)
+  f.client.call = async (name, args) => {
+    if (!name.startsWith('set_ai_agent_')) return call(name, args)
+    f.writes.push({ name, args })
+    f.state.agent[name === 'set_ai_agent_model' ? 'allowed_models' : 'allowed_actions'].push(args[2])
+  }
+  return f
+}
+
+test('reviewed missing-only toggles preserve agent and pool; replay is empty', async () => {
+  const f = reviewedRepair(), before = structuredClone(f.state)
+  await provisionCapabilities(f.config, f.client, true, now)
+  assert.deepEqual(f.writes.slice(0, 3).map(w => w.name), ['set_ai_agent_model', 'set_ai_agent_action', 'set_ai_agent_action'])
+  assert.deepEqual(f.state.budgets, before.budgets)
+  for (const key of Object.keys(before.agent).filter(k => !k.startsWith('allowed_'))) assert.deepEqual(f.state.agent[key], before.agent[key])
+  const count = f.writes.length
+  await provisionCapabilities(f.config, f.client, true, now)
+  assert.equal(f.writes.length, count)
+})
+
+test('default strict behavior and all structural/authority failures precede writes', async () => {
+  for (const breakIt of [
+    f => { delete f.config.agentCapabilities },
+    f => { f.config.agentCapabilities.addModels.push('unknown') },
+    f => { f.config.agentCapabilities.addActions.push('embedding_query') },
+    f => { f.state.agent.company_id = { some: 99 } },
+    f => { f.state.evidence[0].status = [1, []] },
+    f => { f.state.policy.is_active = false },
+    f => { f.client.verifyActivationAuthority = async () => { throw new Error('authority denied') } },
+    f => { f.client.verifyActivationAuthority = async () => { throw new Error('schema mismatch') } },
+  ]) {
+    const f = reviewedRepair()
+    breakIt(f)
+    await assert.rejects(provisionCapabilities(f.config, f.client, true, now))
+    assert.deepEqual(f.writes, [])
+  }
+})
+
+test('unknown toggle outcome stops before pricing or binding', async () => {
+  const f = reviewedRepair()
+  f.client.call = async name => { f.writes.push(name); throw new Error('unknown outcome') }
+  await assert.rejects(provisionCapabilities(f.config, f.client, true, now), /unknown outcome/)
+  assert.deepEqual(f.writes, ['set_ai_agent_model'])
+})
+
+test('HTTP capability preflight blocks stale schema without substituting credentials', async () => {
+  const requests = []
+  const client = httpClient({ STDB_HOST: 'http://localhost:3000', STDB_MODULE: 'fixture',
+    AI_GATEWAY_URL: 'http://localhost:8787', STDB_SERVER_TOKEN: 'operator',
+    AI_SPEND_READ_STDB_TOKEN: 'reader', STDB_TOKEN: 'writer', LUMIERE_AI_GATEWAY_INTERNAL_SECRET: 'secret' },
+  async (url, init) => {
+    requests.push({ url, init })
+    return new Response(JSON.stringify([{ schema: { elements: [{ name: { some: 'id' } }] }, rows: [[9]] }]))
+  })
+  await assert.rejects(client.verifyActivationAuthority(9, 12, true), /invalid deployed activation schema/)
+  assert.equal(requests.length, 1)
+  assert.ok(requests[0].url.endsWith('/schema?version=9'))
+  assert.equal(requests[0].init.headers.Authorization, 'Bearer operator')
+})
+
+test('HTTP deployed primitive signatures precede native no-write authorization probe', async () => {
+  const signatures = [
+    ['check_ai_agent_activation', [['organization_id', 'U64'], ['agent_id', 'U64'], ['configure_meter', 'Bool']]],
+    ['set_ai_agent_model', [['organization_id', 'U64'], ['agent_id', 'U64'], ['model', 'String'], ['enabled', 'Bool']]],
+    ['set_ai_agent_action', [['organization_id', 'U64'], ['agent_id', 'U64'], ['action', 'String'], ['enabled', 'Bool']]],
+  ]
+  for (const scenario of ['valid', 'denied', 'stale']) {
+    const requests = []
+    const schema = { reducers: signatures.map(([name, params]) => ({ name,
+      params: { elements: params.map(([name, type]) => ({ name: { some: name }, algebraic_type: { [type]: [] } })) } })) }
+    if (scenario === 'stale') schema.reducers[1].params.elements[2].algebraic_type = { U64: [] }
+    const client = httpClient({ STDB_HOST: 'http://localhost:3000', STDB_MODULE: 'fixture',
+      AI_GATEWAY_URL: 'http://localhost:8787', STDB_SERVER_TOKEN: 'operator',
+      AI_SPEND_READ_STDB_TOKEN: 'reader', STDB_TOKEN: 'writer', LUMIERE_AI_GATEWAY_INTERNAL_SECRET: 'secret' },
+    async (url, init) => {
+      requests.push({ url, init })
+      if (init.method === 'GET') return new Response(JSON.stringify(schema))
+      assert.ok(url.endsWith('/call/check_ai_agent_activation'))
+      assert.deepEqual(JSON.parse(init.body), [9, 12, true])
+      assert.equal(init.headers.Authorization, 'Bearer operator')
+      return new Response(scenario === 'denied' ? 'private body' : '', { status: scenario === 'denied' ? 403 : 200 })
+    })
+    if (scenario === 'valid') await client.verifyActivationAuthority(9, 12, true)
+    else await assert.rejects(client.verifyActivationAuthority(9, 12, true),
+      scenario === 'stale' ? /signature mismatch/ : /HTTP 403/)
+    assert.equal(requests.length, scenario === 'stale' ? 1 : 2)
+  }
+})
+
 test('read-only check finds missing prices/bindings using dedicated monetary reader', async () => {
   const { config, client, reads, writes } = fixture()
   const result = await provisionCapabilities(config, client, false, now)
   assert.equal(result.ready, false); assert.equal(result.missing.length, 7)
   assert.equal(result.billableCalls, 0); assert.deepEqual(writes, [])
   assert.ok(reads.filter(row => /_read /.test(row.sql)).every(row => row.role === 'spend'))
+})
+
+test('certification accepts raw SQL unit variants and rejects failed or malformed tuples before writes', async () => {
+  const passed = fixture()
+  passed.state.evidence[0].status = [0, []]
+  const result = await provisionCapabilities(passed.config, passed.client, false, now)
+  assert.equal(result.missing.length, 7)
+  assert.deepEqual(passed.writes, [])
+  for (const status of [[1, []], [0], [0, [], 'extra'], [0, null], [0, ['payload']], ['0', []]]) {
+    const failed = fixture()
+    failed.state.evidence[0].status = status
+    await assert.rejects(provisionCapabilities(failed.config, failed.client, true, now),
+      /matching current passed company certification is required/)
+    assert.deepEqual(failed.writes, [])
+  }
 })
 
 test('explicit apply is idempotent and preserves budget, settings, instructions and overrides', async () => {
@@ -116,6 +229,31 @@ test('explicit apply is idempotent and preserves budget, settings, instructions 
   const after = structuredClone(state); writes.length = 0
   assert.equal((await provisionCapabilities(config, client, true, now)).ready, true)
   assert.deepEqual(state, after); assert.deepEqual(writes, [])
+})
+
+test('pool preservation ignores SQL row order but rejects concurrent monetary changes', async () => {
+  for (const changed of [false, true]) {
+    const { config, state, client } = fixture()
+    state.budgets.push({ ...state.budgets[0], id: 22, agent_id: 99,
+      limit_units: 0, settled_units: 0, outstanding_units: 0 })
+    const before = structuredClone(state.budgets)
+    const sql = client.sql.bind(client)
+    let budgetReads = 0
+    client.sql = async (statement, role) => {
+      const rows = await sql(statement, role)
+      if (!statement.includes('FROM ai_spend_budget_read ')) return rows
+      budgetReads += 1
+      if (budgetReads === 2 && changed) state.budgets[0].settled_units += 1
+      return budgetReads === 2 ? [...rows].reverse() : rows
+    }
+    const apply = provisionCapabilities(config, client, true, now)
+    if (changed) await assert.rejects(apply, /pool readback changed/)
+    else {
+      assert.equal((await apply).ready, true)
+      assert.deepEqual(state.budgets, before)
+    }
+    assert.equal(budgetReads, 2)
+  }
 })
 
 test('apply accepts an agent scoped to the requested company and preserves that scope', async () => {

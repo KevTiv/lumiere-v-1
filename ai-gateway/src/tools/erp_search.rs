@@ -75,6 +75,7 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
             query,
             "erp_search",
             None,
+            None,
         )
         .await
     }

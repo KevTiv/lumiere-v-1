@@ -25,21 +25,28 @@ test("chat preserves setup recovery in both streaming and JSON failures", async 
   const codes = [
     "ai_default_agent_not_provisioned",
     "ai_surface_skill_not_provisioned",
+    "ai_retrieval_unavailable",
+    "ai_generation_source_unavailable",
   ] as const
   for (const code of codes) {
     for (const stream of [true, false]) {
       const response = Response.json({ code, error: "Setup is required", recovery_path: "/ai-skills" }, { status: 503 })
+      let answers = 0, drafts = 0
       const result = await coordinateAssistantTurn({
         answer: async () => {
+          answers++
           if (stream) return readAssistantStream(response, metadata)
           throw await httpResponseError(response)
         },
+        drafts: async () => { drafts++; return [42] },
         isCurrent: () => true,
       })
       assert.deepEqual(result, {
         answer: { kind: "unavailable", setup: { code, message: "Setup is required", recoveryPath: "/ai-skills" } },
-        drafts: { kind: "not_requested" },
+        drafts: { kind: "ready", value: [42] },
       })
+      assert.equal(answers, 1)
+      assert.equal(drafts, 1)
     }
   }
 })
@@ -55,10 +62,31 @@ test("chat ignores unrecognized setup errors and external recovery paths", async
     answer: { kind: "unavailable" },
     drafts: { kind: "not_requested" },
   })
-  assert.deepEqual(await request("ai_default_agent_not_provisioned"), {
-    answer: { kind: "unavailable", setup: { code: "ai_default_agent_not_provisioned", message: "Internal detail", recoveryPath: undefined } },
+  assert.deepEqual(await request("ai_retrieval_unavailable"), {
+    answer: { kind: "unavailable", setup: { code: "ai_retrieval_unavailable", message: "Internal detail", recoveryPath: undefined } },
     drafts: { kind: "not_requested" },
   })
+})
+
+test("platform source activation is actionable without tenant configuration or retries", async () => {
+  let calls = 0
+  const message = "AI generation is unavailable pending platform activation of its current source release. Contact platform support to activate this AI feature."
+  const result = await coordinateAssistantTurn({
+    answer: async () => {
+      calls++
+      throw await httpResponseError(Response.json({
+        code: "ai_generation_source_unavailable", error: message,
+      }, { status: 503 }))
+    },
+    isCurrent: () => true,
+  })
+  assert.deepEqual(result, {
+    answer: { kind: "unavailable", setup: {
+      code: "ai_generation_source_unavailable", message, recoveryPath: undefined,
+    } },
+    drafts: { kind: "not_requested" },
+  })
+  assert.equal(calls, 1)
 })
 
 test("only the AI Skills route is restored as chat recovery metadata", () => {

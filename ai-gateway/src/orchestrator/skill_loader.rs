@@ -5,6 +5,28 @@ use stdb_client::StdbClient;
 
 use crate::skills::{compose_prompt, load_bundled_skill};
 
+/// Only executable generation surfaces require a certified current source.
+/// Embedding and indexing adapters are bounded infrastructure, not executables.
+pub(crate) async fn require_generation_source(
+    stdb: &StdbClient,
+    organization_id: u64,
+    skill_key: &str,
+) -> Result<()> {
+    if !matches!(
+        skill_key,
+        "rag_generation" | "form_suggestion" | "action_draft_generation"
+    ) {
+        return Ok(());
+    }
+    if organization_id == 0 {
+        return Err(crate::error::GenerationSourceUnavailable.into());
+    }
+    crate::harness::release_registry::load_active_manifest(stdb, organization_id, skill_key, 1)
+        .await
+        .map(|_| ())
+        .map_err(|_| crate::error::GenerationSourceUnavailable.into())
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GovernedRunRef {
     pub run_id: u64,
@@ -136,31 +158,58 @@ pub fn skill_agent_id(
     }
 }
 
+/// Resolve the effective catalog entry before interpreting activity. A local
+/// disablement or ambiguity must never expose a global (or bundled) fallback.
+pub(crate) async fn load_effective_catalog_skill(
+    stdb: &StdbClient,
+    org_id: u64,
+    skill_key: &str,
+) -> Result<Option<Value>> {
+    let escaped = skill_key.replace('\'', "''");
+    let scopes = if org_id == 0 {
+        vec![0]
+    } else {
+        vec![org_id, 0]
+    };
+    for scope in scopes {
+        let rows = stdb
+            .query_sql(&format!(
+                "SELECT * FROM ai_skill WHERE skill_key = '{escaped}' \
+                 AND organization_id = {scope} LIMIT 2"
+            ))
+            .await
+            .context("load scoped ai_skill")?;
+        if rows.len() > 1 {
+            anyhow::bail!("effective skill catalog is ambiguous");
+        }
+        let Some(row) = rows.into_iter().next() else {
+            continue;
+        };
+        if row.get("organizationId").and_then(Value::as_u64) != Some(scope)
+            || row.get("skillKey").and_then(Value::as_str) != Some(skill_key)
+            || row
+                .get("id")
+                .and_then(Value::as_u64)
+                .is_none_or(|id| id == 0)
+        {
+            anyhow::bail!("effective skill catalog returned a wrong scope or key");
+        }
+        if row.get("isActive").and_then(Value::as_bool) != Some(true) {
+            anyhow::bail!("effective skill catalog entry is inactive");
+        }
+        return Ok(Some(row));
+    }
+    Ok(None)
+}
+
 pub async fn load_skill(
     stdb: &StdbClient,
     org_id: u64,
     company_id: u64,
     skill_key: &str,
 ) -> Result<LoadedSkill> {
-    let escaped = skill_key.replace('\'', "''");
-    let mut rows = stdb
-        .query_sql(&format!(
-            "SELECT * FROM ai_skill WHERE skill_key = '{escaped}' \
-             AND organization_id = {org_id} AND is_active = true LIMIT 1"
-        ))
-        .await
-        .context("load organization ai_skill")?;
-    if rows.is_empty() {
-        rows = stdb
-            .query_sql(&format!(
-                "SELECT * FROM ai_skill WHERE skill_key = '{escaped}' \
-                 AND organization_id = 0 AND is_active = true LIMIT 1"
-            ))
-            .await
-            .context("load system ai_skill")?;
-    }
-
-    if let Some(skill_row) = rows.first() {
+    if let Some(skill_row) = load_effective_catalog_skill(stdb, org_id, skill_key).await? {
+        let skill_row = &skill_row;
         let skill_id = row_u64(skill_row, "id");
         let config = load_skill_config(stdb, org_id, company_id, skill_id).await?;
         let mut skill = LoadedSkill {
@@ -283,18 +332,26 @@ async fn load_skill_config(
         ))
         .await
         .context("load ai_skill_config")?;
-    Ok(select_skill_config(rows, company_id))
+    select_skill_config(rows, company_id)
 }
 
-fn select_skill_config(rows: Vec<Value>, company_id: u64) -> Option<Value> {
-    let exact = rows
+fn select_skill_config(rows: Vec<Value>, company_id: u64) -> Result<Option<Value>> {
+    let exact: Vec<_> = rows
         .iter()
-        .find(|row| row_u64(row, "companyId") == company_id)
-        .cloned();
-    exact.or_else(|| {
-        rows.into_iter()
-            .find(|row| row.get("companyId").is_none_or(Value::is_null))
-    })
+        .filter(|row| row_u64(row, "companyId") == company_id)
+        .collect();
+    let inherited: Vec<_> = rows
+        .iter()
+        .filter(|row| row.get("companyId").is_none_or(Value::is_null))
+        .collect();
+    if exact.len() > 1 || inherited.len() > 1 {
+        anyhow::bail!("effective skill binding is ambiguous");
+    }
+    Ok(exact
+        .first()
+        .or_else(|| inherited.first())
+        .copied()
+        .cloned())
 }
 
 pub async fn lookup_run_id(stdb: &StdbClient, run_key: &str) -> Result<u64> {
@@ -426,6 +483,7 @@ pub async fn create_generation_surface_run(
             "generation surface skill '{skill_key}' is not registered in the governed program catalog"
         ))?;
     let run_key = uuid::Uuid::new_v4().to_string();
+    require_generation_source(stdb, org_id, skill_key).await?;
     create_run_with_program_ref(
         stdb,
         org_id,
@@ -489,6 +547,7 @@ pub async fn create_or_recover_generation_surface_run(
         return Ok(run);
     }
 
+    require_generation_source(stdb, org_id, skill_key).await?;
     let create_result = create_run_with_program_ref(
         stdb,
         org_id,
@@ -886,8 +945,229 @@ pub async fn sync_bundled_skills(stdb: &StdbClient, organization_id: u64) -> Res
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+
+    /// SQL rows, not a resolver bypass: all release/source validation runs normally.
+    pub(crate) fn generation_source_rows(
+        statement: &str,
+        key: &str,
+        case: &str,
+    ) -> Option<Vec<Value>> {
+        use serde_json::json;
+        if statement.contains("FROM ai_skill_release ") {
+            assert!(statement.contains("organization_id = 1"));
+            return Some(if case == "missing" {
+                vec![]
+            } else {
+                vec![json!({"skill_version_id": 90})]
+            });
+        }
+        if statement.contains("FROM ai_skill_version ") {
+            assert!(statement.contains("organization_id = 1"));
+            let manifest = super::super::generation_surface_certification::manifest(key).unwrap();
+            return Some(vec![json!({
+                "id": 90, "organization_id": 1, "skill_id": 8, "skill_key": key,
+                "version": "1.0.0", "risk": "green",
+                "max_steps": manifest.limits.max_steps,
+                "max_tool_calls": manifest.limits.max_tool_calls,
+                "resources": manifest.named_resources, "output_types": [manifest.output_type],
+                "source_hash": if case == "stale" { "a".repeat(64) } else {
+                    super::super::generation_surface_certification::bundle_hash(key).unwrap()
+                }
+            })]);
+        }
+        if statement.contains("FROM ai_skill ") {
+            assert!(statement.contains("LIMIT 2"));
+            assert!(!statement.contains("is_active ="));
+            return Some(vec![json!({
+                "id": 8, "organization_id": if case == "foreign" { 999 } else { 1 },
+                "skill_key": key, "is_active": true
+            })]);
+        }
+        None
+    }
+
+    #[tokio::test]
+    async fn effective_catalog_sql_fails_closed_and_only_falls_back_on_absence() {
+        use axum::{extract::State, routing::post, Json, Router};
+        use std::sync::{Arc, Mutex};
+        type Fixture = (Vec<Value>, Vec<Value>, Vec<String>);
+        async fn sql(State(state): State<Arc<Mutex<Fixture>>>, statement: String) -> Json<Value> {
+            let mut state = state.lock().unwrap();
+            assert!(statement.contains("FROM ai_skill "));
+            assert!(statement.contains("skill_key = 'rag_generation'"));
+            assert!(statement.ends_with("LIMIT 2"));
+            assert!(!statement.contains("is_active ="));
+            assert!(!statement.contains(" OR "));
+            let rows = if statement.contains("organization_id = 1 ") {
+                state.0.clone()
+            } else {
+                assert!(statement.contains("organization_id = 0 "));
+                state.1.clone()
+            };
+            state.2.push(statement);
+            Json(sats_rows(rows))
+        }
+        let state = Arc::new(Mutex::new((vec![], vec![], vec![])));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let stdb = StdbClient::new(
+            format!("http://{}", listener.local_addr().unwrap()),
+            "fixture".into(),
+            "gateway".into(),
+        );
+        let app = Router::new()
+            .route("/v1/database/fixture/sql", post(sql))
+            .with_state(state.clone());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let local = serde_json::json!({
+            "id": 8, "organization_id": 1, "skill_key": "rag_generation", "is_active": true
+        });
+        let global = serde_json::json!({
+            "id": 9, "organization_id": 0, "skill_key": "rag_generation", "is_active": true
+        });
+        let mut inactive_local = local.clone();
+        inactive_local["is_active"] = false.into();
+        let mut inactive_global = global.clone();
+        inactive_global["is_active"] = false.into();
+        let mut wrong_scope = local.clone();
+        wrong_scope["organization_id"] = 99.into();
+        let mut wrong_key = local.clone();
+        wrong_key["skill_key"] = "other".into();
+        for (locals, globals, reads, success) in [
+            (vec![inactive_local], vec![global.clone()], 1, false),
+            (vec![], vec![inactive_global], 2, false),
+            (
+                vec![local.clone(), local.clone()],
+                vec![global.clone()],
+                1,
+                false,
+            ),
+            (vec![], vec![global.clone(), global.clone()], 2, false),
+            (vec![wrong_scope], vec![global.clone()], 1, false),
+            (vec![wrong_key], vec![global.clone()], 1, false),
+            (vec![], vec![global], 2, true),
+        ] {
+            *state.lock().unwrap() = (locals, globals, vec![]);
+            let result = load_effective_catalog_skill(&stdb, 1, "rag_generation").await;
+            assert_eq!(result.is_ok(), success);
+            if success {
+                assert_eq!(result.unwrap().unwrap()["id"], 9);
+            }
+            assert_eq!(state.lock().unwrap().2.len(), reads);
+            if !success {
+                // Both entry points use the same SQL rule and stop before any
+                // release/config lookup (or a bundled fallback).
+                state.lock().unwrap().2.clear();
+                assert!(load_skill(&stdb, 1, 3, "rag_generation").await.is_err());
+                assert_eq!(state.lock().unwrap().2.len(), reads);
+                state.lock().unwrap().2.clear();
+                assert!(crate::harness::release_registry::load_active_manifest(
+                    &stdb,
+                    1,
+                    "rag_generation",
+                    1
+                )
+                .await
+                .is_err());
+                assert_eq!(state.lock().unwrap().2.len(), reads);
+            }
+        }
+        server.abort();
+    }
+
+    pub(crate) fn sats_rows(rows: Vec<Value>) -> Value {
+        let names: Vec<_> = rows
+            .first()
+            .and_then(Value::as_object)
+            .map(|row| row.keys().cloned().collect::<Vec<_>>())
+            .unwrap_or_default();
+        serde_json::json!([{
+            "schema": {"elements": names.iter().map(|name| serde_json::json!({"name": {"some": name}})).collect::<Vec<_>>()},
+            "rows": rows.iter().map(|row| names.iter().map(|name| row[name].clone()).collect::<Vec<_>>()).collect::<Vec<_>>()
+        }])
+    }
+
+    #[tokio::test]
+    async fn generation_source_gate_uses_current_scoped_release_and_exempts_infrastructure() {
+        use axum::{extract::State, routing::post, Json, Router};
+        use std::sync::{Arc, Mutex};
+        async fn sql(
+            State(state): State<Arc<Mutex<(&'static str, &'static str)>>>,
+            statement: String,
+        ) -> Json<Value> {
+            let (key, case) = *state.lock().unwrap();
+            let rows = generation_source_rows(&statement, key, case).unwrap_or_else(|| {
+                if statement.contains("FROM ai_skill_config ")
+                    || statement.contains("FROM ai_agent_run ")
+                {
+                    vec![]
+                } else if statement.contains("FROM ai_skill ") {
+                    vec![serde_json::json!({"id": 8, "skill_key": key})]
+                } else {
+                    panic!("unexpected source/run query: {statement}")
+                }
+            });
+            Json(sats_rows(rows))
+        }
+        let state = Arc::new(Mutex::new(("rag_generation", "active")));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let stdb = StdbClient::new(
+            format!("http://{}", listener.local_addr().unwrap()),
+            "fixture".into(),
+            "gateway".into(),
+        );
+        let app = Router::new()
+            .route("/v1/database/fixture/sql", post(sql))
+            .with_state(state.clone());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        for key in [
+            "rag_generation",
+            "form_suggestion",
+            "action_draft_generation",
+        ] {
+            for case in ["missing", "stale", "foreign", "active"] {
+                *state.lock().unwrap() = (key, case);
+                let result = require_generation_source(&stdb, 1, key).await;
+                if case == "active" {
+                    result.unwrap();
+                    // Revoke/change a source after admission: no cached success.
+                    for changed in ["missing", "stale"] {
+                        *state.lock().unwrap() = (key, changed);
+                        assert!(require_generation_source(&stdb, 1, key)
+                            .await
+                            .unwrap_err()
+                            .is::<crate::error::GenerationSourceUnavailable>());
+                    }
+                } else {
+                    assert!(result
+                        .unwrap_err()
+                        .is::<crate::error::GenerationSourceUnavailable>());
+                }
+            }
+            *state.lock().unwrap() = (key, "missing");
+            assert!(
+                create_generation_surface_run(&stdb, 1, 3, key, 42, None, "{}", "actor",)
+                    .await
+                    .unwrap_err()
+                    .is::<crate::error::GenerationSourceUnavailable>()
+            );
+            assert!(create_or_recover_generation_surface_run(
+                &stdb, 1, 3, key, 42, None, "new-run", "{}", "actor",
+            )
+            .await
+            .unwrap_err()
+            .is::<crate::error::GenerationSourceUnavailable>());
+        }
+        server.abort();
+        for key in [
+            "embedding_query",
+            "document_embeddings",
+            "activity_indexing",
+        ] {
+            require_generation_source(&stdb, 1, key).await.unwrap();
+        }
+    }
 
     fn legacy_analytics_skill(skill_key: &str) -> LoadedSkill {
         LoadedSkill {
@@ -982,13 +1262,29 @@ mod tests {
             ],
             267,
         )
+        .unwrap()
         .unwrap();
         assert_eq!(row_u64(&selected, "id"), 2);
 
         let fallback =
             select_skill_config(vec![serde_json::json!({"id": 1, "companyId": null})], 999)
+                .unwrap()
                 .unwrap();
         assert_eq!(row_u64(&fallback, "id"), 1);
+    }
+
+    #[test]
+    fn ambiguous_skill_bindings_never_pick_an_arbitrary_row() {
+        for company in [serde_json::json!(267), Value::Null] {
+            assert!(select_skill_config(
+                vec![
+                    serde_json::json!({"id": 51, "companyId": company, "isEnabled": false}),
+                    serde_json::json!({"id": 73, "companyId": company, "isEnabled": true}),
+                ],
+                267,
+            )
+            .is_err());
+        }
     }
 
     fn generation_run_binding(inputs_json: &str) -> GenerationSurfaceRunBinding<'_> {

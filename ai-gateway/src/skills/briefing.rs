@@ -184,6 +184,7 @@ pub async fn collect_briefing_context(
             &query,
             "daily_briefing",
             None,
+            None,
         )
         .await?;
         state

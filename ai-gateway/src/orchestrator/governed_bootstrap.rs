@@ -415,7 +415,7 @@ mod tests {
                 ]
             } else if statement.contains("FROM ai_skill ") {
                 vec![
-                    json!({"id": 8, "organization_id": 9, "skill_key": "report_analysis",
+                    json!({"id": 8, "organization_id": 9, "skill_key": "report_analysis", "is_active": true,
                     "name": "Report Analysis", "prompt_template": "test", "default_max_steps": 8,
                     "default_max_tool_calls": 12, "required_tools": [], "optional_tools": []}),
                 ]

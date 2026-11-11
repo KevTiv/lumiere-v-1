@@ -8,13 +8,16 @@ or scoped to the requested company. This procedure does not create credit or
 increase the monthly allowance.
 Recorded local checks and generated-candidate hashes are in the
 [validation report](mistral-alpha-validation.md).
+The current tenant repair has a separate
+[candidate validation checkpoint](../evidence/alpha-ai-activation-candidate-validation.md);
+neither report establishes live activation.
 
 ## Release before activation
 
-The native module adds private `ai_metered_price` and `ai_metered_usage` tables,
+The original metering release added private `ai_metered_price` and `ai_metered_usage` tables,
 their dedicated-reader views and five non-client metering operations. The
-canonical contracts are published as immutable release `v0.3.166`, and the Rust
-and frontend consumer pins match that release. Migration 36 is registered in
+canonical contracts were published as immutable release `v0.3.166`. This is
+historical, not the current application pin. Migration 36 is registered in
 the durable ledger and API catalog with the generated reconstruction output.
 Future schema changes must follow the same generation, review, publication and
 pin-alignment lane. Do not hand-edit generated contracts or earlier migrations.
@@ -25,6 +28,37 @@ Deploy the module, durable storage migration, API, AI gateway, web and Kong as o
 compatible ordered stack release. Retain the previous coherent artifacts and
 the expanded private data when rehearsing rollback. Do not roll back to a native
 spend implementation that can settle a metered reservation as ordinary tokens.
+
+The current repair adds `set_ai_agent_model` and the no-application-write
+`check_ai_agent_activation` probe. Its canonical candidate adds two operations
+and no table or durable migration. Publish and pin the matching immutable
+contracts before deploying consumers; do not assume the previous `0.3.178` pin
+contains these operations.
+
+Generation source activation is a separate gate from contracts publication:
+
+1. Discover each exact manifest from the candidate gateway's skill-binding
+   discovery endpoint. `gateway certification-bundles` also prints the current
+   compiled hashes for chat, forms, action drafts, report analysis, low-stock
+   and report composition. Never copy a hash from a different build.
+2. Through the canonical skill-version/certification owner, register a new
+   immutable version, run its independent fixture envelope, review the
+   certificate and promote the release. Do not overwrite an old version, copy another skill's
+   certificate or turn a synthetic fixture result into live provider evidence.
+3. The new chat/form/action adapters initially use `1.0.0`. Shared source changes
+   also advance report analysis to `1.0.10`, low-stock/report composition to
+   `1.0.1`, and the five Finance reviews to `1.0.4`. Re-certify affected enabled
+   surfaces against this exact build before advertising availability.
+4. RAG certification requires an immutable ordered `accessTranscript` of exact
+   scoped grant and passage reads, including both release-time rechecks.
+   Removing a recheck, leaving unused entries, or withdrawing access must not
+   produce a passing supported answer.
+5. Runtime checks the effective tenant-local catalog first, including explicit
+   disablement, and rechecks current generation source before new runs and
+   each paid generation, RAG query embedding and review attempt. Old source
+   releases therefore fail closed during an incoherent rollout. Coordinate
+   gateway deployment and certification promotion; retain coherent rollback
+   artifacts instead of disabling these checks.
 
 ## Provider and index configuration
 
@@ -103,10 +137,42 @@ their exact `sourceHash`. Each meter contains `model`, `unit` and `unitsPer1k`.
 Prices are integer currency microunits per 1,000 tokens or per 1,000 OCR pages.
 Obtain current prices; no price or funding amount is inferred from this runbook.
 
+This is a **platform operator** workflow, not a tenant onboarding checklist.
+The tenant-facing goal is to open chat and use the approved default; future
+approved-model selection belongs in chat without exposing infrastructure setup.
+The AI Skills binding/catalog repair result is not execution readiness.
+
+For the reviewed non-OCR repair of an existing agent, the manifest may include
+this optional fragment:
+
+```json
+{
+  "agentCapabilities": {
+    "addModels": ["mistral-embed"],
+    "addActions": ["embedding_query", "embedding_index"]
+  }
+}
+```
+
+Omit additions that are not approved for the selected surfaces. Without this
+field, missing allowlist entries continue to block. The tool validates all
+structural prerequisites against the explicitly approved prospective allowlists
+before any mutation. It then verifies the deployed toggle signatures and calls
+the native `check_ai_agent_activation` authorization probe, which changes no
+application state. When a price is missing, this probe requires the existing
+platform pricing authority as well as agent/skill write authority. No
+JavaScript flag or successful SQL read grants these permissions.
+
+Apply adds only missing reviewed model/action entries, verifies that unrelated
+agent fields and scope are preserved, then writes missing prices and bindings
+and reads back the unchanged allowance. A stale schema, missing writer,
+catalog, certificate or operator authority blocks activation. The tool does not
+create those prerequisites or repair them by granting privileges.
+
 ```sh
 node scripts/provision-mistral-capabilities.mjs --plan /private/capabilities.json
 node scripts/provision-mistral-capabilities.mjs --check /private/capabilities.json
-# Apply only the reviewed missing prices and company bindings:
+# Apply only the reviewed missing capabilities, prices and company bindings:
 node scripts/provision-mistral-capabilities.mjs --apply /private/capabilities.json
 node scripts/provision-mistral-capabilities.mjs --check /private/capabilities.json
 ```

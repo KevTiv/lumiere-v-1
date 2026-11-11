@@ -148,7 +148,7 @@ test("existing full synchronization also refreshes the persisted registry", asyn
 
 
 test("company setup validates read-back scope and refreshes agent permissions", async () => {
-  const configured = { ...result, company_setup: { company_id: 42, status: "configured", message: "Configured" } }
+  const configured = { ...result, company_setup: { company_id: 42, status: "bindings_applied", message: "Bindings only", stage: "platform_activation_required", execution_readiness: "not_verified" } }
   const f = fixture(configured)
   const mutation = f.hooks.useProvisionAiSurfaces(7, 42)
   assert.deepEqual(JSON.parse(JSON.stringify(await mutation.mutationFn())), configured)
@@ -168,7 +168,7 @@ test("company setup validates read-back scope and refreshes agent permissions", 
 })
 
 test("profile-required is a distinct setup result, not a ready claim", async () => {
-  const reply = { ...result, company_setup: { company_id: 42, status: "profile_required", message: "Profile required" } }
+  const reply = { ...result, company_setup: { company_id: 42, status: "profile_required", message: "Profile required", stage: "platform_activation_required", execution_readiness: "not_verified" } }
   assert.equal((await fixture(reply).hooks.useProvisionAiSurfaces(7, 42).mutationFn()).company_setup?.status, "profile_required")
   for (const setup of [null, {}, { company_id: 42, status: "ready", message: "Ready" }, { company_id: 42, status: "configured" }]) {
     assert.throws(() => fixture().hooks.parseAiSurfaceProvisioningResult({ ...result, company_setup: setup }), /could not be verified/)
@@ -177,10 +177,23 @@ test("profile-required is a distinct setup result, not a ready claim", async () 
 
 test("missing platform defaults and preserved settings may return a partial catalog without claiming ready", async () => {
   for (const status of ["profile_required", "preserved"] as const) {
-    const reply = { skills: [], company_setup: { company_id: 42, status, message: "Setup preserved" } }
+    const reply = { skills: [], company_setup: { company_id: 42, status, message: "Setup preserved", stage: "platform_activation_required", execution_readiness: "not_verified" } }
     assert.equal((await fixture(reply).hooks.useProvisionAiSurfaces(7, 42).mutationFn()).company_setup?.status, status)
   }
   assert.throws(() => fixture().hooks.parseAiSurfaceProvisioningResult({
     skills: [], company_setup: { company_id: 42, status: "configured", message: "Configured" },
   }), /could not be verified/)
+})
+
+test("binding evidence cannot be upgraded to execution readiness", () => {
+  const setup = { company_id: 42, status: "bindings_applied", message: "Bindings only",
+    stage: "platform_activation_required", execution_readiness: "not_verified" }
+  const parser = fixture().hooks.parseAiSurfaceProvisioningResult
+  assert.equal(parser({ ...result, company_setup: setup }).company_setup?.execution_readiness, "not_verified")
+  for (const override of [
+    { status: "configured" }, { execution_readiness: "ready" },
+    { execution_readiness: undefined }, { stage: undefined },
+  ]) {
+    assert.throws(() => parser({ ...result, company_setup: { ...setup, ...override } }), /could not be verified/)
+  }
 })

@@ -715,6 +715,11 @@ const PARAMS_CANCEL_WORKFLOW_TIMER: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("CancelWorkflowTimerParams") },
 ];
+const PARAMS_CHECK_AI_AGENT_ACTIVATION: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "agent_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "configure_meter", kind: ScalarKind::Bool, ref_target: None },
+];
 const PARAMS_CHECK_MO_AVAILABILITY: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -5130,6 +5135,12 @@ const PARAMS_SET_AI_AGENT_ACTIVE: &[ReducerParam] = &[
     ReducerParam { name: "agent_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "is_active", kind: ScalarKind::Bool, ref_target: None },
 ];
+const PARAMS_SET_AI_AGENT_MODEL: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "agent_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "model", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "enabled", kind: ScalarKind::Bool, ref_target: None },
+];
 const PARAMS_SET_AI_AGENT_RUN_WAIT_STATE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -6816,6 +6827,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "cancel_workflow", contract_operation_id: "erp.cancel_workflow", params: PARAMS_CANCEL_WORKFLOW, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "cancel_workflow_outbox", contract_operation_id: "erp.cancel_workflow_outbox", params: PARAMS_CANCEL_WORKFLOW_OUTBOX, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "cancel_workflow_timer", contract_operation_id: "erp.cancel_workflow_timer", params: PARAMS_CANCEL_WORKFLOW_TIMER, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "check_ai_agent_activation", contract_operation_id: "erp.check_ai_agent_activation", params: PARAMS_CHECK_AI_AGENT_ACTIVATION, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "check_mo_availability", contract_operation_id: "erp.check_mo_availability", params: PARAMS_CHECK_MO_AVAILABILITY, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "claim_ai_capability_execution", contract_operation_id: "erp.claim_ai_capability_execution", params: PARAMS_CLAIM_AI_CAPABILITY_EXECUTION, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "claim_ai_metered_dispatch", contract_operation_id: "erp.claim_ai_metered_dispatch", params: PARAMS_CLAIM_AI_METERED_DISPATCH, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -7869,6 +7881,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "send_sale_order_quotation", contract_operation_id: "erp.send_sale_order_quotation", params: PARAMS_SEND_SALE_ORDER_QUOTATION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "set_ai_agent_action", contract_operation_id: "erp.set_ai_agent_action", params: PARAMS_SET_AI_AGENT_ACTION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "set_ai_agent_active", contract_operation_id: "erp.set_ai_agent_active", params: PARAMS_SET_AI_AGENT_ACTIVE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "set_ai_agent_model", contract_operation_id: "erp.set_ai_agent_model", params: PARAMS_SET_AI_AGENT_MODEL, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "set_ai_agent_run_wait_state", contract_operation_id: "erp.set_ai_agent_run_wait_state", params: PARAMS_SET_AI_AGENT_RUN_WAIT_STATE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "set_ai_calibration_profile_active", contract_operation_id: "erp.set_ai_calibration_profile_active", params: PARAMS_SET_AI_CALIBRATION_PROFILE_ACTIVE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "set_ai_capability_role_grant", contract_operation_id: "erp.set_ai_capability_role_grant", params: PARAMS_SET_AI_CAPABILITY_ROLE_GRANT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -8333,6 +8346,7 @@ pub mod reducer_names {
     pub const CANCEL_WORKFLOW: ReducerName = ReducerName::new("cancel_workflow");
     pub const CANCEL_WORKFLOW_OUTBOX: ReducerName = ReducerName::new("cancel_workflow_outbox");
     pub const CANCEL_WORKFLOW_TIMER: ReducerName = ReducerName::new("cancel_workflow_timer");
+    pub const CHECK_AI_AGENT_ACTIVATION: ReducerName = ReducerName::new("check_ai_agent_activation");
     pub const CHECK_MO_AVAILABILITY: ReducerName = ReducerName::new("check_mo_availability");
     pub const CLAIM_AI_CAPABILITY_EXECUTION: ReducerName = ReducerName::new("claim_ai_capability_execution");
     pub const CLAIM_AI_METERED_DISPATCH: ReducerName = ReducerName::new("claim_ai_metered_dispatch");
@@ -9386,6 +9400,7 @@ pub mod reducer_names {
     pub const SEND_SALE_ORDER_QUOTATION: ReducerName = ReducerName::new("send_sale_order_quotation");
     pub const SET_AI_AGENT_ACTION: ReducerName = ReducerName::new("set_ai_agent_action");
     pub const SET_AI_AGENT_ACTIVE: ReducerName = ReducerName::new("set_ai_agent_active");
+    pub const SET_AI_AGENT_MODEL: ReducerName = ReducerName::new("set_ai_agent_model");
     pub const SET_AI_AGENT_RUN_WAIT_STATE: ReducerName = ReducerName::new("set_ai_agent_run_wait_state");
     pub const SET_AI_CALIBRATION_PROFILE_ACTIVE: ReducerName = ReducerName::new("set_ai_calibration_profile_active");
     pub const SET_AI_CAPABILITY_ROLE_GRANT: ReducerName = ReducerName::new("set_ai_capability_role_grant");
@@ -9835,6 +9850,7 @@ macro_rules! reducer_call {
     ("cancel_workflow", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_WORKFLOW, $args) };
     ("cancel_workflow_outbox", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_WORKFLOW_OUTBOX, $args) };
     ("cancel_workflow_timer", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_WORKFLOW_TIMER, $args) };
+    ("check_ai_agent_activation", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CHECK_AI_AGENT_ACTIVATION, $args) };
     ("check_mo_availability", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CHECK_MO_AVAILABILITY, $args) };
     ("claim_ai_capability_execution", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CLAIM_AI_CAPABILITY_EXECUTION, $args) };
     ("claim_ai_metered_dispatch", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CLAIM_AI_METERED_DISPATCH, $args) };
@@ -10888,6 +10904,7 @@ macro_rules! reducer_call {
     ("send_sale_order_quotation", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SEND_SALE_ORDER_QUOTATION, $args) };
     ("set_ai_agent_action", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_AGENT_ACTION, $args) };
     ("set_ai_agent_active", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_AGENT_ACTIVE, $args) };
+    ("set_ai_agent_model", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_AGENT_MODEL, $args) };
     ("set_ai_agent_run_wait_state", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_AGENT_RUN_WAIT_STATE, $args) };
     ("set_ai_calibration_profile_active", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_CALIBRATION_PROFILE_ACTIVE, $args) };
     ("set_ai_capability_role_grant", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SET_AI_CAPABILITY_ROLE_GRANT, $args) };
