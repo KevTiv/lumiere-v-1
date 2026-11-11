@@ -27,6 +27,7 @@ services:
       API_SERVER_UPSTREAM_HOST: api-server
       API_SERVER_UPSTREAM_PORT: 8082
       CORS_ORIGIN: ${NEXT_PUBLIC_APP_URL:-http://localhost:8000}
+      LUMIERE_POSTHOG_INGEST_ENABLED: ${LUMIERE_POSTHOG_INGEST_ENABLED:-false}
     ports:
       - "8000:8000"
     restart: unless-stopped
@@ -69,8 +70,10 @@ services:
       WORKOS_COOKIE_PASSWORD: ${WORKOS_COOKIE_PASSWORD:-}
       NEXT_PUBLIC_WORKOS_REDIRECT_URI: ${NEXT_PUBLIC_WORKOS_REDIRECT_URI:-}
       WORKOS_REDIRECT_URI: ${WORKOS_REDIRECT_URI:-}
-      POSTHOG_KEY: ${POSTHOG_KEY:-}
-      NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
+      POSTHOG_WEB_TOKEN: ${POSTHOG_WEB_TOKEN:-}
+      POSTHOG_HOST: ${POSTHOG_HOST:-}
+      POSTHOG_ASSETS_HOST: ${POSTHOG_ASSETS_HOST:-}
+      POSTHOG_UI_HOST: ${POSTHOG_UI_HOST:-}
     expose:
       - "3000"
     restart: unless-stopped
@@ -87,6 +90,8 @@ services:
       - chromium-worker
     environment:
       PORT: 8082
+      POSTHOG_KEY: ${POSTHOG_KEY:-}
+      POSTHOG_HOST: ${POSTHOG_HOST:-}
       NODE_ENV: production
       STDB_HOST: ${STDB_HOST:-https://maincloud.spacetimedb.com}
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE}
@@ -244,6 +249,8 @@ services:
       - qdrant
     environment:
       PORT: 8080
+      POSTHOG_KEY: ${POSTHOG_KEY:-}
+      POSTHOG_HOST: ${POSTHOG_HOST:-}
       LUMIERE_AI_GATEWAY_INTERNAL_SECRET: ${LUMIERE_AI_GATEWAY_INTERNAL_SECRET:?set LUMIERE_AI_GATEWAY_INTERNAL_SECRET}
       AI_EXECUTION_ENVELOPE_KEY: ${AI_EXECUTION_ENVELOPE_KEY:?set AI_EXECUTION_ENVELOPE_KEY}
       QDRANT_URL: http://qdrant:6334

@@ -30,6 +30,7 @@ import { useStdbConnection } from "@lumiere/stdb"
 import { useWorkOsAuthMode } from '@/lib/auth-mode-context'
 import { webApi } from "@/lib/lumiere-web-http"
 import { PostHogPageView } from "@/lib/posthog-pageview"
+import type { PostHogBrowserConfig } from "@/lib/posthog-config"
 import { apiFetch } from "@/lib/api-fetch"
 import { EFFECTIVE_ACCESS_ROLE_ID } from "@lumiere/ui/lib/runtime-form-role"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
@@ -202,6 +203,7 @@ export function Providers({
   serverIdentity,
   serverRoleNames,
   authorityExpiresAtMicros,
+  posthog,
   organizationId,
   companyIds,
   fieldAccess,
@@ -211,6 +213,7 @@ export function Providers({
   serverRoleNames?: string[]
   serverRoleIds?: readonly number[]
   authorityExpiresAtMicros?: number | null
+  posthog?: PostHogBrowserConfig
   organizationId?: number
   companyIds?: readonly number[]
   fieldAccess?: FieldAccessContext
@@ -228,7 +231,7 @@ export function Providers({
       <ThemeProvider>
         <SonnerToaster />
         <Suspense fallback={null}>
-          <PostHogPageView />
+          <PostHogPageView config={posthog} identity={authorityUnavailable ? undefined : serverIdentity} />
         </Suspense>
         <LumiereApiProvider client={webApi}>
           <QueryClientProvider client={queryClient}>

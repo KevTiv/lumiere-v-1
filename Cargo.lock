@@ -80,6 +80,7 @@ dependencies = [
  "lumiere-contracts",
  "lumiere-file-inspection",
  "lumiere-finance-review-core",
+ "lumiere-product-analytics",
  "qdrant-client",
  "reqwest",
  "serde",
@@ -168,6 +169,7 @@ dependencies = [
  "lumiere-file-inspection",
  "lumiere-finance-review-core",
  "lumiere-presentation-core",
+ "lumiere-product-analytics",
  "openssl",
  "printpdf",
  "pulldown-cmark",
@@ -2196,6 +2198,17 @@ dependencies = [
  "schemars 1.2.1",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "lumiere-product-analytics"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "reqwest",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

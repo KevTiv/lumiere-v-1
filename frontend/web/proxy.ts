@@ -4,6 +4,8 @@ import { isWorkOsEnabled } from './lib/auth-mode'
 import { withoutPkceCookie } from './lib/workos-pkce-cookie'
 import { NextResponse, NextRequest } from 'next/server'
 import { requiresPrivatePageLogin } from './lib/private-release-policy'
+import { readPostHogProjectToken } from './lib/posthog-config'
+import { posthogIngestRequest } from './lib/posthog-ingest'
 
 /**
  * Extracts Bearer token from Authorization header.
@@ -35,6 +37,17 @@ function isAuthenticated(request: NextRequest): boolean {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  if (pathname === '/ingest' || pathname.startsWith('/ingest/')) {
+    const upstream = posthogIngestRequest(request.nextUrl, request, {
+      token: readPostHogProjectToken(),
+      ingestHost: process.env.POSTHOG_HOST?.trim() || process.env.NEXT_PUBLIC_POSTHOG_HOST,
+      assetsHost: process.env.POSTHOG_ASSETS_HOST?.trim() || process.env.NEXT_PUBLIC_POSTHOG_ASSETS_HOST,
+    })
+    return upstream
+      ? NextResponse.rewrite(upstream.url, { request: { headers: upstream.headers } })
+      : new NextResponse(null, { status: 404 })
+  }
 
   if (isWorkOsEnabled()) {
     // Preserve the custom pathname marker while AuthKit strips forged internal headers,

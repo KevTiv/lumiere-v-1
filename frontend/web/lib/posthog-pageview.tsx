@@ -1,22 +1,26 @@
-'use client'
+"use client"
 
-import { usePathname, useSearchParams } from 'next/navigation'
-import { useEffect } from 'react'
-import { phCapture } from '@/lib/posthog-browser'
+import { usePathname } from "next/navigation"
+import { useEffect } from "react"
+import { initializeBrowserAnalytics, phCapture, phIdentifySession } from "./posthog-browser"
+import { analyticsPage } from "./posthog-events"
+import type { PostHogBrowserConfig } from "./posthog-config"
 
-/**
- * SPA `$pageview` events (automatic pageviews are disabled in `instrumentation-client.ts`).
- */
-export function PostHogPageView() {
+export function PostHogPageView({
+  identity,
+  config,
+}: {
+  identity?: string
+  config?: PostHogBrowserConfig
+}) {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
 
   useEffect(() => {
-    if (!pathname) return
-    const qs = searchParams?.toString()
-    const url = qs ? `${window.origin}${pathname}?${qs}` : `${window.origin}${pathname}`
-    phCapture('$pageview', { $current_url: url })
-  }, [pathname, searchParams])
+    if (!config) return
+    initializeBrowserAnalytics(config)
+    phIdentifySession(identity)
+    if (pathname) phCapture("$pageview", { $pathname: analyticsPage(pathname) })
+  }, [config, identity, pathname])
 
   return null
 }

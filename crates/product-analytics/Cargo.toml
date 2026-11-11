@@ -1,0 +1,13 @@
+[package]
+name = "lumiere-product-analytics"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "Best-effort delivery of allowlisted Lumiere product analytics"
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+reqwest.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true

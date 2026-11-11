@@ -12,7 +12,7 @@ render() {
     sh "$root/infra/kong/render-config.sh" --render-only
 }
 
-render
+LUMIERE_POSTHOG_INGEST_ENABLED=false render
 
 assert_contains() {
   expected="$1"
@@ -34,6 +34,14 @@ assert_contains '- /api/compat/reducer'
 assert_contains 'policy: cluster'
 assert_contains "- /health/ready"
 assert_contains "body: '{\"status\":\"ok\",\"service\":\"api-gateway\"}'"
+assert_contains "paths: ['/ingest', '/_vercel/insights']"
+
+LUMIERE_POSTHOG_INGEST_ENABLED=true render
+assert_contains "paths: ['/_vercel/insights']"
+if grep -Fq "paths: ['/ingest', '/_vercel/insights']" "$tmp/kong.yml"; then
+  echo 'render-kong-config test: PostHog ingestion is still blocked after opt-in' >&2
+  exit 1
+fi
 
 if grep -Eq '__[A-Z0-9_]+__' "$tmp/kong.yml"; then
   echo 'render-kong-config test: unresolved placeholder' >&2
@@ -72,6 +80,7 @@ reject_startup 'verified ingress proxy CIDRs' LUMIERE_ENV=production KONG_TRUSTE
 reject_startup 'globally trusted proxy range' LUMIERE_ENV=production KONG_TRUSTED_IPS='0.0.0.0/0'
 reject_startup 'globally trusted proxy range' LUMIERE_ENV=production KONG_TRUSTED_IPS='192.0.2.0/24, ::/0'
 reject_startup 'rate limit scope must be ip or service' LUMIERE_GATEWAY_RATE_LIMIT_SCOPE=header
+reject_startup 'LUMIERE_POSTHOG_INGEST_ENABLED must be true or false' LUMIERE_POSTHOG_INGEST_ENABLED=yes
 
 LUMIERE_GATEWAY_RATE_LIMIT_SCOPE=service render
 assert_contains 'limit_by: service'

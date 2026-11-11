@@ -70,6 +70,7 @@ interface ChatReply {
 interface AIChatPanelProps {
   open: boolean
   onClose: () => void
+  onRecoveryClick?: () => void
   /** Side chat shares the same mounted conversation as the full workspace. */
   docked?: boolean
   onDockToggle?: () => void
@@ -168,6 +169,7 @@ function selectionSummaryFromContext(context?: ChatContext): string | null {
 export function AIChatPanel({
   open,
   onClose,
+  onRecoveryClick,
   docked: requestedDocked = false,
   onDockToggle,
   workspaceHost,
@@ -883,7 +885,7 @@ export function AIChatPanel({
                         <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.content}</p>
                       </div>
                       {message.role === "assistant" && message.recoveryPath === "/ai-skills" && (
-                        <a className="text-sm font-medium text-primary underline underline-offset-4" href={message.recoveryPath}>
+                        <a className="text-sm font-medium text-primary underline underline-offset-4" href={message.recoveryPath} onClick={onRecoveryClick}>
                           {t("aiSkills.title")}
                         </a>
                       )}

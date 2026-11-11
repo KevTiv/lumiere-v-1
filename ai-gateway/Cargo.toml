@@ -12,6 +12,7 @@ phase4-acceptance = []
 
 [dependencies]
 lumiere-auth-context.workspace = true
+lumiere-product-analytics.workspace = true
 lumiere-finance-review-core.workspace = true
 lumiere-file-inspection.workspace = true
 axum = { workspace = true, features = ["macros", "multipart"] }

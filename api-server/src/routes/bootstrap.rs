@@ -258,6 +258,10 @@ async fn bootstrap_tenant_post(
 
     let payload = serde_json::to_value(&arg).map_err(ApiError::internal)?;
     dispatch_tenant_bootstrap(&state, &session, json!([payload])).await?;
+    state.analytics.capture(
+        &session.identity_hex,
+        lumiere_product_analytics::ProductEvent::TenantBootstrapped,
+    );
     Ok(Json(json!({ "ok": true })))
 }
 

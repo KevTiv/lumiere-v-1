@@ -51,7 +51,8 @@ test('API routes always use the runtime BFF, including builds without WorkOS con
     for (const clientId of [undefined, 'client_test']) {
       if (clientId === undefined) delete process.env.WORKOS_CLIENT_ID
       else process.env.WORKOS_CLIENT_ID = clientId
-      const result = await nextConfig.rewrites!()
+      const config: NextConfig = nextConfig
+      const result = await config.rewrites?.() ?? []
       const rewrites = Array.isArray(result) ? result : result.afterFiles ?? []
       assert.equal(rewrites.some((entry) => entry.source.startsWith('/api/')), false)
     }

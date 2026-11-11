@@ -30,6 +30,7 @@ import { guideDraftQuestion, guideQuestionEdits, guideQuestionContext, guideRequ
 import { isSavedGuide, type GuideDocument, type GuideDraft, type GuideReference, type OpenGuideRequest } from "@lumiere/ui/lib/assistant-guide-types"
 import { EntityCurrencyBoundary } from "@/lib/entity-currency-boundary"
 import { useErpSession } from "@lumiere/erp-session"
+import { captureAssistantIntent } from "@/lib/posthog-browser"
 import type { ChatContext, ChatMessage, ChatMessageSourceRef, ChatAction } from "@lumiere/ui"
 import {
   atCommandsToIncludeTypes,
@@ -535,6 +536,7 @@ function ErpAiChatPanel({
           throw new Error("The selected AI agent is no longer available. Choose another agent.")
         }
         try {
+          captureAssistantIntent("assistant_turn_submitted", identity, organizationId, operatingCompanyId)
           const answer = await rag.mutateAsync({
             query: selectedDocument.action === "explain"
               ? "Explain the selected spreadsheet cells."
@@ -584,6 +586,7 @@ function ErpAiChatPanel({
           if (selectedAgent !== "default" && requestedAgentId == null) {
             throw new Error("The selected AI agent is no longer available. Choose another agent.")
           }
+          captureAssistantIntent("assistant_turn_submitted", identity, organizationId, operatingCompanyId)
           if (!stream) return assistantAnswer(await rag.mutateAsync({
             query: questionGuide ? guideDraftQuestion(questionGuide, userText, hasUnsavedGuideEdits) : userText, companyId: operatingCompanyId,
             include_types: includeTypes, ui_context: uiContext, guide_refs: guideRefs, import_task_refs: importTaskRefs,
@@ -637,7 +640,7 @@ function ErpAiChatPanel({
       })
       return { content, runId: out?.run_id, sources, guides, recoveryPath, importTasks: taskStatuses, actions: actions.length ? actions : undefined }
     },
-    [orgId, orgReady, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft],
+    [orgId, orgReady, identity, organizationId, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft],
   )
   const onSendMessage = useCallback((text: string, guideRefs?: GuideReference[], questionGuide?: GuideDraft, hasUnsavedGuideEdits = false) => runTurn(text, false, guideRefs, questionGuide, hasUnsavedGuideEdits), [runTurn])
   const onStreamMessage = useCallback<NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>>(
@@ -710,6 +713,7 @@ function ErpAiChatPanel({
       onAgentChange={setSelectedAgent}
       onSendMessage={onSendMessage}
       onStreamMessage={onStreamMessage}
+      onRecoveryClick={() => captureAssistantIntent("assistant_recovery_clicked", identity, organizationId, operatingCompanyId)}
       onImportFiles={importTasks.onImportFiles}
       importFileNames={importTasks.fileNames}
       showWorkbench={!firstOrgProfile && permissionsReady && checkPermission("dashboard:analytics", "read").allowed}
@@ -794,9 +798,10 @@ function ModulesContent({
   }, [approvalInboxCountQuery.count])
 
   const openAiChat = useCallback(() => {
+    if (!isAIChatOpen) captureAssistantIntent("assistant_opened", identity, organizationId, operatingCompanyId)
     setIsAIChatDocked(true)
     setWorkspaceTool("assistant")
-  }, [])
+  }, [isAIChatOpen, identity, organizationId, operatingCompanyId])
   const openNotebook = () => setWorkspaceTool("notebook")
   const closeTool = (tool: "assistant" | "notebook") =>
     setWorkspaceTool((current) => current === tool ? null : current)

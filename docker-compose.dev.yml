@@ -121,6 +121,8 @@ services:
       CARGO_PROFILE_DEV_DEBUG: ${CARGO_PROFILE_DEV_DEBUG:-0}
       GIT_SSH_COMMAND: ssh -i /run/secrets/lumiere_contracts_ssh_key -o IdentitiesOnly=yes -o UserKnownHostsFile=/run/secrets/github_known_hosts
       PORT: 8080
+      POSTHOG_KEY: ${POSTHOG_KEY:-}
+      POSTHOG_HOST: ${POSTHOG_HOST:-}
       RUST_LOG: ${RUST_LOG:-ai_gateway=debug,tower_http=info}
       LUMIERE_AI_GATEWAY_INTERNAL_SECRET: ${LUMIERE_AI_GATEWAY_INTERNAL_SECRET:?set LUMIERE_AI_GATEWAY_INTERNAL_SECRET in .env.docker}
       AI_EXECUTION_ENVELOPE_KEY: ${AI_EXECUTION_ENVELOPE_KEY:-local-dev-trusted-envelope-key-32-bytes}
@@ -179,6 +181,8 @@ services:
       CARGO_PROFILE_DEV_DEBUG: ${CARGO_PROFILE_DEV_DEBUG:-0}
       GIT_SSH_COMMAND: ssh -i /run/secrets/lumiere_contracts_ssh_key -o IdentitiesOnly=yes -o UserKnownHostsFile=/run/secrets/github_known_hosts
       PORT: 8082
+      POSTHOG_KEY: ${POSTHOG_KEY:-}
+      POSTHOG_HOST: ${POSTHOG_HOST:-}
       RUST_LOG: ${RUST_LOG:-api_server=debug,tower_http=info}
       STDB_HOST: http://spacetimedb:3000
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
@@ -373,6 +377,10 @@ services:
       NEXT_TELEMETRY_DISABLED: "1"
       WATCHPACK_POLLING: "true"
       NEXT_PUBLIC_APP_URL: http://localhost:3001
+      POSTHOG_WEB_TOKEN: ${POSTHOG_WEB_TOKEN:-}
+      POSTHOG_HOST: ${POSTHOG_HOST:-}
+      POSTHOG_ASSETS_HOST: ${POSTHOG_ASSETS_HOST:-}
+      POSTHOG_UI_HOST: ${POSTHOG_UI_HOST:-}
       LUMIERE_API_SERVER_URL: http://api-server:8082
       LUMIERE_AI_GATEWAY_URL: http://ai-gateway:8080
       LUMIERE_AI_GATEWAY_INTERNAL_SECRET: ${LUMIERE_AI_GATEWAY_INTERNAL_SECRET:?set LUMIERE_AI_GATEWAY_INTERNAL_SECRET in .env.docker}

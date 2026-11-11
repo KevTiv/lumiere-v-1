@@ -183,6 +183,7 @@ async fn main() -> anyhow::Result<()> {
         spend_read_stdb,
         rig: rig.clone(),
         http: Arc::new(http),
+        analytics: lumiere_product_analytics::ProductAnalytics::from_env(),
         download_jobs: Arc::new(DashMap::new()),
         kaggle_search_cache: Arc::new(DashMap::new()),
         activity_watermarks: Arc::new(DashMap::new()),
