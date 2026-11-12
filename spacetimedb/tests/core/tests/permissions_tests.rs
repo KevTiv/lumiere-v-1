@@ -14,6 +14,7 @@ pub fn test_persistent_operator_enrollment(ctx: &ReducerContext) -> Result<(), S
     use crate::core::{
         audit::audit_log,
         auth::{user_credential, UserCredential},
+        permissions::user_role_assignment,
         platform_operator::enroll_with_policy,
         users::{user_organization, user_profile, UserOrganization, UserProfile},
     };
@@ -60,6 +61,56 @@ pub fn test_persistent_operator_enrollment(ctx: &ReducerContext) -> Result<(), S
         .iter()
         .filter(|m| m.user_identity == ctx.sender())
         .collect();
+    // Other core scenarios deliberately leave direct grants and assignments on
+    // the shared caller. Isolate all of its authority, not only memberships;
+    // the production guard must continue rejecting these supplemental grants.
+    let direct_org_grants: Vec<_> = ctx
+        .db
+        .org_permission()
+        .iter()
+        .filter(|g| matches!(g.subject, PermissionSubject::User(id) if id == ctx.sender()))
+        .collect();
+    let direct_field_grants: Vec<_> = ctx
+        .db
+        .field_permission()
+        .iter()
+        .filter(|g| matches!(g.subject, PermissionSubject::User(id) if id == ctx.sender()))
+        .collect();
+    let supplemental_roles: Vec<_> = ctx
+        .db
+        .user_role_assignment()
+        .iter()
+        .filter(|a| a.user_identity == ctx.sender())
+        .collect();
+    let authority_snapshot =
+        || {
+            let mut rows = Vec::new();
+            for row in
+                ctx.db.org_permission().iter().filter(
+                    |g| matches!(g.subject, PermissionSubject::User(id) if id == ctx.sender()),
+                )
+            {
+                rows.push(("org", spacetimedb::sats::bsatn::to_vec(&row).unwrap()));
+            }
+            for row in
+                ctx.db.field_permission().iter().filter(
+                    |g| matches!(g.subject, PermissionSubject::User(id) if id == ctx.sender()),
+                )
+            {
+                rows.push(("field", spacetimedb::sats::bsatn::to_vec(&row).unwrap()));
+            }
+            for row in ctx
+                .db
+                .user_role_assignment()
+                .iter()
+                .filter(|a| a.user_identity == ctx.sender())
+            {
+                rows.push(("role", spacetimedb::sats::bsatn::to_vec(&row).unwrap()));
+            }
+            rows.sort();
+            rows
+        };
+    let original_authority = authority_snapshot();
     let template = copy_profile(
         profiles
             .iter()
@@ -95,6 +146,15 @@ pub fn test_persistent_operator_enrollment(ctx: &ReducerContext) -> Result<(), S
     }
     for m in &memberships {
         ctx.db.user_organization().id().delete(m.id);
+    }
+    for grant in &direct_org_grants {
+        ctx.db.org_permission().id().delete(grant.id);
+    }
+    for grant in &direct_field_grants {
+        ctx.db.field_permission().id().delete(grant.id);
+    }
+    for assignment in &supplemental_roles {
+        ctx.db.user_role_assignment().id().delete(assignment.id);
     }
     let now = ctx.timestamp.to_micros_since_unix_epoch();
     let lease = format!("lumiere-platform-bootstrap-v1:{}:{}", now - 2, now - 1);
@@ -417,6 +477,18 @@ pub fn test_persistent_operator_enrollment(ctx: &ReducerContext) -> Result<(), S
     }
     for membership in memberships {
         ctx.db.user_organization().insert(membership);
+    }
+    for grant in direct_org_grants {
+        ctx.db.org_permission().insert(grant);
+    }
+    for grant in direct_field_grants {
+        ctx.db.field_permission().insert(grant);
+    }
+    for assignment in supplemental_roles {
+        ctx.db.user_role_assignment().insert(assignment);
+    }
+    if authority_snapshot() != original_authority {
+        return Err("operator fixture did not restore existing caller authority".into());
     }
     result
 }

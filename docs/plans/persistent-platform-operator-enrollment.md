@@ -179,8 +179,9 @@ principals, not production credentials or provider calls.
 | Shared policy / authentication / client suites | 15 / 94 / 18 passed |
 | Code generation, including normally ignored parity tests | 148 passed |
 | Build fingerprint, deployment policy and publisher payload tests | 27 passed |
+| API build-script generation test | Passed through the standalone runner with both existing and empty/custom Cargo artifact directories |
 | Isolated PostgreSQL projection regression, explicitly run with `--ignored` | Passed: projection, preservation, bounded lock waits, replay, confirmed-revocation compensation, unavailable-native behavior and changed-metadata protection |
-| Persisted native suites | Core permissions, AI owner configuration and AI spend recovery passed |
+| Persisted native suites | Combined `run_all_core_tests`, all 12 subsequent CI complete-outcome suites, AI owner configuration and AI spend recovery passed |
 | Production-compiled native + PostgreSQL + actual private CLI proof | Passed: default-deny/wrong-principal rejection, plan/check/apply/check/replay, two exact audits, administrative authority and revoked-state rejection |
 | Independent final security/source review | No remaining concrete blocking findings |
 
@@ -197,11 +198,17 @@ only a boolean parameter and denied generic exposure. No table or durable DDL
 change is introduced. Ignored tests are not acceptance evidence; the new
 PostgreSQL regression was executed separately as recorded above.
 
-Remaining gates are the immutable contracts release, clean-head CI, reviewed
-backend/module deployment with the approved production policy, and fresh
-private enrollment/readback. None of this local evidence establishes live
-Mistral provider access, successful indexing, a cited chat answer, settled
-production spend or full alpha acceptance.
+The combined native run also verifies fixture composition: earlier duty-policy
+scenarios leave direct grants on the shared caller. Enrollment tests temporarily
+isolate and then byte-for-byte restore those grants and supplemental assignments,
+alongside the caller's profiles and memberships. Production enrollment continues
+to reject all such additional authority.
+
+Immutable contracts `v0.3.180` has been published, pinned and verified. Remaining
+gates are clean-head CI, reviewed backend/module deployment with the approved
+production policy, and fresh private enrollment/readback. None of this local
+evidence establishes live Mistral provider access, successful indexing, a cited
+chat answer, settled production spend or full alpha acceptance.
 
 ## Provisioning after enrollment
 
