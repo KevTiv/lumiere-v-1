@@ -266,7 +266,7 @@ class Proof:
         database = "lumiere_operator_test_" + suffix
         self.pg_env = dict(self.env, PGHOST="127.0.0.1", PGPORT=str(pgport),
                            PGUSER="operator_test", PGDATABASE=database,
-                           PGPASSWORD="local-synthetic-only", PGSSLMODE="disable")
+                           PGSSLMODE="disable")
         self.run(["createdb", database], env=self.pg_env)
         schema = (ROOT / "api-server/src/platform_control/schema.rs").read_text()
         ddl = []
@@ -344,7 +344,7 @@ VALUES ({quote(platform)},{quote(a)},'operator@local.invalid',false,false,
                        STDB_SERVER_TOKEN=self.owner,
                        LUMIERE_PERSISTENT_PLATFORM_OPERATOR=policy,
                        PG_HOST="127.0.0.1", PG_PORT=str(pgport), PG_DATABASE=database,
-                       PG_USER="operator_test", PG_PASSWORD="local-synthetic-only",
+                       PG_USER="operator_test",
                        PG_TLS_MODE="disable", NODE_ENV="development",
                        LUMIERE_ENV="development")
 
