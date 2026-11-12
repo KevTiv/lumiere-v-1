@@ -2746,6 +2746,9 @@ const PARAMS_ENROLL_AI_COMPANY_DEFAULTS: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
 ];
+const PARAMS_ENROLL_PERSISTENT_PLATFORM_OPERATOR: &[ReducerParam] = &[
+    ReducerParam { name: "apply", kind: ScalarKind::Bool, ref_target: None },
+];
 const PARAMS_ENSURE_AI_MANAGED_ALLOWANCE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "agent_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -7262,6 +7265,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "enqueue_ai_run_follow_up", contract_operation_id: "erp.enqueue_ai_run_follow_up", params: PARAMS_ENQUEUE_AI_RUN_FOLLOW_UP, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "enqueue_job", contract_operation_id: "erp.enqueue_job", params: PARAMS_ENQUEUE_JOB, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "enroll_ai_company_defaults", contract_operation_id: "erp.enroll_ai_company_defaults", params: PARAMS_ENROLL_AI_COMPANY_DEFAULTS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "enroll_persistent_platform_operator", contract_operation_id: "erp.enroll_persistent_platform_operator", params: PARAMS_ENROLL_PERSISTENT_PLATFORM_OPERATOR, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: Some("identity, organization, company and approval reference derive from deployment policy; no caller-supplied enrollment target") },
     ReducerContract { name: "ensure_ai_managed_allowance", contract_operation_id: "erp.ensure_ai_managed_allowance", params: PARAMS_ENSURE_AI_MANAGED_ALLOWANCE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "ensure_dev_admin", contract_operation_id: "erp.ensure_dev_admin", params: PARAMS_ENSURE_DEV_ADMIN, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "error_intercompany_transaction", contract_operation_id: "erp.error_intercompany_transaction", params: PARAMS_ERROR_INTERCOMPANY_TRANSACTION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -8781,6 +8785,7 @@ pub mod reducer_names {
     pub const ENQUEUE_AI_RUN_FOLLOW_UP: ReducerName = ReducerName::new("enqueue_ai_run_follow_up");
     pub const ENQUEUE_JOB: ReducerName = ReducerName::new("enqueue_job");
     pub const ENROLL_AI_COMPANY_DEFAULTS: ReducerName = ReducerName::new("enroll_ai_company_defaults");
+    pub const ENROLL_PERSISTENT_PLATFORM_OPERATOR: ReducerName = ReducerName::new("enroll_persistent_platform_operator");
     pub const ENSURE_AI_MANAGED_ALLOWANCE: ReducerName = ReducerName::new("ensure_ai_managed_allowance");
     pub const ENSURE_DEV_ADMIN: ReducerName = ReducerName::new("ensure_dev_admin");
     pub const ERROR_INTERCOMPANY_TRANSACTION: ReducerName = ReducerName::new("error_intercompany_transaction");
@@ -10285,6 +10290,7 @@ macro_rules! reducer_call {
     ("enqueue_ai_run_follow_up", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ENQUEUE_AI_RUN_FOLLOW_UP, $args) };
     ("enqueue_job", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ENQUEUE_JOB, $args) };
     ("enroll_ai_company_defaults", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ENROLL_AI_COMPANY_DEFAULTS, $args) };
+    ("enroll_persistent_platform_operator", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ENROLL_PERSISTENT_PLATFORM_OPERATOR, $args) };
     ("ensure_ai_managed_allowance", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ENSURE_AI_MANAGED_ALLOWANCE, $args) };
     ("ensure_dev_admin", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ENSURE_DEV_ADMIN, $args) };
     ("error_intercompany_transaction", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ERROR_INTERCOMPANY_TRANSACTION, $args) };

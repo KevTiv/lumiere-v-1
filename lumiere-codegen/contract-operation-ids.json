@@ -1530,6 +1530,7 @@
     "register_ai_platform_template": "erp.register_ai_platform_template",
     "set_ai_platform_default": "erp.set_ai_platform_default",
     "publish_ai_platform_skill": "erp.publish_ai_platform_skill",
-    "ensure_ai_managed_allowance": "erp.ensure_ai_managed_allowance"
+    "ensure_ai_managed_allowance": "erp.ensure_ai_managed_allowance",
+    "enroll_persistent_platform_operator": "erp.enroll_persistent_platform_operator"
   }
 }

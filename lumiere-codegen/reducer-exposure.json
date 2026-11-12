@@ -30,6 +30,12 @@
       "reason": "Reviewed managed AI setup; native authorization enforces organization configuration permissions or platform superuser authority."
     },
     {
+      "name": "enroll_persistent_platform_operator",
+      "exposure": "denied",
+      "reason": "private operator enrollment; the deployment-compiled exact principal and existing scoped binding are enforced by native authorization",
+      "unscoped_reason": "identity, organization, company and approval reference derive from deployment policy; no caller-supplied enrollment target"
+    },
+    {
       "name": "provision_ai_company_defaults",
       "exposure": "session",
       "reason": "Authenticated organization AI setup; native reducer enforces agent/skill configuration permission, company ownership, funded agent/profile compatibility, and preserves existing overrides."

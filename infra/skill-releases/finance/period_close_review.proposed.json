@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "skill_key": "period_close_review",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "risk": "green",
   "limits": {
     "max_steps": 5,
@@ -14,5 +14,5 @@
   "output_types": [
     "finance.period_close_review.result.v1"
   ],
-  "source_hash": "sha256:c72ad8f721c2126bee4acbec756b64b729529dc7e19dc98e30aaf70e08e54c78"
+  "source_hash": "sha256:99b690bad96076545a552a0214fa947a25f1e30d083b1d52e813bf7814065a97"
 }

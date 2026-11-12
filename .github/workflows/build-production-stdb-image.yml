@@ -11,6 +11,7 @@ on:
       - lumiere-codegen/storage-policy-manifest.json
       - crates/stdb-auth/assets/resource_registry.json
       - scripts/railway-publish-spacetimedb.sh
+      - scripts/verify-stdb-publisher-image.sh
       - scripts/test-stdb-production-upgrade.py
       - scripts/tests/fixtures/stdb-production-upgrade/**
       - Dockerfile.spacetimedb-publisher-artifact
@@ -25,6 +26,7 @@ on:
       - lumiere-codegen/storage-policy-manifest.json
       - crates/stdb-auth/assets/resource_registry.json
       - scripts/railway-publish-spacetimedb.sh
+      - scripts/verify-stdb-publisher-image.sh
       - scripts/test-stdb-production-upgrade.py
       - scripts/tests/fixtures/stdb-production-upgrade/**
       - Dockerfile.spacetimedb-publisher-artifact
@@ -54,6 +56,7 @@ jobs:
       production: true
       alpha_founder_identities: ${{ vars.LUMIERE_ALPHA_FOUNDER_IDENTITIES }}
       alpha_additional_tenant_approval: ${{ vars.LUMIERE_ALPHA_ADDITIONAL_TENANT_APPROVAL }}
+      persistent_platform_operator: ${{ vars.LUMIERE_PERSISTENT_PLATFORM_OPERATOR }}
   publish:
     needs: module
     runs-on: ubuntu-latest
@@ -111,16 +114,21 @@ jobs:
           repository="ghcr.io/${GITHUB_REPOSITORY,,}-spacetimedb-publisher"
           echo "repository=$repository" >> "$GITHUB_OUTPUT"
           echo "tag=$repository:$IMAGE_SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          read -r module_sha _ < <(sha256sum .ci/contracts-module.wasm)
+          echo "module-sha=$module_sha" >> "$GITHUB_OUTPUT"
       - name: Preserve existing commit image
         id: existing
         if: github.event_name != 'pull_request'
         shell: bash
         env:
           IMAGE: ${{ steps.image.outputs.tag }}
+          IMAGE_REPOSITORY: ${{ steps.image.outputs.repository }}
+          IMAGE_SOURCE_SHA: ${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           if manifest="$(docker buildx imagetools inspect "$IMAGE" --format '{{json .Manifest}}' 2>/dev/null)"; then
             digest="$(jq -er '.digest' <<<"$manifest")"
+            bash scripts/verify-stdb-publisher-image.sh "$IMAGE_REPOSITORY@$digest" .ci/contracts-module.wasm "$IMAGE_SOURCE_SHA"
             echo "digest=$digest" >> "$GITHUB_OUTPUT"
             echo "Reusing immutable image $IMAGE@$digest" >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -135,6 +143,7 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}
+            io.lumiere.spacetimedb.module-sha256=${{ steps.image.outputs.module-sha }}
           cache-from: type=gha,scope=production-stdb-publisher
           cache-to: type=gha,scope=production-stdb-publisher,mode=max
           provenance: mode=max
@@ -143,7 +152,10 @@ jobs:
         if: github.event_name != 'pull_request'
         env:
           IMAGE: ${{ steps.image.outputs.repository }}@${{ steps.existing.outputs.digest || steps.build.outputs.digest }}
+          IMAGE_SOURCE_SHA: ${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}
         run: |
           task_docker_config="$(mktemp -d)"
+          trap 'rm -rf "$task_docker_config"' EXIT
           DOCKER_CONFIG="$task_docker_config" docker manifest inspect "$IMAGE" >/dev/null
+          DOCKER_CONFIG="$task_docker_config" bash scripts/verify-stdb-publisher-image.sh "$IMAGE" .ci/contracts-module.wasm "$IMAGE_SOURCE_SHA"
           echo "spacetimedb-publisher: $IMAGE" >> "$GITHUB_STEP_SUMMARY"

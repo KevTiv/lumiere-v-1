@@ -48,6 +48,7 @@ path = "src/bin/reconstruct-organization.rs"
 
 [dependencies]
 lumiere-auth-context.workspace = true
+lumiere-policy-core.workspace = true
 lumiere-finance-review-core.workspace = true
 lumiere-file-inspection.workspace = true
 lumiere-presentation-core.workspace = true

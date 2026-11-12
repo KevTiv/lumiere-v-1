@@ -125,6 +125,7 @@ class FingerprintTests(unittest.TestCase):
         baseline = self.fp("stdb-wasm")
         for key in ("LUMIERE_ENABLE_DEV_REDUCERS", "LUMIERE_ALPHA_FOUNDER_IDENTITIES",
                     "LUMIERE_ALPHA_ADDITIONAL_TENANT_APPROVAL",
+                    "LUMIERE_PERSISTENT_PLATFORM_OPERATOR",
                     "LUMIERE_RECONSTRUCTION_BOOTSTRAP_IDENTITY", "RUSTFLAGS",
                     "CARGO_PROFILE_RELEASE_LTO", "SPACETIME_CLI_VERSION",
                     "BINARYEN_VERSION", "WASM_TOOLS_VERSION"):

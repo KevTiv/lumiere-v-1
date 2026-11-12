@@ -66,6 +66,12 @@ impl StdbClient {
         }
     }
 
+    /// Use caller-owned transport policy without changing ordinary clients.
+    pub fn with_http_client(mut self, http: reqwest::Client) -> Self {
+        self.http = std::sync::Arc::new(http);
+        self
+    }
+
     /// Same connection settings with a different bearer token (for a service call).
     pub fn with_token(&self, token: impl Into<String>) -> Self {
         Self {

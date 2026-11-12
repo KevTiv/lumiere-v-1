@@ -58,6 +58,7 @@ lumiere-auth-context = { path = "crates/auth-context" }
 lumiere-finance-review-core = { path = "crates/finance-review-core" }
 lumiere-file-inspection = { path = "crates/file-inspection" }
 lumiere-presentation-core = { path = "crates/presentation-core" }
+lumiere-policy-core = { path = "crates/policy-core" }
 
 [profile.release]
 opt-level = 3
