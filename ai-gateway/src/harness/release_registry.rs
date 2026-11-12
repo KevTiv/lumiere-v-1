@@ -147,19 +147,17 @@ pub async fn load_active_manifest(
     skill_key: &str,
     expected_version: u32,
 ) -> Result<SkillManifest, String> {
+    let skill = crate::orchestrator::skill_loader::load_effective_catalog_skill(
+        stdb,
+        organization_id,
+        skill_key,
+    )
+    .await
+    .map_err(|error| error.to_string())?
+    .ok_or_else(|| "skill has no active catalog entry".to_string())?;
+    let skill_id =
+        row_u64(&skill, "id", "id").ok_or_else(|| "skill catalog entry has no id".to_string())?;
     let skill_key = sql_literal(skill_key)?;
-    let skills = stdb
-        .query_sql(&format!(
-            "SELECT id, organization_id FROM ai_skill WHERE skill_key = '{skill_key}' AND (organization_id = {organization_id} OR organization_id = 0) AND is_active = true LIMIT 2"
-        ))
-        .await
-        .map_err(|error| format!("load AI skill: {error}"))?;
-    let skill_id = skills
-        .iter()
-        .find(|row| row_u64(row, "organizationId", "organization_id") == Some(organization_id))
-        .or_else(|| skills.first())
-        .and_then(|row| row_u64(row, "id", "id"))
-        .ok_or_else(|| "skill has no active catalog entry".to_string())?;
 
     let releases = stdb
         .query_sql(&format!(
@@ -174,13 +172,24 @@ pub async fn load_active_manifest(
         .ok_or_else(|| "active skill release has no version".to_string())?;
     let versions = stdb
         .query_sql(&format!(
-            "SELECT version, risk, max_steps, max_tool_calls, resources, output_types, source_hash FROM ai_skill_version WHERE id = {version_id} AND organization_id = {organization_id} LIMIT 1"
+            "SELECT id, organization_id, skill_id, skill_key, version, risk, max_steps, max_tool_calls, resources, output_types, source_hash FROM ai_skill_version WHERE id = {version_id} AND organization_id = {organization_id} LIMIT 2"
         ))
         .await
         .map_err(|error| format!("load active AI skill version: {error}"))?;
+    if versions.len() != 1 {
+        return Err("active skill version must resolve exactly once".to_string());
+    }
     let version = versions
         .first()
         .ok_or_else(|| "active skill version does not belong to this organization".to_string())?;
+    if crate::orchestrator::generation_surface_certification::KEYS.contains(&skill_key.as_str())
+        && (row_u64(version, "id", "id") != Some(version_id)
+            || row_u64(version, "organizationId", "organization_id") != Some(organization_id)
+            || row_u64(version, "skillId", "skill_id") != Some(skill_id)
+            || row_string(version, "skillKey", "skill_key").as_deref() != Some(skill_key.as_str()))
+    {
+        return Err("active generation source does not match the exact tenant skill".to_string());
+    }
     let release_version = row_string(version, "version", "version")
         .ok_or_else(|| "active skill version is missing a semantic version".to_string())?;
     let source_hash = row_string(version, "sourceHash", "source_hash")
@@ -212,6 +221,9 @@ pub async fn load_active_manifest(
         }
         key if lumiere_finance_review_core::skill(key).is_ok() => {
             super::finance_skills::manifest(key)?
+        }
+        key if crate::orchestrator::generation_surface_certification::KEYS.contains(&key) => {
+            crate::orchestrator::generation_surface_certification::manifest(key)?
         }
         _ => return Err("gateway has no executable adapter for this released skill".to_string()),
     };
@@ -248,6 +260,9 @@ pub(crate) fn candidate_policy_manifest(
         }
         key if lumiere_finance_review_core::skill(key).is_ok() => {
             super::finance_skills::manifest(key)?
+        }
+        key if crate::orchestrator::generation_surface_certification::KEYS.contains(&key) => {
+            crate::orchestrator::generation_surface_certification::manifest(key)?
         }
         _ => return Err("candidate has no canonical built-in policy manifest".to_string()),
     };
@@ -311,6 +326,9 @@ fn validate_active_adapter_binding(
         }
         governed_llm_skills::REPORT_ANALYSIS_SKILL_KEY => {
             Some(certification::report_analysis_certification_bundle_hash())
+        }
+        key if crate::orchestrator::generation_surface_certification::KEYS.contains(&key) => {
+            Some(crate::orchestrator::generation_surface_certification::bundle_hash(key)?)
         }
         _ => None,
     };

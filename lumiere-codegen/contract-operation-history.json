@@ -690,6 +690,10 @@
       "name": "cancel_workflow_timer",
       "shape_fingerprint": "sha256:ae8158f455ad0cbee1052d91fda9d11994426c7327a0074276c3cd1a9ebf4e81"
     },
+    "erp.check_ai_agent_activation": {
+      "name": "check_ai_agent_activation",
+      "shape_fingerprint": "sha256:325ae57fbf992252df2f760f124b96e8cf51fb746998b0d8b638edeed59cc8b7"
+    },
     "erp.check_mo_availability": {
       "name": "check_mo_availability",
       "shape_fingerprint": "sha256:47179d1ac938dda3e46befefa6fd5b7e655347f24b24342631e26e574d67c0b5"
@@ -4914,6 +4918,10 @@
       "name": "set_ai_agent_active",
       "shape_fingerprint": "sha256:89941af3704d234685720c079ecc5f79872e9955729b583a3514d2c998ebb9fe"
     },
+    "erp.set_ai_agent_model": {
+      "name": "set_ai_agent_model",
+      "shape_fingerprint": "sha256:c2981eaed7a09e7a7758f809e943afbf06e7c8c7be1945207b2de4c84c2ba354"
+    },
     "erp.set_ai_agent_run_wait_state": {
       "name": "set_ai_agent_run_wait_state",
       "shape_fingerprint": "sha256:49d8b6218c9517822d06c6b66da945eb67000f28670d47f21576156f543cecc9"
@@ -6504,6 +6512,14 @@
       "current_operations_fingerprint": "sha256:d0417740e2d77583323e992302a8ada2dffe2eb2dd0c812cb3612d09db6116ad",
       "operation_count": 1528,
       "reason": "release on top of v0.3.175: add enroll_ai_company_defaults, ensure_ai_managed_allowance, publish_ai_platform_skill, register_ai_platform_template, set_ai_platform_default; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.178",
+      "previous_ir_sha256": "sha256:f1bc3cce4749d409789d8cc75d59f0516c847704fb04e62e8a56e18c92095679",
+      "previous_operations_fingerprint": "sha256:d0417740e2d77583323e992302a8ada2dffe2eb2dd0c812cb3612d09db6116ad",
+      "current_operations_fingerprint": "sha256:a24a818d98b80c6a9b9a2c8603b4d8c209a870fc06068dd7be92cc741350e79a",
+      "operation_count": 1530,
+      "reason": "Add same-agent model capability repair and a no-mutation native activation authority probe; preserve tenant scope and spend history"
     }
   ]
 }

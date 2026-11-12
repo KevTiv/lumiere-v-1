@@ -13,7 +13,7 @@ pub mod import;
 pub mod inventory;
 pub mod kaggle;
 pub mod ocr;
-mod passage_retrieval;
+pub(crate) mod passage_retrieval;
 pub mod policy;
 pub mod rag;
 mod rag_ui_actions;

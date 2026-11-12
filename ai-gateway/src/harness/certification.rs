@@ -146,6 +146,7 @@ impl CandidateAdapterRegistry {
             Arc::new(ReportComposerCertificationAdapter),
             Arc::new(ReportAnalysisCertificationAdapter),
             Arc::new(FinanceCertificationAdapter),
+            Arc::new(GenerationSurfaceCertificationAdapter),
         ])
     }
 
@@ -197,7 +198,9 @@ fn execution_request(
 }
 
 const REPORT_PREVIEW_FIXTURE_PATH: &str = "reports/daily_business_summary_v1/preview.json";
-pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.9";
+pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.10";
+pub const LOW_STOCK_CERTIFICATION_VERSION: &str = "1.0.1";
+pub const REPORT_COMPOSER_CERTIFICATION_VERSION: &str = "1.0.1";
 
 struct LowStockCertificationAdapter;
 
@@ -335,6 +338,26 @@ impl CandidateCertificationAdapter for ReportComposerCertificationAdapter {
 struct ReportAnalysisCertificationAdapter;
 
 struct FinanceCertificationAdapter;
+
+struct GenerationSurfaceCertificationAdapter;
+
+#[async_trait]
+impl CandidateCertificationAdapter for GenerationSurfaceCertificationAdapter {
+    fn supports(&self, version: &CandidateSkillVersion) -> bool {
+        crate::orchestrator::generation_surface_certification::bundle_hash(&version.skill_key)
+            .is_ok_and(|hash| hash == version.source_hash)
+            && super::release_registry::adapter_version_compatible(&version.version, 1)
+    }
+
+    async fn execute(
+        &self,
+        request: CandidateExecutionRequest,
+    ) -> Result<CandidateExecution, CertificationExecutionError> {
+        crate::orchestrator::generation_surface_certification::execute(request)
+            .await
+            .map_err(|error| CertificationExecutionError::Adapter(format!("{error:#}")))
+    }
+}
 
 #[async_trait]
 impl CandidateCertificationAdapter for FinanceCertificationAdapter {

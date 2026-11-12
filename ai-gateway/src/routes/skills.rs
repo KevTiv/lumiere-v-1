@@ -163,6 +163,20 @@ pub(crate) struct CompanySetup {
     company_id: u64,
     status: &'static str,
     message: &'static str,
+    stage: &'static str,
+    execution_readiness: &'static str,
+}
+
+impl CompanySetup {
+    fn binding_setup(company_id: u64, status: &'static str) -> Self {
+        Self {
+            company_id,
+            status,
+            stage: "platform_activation_required",
+            execution_readiness: "not_verified",
+            message: "Binding/catalog setup only; chat execution is not verified. Existing custom settings and disabled features are preserved. A platform administrator must finish activation and verify approved models, embedding query, metering, writer/index, catalog and releases. Repeating tenant setup does not complete platform activation.",
+        }
+    }
 }
 
 /// Explicit catalog repair through the administrator's canonical API session.
@@ -191,6 +205,7 @@ pub async fn post_provision_surfaces(
     .map_err(setup_error)?;
     let skills;
     let company_setup = if let Some(company_id) = req.company_id {
+        writer.require_company_setup().map_err(setup_error)?;
         // Reuse the explicitly approved company harness binding. A missing profile
         // is an actionable setup state, never permission to select an arbitrary agent.
         if let Some((agent_id, policy)) = company_harness_binding(
@@ -213,11 +228,14 @@ pub async fn post_provision_surfaces(
             let bound = company_chat_bound(state.stdb.as_ref(), req.org_id, company_id, agent_id)
                 .await
                 .map_err(AppError::from_agent_resolution)?;
-            Some(CompanySetup {
+            Some(CompanySetup::binding_setup(
                 company_id,
-                status: if bound { "configured" } else { "preserved" },
-                message: "Default AI bindings applied where eligible. Existing custom settings and disabled features are preserved.",
-            })
+                if bound {
+                    "bindings_applied"
+                } else {
+                    "preserved"
+                },
+            ))
         } else {
             writer
                 .enroll_company_defaults(company_id)
@@ -229,15 +247,7 @@ pub async fn post_provision_surfaces(
             let status = managed_company_setup_status(state.stdb.as_ref(), req.org_id, company_id)
                 .await
                 .map_err(AppError::from_agent_resolution)?;
-            Some(CompanySetup {
-                company_id,
-                status,
-                message: match status {
-                    "configured" => "The platform AI profile is applied. Existing custom settings and disabled features are preserved.",
-                    "preserved" => "Existing AI settings are preserved. This company's chat binding is disabled or unavailable; review the company configuration before using chat.",
-                    _ => "No managed AI defaults were applied. A platform administrator must configure an available profile, or review this organization's existing custom setup.",
-                },
-            })
+            Some(CompanySetup::binding_setup(company_id, status))
         }
     } else {
         skills = writer
@@ -276,7 +286,7 @@ async fn managed_company_setup_status(
     };
     Ok(
         if company_chat_bound(reader, org_id, company_id, agent_id).await? {
-            "configured"
+            "bindings_applied"
         } else {
             "preserved"
         },
@@ -447,6 +457,20 @@ pub async fn post_run(Json(req): Json<GatewayRunSkillRequest>) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn binding_setup_never_claims_execution_acceptance() {
+        for status in ["bindings_applied", "preserved", "profile_required"] {
+            let setup = serde_json::to_value(CompanySetup::binding_setup(7, status)).unwrap();
+            assert_eq!(setup["status"], status);
+            assert_eq!(setup["stage"], "platform_activation_required");
+            assert_eq!(setup["execution_readiness"], "not_verified");
+            assert!(setup["message"]
+                .as_str()
+                .unwrap()
+                .contains("platform administrator"));
+        }
+    }
 
     #[test]
     fn managed_setup_accepts_only_company_scope_from_client() {

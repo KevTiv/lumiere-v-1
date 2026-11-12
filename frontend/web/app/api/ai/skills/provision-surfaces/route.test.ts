@@ -27,7 +27,7 @@ function fixture(
       roleId: 2,
       roleName: "skill-admin",
       isSuperuser: false,
-      rolePermissions: ["ai_skill:create"],
+      rolePermissions: ["ai_skill:create", "ai_skill:write", "ai_agent:write"],
       fieldPermissions: [],
       ...options.access,
     },
@@ -161,4 +161,19 @@ test("company setup forwards only validated scope, never client agent or policy 
   const denied = fixture({ companyAllowed: false })
   assert.equal((await denied.submit({ companyId: 42 })).status, 403)
   assert.equal(denied.calls.length, 0)
+})
+
+test("active create-only user cannot invoke company defaults before gateway mutations", async () => {
+  for (const rolePermissions of [
+    ["ai_skill:create"],
+    ["ai_skill:create", "ai_skill:write"],
+    ["ai_skill:create", "ai_agent:write"],
+  ]) {
+    const f = fixture({ access: { rolePermissions } })
+    assert.equal((await f.submit({ companyId: 42 })).status, 403)
+    assert.equal(f.calls.length, 0)
+  }
+  const owner = fixture()
+  assert.equal((await owner.submit({ companyId: 42 })).status, 200)
+  assert.equal(owner.calls.length, 1)
 })

@@ -13,7 +13,10 @@ use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use spacetimedb::{ReducerContext, Table};
 
 pub fn test_agent_action_preserves_configuration(ctx: &ReducerContext) -> Result<(), String> {
-    use crate::ai::agents::{set_ai_agent_action, AiAgent};
+    use crate::ai::agents::{
+        check_ai_agent_activation, set_ai_agent_action, set_ai_agent_model, AiAgent,
+    };
+    use crate::core::audit::audit_log;
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let foreign = OrgFixture::seed_minimal(ctx)?;
@@ -37,11 +40,424 @@ pub fn test_agent_action_preserves_configuration(ctx: &ReducerContext) -> Result
         .find(agent_id)
         .ok_or("agent missing")?;
     let original = ctx.db.ai_agent().id().update(AiAgent {
+        provider: "Mistral".into(),
+        model: "mistral-small-2506".into(),
+        allowed_models: vec!["mistral-small-2506".into()],
         system_prompt: Some("Keep this private prompt".into()),
         monthly_budget: Some(42.0),
         allowed_actions: vec!["analytics_read".into()],
         ..original
     });
+    // Seed real paid-admission rows before editing capabilities, without provider I/O.
+    use crate::ai::metered_spend::*;
+    use crate::ai::spend::{ai_provider_attempt, ai_spend_reservation};
+    ctx.db.ai_agent().id().update(AiAgent {
+        allowed_models: vec![original.model.clone(), "mistral-embed".into()],
+        ..original.clone()
+    });
+    configure_ai_spend(
+        ctx,
+        fixture.organization_id,
+        agent_id,
+        ConfigureAiSpendParams {
+            billing_period: current_period(ctx.timestamp)?,
+            currency: "USD".into(),
+            limit_units: 10_000,
+            provider: "mistral".into(),
+            model: "mistral-embed".into(),
+            input_units_per_1k: 1_000,
+            output_units_per_1k: 1_000,
+        },
+    )?;
+    configure_ai_metered_price(
+        ctx,
+        fixture.organization_id,
+        agent_id,
+        ConfigureAiMeteredPriceParams {
+            model: "mistral-embed".into(),
+            unit: "tokens".into(),
+            currency: "USD".into(),
+            units_per_1k: 1_000,
+        },
+    )?;
+    use crate::core::cold_tier_identity::{cold_tier_service_identity, ColdTierServiceIdentity};
+    let writer_key = format!("toggle-history-writer-{agent_id}");
+    ctx.db
+        .cold_tier_service_identity()
+        .insert(ColdTierServiceIdentity {
+            platform_id: writer_key.clone(),
+            organization_id: fixture.organization_id,
+            service_name: "ai_spend_writer".into(),
+            identity: ctx.sender(),
+            is_active: true,
+            registered_by: ctx.sender(),
+            registered_at: ctx.timestamp,
+            retired_at: None,
+        });
+    reserve_ai_metered_spend(
+        ctx,
+        fixture.organization_id,
+        ReserveAiMeteredSpendParams {
+            company_id: fixture.company_id,
+            agent_id,
+            run_id,
+            actor_identity: ctx.sender().to_hex().to_string(),
+            request_key: format!("toggle:history:{agent_id}"),
+            model: "mistral-embed".into(),
+            unit: "tokens".into(),
+            allowance: 17,
+        },
+    )?;
+    let reservation = ctx
+        .db
+        .ai_spend_reservation()
+        .iter()
+        .find(|row| {
+            row.organization_id == fixture.organization_id
+                && row.request_key == format!("toggle:history:{agent_id}")
+        })
+        .ok_or("history reservation missing")?;
+    crate::ai::spend::accept_ai_provider_attempt(
+        ctx,
+        fixture.organization_id,
+        crate::ai::spend::AcceptAiProviderAttemptParams {
+            company_id: fixture.company_id,
+            agent_id,
+            run_id,
+            reservation_id: reservation.id,
+            request_key: reservation.request_key,
+            provider: "mistral".into(),
+            model: "mistral-embed".into(),
+        },
+    )?;
+    ctx.db
+        .cold_tier_service_identity()
+        .platform_id()
+        .delete(writer_key);
+    ctx.db.ai_agent().id().update(original.clone());
+    // Compare complete encoded rows, including attribution, counters and timestamps.
+    // Nonempty admission/usage rows prove preservation, not merely unchanged counts.
+    let history_snapshot = || {
+        let mut rows = Vec::new();
+        macro_rules! snapshot {
+            ($table:ident) => {
+                for row in ctx.db.$table().iter().filter(|r| r.agent_id == agent_id) {
+                    rows.push(
+                        spacetimedb::sats::bsatn::to_vec(&row).expect("fixture row encoding"),
+                    );
+                }
+            };
+        }
+        snapshot!(ai_spend_budget);
+        snapshot!(ai_price_snapshot);
+        snapshot!(ai_spend_reservation);
+        snapshot!(ai_provider_attempt);
+        snapshot!(ai_metered_price);
+        snapshot!(ai_metered_usage);
+        snapshot!(ai_agent_run);
+        rows.sort();
+        rows
+    };
+    let before_history = history_snapshot();
+    if before_history.len() != 7 {
+        return Err("Expected nonempty budget, prices, reservation, attempt, usage and run".into());
+    }
+    let audit_count = ctx.db.audit_log().iter().count();
+    check_ai_agent_activation(ctx, fixture.organization_id, agent_id, true)?;
+    check_ai_agent_activation(ctx, fixture.organization_id, agent_id, true)?;
+    if before_history != history_snapshot() || ctx.db.audit_log().iter().count() != audit_count {
+        return Err("Activation authority probe changed application history".into());
+    }
+    // Remove platform bypass as well as the tenant profile bypass.
+    let profiles = ctx
+        .db
+        .user_profile()
+        .iter()
+        .filter(|p| p.identity == ctx.sender())
+        .collect::<Vec<_>>();
+    let profile_authority = profiles
+        .iter()
+        .map(|p| (p.id, p.is_superuser))
+        .collect::<Vec<_>>();
+    for profile in profiles {
+        ctx.db.user_profile().id().update(UserProfile {
+            is_superuser: false,
+            ..profile
+        });
+    }
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(ctx.sender())
+        .find(|m| m.organization_id == fixture.organization_id && m.is_active)
+        .ok_or("membership missing")?;
+    let assigned = ctx
+        .db
+        .role()
+        .id()
+        .find(membership.role_id)
+        .ok_or("role missing")?;
+    let editor = ctx.db.role().id().update(Role {
+        permissions: vec!["ai_agent:write".into()],
+        ..assigned.clone()
+    });
+    if check_ai_agent_activation(ctx, fixture.organization_id, agent_id, false).is_ok() {
+        return Err("Activation probe ignored missing skill binding authority".into());
+    }
+    ctx.db.role().id().update(Role {
+        permissions: vec!["ai_agent:write".into(), "ai_skill:write".into()],
+        ..editor.clone()
+    });
+    check_ai_agent_activation(ctx, fixture.organization_id, agent_id, false)?;
+    if check_ai_agent_activation(ctx, fixture.organization_id, agent_id, true).is_ok() {
+        return Err("Activation probe granted platform pricing to an ordinary editor".into());
+    }
+    ctx.db.role().id().update(editor.clone());
+    let audits = || {
+        ctx.db
+            .audit_log()
+            .audit_by_org()
+            .filter(fixture.organization_id)
+            .filter(|a| {
+                a.table_name == "ai_agent"
+                    && a.record_id == agent_id
+                    && a.changed_fields == vec!["allowed_models".to_string()]
+            })
+            .collect::<Vec<_>>()
+    };
+    let before_audits = audits().len();
+    // Historical invalid entries can be removed exactly, but never re-enabled.
+    for legacy in ["mistral-latest", "placeholder", " legacy alias ", ""] {
+        let agent = ctx
+            .db
+            .ai_agent()
+            .id()
+            .find(agent_id)
+            .ok_or("agent missing")?;
+        let mut allowed_models = agent.allowed_models.clone();
+        allowed_models.push(legacy.into());
+        ctx.db.ai_agent().id().update(AiAgent {
+            allowed_models,
+            ..agent
+        });
+        set_ai_agent_model(ctx, fixture.organization_id, agent_id, legacy.into(), false)?;
+        set_ai_agent_model(ctx, fixture.organization_id, agent_id, legacy.into(), false)?;
+        if set_ai_agent_model(ctx, fixture.organization_id, agent_id, legacy.into(), true).is_ok() {
+            return Err("Historical invalid model was re-enabled".into());
+        }
+    }
+    let before_audits = before_audits + 4;
+    for _ in 0..2 {
+        set_ai_agent_model(
+            ctx,
+            fixture.organization_id,
+            agent_id,
+            "mistral-embed".into(),
+            true,
+        )?;
+    }
+    let added = ctx
+        .db
+        .ai_agent()
+        .id()
+        .find(agent_id)
+        .ok_or("agent missing")?;
+    if added.allowed_models != vec!["mistral-small-2506", "mistral-embed"]
+        || audits().len() != before_audits + 1
+    {
+        return Err("Model addition was not exact, audited and idempotent".into());
+    }
+    for invalid in [
+        "",
+        "*",
+        "mistral-latest",
+        "rolling",
+        "placeholder",
+        "mistral-embed\n",
+        "x;DROP",
+        "gpt-4o",
+    ] {
+        if set_ai_agent_model(ctx, fixture.organization_id, agent_id, invalid.into(), true).is_ok()
+        {
+            return Err(format!("Invalid/incompatible model accepted: {invalid:?}"));
+        }
+    }
+    if set_ai_agent_model(
+        ctx,
+        foreign.organization_id,
+        agent_id,
+        "mistral-embed".into(),
+        false,
+    )
+    .is_ok()
+        || set_ai_agent_model(
+            ctx,
+            fixture.organization_id,
+            agent_id,
+            original.model.clone(),
+            false,
+        )
+        .is_ok()
+    {
+        return Err("Foreign organization or selected-model removal accepted".into());
+    }
+    // Inactive callers cannot mutate even when their role otherwise grants write.
+    let profile = find_user_profile_for_organization(ctx, ctx.sender(), fixture.organization_id)
+        .ok_or("profile missing")?;
+    let profile_id = profile.id;
+    let was_active = profile.is_active;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_active: false,
+        ..profile
+    });
+    let denied = set_ai_agent_model(
+        ctx,
+        fixture.organization_id,
+        agent_id,
+        "mistral-embed".into(),
+        false,
+    );
+    let profile = ctx
+        .db
+        .user_profile()
+        .id()
+        .find(profile_id)
+        .ok_or("profile missing")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_active: was_active,
+        ..profile
+    });
+    if denied.is_ok() {
+        return Err("Unauthorized model removal accepted".into());
+    }
+    ctx.db.role().id().update(Role {
+        permissions: vec![],
+        ..editor.clone()
+    });
+    let no_permission_model = set_ai_agent_model(
+        ctx,
+        fixture.organization_id,
+        agent_id,
+        "mistral-embed".into(),
+        false,
+    );
+    let no_permission_action = set_ai_agent_action(
+        ctx,
+        fixture.organization_id,
+        agent_id,
+        "embedding_query".into(),
+        true,
+    );
+    // An expired additive grant cannot rescue the active role with no permissions.
+    use crate::core::permissions::{user_role_assignment, UserRoleAssignment};
+    let expired_role = ctx.db.role().insert(Role {
+        id: 0,
+        ..editor.clone()
+    });
+    let expired = ctx.db.user_role_assignment().insert(UserRoleAssignment {
+        id: 0,
+        user_identity: ctx.sender(),
+        role_id: expired_role.id,
+        organization_id: fixture.organization_id,
+        assigned_by: ctx.sender(),
+        assigned_at: ctx.timestamp,
+        expires_at: Some(ctx.timestamp),
+        is_active: true,
+        metadata: None,
+    });
+    let expired_model = set_ai_agent_model(
+        ctx,
+        fixture.organization_id,
+        agent_id,
+        "mistral-embed".into(),
+        false,
+    );
+    let expired_action = set_ai_agent_action(
+        ctx,
+        fixture.organization_id,
+        agent_id,
+        "embedding_query".into(),
+        true,
+    );
+    ctx.db.user_role_assignment().id().delete(expired.id);
+    ctx.db.role().id().delete(expired_role.id);
+    ctx.db.role().id().update(editor);
+    if no_permission_model.is_ok()
+        || no_permission_action.is_ok()
+        || expired_model.is_ok()
+        || expired_action.is_ok()
+    {
+        return Err("Unprivileged or expired role changed capabilities".into());
+    }
+    use crate::core::permissions::{delegated_admin_scope, DelegatedAdminScope};
+    let delegated = ctx.db.delegated_admin_scope().insert(DelegatedAdminScope {
+        id: 0,
+        organization_id: fixture.organization_id,
+        company_id: foreign.company_id,
+        user_identity: ctx.sender(),
+        granted_by: ctx.sender(),
+        granted_at: ctx.timestamp,
+        is_active: true,
+        metadata: None,
+    });
+    let denied = set_ai_agent_model(
+        ctx,
+        fixture.organization_id,
+        agent_id,
+        "mistral-embed".into(),
+        false,
+    );
+    let action_denied = set_ai_agent_action(
+        ctx,
+        fixture.organization_id,
+        agent_id,
+        "embedding_query".into(),
+        true,
+    );
+    ctx.db.delegated_admin_scope().id().delete(delegated.id);
+    if denied.is_ok() || action_denied.is_ok() {
+        return Err("Cross-company capability edit accepted".into());
+    }
+    for _ in 0..2 {
+        set_ai_agent_model(
+            ctx,
+            fixture.organization_id,
+            agent_id,
+            "mistral-embed".into(),
+            false,
+        )?;
+    }
+    let restored = ctx
+        .db
+        .ai_agent()
+        .id()
+        .find(agent_id)
+        .ok_or("agent missing")?;
+    if restored.allowed_models != original.allowed_models
+        || audits().len() != before_audits + 2
+        || audits().iter().skip(before_audits).any(|a| {
+            a.company_id != original.company_id
+                || a.user_identity != ctx.sender()
+                || a.old_values.is_none()
+                || a.new_values.is_none()
+        })
+    {
+        return Err("Model removal/no-op or audit preservation failed".into());
+    }
+    for action in ["embedding_query", "embedding_index"] {
+        set_ai_agent_action(ctx, fixture.organization_id, agent_id, action.into(), true)?;
+        let saved = ctx
+            .db
+            .ai_agent()
+            .id()
+            .find(agent_id)
+            .ok_or("agent missing")?;
+        if !saved.allowed_actions.iter().any(|a| a == action) {
+            return Err("Embedding action not persisted".into());
+        }
+        set_ai_agent_action(ctx, fixture.organization_id, agent_id, action.into(), false)?;
+    }
     for _ in 0..2 {
         set_ai_agent_action(ctx, fixture.organization_id, agent_id, "chat".into(), true)?;
     }
@@ -83,8 +499,45 @@ pub fn test_agent_action_preserves_configuration(ctx: &ReducerContext) -> Result
         || saved.is_active != original.is_active
         || saved.provider != original.provider
         || saved.model != original.model
+        || saved.allowed_models != original.allowed_models
+        || saved.company_id != original.company_id
+        || saved.monthly_spend != original.monthly_spend
+        || saved.create_uid != original.create_uid
+        || saved.create_date != original.create_date
+        || saved.metadata != original.metadata
+        || saved.api_key_reference != original.api_key_reference
+        || saved.context_window != original.context_window
+        || saved.top_p != original.top_p
+        || saved.frequency_penalty != original.frequency_penalty
+        || saved.presence_penalty != original.presence_penalty
+        || saved.cost_per_1k_tokens != original.cost_per_1k_tokens
     {
         return Err("Action toggle changed unrelated agent configuration".into());
+    }
+    let history = ctx
+        .db
+        .ai_agent_run()
+        .id()
+        .find(run_id)
+        .ok_or("history removed")?;
+    if history.agent_id != run.agent_id
+        || history.company_id != run.company_id
+        || history_snapshot() != before_history
+    {
+        return Err("Capability repair changed run history".into());
+    }
+    ctx.db.role().id().update(assigned);
+    for (id, is_superuser) in profile_authority {
+        let profile = ctx
+            .db
+            .user_profile()
+            .id()
+            .find(id)
+            .ok_or("profile missing")?;
+        ctx.db.user_profile().id().update(UserProfile {
+            is_superuser,
+            ..profile
+        });
     }
     Ok(())
 }

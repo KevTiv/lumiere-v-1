@@ -250,7 +250,7 @@ fn coerce_suggestion_value(field: &FormField, value: Value) -> Option<Value> {
     }
 }
 
-fn clean_json_response(text: &str) -> &str {
+pub(crate) fn clean_json_response(text: &str) -> &str {
     text.trim()
         .trim_start_matches("```json")
         .trim_start_matches("```")
@@ -279,7 +279,7 @@ fn build_suggestion_prompt(req: &FormSuggestRequest) -> String {
     )
 }
 
-fn sanitize_suggestions(fields: &[FormField], raw: &Value) -> Map<String, Value> {
+pub(crate) fn sanitize_suggestions(fields: &[FormField], raw: &Value) -> Map<String, Value> {
     let mut out = Map::new();
     let Some(raw_suggestions) = raw.get("suggestions").and_then(Value::as_object) else {
         return out;
@@ -452,7 +452,7 @@ pub async fn post_suggest(
         &req.identity_hex,
     )
     .await
-    .map_err(|e| AppError::Internal(e.to_string()))?;
+    .map_err(AppError::from_generation)?;
     let model_store = StdbModelConfigurationStore {
         reader: state.stdb.as_ref(),
     };
@@ -498,7 +498,7 @@ pub async fn post_suggest(
                 Some(error.to_string()),
             )
             .await;
-            return Err(AppError::Internal(format!("LLM request failed: {error}")));
+            return Err(AppError::from_generation(error));
         }
     };
     let total_tokens = program
@@ -542,22 +542,7 @@ pub async fn post_suggest(
         }
     };
 
-    let suggestions = sanitize_suggestions(&req.fields, &model_json);
-    let validation_notes = parse_validation_notes(&model_json);
-    let mut sources = parse_sources(&model_json);
-    if sources.is_empty()
-        && req
-            .raw_text
-            .as_deref()
-            .is_some_and(|text| !text.trim().is_empty())
-    {
-        sources.push(FormSuggestionSource {
-            source_type: "text".to_string(),
-            label: Some("Prompt text".to_string()),
-            value: None,
-            field: None,
-        });
-    }
+    let parsed = parse_generated_suggestions(&req.fields, req.raw_text.as_deref(), &model_json);
 
     complete_run(
         state.stdb.as_ref(),
@@ -565,7 +550,10 @@ pub async fn post_suggest(
         req.company_id,
         run.run_id,
         "completed",
-        Some(format!("generated {} form suggestions", suggestions.len())),
+        Some(format!(
+            "generated {} form suggestions",
+            parsed.suggestions.len()
+        )),
         None,
         None,
         program.trace.len() as u32,
@@ -575,11 +563,31 @@ pub async fn post_suggest(
     .await
     .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    Ok(Json(FormSuggestResponse {
+    Ok(Json(parsed))
+}
+
+/// The route's deterministic publication shape, shared with source certification.
+pub(crate) fn parse_generated_suggestions(
+    fields: &[FormField],
+    raw_text: Option<&str>,
+    model_json: &Value,
+) -> FormSuggestResponse {
+    let suggestions = sanitize_suggestions(fields, model_json);
+    let validation_notes = parse_validation_notes(model_json);
+    let mut sources = parse_sources(model_json);
+    if sources.is_empty() && raw_text.is_some_and(|text| !text.trim().is_empty()) {
+        sources.push(FormSuggestionSource {
+            source_type: "text".to_string(),
+            label: Some("Prompt text".to_string()),
+            value: None,
+            field: None,
+        });
+    }
+    FormSuggestResponse {
         suggestions,
         validation_notes,
         sources,
-    }))
+    }
 }
 
 pub async fn post_validate(

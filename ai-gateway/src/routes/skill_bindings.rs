@@ -29,7 +29,18 @@ fn binding(skill_key: &str) -> Option<Value> {
             harness::finance_skills::bundle_hash(key),
             vec![],
         ),
+        key if crate::orchestrator::generation_surface_certification::KEYS.contains(&key) => (
+            crate::orchestrator::generation_surface_certification::manifest(key).ok()?,
+            crate::orchestrator::generation_surface_certification::bundle_hash(key).ok()?,
+            vec![],
+        ),
         _ => return None,
+    };
+    let version = match skill_key {
+        "report_analysis" => harness::certification::REPORT_ANALYSIS_CERTIFICATION_VERSION,
+        "report_composer" => harness::certification::REPORT_COMPOSER_CERTIFICATION_VERSION,
+        "low_stock" => harness::certification::LOW_STOCK_CERTIFICATION_VERSION,
+        _ => "1.0.0",
     };
     Some(json!({
         "skillKey": skill_key,
@@ -37,7 +48,7 @@ fn binding(skill_key: &str) -> Option<Value> {
         "manifest": {
             "schema_version": 1,
             "skill_key": skill_key,
-            "version": "1.0.0",
+            "version": version,
             "source_hash": source_hash,
             "risk": manifest.risk,
             "permissions": permissions,
@@ -58,6 +69,9 @@ pub async fn get_bindings(State(state): State<AppState>) -> Json<Value> {
         "report_analysis",
         "report_composer",
         "low_stock",
+        "rag_generation",
+        "form_suggestion",
+        "action_draft_generation",
         "finance_report_review",
         "bank_reconciliation_review",
         "period_close_review",
@@ -96,5 +110,29 @@ mod tests {
             "analytics.report_analysis.result.v1"
         );
         assert!(binding("unregistered_code").is_none());
+    }
+
+    #[test]
+    fn generation_discovery_binds_each_surface_to_its_own_executable_source() {
+        for key in crate::orchestrator::generation_surface_certification::KEYS {
+            let discovered = binding(key).expect("supported generation source");
+            let expected =
+                crate::orchestrator::generation_surface_certification::manifest(key).unwrap();
+            assert_eq!(discovered["manifest"]["skill_key"], key);
+            assert_eq!(discovered["manifest"]["version"], "1.0.0");
+            assert_eq!(
+                discovered["manifest"]["source_hash"],
+                crate::orchestrator::generation_surface_certification::bundle_hash(key).unwrap()
+            );
+            assert_eq!(
+                discovered["manifest"]["resources"],
+                json!(expected.named_resources)
+            );
+            assert_eq!(
+                discovered["manifest"]["output_types"],
+                json!([expected.output_type])
+            );
+        }
+        assert!(binding("unregistered_generation").is_none());
     }
 }

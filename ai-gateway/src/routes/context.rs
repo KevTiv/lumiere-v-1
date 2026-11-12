@@ -121,6 +121,7 @@ pub(crate) async fn admitted_query_vector(
     query: &str,
     _operation_ref: &str,
     agent: Option<&ResolvedAgentConfig>,
+    generation_source_key: Option<&str>,
 ) -> Result<Vec<f32>> {
     if query.trim().is_empty() || query.len() > 8192 || !state.config.embedding_enabled() {
         anyhow::bail!("query embeddings are disabled or outside their input bound");
@@ -188,12 +189,36 @@ pub(crate) async fn admitted_query_vector(
         unit: MeteredUnit::Tokens,
         allowance: u32::try_from(query.len() + 128)?,
     };
-    execute_metered(state.stdb.as_ref(), reader, scope, || async {
-        let response = state
-            .providers
-            .embedder
-            .embed_batch_with_usage(&[query.to_owned()])
-            .await?;
+    execute_query_embedding(
+        state.stdb.as_ref(),
+        reader,
+        state.providers.embedder.as_ref(),
+        scope,
+        query,
+        generation_source_key,
+    )
+    .await
+}
+
+/// The paid embedding boundary; the source key is supplied only by server code.
+async fn execute_query_embedding(
+    stdb: &stdb_client::StdbClient,
+    reader: &stdb_client::StdbClient,
+    embedder: &dyn crate::providers::EmbedProvider,
+    scope: MeteredScope,
+    query: &str,
+    generation_source_key: Option<&str>,
+) -> Result<Vec<f32>> {
+    if let Some(key) = generation_source_key {
+        crate::orchestrator::skill_loader::require_generation_source(
+            stdb,
+            scope.organization_id,
+            key,
+        )
+        .await?;
+    }
+    execute_metered(stdb, reader, scope, || async {
+        let response = embedder.embed_batch_with_usage(&[query.to_owned()]).await?;
         let units = response
             .input_tokens
             .context("embedding provider omitted actual token usage")?;
@@ -227,6 +252,7 @@ pub async fn post_search(
         req.company_id,
         &req.query,
         "context_search",
+        None,
         None,
     )
     .await
@@ -548,6 +574,79 @@ pub async fn post_ingest(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn revoked_or_stale_rag_source_blocks_embedding_before_spend_or_io() {
+        use crate::orchestrator::skill_loader::tests::{generation_source_rows, sats_rows};
+        use axum::{extract::State, routing::post, Router};
+        use std::sync::{Arc, Mutex};
+
+        struct NeverEmbed;
+        #[async_trait::async_trait]
+        impl crate::providers::EmbedProvider for NeverEmbed {
+            async fn embed(&self, _: &str) -> Result<Vec<f32>> {
+                panic!("revoked source must not embed")
+            }
+            async fn embed_batch(&self, _: &[String]) -> Result<Vec<Vec<f32>>> {
+                panic!("revoked source must not embed")
+            }
+            fn dimensions(&self) -> u64 {
+                1
+            }
+            fn name(&self) -> &'static str {
+                "never"
+            }
+        }
+        async fn sql(
+            State(case): State<Arc<Mutex<&'static str>>>,
+            statement: String,
+        ) -> Json<serde_json::Value> {
+            Json(sats_rows(
+                generation_source_rows(&statement, "rag_generation", *case.lock().unwrap())
+                    .expect("source rejection must precede any spend SQL"),
+            ))
+        }
+        let case = Arc::new(Mutex::new("active"));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let stdb = stdb_client::StdbClient::new(
+            format!("http://{}", listener.local_addr().unwrap()),
+            "fixture".into(),
+            "gateway".into(),
+        );
+        let app = Router::new()
+            .route("/v1/database/fixture/sql", post(sql))
+            .with_state(case.clone());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        crate::orchestrator::skill_loader::require_generation_source(&stdb, 1, "rag_generation")
+            .await
+            .unwrap();
+        for changed in ["missing", "stale"] {
+            *case.lock().unwrap() = changed;
+            let error = execute_query_embedding(
+                &stdb,
+                &stdb,
+                &NeverEmbed,
+                MeteredScope {
+                    organization_id: 1,
+                    company_id: 3,
+                    agent_id: 42,
+                    run_id: 0,
+                    actor_identity: "actor".into(),
+                    request_key: "query".into(),
+                    model: "mistral-embed".into(),
+                    unit: MeteredUnit::Tokens,
+                    allowance: 128,
+                },
+                "answer",
+                Some("rag_generation"),
+            )
+            .await
+            .unwrap_err();
+            assert!(error.is::<crate::error::GenerationSourceUnavailable>());
+        }
+        server.abort();
+    }
+
     #[test]
     fn references_require_canonical_bounded_exact_identity() {
         let resource = |id: &str| ActivityReference {

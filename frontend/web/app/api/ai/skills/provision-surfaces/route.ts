@@ -31,6 +31,13 @@ export async function POST(request: NextRequest) {
       if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
         return NextResponse.json({ error: "companyId must be a positive integer" }, { status: 400 })
       }
+      if (!sessionAllowsPermission(session, "ai_agent", "write")
+        || !sessionAllowsPermission(session, "ai_skill", "write")) {
+        return NextResponse.json(
+          { error: "Company binding setup requires ai_agent:write and ai_skill:write permissions" },
+          { status: 403 },
+        )
+      }
       const scopeError = await validateCompanyScope(session, value)
       if (scopeError) return scopeError
       companyId = value

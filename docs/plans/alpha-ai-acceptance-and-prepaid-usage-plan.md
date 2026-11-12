@@ -1,6 +1,6 @@
 # Alpha AI acceptance and prepaid usage plan
 
-Status: planned; current-tenant activation blocked. Updated 2026-11-11.
+Status: source repair locally validated; current-tenant activation blocked. Updated 2026-11-11.
 No runtime, allowance or payment change is made by this plan.
 
 Complete the owner's non-OCR AI workflow, then add prepaid usage with manual top-ups. Keep one shared monthly limit for Mugisha Farm and Farm UI acceptance. Extend the existing reservation and settlement system so funding and usage have one canonical owner.
@@ -8,7 +8,8 @@ Complete the owner's non-OCR AI workflow, then add prepaid usage with manual top
 ## Current alpha tenant activation — execute before broader expansion
 
 This section supersedes conflicting historical assumptions below for the
-current production repair. Source review base: `450987d21` on `main`.
+current production repair. Initial source review base: `450987d21`; the repair
+candidate is based on `e2b8e56c2`, including merged #404 and #405.
 The target is Umunopfu Chicken Ltd, organization **4097**, company **4097**,
 existing agent **2** (`mistral-mugisha-usd5`) and policy
 **`mistral-mugisha-usd5@1`**. These are operator target selectors, not defaults
@@ -19,6 +20,36 @@ settings and company scope. The historical USD 10/two-company and prepaid
 proposals below are not authorization to raise the current USD 5 cap, grant
 credit, enroll a replacement agent or enable payments. Sharing the same agent
 with another company remains a separately approved owner operation.
+
+### Tenant experience and platform ownership
+
+The release goal is **open chat and ask**, with a working platform-approved
+default. Tenant users must not configure providers, credentials, agents, model
+profiles, embeddings, meters, service identities or certificates before using
+the prominent chat feature. These are platform deployment/activation duties.
+The AI Skills repair action is an administrative binding/catalog operation,
+not the normal entry path and not an execution-readiness certificate.
+
+As additional models are made available, the tenant-facing control is a simple
+approved-model choice in chat. That choice must resolve a platform-approved
+generation profile within the current company/policy and the same spend pool;
+it must not create a separately funded agent or rewrite shared agent defaults
+for other conversations. Review-model independence and the existing
+authorization, evidence, cost and answer-release gates remain authoritative.
+Do not expose raw provider/model configuration as the model picker.
+
+The current repair must make the default usable without a tenant configuration
+round. A future model chooser is not implemented by the native allowlist
+maintenance operation: do not claim that operation is a completed chat picker.
+Before adding the chooser, validate a per-turn profile-selection contract and
+its policy/pricing/recovery semantics end to end. Platform enablement and
+tenant selection must remain separate authorities.
+
+Missing platform activation is a service limitation for the affected surface,
+not a tenant setup task or a healthy empty answer. Normal ERP and any already
+authorized non-semantic context paths remain available. Setup responses must
+report binding state separately from verified execution readiness; the UI must
+not invite repeated setup clicks to repair missing platform authority.
 
 ### What the current tenant must be able to use
 
@@ -54,7 +85,7 @@ repeat private readback immediately before any write or paid acceptance.
 | Agent capabilities | Models: `mistral-small-2603`, `mistral-medium-3-5`; actions: `skill_run`, `chat`, `form_suggest`, `action_draft` | Missing `mistral-embed`, `embedding_query` and indexing action require an in-place, authorized repair. |
 | Metering identities/prices | Dedicated reader matches its active registration; gateway writer has no org `ai_spend_writer` registration; embedding price absent | Register the existing verified writer and reviewed meter through platform authority, preserving reader/certification separation. |
 | Infrastructure catalog | No effective `embedding_query`, `document_embeddings` or `activity_indexing` entries | Add only required bounded infrastructure definitions through their canonical catalog owner, then discover actual IDs. Never invent IDs or certificates. |
-| Provider/index | Mistral embeddings selected; the 1,024-dimensional collection and worker were reported started | Check document and activity collections and completed source/version-bound indexing; query admission currently requires both stores ready. Startup does not prove source coverage. |
+| Provider/index | Mistral embeddings selected; both compatible 1,024-dimensional document/activity collections are green but contain zero points. Account catalog exposes the exact approved generation/review/embedding models; no paid call was made. | Complete authorized source/version-bound indexing before cited chat acceptance; query admission requires both stores ready. Startup and account catalog access do not prove generation or source coverage. |
 | Platform pricing authority | No superuser records returned; SQL operator profile is inactive and not superuser | Operator SQL access is not pricing authority. Platform owners must supply the approved provisioning/recovery path; do not promote the tenant owner or reuse a writer as administrator. |
 | Chat | Gateway log: `admitted query embedding unavailable`; no new cited answer verified | Configuration repair, truthful degraded-state handling and signed-in live acceptance are all still required. |
 
@@ -78,19 +109,21 @@ source as proof of deployed admission.
 
 ### Ordered repair packets
 
-Only `Verified` with the listed evidence counts as done. The following are
-planned source/operator changes, not changes applied by this document.
+Only `Verified` with the listed evidence counts as done. Source validation is
+recorded separately in the
+[candidate checkpoint](../evidence/alpha-ai-activation-candidate-validation.md).
+Its passing local checks do not close the production completion gates below.
 
 | ID / priority | Required change and owning paths | Completion gate | Status |
 | --- | --- | --- | --- |
-| T0 / P1 | Re-read served artifacts/schema, exact edge/BFF routes, company, agent, policy/profiles, effective bindings, releases/certificates/grants, budget/holds, meters and service identities through existing Railway private SSH/operator job. Check both vector stores and account-visible model access without generation. | Exact target and schema verified, reviewed missing-only change list, known source checksum/version and approved bounded test question; no secrets in logs/manifests. | Not started |
-| T1 / P1 | In `spacetimedb/src/ai/agents.rs`, add a narrow audited model-allowlist operation analogous to `set_ai_agent_action`; extend action validation for `embedding_query` and `embedding_index`. Prefer intent-shaped toggles over reconstructing the full private agent through `update_ai_agent`, whose nullable prompt/budget inputs can replace existing values. | On the same agent, add only `mistral-embed` and required actions; omission/unrelated values, scope, model settings and spend remain unchanged. Same request is a no-op; unauthorized/foreign-org edits fail. Review provider/model validation and audit exact changes. | Not started |
-| T2 / P1 | Align `scripts/provision-mistral-capabilities.mjs` and the activation runbook with existing company-compatible runtime semantics: agent must be in the same org and either organization-shared or scoped to exactly the requested company. Do not remove scope checks or require sharing merely to run provisioning. | Tests accept exact-company and shared agents, reject foreign-company/org agents, and retain single-pool, disabled/conflicting binding, allowlist and no-write-before-complete-inspection checks. Agent 2 remains company-scoped. | Not started |
+| T0 / P1 | Re-read served artifacts/schema, exact edge/BFF routes, company, agent, policy/profiles, effective bindings, releases/certificates/grants, budget/holds, meters and service identities through existing Railway private SSH/operator job. Check both vector stores and account-visible model access without generation. | Exact target and schema verified, reviewed missing-only change list, known source checksum/version and approved bounded test question; no secrets in logs/manifests. | In progress |
+| T1 / P1 | In `spacetimedb/src/ai/agents.rs`, add a narrow audited model-allowlist operation analogous to `set_ai_agent_action`; extend action validation for `embedding_query` and `embedding_index`. Prefer intent-shaped toggles over reconstructing the full private agent through `update_ai_agent`, whose nullable prompt/budget inputs can replace existing values. | On the same agent, add only `mistral-embed` and required actions; omission/unrelated values, scope, model settings and spend remain unchanged. Same request is a no-op; unauthorized/foreign-org edits fail. Review provider/model validation and audit exact changes. | Implemented, unverified |
+| T2 / P1 | Align `scripts/provision-mistral-capabilities.mjs` and the activation runbook with existing company-compatible runtime semantics: agent must be in the same org and either organization-shared or scoped to exactly the requested company. Do not remove scope checks or require sharing merely to run provisioning. | Tests accept exact-company and shared agents, reject foreign-company/org agents, and retain single-pool, disabled/conflicting binding, allowlist and no-write-before-complete-inspection checks. Agent 2 remains company-scoped. | Verified |
 | T3 / P0 | Platform operator supplies the approved authority path, registers the existing server-verified gateway writer, verifies explicit metering/attempt/queue/evidence permissions, and creates only the required missing infrastructure catalog records. Owners: `core/cold_tier_identity.rs`, `ai/metered_spend.rs`, existing skill catalog. | Writer and reader readbacks match distinct runtime identities. Tenant owner/writer cannot configure meters, self-register trusted authority or manufacture certificates. No new pool or ERP write grant. Missing active platform authority remains a blocker, not a reason to weaken checks. | Blocked |
-| T4 / P1 | Release T1/T2 through the canonical contract/codegen lane; align module, generated bindings, Rust/frontend pins, durable projection/catalog and API/gateway/web/edge artifacts. | Exact deployed reducer schema and release hashes read back; regeneration/checks pass. Never edit generated bindings or old migrations by hand. Recheck whether a durable migration is needed rather than assume a command-only change needs a new table. | Not started |
+| T4 / P1 | Release T1/T2 through the canonical contract/codegen lane; align module, generated bindings, Rust/frontend pins, durable projection/catalog and API/gateway/web/edge artifacts. | Exact deployed reducer schema and release hashes read back; regeneration/checks pass. Never edit generated bindings or old migrations by hand. Recheck whether a durable migration is needed rather than assume a command-only change needs a new table. | Blocked |
 | T5 / P1 | With live skill IDs and source hashes, run `scripts/provision-mistral-capabilities.mjs --plan`, `--check`, `--apply`, then `--check` in the private operator runtime. Supply an explicitly reviewed `mistral-embed` token rate/date in integer USD microunits per 1,000 tokens. Include query and only required indexing surfaces; omit OCR. | All prerequisites checked before writes; only missing meter/company bindings written. Readback verifies agent/policy/scope/allowance unchanged and complete bindings. An uncertain response stops for durable reconciliation before retry. | Blocked |
-| T6 / P1 | Verify generation-surface source versions, independent certificates, capability grants and profile/price bindings individually. Use existing setup/registry owners; include report analysis and form/action surfaces in addition to chat. | Each enabled surface resolves the current source/release and actor/company authority, or displays a specific blocker before a paid call. No certifying one skill as a shortcut for another. | Not started |
-| T7 / P1 | In `ai-gateway/src/routes/rag.rs` and existing BFF/client error handling, distinguish healthy empty retrieval from unavailable embeddings/index/service. Preserve the supported authorized live-snapshot fallback. | Missing configuration/dependency plus no grounded fallback reports retrieval unavailable, not a healthy "no relevant information" result. A healthy no-match stays distinct; valid grounded fallback discloses degraded retrieval; normal ERP remains usable. | Not started |
+| T6 / P1 | Verify generation-surface source versions, independent certificates, capability grants and profile/price bindings individually. Use existing setup/registry owners; include report analysis and form/action surfaces in addition to chat. | Each enabled surface resolves the current source/release and actor/company authority, or displays a specific blocker before a paid call. No certifying one skill as a shortcut for another. | Implemented, unverified |
+| T7 / P1 | In `ai-gateway/src/routes/rag.rs` and existing BFF/client error handling, distinguish healthy empty retrieval from unavailable embeddings/index/service. Preserve the supported authorized live-snapshot fallback. | Missing configuration/dependency plus no grounded fallback reports retrieval unavailable, not a healthy "no relevant information" result. A healthy no-match stays distinct; valid grounded fallback discloses degraded retrieval; normal ERP remains usable. | Implemented, unverified |
 | T8 / P1 | Run the signed-in company-4097 workflow matrix below; retain exact source/run/reservation/attempt and saved-effect receipts privately. | Cited answer and independently admitted text surfaces work on the served release, with settled shared economics and fresh reload/recovery. Unaccepted additional cohorts remain explicitly unavailable. | Blocked |
 
 T1/T2/T7 can be implemented independently. T3 authority and reviewed pricing can
@@ -371,9 +404,19 @@ The prepaid foundation is not a claim of paid-production readiness.
 
 ## Current-tenant readiness verdict
 
-The current-tenant repair is planned, not implemented or accepted by this
-document. The earlier live inspection found missing model/action admission,
-writer registration and meter pricing; platform authority, coherent deployment,
-fresh cited-chat and independent surface acceptance remain unverified.
+The consolidated source repair has passing local gateway, provisioning,
+frontend and persisted native tests, including ordinary-role authorization and
+history preservation. See the
+[candidate validation checkpoint](../evidence/alpha-ai-activation-candidate-validation.md)
+for commands, limitations, source-version changes and the missing-only rollout.
+Source-verified work does not imply a live mutation or close T1/T6/T7 acceptance
+on the served release.
+
+Production remains blocked on approved platform authority, writer registration,
+reviewed metering, infrastructure catalog and independent current-source
+activation. Both vector collections were empty at readback. Immutable contracts
+publication, coherent deployment, indexing, fresh cited chat and independent
+surface acceptance remain outstanding. No tenant owner promotion, allowance
+increase, replacement agent or automatic ERP effect is authorized.
 
 Partially relational

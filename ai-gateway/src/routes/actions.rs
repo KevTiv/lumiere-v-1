@@ -9,7 +9,7 @@ use crate::{
         resolve_surface_agent, AgentLimitViolation,
     },
     ai_spend::{self, input_request_key, RequestKind, SpendReader},
-    error::{AppError, AppResult, DefaultAgentNotProvisioned, SurfaceSkillNotProvisioned},
+    error::{AppError, AppResult},
     harness::snapshot::{
         fetch_authorized_live_snapshots, filter_entity_refs_by_allowed_types, ActorCredentials,
         EntityRef, LiveSnapshot,
@@ -36,8 +36,7 @@ const ACTION_DRAFT_MAX_TOKENS: u32 = 2048;
 #[derive(Debug)]
 enum DraftActionsError {
     Limit(AgentLimitViolation),
-    Setup(SurfaceSkillNotProvisioned),
-    DefaultSetup(DefaultAgentNotProvisioned),
+    AgentResolution(AppError),
     Other(String),
 }
 
@@ -47,13 +46,11 @@ impl DraftActionsError {
     }
 
     fn from_agent_resolution(error: anyhow::Error) -> Self {
-        match error.downcast::<SurfaceSkillNotProvisioned>() {
-            Ok(error) => Self::Setup(error),
-            Err(error) => match error.downcast::<DefaultAgentNotProvisioned>() {
-                Ok(error) => Self::DefaultSetup(error),
-                Err(error) => Self::other(error.to_string()),
-            },
-        }
+        Self::AgentResolution(AppError::from_agent_resolution(error))
+    }
+
+    fn from_generation(error: anyhow::Error) -> Self {
+        Self::AgentResolution(AppError::from_generation(error))
     }
 }
 
@@ -120,7 +117,7 @@ struct GeneratedDraftBatch {
 }
 
 #[derive(Debug)]
-struct ActionCatalogEntry {
+pub(crate) struct ActionCatalogEntry {
     reducer_name: &'static str,
     elevated: bool,
     param_fields: &'static [&'static str],
@@ -259,7 +256,7 @@ fn sanitize_draft_params(
     params
 }
 
-fn parse_llm_drafts(
+pub(crate) fn parse_llm_drafts(
     req: &ActionDraftRequest,
     entries: &[&ActionCatalogEntry],
     raw: &Value,
@@ -406,7 +403,7 @@ async fn draft_actions_llm(
         &req.identity_hex,
     )
     .await
-    .map_err(|e| DraftActionsError::other(e.to_string()))?;
+    .map_err(DraftActionsError::from_generation)?;
     let model_store = StdbModelConfigurationStore {
         reader: state.stdb.as_ref(),
     };
@@ -451,9 +448,7 @@ async fn draft_actions_llm(
                 Some(error.to_string()),
             )
             .await;
-            return Err(DraftActionsError::other(format!(
-                "LLM request failed: {error}"
-            )));
+            return Err(DraftActionsError::from_generation(error));
         }
     };
     let total_tokens = program
@@ -533,7 +528,7 @@ fn catalog_entry(reducer_name: &str) -> Option<&'static ActionCatalogEntry> {
         .find(|entry| entry.reducer_name == reducer_name)
 }
 
-fn allowed_catalog_entries(
+pub(crate) fn allowed_catalog_entries(
     allowed_reducers: &[String],
 ) -> Result<Vec<&'static ActionCatalogEntry>, String> {
     if allowed_reducers.is_empty() {
@@ -556,6 +551,7 @@ fn allowed_catalog_entries(
     Ok(entries)
 }
 
+#[cfg(test)]
 fn choose_catalog_entry<'a>(
     query: &str,
     ui_context: Option<&ActionUiContext>,
@@ -762,6 +758,15 @@ fn enrich_drafts_with_grounding(drafts: &mut [ActionDraft], snapshots: &[LiveSna
     }
 }
 
+pub(crate) fn require_generated_drafts(drafts: &[ActionDraft]) -> Result<(), String> {
+    if drafts.is_empty() {
+        return Err("AI produced no admissible action draft. No draft was created.".into());
+    }
+    Ok(())
+}
+
+// Legacy deterministic fixtures are not a fallback from paid model generation.
+#[cfg(test)]
 fn draft_actions_stub(req: &ActionDraftRequest) -> Result<Vec<ActionDraft>, String> {
     let entries = allowed_catalog_entries(&req.allowed_reducers)?;
     let Some(entry) = choose_catalog_entry(&req.query, req.ui_context.as_ref(), &entries) else {
@@ -927,20 +932,19 @@ pub async fn post_draft(
     let grounding_snapshots = fetch_grounding_snapshots(&state, &req).await?;
 
     let mut batch = match draft_actions_llm(&state, &req, grounding_snapshots.as_deref()).await {
-        Ok(batch) if !batch.drafts.is_empty() => batch,
-        Ok(mut batch) => {
-            batch.drafts = draft_actions_stub(&req).map_err(AppError::BadRequest)?;
-            batch
-        }
+        Ok(batch) => batch,
         Err(DraftActionsError::Limit(violation)) => return Err(violation.into_app_error()),
-        Err(DraftActionsError::Setup(error)) => return Err(error.into()),
-        Err(DraftActionsError::DefaultSetup(error)) => return Err(error.into()),
+        Err(DraftActionsError::AgentResolution(error)) => return Err(error),
         Err(DraftActionsError::Other(err)) => {
             return Err(AppError::Internal(format!(
                 "action draft generation failed before stable persistence: {err}"
             )));
         }
     };
+    if let Err(reason) = require_generated_drafts(&batch.drafts) {
+        fail_generated_run(&state, &req, &batch, reason.clone()).await;
+        return Err(AppError::Unavailable(reason));
+    }
     let drafts = &mut batch.drafts;
 
     if let Some(ref snapshots) = grounding_snapshots {
@@ -1058,6 +1062,32 @@ mod tests {
     fn rejects_unknown_allowed_reducer() {
         let result = allowed_catalog_entries(&["drop_database".to_string()]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn invalid_model_batch_never_selects_the_first_allowed_action() {
+        let req = ActionDraftRequest {
+            org_id: Some(1),
+            company_id: 42,
+            query: "Hello".into(),
+            ui_context: None,
+            allowed_reducers: vec!["create_task".into()],
+            allowed_entity_types: vec![],
+            agent_id: None,
+            team_member_id: None,
+            stdb_token: "fixture-token".into(),
+            identity_hex: "fixture-actor".into(),
+        };
+        let entries = allowed_catalog_entries(&req.allowed_reducers).unwrap();
+        for raw in [
+            json!({}),
+            json!({"drafts": []}),
+            json!({"drafts": "invalid"}),
+            json!({"drafts": [{"reducer_name": "drop_database"}]}),
+        ] {
+            let drafts = parse_llm_drafts(&req, &entries, &raw).unwrap();
+            assert!(require_generated_drafts(&drafts).is_err());
+        }
     }
 
     #[test]

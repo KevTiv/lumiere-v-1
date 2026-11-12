@@ -91,9 +91,12 @@ async fn main() -> anyhow::Result<()> {
             "{}",
             serde_json::json!({
                 "schemaVersion": 1,
-                "low_stock": {"version": "1.0.0", "sourceHash": harness::certification::low_stock_certification_bundle_hash()},
-                "report_composer": {"version": "1.0.0", "sourceHash": harness::certification::report_composer_certification_bundle_hash()},
-                "report_analysis": {"version": harness::certification::REPORT_ANALYSIS_CERTIFICATION_VERSION, "sourceHash": harness::certification::report_analysis_certification_bundle_hash()}
+                "low_stock": {"version": harness::certification::LOW_STOCK_CERTIFICATION_VERSION, "sourceHash": harness::certification::low_stock_certification_bundle_hash()},
+                "report_composer": {"version": harness::certification::REPORT_COMPOSER_CERTIFICATION_VERSION, "sourceHash": harness::certification::report_composer_certification_bundle_hash()},
+                "report_analysis": {"version": harness::certification::REPORT_ANALYSIS_CERTIFICATION_VERSION, "sourceHash": harness::certification::report_analysis_certification_bundle_hash()},
+                "rag_generation": {"version": orchestrator::generation_surface_certification::VERSION, "sourceHash": orchestrator::generation_surface_certification::bundle_hash("rag_generation").map_err(anyhow::Error::msg)?},
+                "form_suggestion": {"version": orchestrator::generation_surface_certification::VERSION, "sourceHash": orchestrator::generation_surface_certification::bundle_hash("form_suggestion").map_err(anyhow::Error::msg)?},
+                "action_draft_generation": {"version": orchestrator::generation_surface_certification::VERSION, "sourceHash": orchestrator::generation_surface_certification::bundle_hash("action_draft_generation").map_err(anyhow::Error::msg)?}
             })
         );
         return Ok(());

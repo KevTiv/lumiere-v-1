@@ -3883,6 +3883,16 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "set_ai_agent_model",
+      "exposure": "session",
+      "reason": "authorized model allowlist toggle; preserves agent identity, company scope and unrelated configuration"
+    },
+    {
+      "name": "check_ai_agent_activation",
+      "exposure": "denied",
+      "reason": "read-only native authorization probe for reviewed operator activation; never dispatched through the tenant BFF"
+    },
+    {
       "name": "set_ai_capability_role_grant",
       "exposure": "session",
       "reason": "invoked by the authenticated AI capability-policy administration boundary"

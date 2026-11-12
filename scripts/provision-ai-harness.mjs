@@ -312,6 +312,32 @@ export function httpClient(env, fetcher = fetch) {
     async call(name, args) {
       await request(`${base}/v1/database/${database}/call/${name}`, owner, JSON.stringify(args), 'application/json')
     },
+    async verifyActivationAuthority(organizationId, agentId, configureMeter) {
+      const response = await fetcher(`${base}/v1/database/${database}/schema?version=9`, {
+        method: 'GET', redirect: 'error', signal: AbortSignal.timeout(30_000),
+        headers: { Authorization: `Bearer ${owner}` },
+      }).catch(() => { throw new Error('activation schema probe transport failed') })
+      requireValue(response.ok, `activation schema probe failed: HTTP ${response.status}`)
+      const schema = await responseJson(response)
+      requireValue(Array.isArray(schema.reducers), 'invalid deployed activation schema')
+      const signatures = {
+        check_ai_agent_activation: [['organization_id', 'U64'], ['agent_id', 'U64'], ['configure_meter', 'Bool']],
+        set_ai_agent_model: [['organization_id', 'U64'], ['agent_id', 'U64'], ['model', 'String'], ['enabled', 'Bool']],
+        set_ai_agent_action: [['organization_id', 'U64'], ['agent_id', 'U64'], ['action', 'String'], ['enabled', 'Bool']],
+      }
+      for (const [name, signature] of Object.entries(signatures)) {
+        const reducer = exactlyOne(schema.reducers.filter(row => row.name === name), 'deployed activation reducer')
+        const elements = reducer.params?.elements
+        requireValue(Array.isArray(elements) && elements.length === signature.length && elements.every((element, i) => {
+          const type = element.algebraic_type
+          return element.name?.some === signature[i][0] && type && Object.keys(type).length === 1
+            && Array.isArray(type[signature[i][1]]) && type[signature[i][1]].length === 0
+        }), 'deployed activation reducer signature mismatch')
+      }
+      // This native reducer checks the real caller's current authorization and
+      // writes no application state. JS schema checks do not replace reducer auth.
+      await this.call('check_ai_agent_activation', [organizationId, agentId, configureMeter])
+    },
     async writerIdentity() {
       // A configured token name is not proof of the runtime writer's identity.
       // This authenticated SELECT is non-billable and performs no reducer call.

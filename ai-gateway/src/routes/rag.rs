@@ -153,14 +153,30 @@ pub struct RagResponse {
     pub ui_actions: Vec<UiActionProposal>,
 }
 
-fn no_relevant_information_response(retrieval_degraded: bool) -> RagResponse {
-    RagResponse {
-        answer: "No relevant information found for your query.".to_string(),
+fn no_relevant_information_response(
+    retrieval_degraded: bool,
+    related_guides: Vec<RelatedGuide>,
+    guide_retrieval_degraded: bool,
+) -> AppResult<RagResponse> {
+    // Saved guides are independently authorized readback cards, not grounding
+    // for a generated answer. Keep them useful without claiming a healthy search.
+    if (retrieval_degraded || guide_retrieval_degraded) && related_guides.is_empty() {
+        return Err(AppError::RetrievalUnavailable);
+    }
+    let answer = if related_guides.is_empty() {
+        "No relevant information found for your query."
+    } else if retrieval_degraded {
+        "Semantic retrieval is unavailable. Saved guides are available for this question. Open a guide to review its saved instructions. Draft guides have not been independently verified."
+    } else {
+        "Saved guides are available for this question. Open a guide to review its saved instructions. Draft guides have not been independently verified."
+    };
+    Ok(RagResponse {
+        answer: answer.to_string(),
         sources: Vec::new(),
         retrieval_degraded,
-        related_guides: Vec::new(),
+        related_guides,
         import_task_statuses: Vec::new(),
-        guide_retrieval_degraded: false,
+        guide_retrieval_degraded,
         run_id: None,
         agent_id: None,
         provider: None,
@@ -168,7 +184,7 @@ fn no_relevant_information_response(retrieval_degraded: bool) -> RagResponse {
         verification: None,
         provenance: None,
         ui_actions: Vec::new(),
-    }
+    })
 }
 
 /// What the server established for this answer: each live snapshot it read
@@ -213,7 +229,7 @@ fn source_passage(passage: &ResolvedPassage) -> SourcePassage {
 
 /// Judges a candidate against the actor's authorized passages.
 #[async_trait]
-trait RagAnswerAdmission: Send + Sync {
+pub(crate) trait RagAnswerAdmission: Send + Sync {
     async fn admit(
         &self,
         candidate: &str,
@@ -224,7 +240,7 @@ trait RagAnswerAdmission: Send + Sync {
 
 /// Records a released answer's claims durably and returns their ids.
 #[async_trait]
-trait RagProvenanceSink: Send + Sync {
+pub(crate) trait RagProvenanceSink: Send + Sync {
     async fn record(&self, gated: &GatedTextAnswer) -> anyhow::Result<(u64, Vec<u64>)>;
 }
 
@@ -289,7 +305,7 @@ impl RagProvenanceSink for StdbRagProvenance<'_> {
 }
 
 /// Everything the release decision needs.
-struct ReleaseInputs<'a> {
+pub(crate) struct ReleaseInputs<'a> {
     scope: EvidenceScope,
     requested_rows: u64,
     query: &'a str,
@@ -300,20 +316,42 @@ struct ReleaseInputs<'a> {
     spreadsheet: Option<&'a AuthorizedSelection>,
 }
 
+impl<'a> ReleaseInputs<'a> {
+    /// Reuse passage admission without importing unrelated task/selection authority.
+    pub(crate) fn passage_backed(
+        scope: EvidenceScope,
+        requested_rows: u64,
+        query: &'a str,
+        snapshots: &'a [LiveSnapshot],
+        evidence: &'a AuthorizedEvidence,
+    ) -> Self {
+        Self {
+            scope,
+            requested_rows,
+            query,
+            snapshots,
+            evidence,
+            import_tasks: &[],
+            import_access: None,
+            spreadsheet: None,
+        }
+    }
+}
+
 /// What may leave the gateway for one candidate.
-struct RagRelease {
+pub(crate) struct RagRelease {
     /// The gated answer, or a withheld notice — never the raw candidate.
-    answer: String,
-    verification: TextAnswerVerification,
-    provenance: TextAnswerProvenance,
+    pub(crate) answer: String,
+    pub(crate) verification: TextAnswerVerification,
+    pub(crate) provenance: TextAnswerProvenance,
     /// Passage sources may accompany an admitted answer. False whenever the
     /// candidate was withheld or withdrawn, so a failed answer cannot disclose
     /// source snippets without the successful release-time authority checks.
-    passages_disclosed: bool,
+    pub(crate) passages_disclosed: bool,
     /// The durable run must be recorded as failed, with this reason.
-    run_failure: Option<&'static str>,
+    pub(crate) run_failure: Option<&'static str>,
     /// True only after answer admission, provenance and release checks succeeded.
-    answer_released: bool,
+    pub(crate) answer_released: bool,
 }
 
 impl RagRelease {
@@ -335,7 +373,7 @@ impl RagRelease {
 /// current *at the moment of release*. A qualified answer carries its
 /// limitations; an unverified one is replaced by a withheld notice. Neither
 /// `post_rag_stream` nor any client ever sees the raw candidate.
-async fn release_rag_answer(
+pub(crate) async fn release_rag_answer(
     inputs: &ReleaseInputs<'_>,
     candidate: &str,
     admission: &dyn RagAnswerAdmission,
@@ -722,12 +760,21 @@ pub async fn post_rag(
                     &req.query,
                     "rag",
                     Some(&agent),
+                    Some("rag_generation"),
                 )
                 .await
             }
             .await,
         )
     };
+    if let Some(Err(error)) = &query_vector {
+        if error.is::<crate::error::GenerationSourceUnavailable>() {
+            // Revoked source is an activation failure, not optional retrieval.
+            return Err(AppError::GenerationSourceUnavailable(
+                crate::error::GenerationSourceUnavailable,
+            ));
+        }
+    }
     let mut retrieval_degraded = false;
     let company_result = match &query_vector {
         Some(Ok(query_vector)) => {
@@ -934,18 +981,17 @@ pub async fn post_rag(
             live_snapshot_count = 0,
             source_count = 0,
             duration_ms = started.elapsed().as_millis() as u64,
-            "RAG query answered (no hits)"
+            "RAG query has no grounded context"
         );
         let fresh_guides =
             recheck_related_guides(&state, &actor, org_id, req.company_id, &related_guides).await;
         related_guides = fresh_guides.references;
         guide_retrieval_degraded |= fresh_guides.degraded;
-        let mut response = no_relevant_information_response(retrieval_degraded);
-        if !related_guides.is_empty() {
-            response.answer = "Saved guides are available for this question. Open a guide to review its saved instructions. Draft guides have not been independently verified.".to_string();
-        }
-        response.related_guides = related_guides;
-        response.guide_retrieval_degraded = guide_retrieval_degraded;
+        let response = no_relevant_information_response(
+            retrieval_degraded,
+            related_guides,
+            guide_retrieval_degraded,
+        )?;
         return Ok(Json(response));
     }
 
@@ -1047,7 +1093,7 @@ pub async fn post_rag(
         &req.identity_hex,
     )
     .await
-    .map_err(|e| AppError::Internal(e.to_string()))?;
+    .map_err(AppError::from_generation)?;
     let model_store = StdbModelConfigurationStore {
         reader: state.stdb.as_ref(),
     };
@@ -1093,7 +1139,7 @@ pub async fn post_rag(
                 Some(error.to_string()),
             )
             .await;
-            return Err(AppError::Internal(format!("LLM request failed: {error}")));
+            return Err(AppError::from_generation(error));
         }
     };
     let total_tokens = program
@@ -1318,13 +1364,109 @@ mod tests {
     use super::*;
 
     #[test]
-    fn degraded_empty_retrieval_returns_no_unverified_sources() {
-        let response = no_relevant_information_response(true);
-        assert!(response.retrieval_degraded);
+    fn healthy_empty_retrieval_returns_no_unverified_sources() {
+        let response = no_relevant_information_response(false, Vec::new(), false).unwrap();
+        assert_eq!(
+            response.answer,
+            "No relevant information found for your query."
+        );
+        assert!(!response.retrieval_degraded);
         assert!(response.sources.is_empty());
         assert!(response.provider.is_none());
         assert!(response.model.is_none());
         assert!(!has_grounded_context(&[], &[]));
+    }
+
+    #[tokio::test]
+    async fn degraded_empty_retrieval_is_actionably_unavailable_before_json_or_sse() {
+        use axum::response::IntoResponse;
+        for streaming in [false, true] {
+            let retrieval = optional_retrieval::<Vec<RankedSource>, _>(Err(anyhow::anyhow!(
+                "provider credential secret-do-not-disclose"
+            )));
+            assert!(!has_grounded_context(&retrieval.value, &[]));
+            let result = no_relevant_information_response(retrieval.degraded, Vec::new(), false);
+            // Both routes propagate this shared decision before serializing an
+            // answer or constructing any SSE delta events.
+            let response = if streaming {
+                result
+                    .map(|response| rag_stream_events(&response))
+                    .unwrap_err()
+                    .into_response()
+            } else {
+                result.map(Json).into_response()
+            };
+            assert_eq!(
+                response.status(),
+                axum::http::StatusCode::SERVICE_UNAVAILABLE
+            );
+            assert_eq!(response.headers()["content-type"], "application/json");
+            let bytes = axum::body::to_bytes(response.into_body(), 4096)
+                .await
+                .unwrap();
+            let body: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(body["code"], "ai_retrieval_unavailable");
+            assert!(body.get("recovery_path").is_none());
+            assert_eq!(body["error"], AppError::RetrievalUnavailable.to_string());
+            assert!(!String::from_utf8_lossy(&bytes).contains("secret-do-not-disclose"));
+        }
+    }
+
+    #[test]
+    fn failed_guide_lookup_cannot_be_reported_as_healthy_empty_retrieval() {
+        assert!(matches!(
+            no_relevant_information_response(false, Vec::new(), true),
+            Err(AppError::RetrievalUnavailable)
+        ));
+    }
+
+    #[test]
+    fn degraded_retrieval_keeps_live_snapshot_grounding_and_disclosure() {
+        let retrieval = optional_retrieval::<Vec<RankedSource>, _>(Err(anyhow::anyhow!(
+            "semantic retrieval unavailable"
+        )));
+        let snapshots = [snapshot_with_total(1250.5)];
+        // The no-grounding branch must not intercept this independently
+        // authorized fallback; generation still passes through the answer gate.
+        assert!(retrieval.degraded);
+        assert!(has_grounded_context(&retrieval.value, &snapshots));
+        let sources = live_snapshots_to_rag_sources(&snapshots);
+        assert!(!sources.is_empty());
+        assert!(sources.iter().all(|source| source.kind == "live"));
+    }
+
+    #[test]
+    fn related_guide_cards_survive_empty_or_degraded_retrieval_without_becoming_sources() {
+        for degraded in [false, true] {
+            let guide = RelatedGuide {
+                guide_id: "guide-1".into(),
+                revision: 1,
+                title: "Saved instructions".into(),
+                module: "sales".into(),
+                workflow: None,
+                language: "en".into(),
+                review_state: "draft".into(),
+                company_id: "4097".into(),
+                updated_at: None,
+                content_hash: "hash".into(),
+                product_version: None,
+            };
+            let response = no_relevant_information_response(degraded, vec![guide], true).unwrap();
+            assert_eq!(response.related_guides.len(), 1);
+            assert!(response.sources.is_empty());
+            assert!(response.verification.is_none());
+            assert_eq!(response.retrieval_degraded, degraded);
+            assert!(response.guide_retrieval_degraded);
+            assert!(response
+                .answer
+                .contains("Draft guides have not been independently verified"));
+            assert_eq!(
+                response
+                    .answer
+                    .contains("Semantic retrieval is unavailable"),
+                degraded
+            );
+        }
     }
 
     #[test]

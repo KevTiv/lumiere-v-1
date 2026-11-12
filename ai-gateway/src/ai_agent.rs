@@ -120,6 +120,7 @@ pub async fn resolve_surface_agent(
     if scope_rows.len() != 1 || !agent_company_matches(&scope_rows[0], company_id) {
         anyhow::bail!("AI agent is unavailable for this company");
     }
+    crate::orchestrator::skill_loader::require_generation_source(stdb, org_id, skill_key).await?;
     Ok(agent)
 }
 
@@ -557,7 +558,17 @@ mod tests {
                 !statement.contains("is_default"),
                 "company binding must win"
             );
-            let rows = if statement.contains("FROM ai_skill_config ") {
+            let rows = if case == "unprovisioned" && statement.contains("FROM ai_skill ") {
+                vec![]
+            } else if let Some(rows) =
+                crate::orchestrator::skill_loader::tests::generation_source_rows(
+                    &statement,
+                    "rag_generation",
+                    "active",
+                )
+            {
+                rows
+            } else if statement.contains("FROM ai_skill_config ") {
                 vec![json!({
                     "id": 7, "company_id": 3, "is_enabled": case != "disabled",
                     "config_json": "{\"defaultAgentId\":42}"

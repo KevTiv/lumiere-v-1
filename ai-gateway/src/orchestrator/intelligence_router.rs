@@ -268,7 +268,8 @@ pub(crate) async fn run_catalogued_generation_surface(
         organization_id,
         company_id,
         run.run_id,
-    );
+    )
+    .with_source_gate(reader, skill_key);
     let checkpoint_store = StdbProgramCheckpointStore { writer, reader };
     let recorder = StdbIntelligenceEventRecorder { writer, reader };
     let context = GovernedProgramContext {
@@ -328,7 +329,8 @@ pub(crate) async fn gate_rag_answer_with_review(
         run.run_id,
         IntelligenceRole::Review,
         &NoopShadowDecisionRecorder,
-    )?;
+    )?
+    .with_source_gate(store.reader, "rag_generation");
     let checker = DecisionClaimCoverageChecker {
         reviewer: &reviewer,
     };
@@ -373,6 +375,7 @@ pub(super) struct RoutedDecisionProvider<'a> {
     role: IntelligenceRole,
     shadow_recorder: &'a dyn ShadowDecisionRecorder,
     next_scope: AtomicU32,
+    source_gate: Option<(&'a stdb_client::StdbClient, &'a str)>,
 }
 
 impl<'a> RoutedDecisionProvider<'a> {
@@ -401,7 +404,20 @@ impl<'a> RoutedDecisionProvider<'a> {
             role,
             shadow_recorder,
             next_scope: AtomicU32::new(1),
+            source_gate: None,
         })
+    }
+
+    fn with_source_gate(mut self, stdb: &'a stdb_client::StdbClient, key: &'a str) -> Self {
+        self.source_gate = Some((stdb, key));
+        self
+    }
+
+    async fn require_source(&self) -> Result<()> {
+        if let Some((stdb, key)) = self.source_gate {
+            super::skill_loader::require_generation_source(stdb, self.organization_id, key).await?;
+        }
+        Ok(())
     }
 
     /// Evaluate every resolved shadow profile against the exact same
@@ -470,6 +486,7 @@ impl<'a> RoutedDecisionProvider<'a> {
         request: DecisionRequest,
         call_scope: u32,
     ) -> Result<DecisionResponse> {
+        self.require_source().await?;
         let binding = spend_binding_for_profile(
             self.agent,
             profile,
@@ -489,6 +506,7 @@ impl<'a> RoutedDecisionProvider<'a> {
 #[async_trait::async_trait]
 impl DecisionProvider for RoutedDecisionProvider<'_> {
     async fn decide(&self, request: DecisionRequest) -> Result<DecisionResponse> {
+        self.require_source().await?;
         let route = self
             .router
             .route(self.role, Some(&request.decision_type.name))
@@ -508,6 +526,9 @@ impl DecisionProvider for RoutedDecisionProvider<'_> {
                         return Ok(response);
                     }
                     Err(error) if error.is::<UnresolvedProviderAttempt>() => return Err(error),
+                    Err(error) if error.is::<crate::error::GenerationSourceUnavailable>() => {
+                        return Err(error)
+                    }
                     Err(error) => {
                         record_retryable_failure(&profile, attempt_no, error, &mut failures).await?
                     }
@@ -610,6 +631,7 @@ pub(super) struct RoutedGenerationProvider<'a> {
     company_id: u64,
     run_id: u64,
     next_scope: AtomicU32,
+    source_gate: Option<(&'a stdb_client::StdbClient, &'a str)>,
 }
 
 impl<'a> RoutedGenerationProvider<'a> {
@@ -631,13 +653,24 @@ impl<'a> RoutedGenerationProvider<'a> {
             company_id,
             run_id,
             next_scope: AtomicU32::new(1),
+            source_gate: None,
         }
+    }
+
+    fn with_source_gate(mut self, stdb: &'a stdb_client::StdbClient, key: &'a str) -> Self {
+        self.source_gate = Some((stdb, key));
+        self
     }
 }
 
 #[async_trait::async_trait]
 impl GenerationProvider for RoutedGenerationProvider<'_> {
     async fn generate(&self, request: GenerationRequest) -> Result<GenerationResponse> {
+        // The executor may recover a completed checkpoint without invoking this
+        // provider. Only new paid generation needs the current source release.
+        if let Some((stdb, key)) = self.source_gate {
+            super::skill_loader::require_generation_source(stdb, self.organization_id, key).await?;
+        }
         let route = self
             .router
             .route(IntelligenceRole::Generation, None)
@@ -648,6 +681,10 @@ impl GenerationProvider for RoutedGenerationProvider<'_> {
         let mut failures = Vec::new();
         for profile in profiles {
             for attempt_no in 0..=profile.max_retries.min(MAX_SAFE_RETRIES) {
+                if let Some((stdb, key)) = self.source_gate {
+                    super::skill_loader::require_generation_source(stdb, self.organization_id, key)
+                        .await?;
+                }
                 let binding = spend_binding_for_profile(
                     self.agent,
                     &profile,
@@ -759,6 +796,118 @@ mod tests {
 
     struct Fixed(&'static str);
     struct Broken;
+
+    #[tokio::test]
+    async fn source_revocation_or_change_blocks_provider_before_routing_or_spend() {
+        use super::super::skill_loader::tests::{generation_source_rows, sats_rows};
+        use axum::{extract::State, routing::post, Json, Router};
+        use std::sync::{Arc, Mutex};
+
+        struct NeverPaid;
+        #[async_trait]
+        impl LlmCompletion for NeverPaid {
+            async fn complete(
+                &self,
+                _: crate::providers::llm::LlmRequest,
+            ) -> Result<crate::providers::llm::LlmResponse> {
+                panic!("revoked source must not dispatch");
+            }
+        }
+        async fn sql(
+            State(case): State<Arc<Mutex<&'static str>>>,
+            statement: String,
+        ) -> Json<serde_json::Value> {
+            let case = *case.lock().unwrap();
+            // Any model configuration, spend query or write is unexpected.
+            Json(sats_rows(
+                generation_source_rows(&statement, "rag_generation", case)
+                    .expect("only release SQL before dispatch"),
+            ))
+        }
+        let case = Arc::new(Mutex::new("active"));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let stdb = StdbClient::new(
+            format!("http://{}", listener.local_addr().unwrap()),
+            "fixture".into(),
+            "gateway".into(),
+        );
+        let app = Router::new()
+            .route("/v1/database/fixture/sql", post(sql))
+            .with_state(case.clone());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        super::super::skill_loader::require_generation_source(&stdb, 1, "rag_generation")
+            .await
+            .unwrap();
+        let agent = ResolvedAgentConfig {
+            agent_id: 42,
+            provider: "mistral".into(),
+            model: "mistral-small".into(),
+            system_prompt: "test".into(),
+            temperature: 0.0,
+            max_tokens: 256,
+            context_window: 32_000,
+            top_p: 1.0,
+            allowed_actions: vec!["chat".into()],
+            allowed_models: vec![],
+            monthly_budget: None,
+            monthly_spend: 0.0,
+            cost_per_1k_tokens: 0.0,
+            rate_limit_per_minute: 0,
+            ollama_supports_tool_calling: false,
+        };
+        let store =
+            super::super::model_configuration::StdbModelConfigurationStore { reader: &stdb };
+        let router = ConfiguredIntelligenceRouter::new(
+            IntelligenceRouteResolver::new(&store, 1, &agent, None).unwrap(),
+        );
+        let ledger = super::super::spend_admission::StdbSpendLedger {
+            writer: &stdb,
+            reader: &stdb,
+        };
+        let provider =
+            RoutedGenerationProvider::new(&router, &NeverPaid, &ledger, &agent, 1, 3, 99)
+                .with_source_gate(&stdb, "rag_generation");
+        let reviewer = RoutedDecisionProvider::new(
+            &router,
+            &NeverPaid,
+            &ledger,
+            &agent,
+            1,
+            3,
+            99,
+            IntelligenceRole::Review,
+            &NoopShadowDecisionRecorder,
+        )
+        .unwrap()
+        .with_source_gate(&stdb, "rag_generation");
+        for changed in ["missing", "stale"] {
+            *case.lock().unwrap() = changed;
+            let error = provider
+                .generate(GenerationRequest {
+                    objective: "answer".into(),
+                    context: json!({}),
+                    format: "text".into(),
+                    response_format: Default::default(),
+                    instructions: None,
+                    max_tokens: None,
+                })
+                .await
+                .unwrap_err();
+            assert!(error.is::<crate::error::GenerationSourceUnavailable>());
+            // Both initial routing and an already-routed retry/fallback must
+            // re-read source authority, not reuse the earlier active result.
+            let error = reviewer.decide(request()).await.unwrap_err();
+            assert!(error.is::<crate::error::GenerationSourceUnavailable>());
+            for key in ["primary", "retry", "fallback"] {
+                let error = reviewer
+                    .attempt(&limit_profile(key), request(), 4001)
+                    .await
+                    .unwrap_err();
+                assert!(error.is::<crate::error::GenerationSourceUnavailable>());
+            }
+        }
+        server.abort();
+    }
 
     #[async_trait]
     impl DecisionProvider for Fixed {

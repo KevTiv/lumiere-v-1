@@ -8,7 +8,7 @@ import type { ChatImportTaskStatus } from "@lumiere/ui/lib/import-task-status"
 
 export type TurnFailure = "denied" | "unavailable" | "failed" | "outcome_unknown"
 type SetupFailure = {
-  code: "ai_default_agent_not_provisioned" | "ai_surface_skill_not_provisioned"
+  code: "ai_default_agent_not_provisioned" | "ai_surface_skill_not_provisioned" | "ai_retrieval_unavailable" | "ai_generation_source_unavailable"
   message: string
   recoveryPath?: "/ai-skills"
 }
@@ -34,7 +34,7 @@ export function assistantSetupFailure(error: unknown): SetupFailure | undefined 
   if (!(error instanceof HttpResponseError) || error.status !== 503) return undefined
 
   const { code, message, recoveryPath } = error
-  if (code !== "ai_default_agent_not_provisioned" && code !== "ai_surface_skill_not_provisioned") return undefined
+  if (code !== "ai_default_agent_not_provisioned" && code !== "ai_surface_skill_not_provisioned" && code !== "ai_retrieval_unavailable" && code !== "ai_generation_source_unavailable") return undefined
 
   return { code, message, recoveryPath: aiSkillsRecoveryPath(recoveryPath) }
 }

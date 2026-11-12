@@ -224,7 +224,10 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
   const companySetup = operatingCompanyId != null && provisionSurfaces.data?.company_setup?.company_id === operatingCompanyId
     ? provisionSurfaces.data.company_setup
     : undefined
-  const canProvisionSurfaces = permissionsReady === true && checkPermission("ai_skill", "create").allowed
+  const canProvisionSurfaces = permissionsReady === true
+    && checkPermission("ai_skill", "create").allowed
+    && checkPermission("ai_skill", "write").allowed
+    && checkPermission("ai_agent", "write").allowed
   const createSkill = useCreateAiSkill(organizationId)
   const setSkillActive = useSetAiSkillActive(organizationId)
   const upsertConfig = useUpsertAiSkillConfig()
@@ -367,29 +370,30 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
       <section aria-labelledby="ai-feature-setup-title" className="space-y-3 rounded-xl border border-border bg-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1 space-y-1">
-            <h2 id="ai-feature-setup-title" className="text-sm font-semibold">{t("aiSkills.setup.title")}</h2>
-            <p className="text-sm text-muted-foreground">{t("aiSkills.setup.description")}</p>
+            <h2 id="ai-feature-setup-title" className="text-sm font-semibold">AI binding and catalog setup</h2>
+            <p className="text-sm text-muted-foreground">Apply eligible company defaults without replacing custom or disabled bindings. This does not activate or verify chat execution.</p>
           </div>
           <Button
             type="button"
             variant="outline"
-            disabled={isPending || !canProvisionSurfaces || !operatingCompanyId}
+            disabled={isPending || !canProvisionSurfaces || !operatingCompanyId || !!companySetup}
             onClick={() => provisionSurfaces.mutate()}
             data-testid="ai-skills-provision-surfaces"
           >
-            {t(provisionSurfaces.isPending ? "aiSkills.setup.settingUp" : "aiSkills.setup.action")}
+            {provisionSurfaces.isPending ? "Applying bindings…" : "Apply binding/catalog defaults"}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">{t("aiSkills.setup.prerequisites")}</p>
+        <p className="text-xs text-muted-foreground">Platform activation is managed by the platform administrator, not tenants. No model calls are made by this setup check.</p>
         {!operatingCompanyId ? (
           <p className="text-sm text-muted-foreground">{t("aiSkills.setup.companyRequired")}</p>
         ) : null}
         {permissionsReady === true && !canProvisionSurfaces ? (
-          <p className="text-sm text-muted-foreground">{t("aiSkills.setup.permissionRequired")}</p>
+          <p className="text-sm text-muted-foreground">Setup requires ai_skill:create, ai_skill:write and ai_agent:write permissions.</p>
         ) : null}
         {companySetup ? (
           <div role="status" className="space-y-2 text-sm">
-            <p>{t(`aiSkills.setup.companyStatus.${companySetup.status}`)}</p>
+            <p>Platform activation required — chat execution not verified.</p>
+            <p>{companySetup.message}</p>
             <ul className="space-y-1">
               {provisionSurfaces.data?.skills.map((skill) => (
                 <li key={skill.skill_key} className="flex flex-wrap justify-between gap-2">
