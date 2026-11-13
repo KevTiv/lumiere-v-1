@@ -35,6 +35,11 @@ import {
 } from "@/app/api/ai/_lib/history-references"
 import { apiFetch } from "./api-fetch"
 import { assistantSavedWidgetHref } from "./assistant-native-actions"
+import {
+  assistantWidgetReceiptHref,
+  assistantWidgetReceiptQueryKey,
+  readAssistantWidgetReceipts,
+} from "./assistant-widget-receipts"
 import type { ChatImportTask } from "./chat-import-task"
 import { importTaskHref } from "./import-task-navigation"
 import { useErpAiHistoryReferenceRequest } from "./erp-ai-context"
@@ -173,6 +178,14 @@ export function useAssistantHistoryReferences({
         .parse(payload)
         .data.map(decisionNote)
     },
+  })
+  const widgetReceipts = useQuery({
+    queryKey: [...assistantWidgetReceiptQueryKey(scopeKey, sessionKey), ids],
+    enabled: !!scopeKey && !!sessionKey && !!companyId && !!ids,
+    retry: false,
+    gcTime: 60_000,
+    queryFn: ({ signal }) =>
+      readAssistantWidgetReceipts(companyId!, sessionKey!, ids, signal),
   })
   const notes = notesQuery.isError
     ? EMPTY_NOTES
@@ -324,13 +337,24 @@ export function useAssistantHistoryReferences({
     if (!parsed.success || parsed.data.kind !== "message") return null
     const reference = parsed.data
     const saved = notesByMessage.get(message.id)
-    const widgetLinks =
+    const proposalLinks =
       message.actions?.flatMap((action) => {
         const href =
           action.nativeAction &&
           assistantSavedWidgetHref(action.nativeAction, companyId)
         return href ? [{ href, label: action.label }] : []
       }) ?? []
+    const savedLinks = widgetReceipts.isError
+      ? []
+      : (widgetReceipts.data ?? [])
+          .filter((receipt) => receipt.messageId === message.id)
+          .map((receipt) => ({
+            href: assistantWidgetReceiptHref(receipt, companyId),
+            label: t("aiChat.history.savedChart", {
+              defaultValue: "Saved chart",
+            }),
+          }))
+    const widgetLinks = [...savedLinks, ...proposalLinks]
     return (
       <div className="mt-2 space-y-2">
         <div className="flex flex-wrap items-center gap-1">

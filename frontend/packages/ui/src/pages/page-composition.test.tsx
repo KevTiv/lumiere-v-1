@@ -454,6 +454,24 @@ describe("PageComposition adding and editing", () => {
     )
   })
 
+  it("keeps the exact Assistant request identity on a newly created widget through layout save", async () => {
+    const requestId = "2bf34d57-7c1d-44b2-bf70-5cd3d7a067c6"
+    const onAssistantWidgetPlaced = vi.fn()
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    render(<PageComposition {...props({
+      request: { id: requestId, kind: "add_widget", prompt: "Late invoices" },
+      onCreateWidget: vi.fn().mockResolvedValue(saved),
+      onAssistantWidgetPlaced,
+      onSave,
+    })} />)
+    click("Create new widget")
+    const placement = { id: `assistant-${requestId}`, source: "saved", widgetId: "42", width: 6 }
+    await waitFor(() => expect(onAssistantWidgetPlaced).toHaveBeenCalledExactlyOnceWith(requestId, placement))
+    expect(onSave).not.toHaveBeenCalled()
+    click("Done")
+    await waitFor(() => expect(onSave).toHaveBeenCalledExactlyOnceWith([...defaultValue, placement], "4"))
+  })
+
   it("caps manual and harness additions at 64 while leaving removal and reset available", () => {
     const full: PageWidgetPlacement[] = Array.from(
       { length: 64 },

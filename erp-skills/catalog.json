@@ -795,6 +795,16 @@
             "required": false
           },
           {
+            "name": "chat_session_key",
+            "rustType": "Option<String>",
+            "required": false
+          },
+          {
+            "name": "history_refs",
+            "rustType": "Vec<HistoryReference>",
+            "required": false
+          },
+          {
             "name": "ui_action_offers",
             "rustType": "Vec<UiActionOffer>",
             "required": false

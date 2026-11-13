@@ -50,7 +50,7 @@ Generation source activation is a separate gate from contracts publication:
    `form_suggestion`, and `action_draft_generation` at `1.0.2` using the exact
    source hashes returned by the candidate gateway. Promote each enabled
    surface through the existing AI Skills release flow before advertising it.
-   The five Finance reviews use `1.0.5`, report analysis uses `1.0.10`, and
+   The five Finance reviews use `1.0.6`, report analysis uses `1.0.11`, and
    low-stock/report composition use `1.0.1`. The code and CI rollout uses
    synthetic fixtures. Live provider acceptance and paid calls require their
    own approved activation run.

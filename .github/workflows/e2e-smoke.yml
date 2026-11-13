@@ -828,6 +828,7 @@ jobs:
           path: |
             .tmp/assistant-history/acceptance.json
             frontend/web/test-results/assistant-history/**/browser-heap.json
+            frontend/web/test-results/assistant-history/**/alpha-history-surfaces.json
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 7

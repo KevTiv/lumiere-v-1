@@ -216,6 +216,49 @@ async function seedThread(actor, companyId, sessionKey, count, mapping) {
   }
 }
 
+async function seedAssistantAction(actor, companyId, sessionKey, { title, module, content, action, archived = false }) {
+  const session = await request(api, "/v1/session/field-access", { actor })
+  const organizationId = String(session.value.organizationId)
+  const metadata = {
+    nativeActions: [{
+      version: 1,
+      ...action,
+      scope: { actorId: session.value.identityHex, organizationId, companyId: String(companyId) },
+    }],
+  }
+  await createThread(actor, companyId, sessionKey, title, module)
+  await operation(actor, "append_ai_chat_message", {
+    companyId,
+    params: {
+      session_key: sessionKey,
+      role: "assistant",
+      content,
+      sources_json: none,
+      ui_context_json: none,
+      model: none,
+      duration_ms: none,
+      status: "completed",
+      metadata: some(JSON.stringify(metadata)),
+    },
+  })
+  if (archived) await operation(actor, "archive_ai_chat_session", { companyId, sessionKey, archived: true })
+}
+
+async function seedWarehouseOutcome(actor, companyId, sessionKey) {
+  const picks = (await query(actor, "stock-pickings", { companyId })).value.data
+  const transfer = picks.find((row) => row.name === "WH/IN/SEED-0001" && String(row.companyId ?? row.company_id) === String(companyId))
+  assert.ok(transfer, "The Warehouse acceptance fixture must contain its seeded transfer")
+  const transferId = rowId(transfer)
+  await seedAssistantAction(actor, companyId, sessionKey, {
+    title: "Warehouse archived outcome",
+    module: "warehouse",
+    content: "Open the current Warehouse receipt.",
+    action: { kind: "open_record", capabilityKey: "warehouse.transfer.open", recordId: transferId },
+    archived: true,
+  })
+  return transferId
+}
+
 async function getContext(env, actor, companyId, sessionKey, expected = 200) {
   return request(api, contextPath, {
     headers: {
@@ -375,13 +418,14 @@ async function startWeb(env) {
   await ready(web, "/sign-in")
 }
 
-async function runBrowser(env, companyId, sessionKey, originalMessage) {
+async function runBrowser(env, companyId, sessionKey, originalMessage, warehouseTransfer) {
   await command("pnpm", ["exec", "playwright", "test", "--config", "playwright.assistant-history.config.ts"], {
     ...env,
     ASSISTANT_HISTORY_COMPANY: String(companyId),
     ASSISTANT_HISTORY_SESSION: sessionKey,
     ASSISTANT_HISTORY_MESSAGE: originalMessage,
-  }, { cwd: join(root, "frontend/web"), timeout: 180_000 })
+    ASSISTANT_HISTORY_WAREHOUSE_TRANSFER: warehouseTransfer,
+  }, { cwd: join(root, "frontend/web"), timeout: 540_000 })
 }
 
 async function main() {
@@ -511,7 +555,14 @@ async function main() {
   assert.deepEqual(fresh.recentTurns, [])
   assert.deepEqual(fresh.historyRefs, [])
   assert.deepEqual(fresh.summary, { objective: null, questions: [], highlights: [] })
-  await runBrowser(env, companyId, sessionKey, originalMessage)
+  const warehouseTransfer = await seedWarehouseOutcome(admin, companyId, `${sessionKey}-warehouse`)
+  await seedAssistantAction(admin, companyId, `${sessionKey}-chart`, {
+    title: "Overview chart proposal",
+    module: "overview",
+    content: "Review the chart before adding it to Overview.",
+    action: { kind: "add_widget", capabilityKey: "overview.widget.add", pageId: "dashboard" },
+  })
+  await runBrowser(env, companyId, sessionKey, originalMessage, warehouseTransfer)
   await snapshot("after-restart-browser")
   assertMemoryBudget()
   report.scope = "Actual web, gateway, API, STDB and PostgreSQL with no generation provider provisioned"

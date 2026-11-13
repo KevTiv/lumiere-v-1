@@ -69,6 +69,11 @@ import {
 import { useStoredDashboardDataSources } from "@/hooks/use-stored-dashboard-data-sources";
 import { assistantHistoryScope } from "./assistant-history";
 import {
+  assistantWidgetReceiptQueryKey,
+  saveAssistantWidgetReceipt,
+  type AssistantWidgetReceipt,
+} from "./assistant-widget-receipts";
+import {
   fetchModulePageLayout,
   modulePageQueryKey,
   saveModulePageLayout,
@@ -84,6 +89,7 @@ export interface AssistantPageRequest {
   kind: "edit_page" | "add_widget";
   widgetKey?: string;
   prompt?: string;
+  origin?: { sessionKey: string; messageId: string };
 }
 
 interface RegisteredPage extends AssistantPageCatalog {
@@ -400,6 +406,9 @@ function ScopedModulePageHost({
   const tab = searchParams?.get("tab") ?? "dashboard";
   const savedWidgetFocus = searchParams?.get("savedWidgetCompany") === scope.companyId && pageId === tab
     ? parseAssistantActionId(searchParams.get("savedWidget")) : undefined;
+  const savedPlacement = searchParams?.get("savedWidgetPlacement");
+  const savedPlacementFocus = savedPlacement && /^assistant-[a-f0-9-]{36}$/.test(savedPlacement)
+    ? savedPlacement : undefined;
   const rawPeriod = searchParams?.get("period");
   const periodTimeZone = searchParams?.get("periodTimeZone") ?? "UTC";
   const bounds = useMemo(() => {
@@ -580,6 +589,30 @@ function ScopedModulePageHost({
     editorRef.current = null;
     setEditor(null);
   };
+  const pendingWidgetOrigins = useRef(new Map<string, NonNullable<AssistantPageRequest["origin"]>>());
+  const widgetOrigins = useRef(new Map<string, Omit<AssistantWidgetReceipt, "moduleId" | "pageId" | "layoutRevision">>());
+  const markAssistantWidget = (requestId: string, placement: PageWidgetPlacement) => {
+    const origin = pendingWidgetOrigins.current.get(requestId);
+    if (!origin || !isCurrent(scopeKey)) return;
+    pendingWidgetOrigins.current.delete(requestId);
+    if (widgetOrigins.current.size >= 64) widgetOrigins.current.clear();
+    widgetOrigins.current.set(placement.id, { ...origin, requestId, widgetId: placement.widgetId });
+  };
+  const recordWidgetReceipt = async (receipt: AssistantWidgetReceipt): Promise<void> => {
+    if (!isCurrent(scopeKey)) return;
+    try {
+      await saveAssistantWidgetReceipt(scope.companyId, receipt);
+      if (isCurrent(scopeKey)) {
+        await queryClient.invalidateQueries({
+          queryKey: assistantWidgetReceiptQueryKey(scopeKey, receipt.sessionKey),
+        });
+      }
+    } catch {
+      if (isCurrent(scopeKey)) toast.warning(t("aiChat.history.widgetReceiptFailed", {
+        defaultValue: "The widget was saved. Its conversation link needs another attempt.",
+      }), { action: { label: t("common.retry"), onClick: () => void recordWidgetReceipt(receipt) } });
+    }
+  };
   const onSave = async (
     placements: PageCompositionValue,
     expectedRevision: string | null,
@@ -610,6 +643,15 @@ function ScopedModulePageHost({
       if (!isCurrent(scopeKey)) return;
       queryClient.setQueryData(queryKey, next);
       await queryClient.invalidateQueries({ queryKey, refetchType: "none" });
+      const origins = widgetOrigins.current;
+      widgetOrigins.current = new Map();
+      if (next.revision && next.layout) {
+        for (const placement of next.layout.widgets) {
+          const origin = origins.get(placement.id);
+          if (!origin || placement.source !== "saved" || placement.widgetId !== origin.widgetId) continue;
+          void recordWidgetReceipt({ ...origin, moduleId: scope.moduleId, pageId, layoutRevision: next.revision });
+        }
+      }
     } catch (error) {
       if (error instanceof ModulePageLayoutError && error.status === 409) {
         void layout.refetch();
@@ -636,6 +678,13 @@ function ScopedModulePageHost({
           prompt: pending.prompt,
         }
       : null;
+  const handleAssistantRequest = (requestId: string) => {
+    if (pending?.requestId === requestId && pending.origin) {
+      if (pendingWidgetOrigins.current.size >= 64) pendingWidgetOrigins.current.clear();
+      pendingWidgetOrigins.current.set(requestId, pending.origin);
+    }
+    settle(requestId);
+  };
   if (!permitted) return <>{children}</>;
   const insights = placement === "insights";
   return (
@@ -675,6 +724,8 @@ function ScopedModulePageHost({
           onSave={onSave}
           onDraftChange={setDraft}
           focusSavedWidgetId={savedWidgetFocus}
+          focusSavedPlacementId={savedPlacementFocus}
+          onAssistantWidgetPlaced={markAssistantWidget}
           onCreateWidget={canCreateWidgets ? () => openEditor() : undefined}
           onConfigureWidget={
             canCreateWidgets
@@ -686,7 +737,7 @@ function ScopedModulePageHost({
               : undefined
           }
           request={request}
-          onRequestHandled={settle}
+          onRequestHandled={handleAssistantRequest}
           actionTarget={actionTarget}
           insights={insights}
           scopeNote={

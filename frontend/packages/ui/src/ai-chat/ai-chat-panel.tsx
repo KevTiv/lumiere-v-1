@@ -1176,7 +1176,7 @@ function AIChatConversation({
                                 onRefresh={config?.onRefreshActionDraft ? handleRefreshDraft : undefined}
                               />
                             ) : action.type === "native" && action.nativeAction ? (
-                              <AiNativeActionCard key={action.id} action={action.nativeAction} label={action.label} onOpen={config?.onNativeAction} />
+                              <AiNativeActionCard key={action.id} action={action.nativeAction} label={action.label} onOpen={config?.onNativeAction ? (nativeAction) => config.onNativeAction?.(nativeAction, message.id) : undefined} />
                             ) : null,
                           )}
                         </div>

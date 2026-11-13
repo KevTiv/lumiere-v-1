@@ -646,12 +646,12 @@ fn seed_active_release_for_skill(
     // Development fixture only. Keep exact adapter bindings aligned with
     // `gateway certification-bundles`; these rows are not production certificates.
     let source_hash = if skill_key == "report_analysis" {
-        "sha256:e1709d409390f8f0d5b159ee7251cf536467fa8d6c4c3d942a4cc57a49ce1c81".to_string()
+        "sha256:58f7b11ae5bc93b139ba4198ae276c6612d9afee1c71bc79254e79914c02d600".to_string()
     } else {
         format!("sha256:{}", source_hash_char.to_string().repeat(64))
     };
     let version = if skill_key == "report_analysis" {
-        "1.0.10"
+        "1.0.11"
     } else {
         "1.0.0"
     };

@@ -132,7 +132,7 @@ export interface AIChatConfig {
   onApproveActionDraft?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload | void>
   onRejectActionDraft?: (draft: ChatActionDraftPayload, reason?: string) => Promise<ChatActionDraftPayload | void>
   onUpdateActionDraft?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload | void>
-  onNativeAction?: (action: AssistantAction) => Promise<void> | void
+  onNativeAction?: (action: AssistantAction, messageId: string) => Promise<void> | void
   onRefreshActionDraft?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload>
   /** User asserts they're relying on a cited passage as evidence (AIH-13/14). */
   onCiteSource?: (args: { messageId: string; source: ChatMessageSourceRef }) => Promise<void>

@@ -14024,6 +14024,7 @@
       "reviseDecision": "Revise decision",
       "revision": "Revision {{revision}}",
       "saveDecision": "Save decision",
+      "savedChart": "Saved chart",
       "search": "Search conversations",
       "sourceDescription": "Original saved conversation source",
       "status": "Conversation status",
@@ -14035,7 +14036,8 @@
       "useInDraft": "Add reference",
       "useInNewChat": "Use in new chat",
       "viewSource": "View source",
-      "waitForReply": "Wait for an Assistant response to finish before sending another message."
+      "waitForReply": "Wait for an Assistant response to finish before sending another message.",
+      "widgetReceiptFailed": "The widget was saved. Its conversation link needs another attempt."
     },
     "historySaveFailed": "Conversation history may not be available after leaving this page. Your answer is still here. Copy anything you need to keep. This warning does not describe whether a business action completed.",
     "turn": {

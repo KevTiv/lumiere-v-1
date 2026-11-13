@@ -509,7 +509,7 @@ function ErpAiChatPanel({
         if (!operatingCompanyId || (draft.companyId != null && draft.companyId !== operatingCompanyId)) throw new Error("Draft scope changed")
         return fetchAiActionDraftPayload(orgId, operatingCompanyId, draft.draftId)
       },
-      onNativeAction: (proposed: AssistantAction) => {
+      onNativeAction: (proposed: AssistantAction, messageId: string) => {
         const validate = () => {
           const current = currentActionContext.current
           const action = current.actionScope && decodeAssistantAction(proposed, current.actionScope, { allowedModules: current.allowedActionModules, allowedPageModules: ASSISTANT_PAGE_MODULES })
@@ -529,7 +529,9 @@ function ErpAiChatPanel({
             if (isAssistantPageAction(action)) {
               const composer = currentActionContext.current.pageComposition
               if (!composer) throw new Error(i18n.t("aiChat.native.pageUnavailable"))
-              const result = composer.requestPage({ requestId: crypto.randomUUID(), scopeKey, moduleId: capability.module, pageId: action.pageId, kind: action.kind, widgetKey: action.widgetKey, prompt: action.prompt })
+              const origin = action.kind === "add_widget" && !action.widgetKey && sessionKey && /^[1-9][0-9]{0,19}$/.test(messageId)
+                ? { sessionKey, messageId } : undefined
+              const result = composer.requestPage({ requestId: crypto.randomUUID(), scopeKey, moduleId: capability.module, pageId: action.pageId, kind: action.kind, widgetKey: action.widgetKey, prompt: action.prompt, origin })
               if (result !== "pending") throw new Error(i18n.t(result === "busy" ? "aiChat.native.pageBusy" : "aiChat.native.scopeChanged"))
               // Preserve the current date range and filters when opening this page's editor.
               if (composer.page?.moduleId !== capability.module || (action.pageId && composer.page.pageId !== action.pageId)) router.push(href)

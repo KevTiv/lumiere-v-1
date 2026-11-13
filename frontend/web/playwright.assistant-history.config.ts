@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test"
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: "assistant-history-load.spec.ts",
+  testMatch: ["assistant-history-load.spec.ts", "assistant-history-alpha.spec.ts"],
   outputDir: "test-results/assistant-history",
   workers: 1,
   timeout: 90_000,

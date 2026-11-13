@@ -219,7 +219,7 @@ fn require_history_read(access: &FieldAccessContext) -> Result<(), ApiError> {
     Ok(())
 }
 
-async fn recheck_scope(
+pub(super) async fn recheck_scope(
     state: &AppState,
     context: &TrustedOperationContext,
     company: u64,
@@ -250,7 +250,7 @@ async fn recheck_scope(
     Ok(())
 }
 
-async fn scope(
+pub(super) async fn scope(
     state: &AppState,
     session: &crate::session::ApiSession,
     company: u64,
@@ -275,7 +275,7 @@ async fn scope(
     context.with_company_scope(vec![company])
 }
 
-async fn owned_session(
+pub(super) async fn owned_session(
     state: &AppState,
     context: &TrustedOperationContext,
     company: u64,
@@ -294,7 +294,7 @@ async fn owned_session(
         .ok_or_else(unavailable)
 }
 
-async fn owned_message(
+pub(super) async fn owned_message(
     state: &AppState,
     context: &TrustedOperationContext,
     company: u64,
