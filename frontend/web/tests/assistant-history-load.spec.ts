@@ -64,6 +64,7 @@ test("keeps the authenticated mobile transcript bounded and preserves drafts acr
   await expect(input).toHaveCount(0)
   await history.click()
   await panel.getByRole("button", { name: "Archived", exact: true }).click()
+  await search.clear()
   await panel.getByRole("button", { name: renamed, exact: true }).click()
   await panel.getByRole("button", { name: "Restore", exact: true }).click()
   await expect(input).toHaveValue(draft)
