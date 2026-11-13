@@ -2,7 +2,7 @@ import { writeFile } from "node:fs/promises"
 
 import { expect, test } from "@playwright/test"
 
-import { openErpAiChat, signIn } from "./e2e/helpers"
+import { TEST_EMAIL, TEST_PASSWORD } from "./e2e/helpers"
 
 test("keeps the authenticated mobile transcript bounded and preserves drafts across history navigation", async ({ page, context }, info) => {
   const company = process.env.ASSISTANT_HISTORY_COMPANY
@@ -11,9 +11,12 @@ test("keeps the authenticated mobile transcript bounded and preserves drafts acr
   expect(company, "Run this test with the seeded assistant-history CI fixture").toBeTruthy()
   expect(thread).toBeTruthy()
   expect(message).toBeTruthy()
-  await signIn(page)
-  await page.goto("/overview")
-  await openErpAiChat(page)
+  const signIn = await page.request.post("/api/auth/signin", {
+    data: { email: TEST_EMAIL, password: TEST_PASSWORD },
+  })
+  expect(signIn.ok()).toBe(true)
+  const threadLink = new URLSearchParams({ assistantCompany: company!, assistantThread: thread! })
+  await page.goto(`/overview?${threadLink}`)
 
   const panel = page.getByTestId("erp-ai-chat-panel")
   const input = panel.getByTestId("erp-ai-chat-input")
@@ -30,6 +33,7 @@ test("keeps the authenticated mobile transcript bounded and preserves drafts acr
   }
 
   await expect(panel).toHaveAttribute("data-mode", "full")
+  await expect(messages.first()).toBeVisible()
   await history.click()
   await search.fill("PRODUCTS-RECENT-CATALOG-2026")
   await panel.getByRole("button", { name: title, exact: true }).click()
