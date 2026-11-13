@@ -256,6 +256,9 @@ export function ReportComposerPanel({
 function ReportComposerResultView({ result }: { result: ReportComposerResult }) {
   const { t } = useTranslation()
   const { decision } = result.decision
+  const summaryWithheld =
+    result.summaryVerification.outcome === "requires_review" ||
+    result.summaryVerification.outcome === "blocked"
 
   return (
     <div className="flex flex-col gap-4">
@@ -304,7 +307,15 @@ function ReportComposerResultView({ result }: { result: ReportComposerResult }) 
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm leading-relaxed">{result.summary}</p>
+              {summaryWithheld ? (
+                <p className="text-sm leading-relaxed">
+                  {t("aiHarness.reportComposer.summaryWithheld", {
+                    defaultValue: "The summary is withheld pending verification. You can review the source figures below.",
+                  })}
+                </p>
+              ) : (
+                <p className="text-sm leading-relaxed">{result.summary}</p>
+              )}
             </CardContent>
           </Card>
 

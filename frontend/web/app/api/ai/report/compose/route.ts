@@ -9,6 +9,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 
 import { fetchAiGateway, resolveAiGatewayBaseUrl } from '@/lib/ai-gateway-server'
 import {
+  boundedString,
   optionalPositiveInteger,
   parseJsonBody,
   requireAiRouteContext,
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'date is required' }, { status: 400 })
   }
 
-  const timezone = sanitizeIdentifier(body.timezone ?? '', 120)
+  const timezone = boundedString(body.timezone, 120)
   if (!timezone) {
     return NextResponse.json({ error: 'timezone is required' }, { status: 400 })
   }
@@ -57,14 +58,14 @@ export async function POST(request: NextRequest) {
     const gw = await fetchAiGateway('/v1/skills/report/compose', {
       method: 'POST',
       body: JSON.stringify({
-        org_id: orgId,
-        company_id: companyId,
-        report_key: reportKey,
+        orgId,
+        companyId,
+        reportKey,
         date,
         timezone,
-        stdb_token: session.stdbToken,
-        identity_hex: session.identityHex,
-        org_privacy_policy: orgPrivacyPolicy,
+        stdbToken: session.stdbToken,
+        identityHex: session.identityHex,
+        orgPrivacyPolicy,
       }),
     })
 

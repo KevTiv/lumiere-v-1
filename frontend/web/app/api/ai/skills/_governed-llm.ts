@@ -99,15 +99,15 @@ async function postGovernedLlmSkill(
   }
 
   return proxyAiGateway(GATEWAY_PATHS[skillSlug], {
-    org_id: orgId,
-    company_id: companyId,
+    orgId,
+    companyId,
     inputs,
-    agent_id: agentId,
-    team_member_id: teamMemberId,
-    max_steps: maxSteps,
-    stdb_token: session.stdbToken,
-    identity_hex: session.identityHex,
-    org_privacy_policy: orgPrivacyPolicy,
+    agentId,
+    teamMemberId,
+    maxSteps,
+    stdbToken: session.stdbToken,
+    identityHex: session.identityHex,
+    orgPrivacyPolicy,
   })
 }
 

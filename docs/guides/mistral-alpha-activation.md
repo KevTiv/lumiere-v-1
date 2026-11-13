@@ -35,6 +35,19 @@ and no table or durable migration. Publish and pin the matching immutable
 contracts before deploying consumers; do not assume the previous `0.3.178` pin
 contains these operations.
 
+Embedding execution also needs the exact `ai_spend_writer` service binding for
+the `embedding` queue. This does not grant generic queue or business permissions.
+Unknown paid results use the private `cancel_ai_embedding_job` operation with
+the current worker, lease token and revision. Delivery is cancelled without
+settling or releasing its financial hold. Publish the contract containing this
+operation before deploying the corresponding worker.
+
+The gateway must read back each claim and verify the persisted live lease
+before dispatching work. Reducer success alone is not lease evidence: reclaiming
+an expired final attempt can successfully dead-letter the job instead. Missing,
+expired or mismatched readback stops processing without another claim or paid
+request.
+
 Generation source activation is a separate gate from contracts publication:
 
 1. Discover each exact manifest from the candidate gateway's skill-binding
@@ -45,15 +58,14 @@ Generation source activation is a separate gate from contracts publication:
    immutable version, run its independent fixture envelope, review the
    certificate and promote the release. Do not overwrite an old version, copy another skill's
    certificate or turn a synthetic fixture result into live provider evidence.
-3. The Assistant history and compaction release changes the shared generation
-   source bundle. Register and independently certify `rag_generation`,
-   `form_suggestion`, and `action_draft_generation` at `1.0.2` using the exact
-   source hashes returned by the candidate gateway. Promote each enabled
-   surface through the existing AI Skills release flow before advertising it.
-   The five Finance reviews use `1.0.6`, report analysis uses `1.0.11`, and
-   low-stock/report composition use `1.0.1`. The code and CI rollout uses
-   synthetic fixtures. Live provider acceptance and paid calls require their
-   own approved activation run.
+3. The combined Assistant history and persistent-operator release changes the
+   shared authentication and generation bundles. Register and independently
+   certify `rag_generation`, `form_suggestion`, and `action_draft_generation`
+   at `1.0.3`. The five Finance reviews use `1.0.6`, Report Analysis uses
+   `1.0.11`, and Low Stock and Report Composer use `1.0.3`. Discover the
+   exact hashes from the candidate gateway, certify each enabled surface, and
+   promote it through AI Skills before advertising availability. Live provider
+   acceptance uses its own activation run.
 4. RAG certification requires an immutable ordered `accessTranscript` of exact
    scoped grant and passage reads, including both release-time rechecks.
    Removing a recheck, leaving unused entries, or withdrawing access must not

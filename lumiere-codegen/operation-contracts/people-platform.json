@@ -641,6 +641,16 @@
       },
       "evidence": "spacetimedb/src/ai/skills.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
     },
+    "cancel_ai_embedding_job": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/queue.rs: active organization-bound AI writer, embedding-only worker, exact revision and active lease proof; delivery cancellation preserves financial holds"
+    },
     "cancel_contract": {
       "semantic_kind": "command",
       "client_facing": true,

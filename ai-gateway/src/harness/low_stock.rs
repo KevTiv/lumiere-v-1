@@ -18,6 +18,7 @@ use super::{
 
 pub const LOW_STOCK_SKILL_KEY: &str = "low_stock";
 pub const LOW_STOCK_SKILL_VERSION: u32 = 1;
+pub const LOW_STOCK_RELEASE_VERSION: &str = "1.0.3";
 pub const LOW_STOCK_RESOURCE: &str = "inventory.low_stock.v1";
 pub const LOW_STOCK_OUTPUT_TYPE: &str = "inventory.low_stock.result.v1";
 pub const NAMED_READ_TOOL: &str = "named_resource_read";
@@ -153,6 +154,27 @@ pub async fn scan_low_stock(
         ),
     );
 
+    finish_low_stock_scan(
+        policy,
+        organization_id,
+        company_id,
+        identity_hex,
+        input,
+        output,
+        audit,
+    )
+}
+
+fn finish_low_stock_scan(
+    policy: PolicyEngine,
+    organization_id: u64,
+    company_id: u64,
+    identity_hex: &str,
+    input: LowStockInput,
+    output: LowStockOutput,
+    mut audit: HarnessAuditLogger,
+) -> Result<LowStockScanResult, String> {
+    let correlation_id = audit.correlation_id().to_string();
     let request = PolicyControlledRequest {
         execution: PolicyExecutionRequest {
             skill: SkillVersionRef::new(LOW_STOCK_SKILL_KEY, LOW_STOCK_SKILL_VERSION),
@@ -190,7 +212,7 @@ pub async fn scan_low_stock(
         ),
     );
 
-    if decision.decision.outcome == DecisionOutcome::Deny {
+    if decision.decision.outcome != DecisionOutcome::Allow {
         audit.record("completed", "low_stock scan denied by policy");
         return Ok(LowStockScanResult {
             decision,
@@ -200,12 +222,18 @@ pub async fn scan_low_stock(
         });
     }
 
-    let summary = if output.items.is_empty() {
+    let protected = decision
+        .output
+        .as_ref()
+        .ok_or_else(|| "allowed low-stock scan has no protected output".to_string())?;
+    let LowStockOutput { items } = LowStockOutput::deserialize(protected)
+        .map_err(|error| format!("invalid protected low-stock output: {error}"))?;
+    let summary = if items.is_empty() {
         "No low-stock products found for the selected threshold.".to_string()
     } else {
         format!(
             "Found {} product(s) at or below threshold {}.",
-            output.items.len(),
+            items.len(),
             input.threshold
         )
     };
@@ -214,7 +242,7 @@ pub async fn scan_low_stock(
     Ok(LowStockScanResult {
         decision,
         summary,
-        items: output.items,
+        items,
         audit: audit.into_trail(),
     })
 }
@@ -339,6 +367,7 @@ fn row_string(row: &Value, camel: &str, snake: Option<&str>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::harness::manifest::OrgPrivacyPolicy;
 
     #[test]
     fn low_stock_contract_accepts_typed_values() {
@@ -362,5 +391,43 @@ mod tests {
         let error =
             validate_input(&serde_json::json!({"threshold": 5.0, "sql": "SELECT *"})).unwrap_err();
         assert!(error.contains("unknown field"));
+    }
+
+    #[test]
+    fn low_stock_result_returns_the_policy_protected_items() {
+        let policy = PolicyEngine::default().with_org_privacy(OrgPrivacyPolicy {
+            masked_fields: vec!["sku".to_string()],
+            ..Default::default()
+        });
+        let input = LowStockInput {
+            threshold: 5.0,
+            location_id: None,
+        };
+        let output = LowStockOutput {
+            items: vec![LowStockItem {
+                organization_id: 1,
+                company_id: 2,
+                product_id: 3,
+                sku: "Private-SKU-1234".to_string(),
+                name: "Widget".to_string(),
+                quantity_on_hand: 2.0,
+                reorder_level: 5.0,
+            }],
+        };
+        let result = finish_low_stock_scan(
+            policy,
+            1,
+            2,
+            "fixture",
+            input,
+            output,
+            HarnessAuditLogger::new("correlation"),
+        )
+        .unwrap();
+        assert_eq!(result.decision.decision.outcome, DecisionOutcome::Allow);
+        assert_eq!(result.items[0].sku, "[MASKED]…1234");
+        assert_eq!(result.items[0].quantity_on_hand, 2.0);
+        assert_eq!(result.items[0].reorder_level, 5.0);
+        assert_eq!(result.decision.privacy.unwrap().masked_fields, ["sku"]);
     }
 }

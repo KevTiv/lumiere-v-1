@@ -34,11 +34,29 @@ test("invalid or incompatible versions and missing executable bindings cannot be
   for (const version of ["2.0.0", "1", "1.2", "01.0.1", "1.00.2", "1.0.x"]) {
     assert.throws(() => nativeVersionManifest(binding, version))
   }
-  assert.throws(() => nativeVersionManifest({ ...binding, manifest: { ...binding.manifest, source_hash: "browser-asserted" } }, "1.0.9"))
+  for (const source_hash of ["browser-asserted", "a".repeat(63), "A".repeat(64), `SHA256:${"a".repeat(64)}`]) {
+    assert.throws(() => nativeVersionManifest({ ...binding, manifest: { ...binding.manifest, source_hash } }, "1.0.9"))
+  }
 })
 
-test("the next version follows existing skill releases, not the harness build", () => {
+test("generation candidates preserve the gateway's bare digest", () => {
+  const source_hash = "b".repeat(64)
+  const generationBinding: NativeSkillBinding = {
+    ...binding,
+    skillKey: "rag_generation",
+    manifest: { ...binding.manifest, skill_key: "rag_generation", version: "1.0.1", source_hash },
+  }
+
+  assert.equal(JSON.parse(nativeVersionManifest(generationBinding, "1.0.1")).source_hash, source_hash)
+})
+
+test("the suggested version starts at the discovered revision and advances past registered versions", () => {
   assert.equal(nextSkillVersion(["1.0.7", "1.0.8"]), "1.0.9")
   assert.equal(nextSkillVersion(["1.2.9", "1.10.1", "1.0.20"]), "1.10.2")
   assert.equal(nextSkillVersion([]), "1.0.0")
+  assert.equal(nextSkillVersion([], "1.0.1"), "1.0.1")
+  assert.equal(nextSkillVersion(["1.0.2"], "1.0.5"), "1.0.5")
+  assert.equal(nextSkillVersion(["1.0.5", "2.0.1"], "1.0.5"), "1.0.6")
+  assert.equal(nextSkillVersion(["1.9.99"], "1.10.0"), "1.10.0")
+  assert.equal(nextSkillVersion(["2.1.5", "1.99.1"], "2.1.4"), "2.1.6")
 })

@@ -146,6 +146,7 @@
     "bootstrap_new_tenant": "erp.bootstrap_new_tenant",
     "cancel_account_move": "erp.cancel_account_move",
     "cancel_ai_agent_run": "erp.cancel_ai_agent_run",
+    "cancel_ai_embedding_job": "erp.cancel_ai_embedding_job",
     "cancel_budget": "erp.cancel_budget",
     "cancel_consolidation": "erp.cancel_consolidation",
     "cancel_contract": "erp.cancel_contract",
