@@ -35,6 +35,19 @@ and no table or durable migration. Publish and pin the matching immutable
 contracts before deploying consumers; do not assume the previous `0.3.178` pin
 contains these operations.
 
+Embedding execution also needs the exact `ai_spend_writer` service binding for
+the `embedding` queue. This does not grant generic queue or business permissions.
+Unknown paid results use the private `cancel_ai_embedding_job` operation with
+the current worker, lease token and revision. Delivery is cancelled without
+settling or releasing its financial hold. Publish the contract containing this
+operation before deploying the corresponding worker.
+
+The gateway must read back each claim and verify the persisted live lease
+before dispatching work. Reducer success alone is not lease evidence: reclaiming
+an expired final attempt can successfully dead-letter the job instead. Missing,
+expired or mismatched readback stops processing without another claim or paid
+request.
+
 Generation source activation is a separate gate from contracts publication:
 
 1. Discover each exact manifest from the candidate gateway's skill-binding
@@ -46,7 +59,7 @@ Generation source activation is a separate gate from contracts publication:
    certificate and promote the release. Do not overwrite an old version, copy another skill's
    certificate or turn a synthetic fixture result into live provider evidence.
 3. The persistent-operator release changes shared authentication source: current
-   chat/form/action adapters use `1.0.1` and the five Finance reviews use
+   chat/form/action adapters use `1.0.2` and the five Finance reviews use
    `1.0.5`. Report analysis remains `1.0.10`; low-stock/report composition remain
    `1.0.1`. Discover exact hashes and independently re-certify affected enabled
    surfaces against this build before advertising availability. Never overwrite

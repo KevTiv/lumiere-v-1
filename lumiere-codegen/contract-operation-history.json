@@ -590,6 +590,10 @@
       "name": "cancel_ai_agent_run",
       "shape_fingerprint": "sha256:e206d5d7e8ddc3f6b88c1619b5d0a529f526fff6bf0d8d2363375e980f55ec98"
     },
+    "erp.cancel_ai_embedding_job": {
+      "name": "cancel_ai_embedding_job",
+      "shape_fingerprint": "sha256:61f80ab3d154bd33891b5b4739ce5592b963dc41700648c5f69209ce22465413"
+    },
     "erp.cancel_budget": {
       "name": "cancel_budget",
       "shape_fingerprint": "sha256:489a0d7d4383c4bdbb8939cb077943a5ca66b98989952a0a0e89564e9da6a195"
@@ -6532,6 +6536,14 @@
       "current_operations_fingerprint": "sha256:f93aaef84c3abb0e0fc2e9943bbe015a641385699900492660469658b5e19a7c",
       "operation_count": 1531,
       "reason": "Add deployment-bound persistent nonhuman operator enrollment; preserve lease checks, tenant ownership and monetary history"
+    },
+    {
+      "previous_release": "v0.3.180",
+      "previous_ir_sha256": "sha256:127179da29bc9dda4f3eba38fb0511bed8ff14bfdadc9f20a9c4b7af345465ec",
+      "previous_operations_fingerprint": "sha256:f93aaef84c3abb0e0fc2e9943bbe015a641385699900492660469658b5e19a7c",
+      "current_operations_fingerprint": "sha256:a764569d9d1ed3daa08801c2d6d78551a3c4315e779a174bccf4b070bcb43d2c",
+      "operation_count": 1532,
+      "reason": "Add private embedding lease-proof cancellation; preserve generic queue authority and monetary holds"
     }
   ]
 }

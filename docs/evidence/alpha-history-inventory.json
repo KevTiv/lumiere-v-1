@@ -541,7 +541,7 @@
     },
     {
       "path": "lumiere-codegen/contract-operation-ids.json",
-      "sha256": "774b2d12a6fdef9432021c19befbc0e27155f4624bf611d923565acd90bb819f"
+      "sha256": "36720b6d45aba1e92c7bc3dd33a5ef8139f53ee039f094005e94e367ea699312"
     },
     {
       "path": "lumiere-codegen/operation-contracts/finance-commercial.json",
@@ -553,7 +553,7 @@
     },
     {
       "path": "lumiere-codegen/operation-contracts/people-platform.json",
-      "sha256": "7c36a6a7950b49f0f7a2ca222aade4c1ff5908cddfc9feb194dd7841347f11dd"
+      "sha256": "cf18c93bb76d1d917fca693985a2a199d52f16891ccb99a5451c3460a22d782a"
     },
     {
       "path": "lumiere-codegen/operation-contracts/presentation.json",
@@ -561,7 +561,7 @@
     },
     {
       "path": "lumiere-codegen/reducer-exposure.json",
-      "sha256": "c9394d1531911ad4f8735fc212eec4b26e3eb65c57616b1daedba0620fabb58f"
+      "sha256": "8e618f40c6c471bb18d8ea7bd1722327e3f82ca3cb6ac5f5b6510e7c775429b9"
     },
     {
       "path": "scripts/generate-alpha-history-inventory.py",

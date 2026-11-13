@@ -26,7 +26,8 @@ pub fn run_all_core_tests(ctx: &ReducerContext) -> Result<(), String> {
 pub fn run_queue_foundation_tests(ctx: &ReducerContext) -> Result<(), String> {
     queue_tests::test_queue_system(ctx)?;
     queue_tests::test_queue_job_edge_cases(ctx)?;
-    queue_tests::test_worker_edge_cases(ctx)
+    queue_tests::test_worker_edge_cases(ctx)?;
+    queue_tests::test_embedding_service_authority(ctx)
 }
 
 #[spacetimedb::reducer]

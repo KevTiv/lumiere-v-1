@@ -73,10 +73,26 @@ organization and target tenant. It passes actual activation, model/action
 toggles, metering, catalog creation and role update without creating a tenant
 binding for the operator, and rejects the same authority after revocation.
 The combined core and subsequent CI native outcome suites also pass.
-No reducer signature, table, durable DDL or protocol pin change is required.
-This correction still needs clean CI and coherent deployment before the live
-activation probe can pass. Do not revoke or re-enroll the persistent operator
-as part of that deployment.
+
+The indexing runtime also needs a bounded service queue lane. The exact active
+AI writer can register/process only its `embedding` queue without generic queue
+grants. A new private `cancel_ai_embedding_job` operation proves its current
+worker, lease token and revision before cancelling delivery; financial holds
+remain for explicit recovery. Ordinary queue cancellation and logical worker
+metadata/name semantics are unchanged. This operation requires a new immutable
+contract publication; no table or durable DDL change is introduced.
+
+Gateway queue transport now uses the native composite field names and SATS
+Option/enum encoding. After claiming, it verifies the persisted queue, tenant,
+revision, worker, token and unexpired deadline before allowing work. The local
+actual-client proof covers registration, heartbeat, claim, failed completion and
+an exhausted expired claim that must dead-letter rather than dispatch. The
+source-certification worker and canonical provisioning CLI also pass against
+the same local module/build; this is not live-provider or tenant UI acceptance.
+
+These corrections still need clean CI and coherent deployment before live
+activation/indexing can pass. Do not revoke or re-enroll the persistent
+operator as part of that deployment.
 
 ## Chosen path
 
@@ -192,7 +208,7 @@ bootstrap lease checks and nonrenewal rules remain unchanged for everyone else.
   deployment before the private enrollment command is used.
 
 Shared authentication source changes also require fresh immutable source
-versions: chat/forms/action drafts now default to `1.0.1`, Finance reviews to
+versions: chat/forms/action drafts now default to `1.0.2`, Finance reviews to
 `1.0.5`. Discover hashes from the served build and re-certify; no previous
 certificate is rewritten or treated as live-provider acceptance.
 
