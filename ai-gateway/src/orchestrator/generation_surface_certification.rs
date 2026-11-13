@@ -50,7 +50,7 @@ pub(crate) const KEYS: [&str; 3] = [
     "form_suggestion",
     "action_draft_generation",
 ];
-pub(crate) const VERSION: &str = "1.0.1";
+pub(crate) const VERSION: &str = "1.0.2";
 
 // Release helpers below the route modules and the local crates that implement
 // scoped reads/authentication. Explicit at compile time; never filesystem discovery.

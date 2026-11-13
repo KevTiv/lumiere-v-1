@@ -1,7 +1,7 @@
 # Persistent platform operator for alpha activation
 
-Status: locally validated and independently reviewed release candidate;
-**no production enrollment applied**.
+Status: production operator enrollment applied and verified; cross-organization
+permission integration repair validated locally but not yet deployed.
 
 ## Explicit authority decision
 
@@ -44,6 +44,55 @@ These are operator selectors, not constants to embed in enrollment logic.
 Resolve and verify them again immediately before writes. Credentials remain in
 Railway runtime environment variables and never enter command arguments,
 reports, manifests or source.
+
+### Production result and tenant-configuration correction
+
+On 2026-11-13, ordered Railway release `fa1a7eb12` completed. The private
+`--plan → --check → --apply → --check` enrolled the exact existing operator:
+native profile/membership 4098 and its existing canonical PG profile now agree
+on active persistent authority, and interactive sessions remain disallowed.
+There were no billable calls. The tenant's pool remained 5,000,000 USD
+microunits, with 9,060 settled and zero held.
+
+The subsequent native `check_ai_agent_activation(4097, 2, true)` probe returned
+`User not found`: generic permission lookup still demanded an operator profile
+inside the tenant. Enrollment alone therefore did not complete activation.
+Creating another operator profile/membership would violate its exact-binding
+invariant and is not the repair.
+
+The correction reuses the enrolled operator's canonical native validation at
+permission checks and sender-bound permission-grant checks. Only the exact
+compiled principal with active/root persistent state gains cross-organization
+administrative authority. Target organizations must be active/self-owned, and
+their reconstruction write fences remain authoritative. Ordinary tenant,
+human and writer paths are unchanged; existing tenant-owned business-field
+mutation constraints are not removed.
+
+The production-compiled loopback proof now uses a different operator source
+organization and target tenant. It passes actual activation, model/action
+toggles, metering, catalog creation and role update without creating a tenant
+binding for the operator, and rejects the same authority after revocation.
+The combined core and subsequent CI native outcome suites also pass.
+
+The indexing runtime also needs a bounded service queue lane. The exact active
+AI writer can register/process only its `embedding` queue without generic queue
+grants. A new private `cancel_ai_embedding_job` operation proves its current
+worker, lease token and revision before cancelling delivery; financial holds
+remain for explicit recovery. Ordinary queue cancellation and logical worker
+metadata/name semantics are unchanged. This operation requires a new immutable
+contract publication; no table or durable DDL change is introduced.
+
+Gateway queue transport now uses the native composite field names and SATS
+Option/enum encoding. After claiming, it verifies the persisted queue, tenant,
+revision, worker, token and unexpired deadline before allowing work. The local
+actual-client proof covers registration, heartbeat, claim, failed completion and
+an exhausted expired claim that must dead-letter rather than dispatch. The
+source-certification worker and canonical provisioning CLI also pass against
+the same local module/build; this is not live-provider or tenant UI acceptance.
+
+These corrections still need clean CI and coherent deployment before live
+activation/indexing can pass. Do not revoke or re-enroll the persistent
+operator as part of that deployment.
 
 ## Chosen path
 
@@ -159,7 +208,7 @@ bootstrap lease checks and nonrenewal rules remain unchanged for everyone else.
   deployment before the private enrollment command is used.
 
 Shared authentication source changes also require fresh immutable source
-versions: chat/forms/action drafts now default to `1.0.1`, Finance reviews to
+versions: chat/forms/action drafts now default to `1.0.2`, Finance reviews to
 `1.0.5`. Discover hashes from the served build and re-certify; no previous
 certificate is rewritten or treated as live-provider acceptance.
 
@@ -182,7 +231,7 @@ principals, not production credentials or provider calls.
 | API build-script generation test | Passed through the standalone runner with both existing and empty/custom Cargo artifact directories |
 | Isolated PostgreSQL projection regression, explicitly run with `--ignored` | Passed: projection, preservation, bounded lock waits, replay, confirmed-revocation compensation, unavailable-native behavior and changed-metadata protection |
 | Persisted native suites | Combined `run_all_core_tests`, all 12 subsequent CI complete-outcome suites, AI owner configuration and AI spend recovery passed |
-| Production-compiled native + PostgreSQL + actual private CLI proof | Passed: default-deny/wrong-principal rejection, plan/check/apply/check/replay, two exact audits, administrative authority and revoked-state rejection |
+| Production-compiled native + PostgreSQL + actual private CLI proof | Passed: default-deny/wrong-principal rejection, plan/check/apply/check/replay, two exact audits, cross-org activation/model/actions/meter/catalog/role update without another binding, and revoked-state rejection |
 | Independent final security/source review | No remaining concrete blocking findings |
 
 The full proof is repeatable with
@@ -205,10 +254,10 @@ alongside the caller's profiles and memberships. Production enrollment continues
 to reject all such additional authority.
 
 Immutable contracts `v0.3.180` has been published, pinned and verified. Remaining
-gates are clean-head CI, reviewed backend/module deployment with the approved
-production policy, and fresh private enrollment/readback. None of this local
-evidence establishes live Mistral provider access, successful indexing, a cited
-chat answer, settled production spend or full alpha acceptance.
+gates are clean-head CI and coherent deployment of the permission correction,
+then fresh operator verification and tenant activation. None of this local
+evidence establishes live Mistral provider access, successful indexing, a
+cited chat answer, settled production spend or full alpha acceptance.
 
 ## Provisioning after enrollment
 

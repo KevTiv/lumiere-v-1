@@ -12,6 +12,7 @@ use crate::types::{QueueAttemptOutcome, QueueCompletionOutcome, QueueJobStatus};
 
 const OWNER_REPORT_QUEUE: &str = "owner_report";
 const WORKFLOW_EXTERNAL_QUEUE: &str = "workflow-external";
+const EMBEDDING_QUEUE: &str = "embedding";
 const COMPLETED_EMBEDDING_PAYLOAD: &str = "{}";
 
 const BASE_BACKOFF_SECS: u64 = 1;
@@ -229,6 +230,7 @@ fn queue_service_name(queue_name: &str) -> Option<&'static str> {
     match queue_name {
         OWNER_REPORT_QUEUE => Some(crate::core::cold_tier_identity::OWNER_REPORT_WORKER_SERVICE),
         WORKFLOW_EXTERNAL_QUEUE => Some(crate::core::cold_tier_identity::WORKFLOW_WORKER_SERVICE),
+        EMBEDDING_QUEUE => Some(crate::ai::platform_runtime::WRITER_SERVICE),
         _ => None,
     }
 }
@@ -245,7 +247,7 @@ pub(crate) fn require_queue_job_worker_authority(
             service_name,
         )
     }) {
-        Ok(())
+        crate::core::reconstruction::require_writes_unfenced(ctx, organization_id)
     } else {
         check_permission(ctx, organization_id, "queue_job", "write")
     }
@@ -266,7 +268,7 @@ fn require_queue_worker_authority(
             )
         });
     if service_authorized {
-        Ok(())
+        crate::core::reconstruction::require_writes_unfenced(ctx, organization_id)
     } else {
         check_permission(ctx, organization_id, "queue_worker", action)
     }
@@ -756,7 +758,7 @@ pub(crate) fn complete_queue_job_inner(
             );
             ctx.db.queue_job().id().update(QueueJob {
                 status: QueueJobStatus::Completed,
-                payload: if job.queue_name == "embedding" {
+                payload: if job.queue_name == EMBEDDING_QUEUE {
                     COMPLETED_EMBEDDING_PAYLOAD.to_string()
                 } else {
                     job.payload.clone()
@@ -921,6 +923,51 @@ pub fn cancel_queue_job(
     cancel_queue_job_internal(ctx, organization_id, job_id, params)
 }
 
+/// Trusted runtime recovery for an unknown paid embedding outcome. Cancels
+/// delivery only: financial reservations remain held for explicit recovery.
+#[spacetimedb::reducer]
+pub fn cancel_ai_embedding_job(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    job_id: u64,
+    worker_id: u64,
+    expected_revision: u64,
+    lease_token: String,
+    reason: String,
+) -> Result<(), String> {
+    crate::core::cold_tier_identity::require_active_service_identity(
+        ctx,
+        organization_id,
+        crate::ai::platform_runtime::WRITER_SERVICE,
+    )?;
+    crate::core::reconstruction::require_writes_unfenced(ctx, organization_id)?;
+    let job = ctx
+        .db
+        .queue_job()
+        .id()
+        .find(job_id)
+        .ok_or("queue job not found")?;
+    require_job_scope(&job, organization_id)?;
+    if job.queue_name != EMBEDDING_QUEUE {
+        return Err("queue job is not an embedding job".into());
+    }
+    require_revision(&job, expected_revision)?;
+    let worker = require_worker(ctx, &job, worker_id)?;
+    if worker.queues != [EMBEDDING_QUEUE] {
+        return Err("embedding worker must register only the embedding queue".into());
+    }
+    require_active_lease(ctx, &job, worker_id, &lease_token)?;
+    cancel_queue_job_internal(
+        ctx,
+        organization_id,
+        job_id,
+        CancelQueueJobParams {
+            expected_revision,
+            reason,
+        },
+    )
+}
+
 pub(crate) fn cancel_queue_job_internal(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -1039,6 +1086,10 @@ mod tests {
             Some(WORKFLOW_WORKER_SERVICE)
         );
         assert_eq!(queue_service_name("email"), None);
+        assert_eq!(
+            queue_service_name("embedding"),
+            Some(crate::ai::platform_runtime::WRITER_SERVICE)
+        );
         assert_eq!(queue_service_name(""), None);
     }
 }
