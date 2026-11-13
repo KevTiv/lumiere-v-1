@@ -18,7 +18,7 @@ use super::{
 
 pub const LOW_STOCK_SKILL_KEY: &str = "low_stock";
 pub const LOW_STOCK_SKILL_VERSION: u32 = 1;
-pub const LOW_STOCK_RELEASE_VERSION: &str = "1.0.2";
+pub const LOW_STOCK_RELEASE_VERSION: &str = "1.0.3";
 pub const LOW_STOCK_RESOURCE: &str = "inventory.low_stock.v1";
 pub const LOW_STOCK_OUTPUT_TYPE: &str = "inventory.low_stock.result.v1";
 pub const NAMED_READ_TOOL: &str = "named_resource_read";

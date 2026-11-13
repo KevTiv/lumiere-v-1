@@ -12,6 +12,7 @@ import {
 } from "react"
 import { usePathname, useSearchParams } from "next/navigation"
 import { deriveRouteContext, type AiUiContext } from "@lumiere/query-hooks/ai-ui-context"
+import type { AiChatHistoryReference } from "@lumiere/query-hooks/hooks/ai-memory"
 import { useErpSession } from "@lumiere/erp-session"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { assistantHistoryScope } from "./assistant-history"
@@ -41,10 +42,14 @@ export type OpenErpAiChatOptions = {
   selection?: AiEntitySelection | null
 }
 
+type HistoryReferenceRequest = { scope: string; id: string; reference: AiChatHistoryReference }
+
 type ErpAiChatController = {
   open: () => void
   explainError: (error: AssistantErrorHelp) => void
   errorQuestion: { id: string; text: string } | null
+  requestHistoryReference: (reference: AiChatHistoryReference, companyId: number) => void
+  historyReferenceRequest: HistoryReferenceRequest | null
 }
 
 const ErpAiChatControllerContext = createContext<ErpAiChatController | null>(null)
@@ -103,7 +108,20 @@ export function ErpAiChatControllerProvider({
     open()
   }, [open, scope])
   const errorQuestion = request?.scope === scope ? request : null
-  const value = useMemo(() => ({ open, explainError, errorQuestion }), [open, explainError, errorQuestion])
+  const [historyRequest, setHistoryRequest] = useState<HistoryReferenceRequest | null>(null)
+  useEffect(() => {
+    setHistoryRequest(current => current?.scope === scope ? current : null)
+  }, [scope])
+  const requestHistoryReference = useCallback((reference: AiChatHistoryReference, requestedCompany: number) => {
+    if (!scope || currentScope.current !== scope || requestedCompany !== companyId) return
+    setHistoryRequest({ scope, id: crypto.randomUUID(), reference })
+    open()
+  }, [companyId, open, scope])
+  const historyReferenceRequest = historyRequest?.scope === scope ? historyRequest : null
+  const value = useMemo(
+    () => ({ open, explainError, errorQuestion, requestHistoryReference, historyReferenceRequest }),
+    [open, explainError, errorQuestion, requestHistoryReference, historyReferenceRequest],
+  )
   return (
     <ErpAiChatControllerContext.Provider value={value}>
       {children}
@@ -119,6 +137,15 @@ export function useExplainErpError(): (message: string, code?: string) => void {
 
 export function useErpAiErrorQuestion() {
   return useContext(ErpAiChatControllerContext)?.errorQuestion ?? null
+}
+
+export function useErpAiHistoryReferenceRequest() {
+  return useContext(ErpAiChatControllerContext)?.historyReferenceRequest ?? null
+}
+
+export function useReferenceInNewErpAiChat() {
+  const controller = useContext(ErpAiChatControllerContext)
+  return controller?.requestHistoryReference
 }
 
 export function useErpAiRouteContext(): ErpAiRouteContext {

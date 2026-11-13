@@ -33,7 +33,7 @@ use crate::orchestrator::{
 
 pub const REPORT_COMPOSER_SKILL_KEY: &str = "report_composer";
 pub const REPORT_COMPOSER_SKILL_VERSION: u32 = 1;
-pub const REPORT_COMPOSER_RELEASE_VERSION: &str = "1.0.2";
+pub const REPORT_COMPOSER_RELEASE_VERSION: &str = "1.0.3";
 pub const REPORT_COMPOSER_RESOURCE: &str = "reports.daily_business_summary.v1";
 pub const REPORT_COMPOSER_OUTPUT_TYPE: &str = "reports.daily_business_summary.summary.v1";
 pub const NAMED_READ_TOOL: &str = "named_resource_read";

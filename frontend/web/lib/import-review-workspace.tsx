@@ -66,6 +66,7 @@ import { ImportReviewBulk } from "./import-review-bulk"
 import { ImportReviewDecisionSummary } from "./import-review-decision-summary"
 import { resetHistoryQueries } from "./history-data"
 import { sourceHistoryLink } from "./source-observation"
+import { useReferenceInNewErpAiChat } from "./erp-ai-context"
 import { exactSourceReviewRevision, pinnedSourceReview, sourceReviewBeforeRevision, type PinnedSourceReview } from "@lumiere/query-hooks/hooks/source-review-navigation"
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -106,6 +107,7 @@ export function ImportReviewWorkspace({
   syncUrl = true,
   onSelectedIdChange,
   onChanged,
+  historySource,
 }: {
   organizationId: number
   selectedId?: string
@@ -117,6 +119,7 @@ export function ImportReviewWorkspace({
   syncUrl?: boolean
   onSelectedIdChange?: (id: string) => void
   onChanged?: () => void
+  historySource?: { taskId: string; sessionKey: string }
 }) {
   const companyId = useOperatingCompanyId(organizationId)
   const { t } = useTranslation()
@@ -134,6 +137,7 @@ export function ImportReviewWorkspace({
       syncUrl={syncUrl}
       onSelectedIdChange={onSelectedIdChange}
       onChanged={onChanged}
+      historySource={historySource}
     />
   )
 }
@@ -150,6 +154,7 @@ export function ImportReviewPanel(props: {
   syncUrl?: boolean
   onSelectedIdChange?: (id: string) => void
   onChanged?: () => void
+  historySource?: { taskId: string; sessionKey: string }
 }) {
   const { identity } = useErpSession()
   const { t } = useTranslation()
@@ -177,6 +182,7 @@ function ReviewWorkspace({
   syncUrl = true,
   onSelectedIdChange,
   onChanged,
+  historySource,
 }: {
   actor: string
   organizationId: number
@@ -190,6 +196,7 @@ function ReviewWorkspace({
   syncUrl?: boolean
   onSelectedIdChange?: (id: string) => void
   onChanged?: () => void
+  historySource?: { taskId: string; sessionKey: string }
 }) {
   const { t } = useTranslation()
   const mounted = useRef(true)
@@ -208,6 +215,7 @@ function ReviewWorkspace({
   }
   const cache = useQueryClient()
   const identityLabels = useIdentityLabelMap(organizationId)
+  const referenceInChat = useReferenceInNewErpAiChat()
   const [selectedId, setSelectedId] = useState(initialId && (!allowedReviewIds || allowedReviewIds.includes(initialId)) ? initialId : "")
   const [selected, setSelected] = useState<ReviewRow | null>(null)
   const [checked, setChecked] = useState<Set<string>>(new Set())
@@ -983,6 +991,14 @@ function ReviewWorkspace({
                       {entry.reason}
                     </span>
                     {pinnedReview && <dl className="w-full space-y-2 rounded border p-3">{Object.entries(entry.values).map(([field, value]) => <div key={field} className="grid min-w-0 gap-1 sm:grid-cols-2"><dt className="break-words text-muted-foreground">{item?.source.fields.find((sourceField) => sourceField.key === field)?.label ?? field}</dt><dd className="whitespace-pre-wrap break-all">{value === null ? t("recordChanges.noValue") : value === "" ? t("recordChanges.emptyText") : value}</dd></div>)}</dl>}
+                    {historySource && referenceInChat && selectedId && detail.data.targetEntity === "product" && entry.state === "confirmed" && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => referenceInChat({
+                        kind: "import_mapping", ...historySource, batchId: selectedId,
+                        itemId: entry.itemId, revision: entry.revision,
+                      }, companyId)}>
+                        {t("aiChat.history.useInNewChat", { defaultValue: "Use in new chat" })}
+                      </Button>
+                    )}
                     {!pinnedReview && item &&
                     entry.previousValues &&
                     item.revision === entry.revision ? (

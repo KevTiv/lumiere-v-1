@@ -53,6 +53,8 @@ import {
 } from "@lumiere/query-hooks/hooks/approvals"
 import {
   humanTaskClaimExpectation,
+  humanTaskCommandReadbackPath,
+  resolveHumanTaskCommandEffect,
   humanTaskDecisionExpectation,
   humanTaskResubmissionExpectation,
   normalizeHumanTaskResubmissionReason,
@@ -63,6 +65,10 @@ import {
   UnresolvedOperationEffectError,
 } from "@lumiere/query-hooks/hooks/operation-effect"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
+import { assistantHistoryReference } from "@/app/api/ai/_lib/history-references"
+import { apiFetch } from "@/lib/api-fetch"
+import { useReferenceInNewErpAiChat } from "@/lib/erp-ai-context"
+import type { AiChatHistoryReference } from "@lumiere/query-hooks/hooks/ai-memory"
 
 const selectClass =
   "h-9 max-w-full"
@@ -92,6 +98,7 @@ export function WorkflowWorkContent({
   onTeamChange: (team: string | null) => void
 }) {
   const { t } = useTranslation()
+  const referenceInChat = useReferenceInNewErpAiChat()
   const taskTitle = (row: WorkTaskRow) => {
     if (row.workSourceTitle?.trim()) return row.workSourceTitle
     const subjectId = row.subjectId ?? row.subject_id
@@ -113,6 +120,35 @@ export function WorkflowWorkContent({
   const commentId = useId()
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [approvalReceipt, setApprovalReceipt] = useState<{
+    scopeKey: string; reference: AiChatHistoryReference
+  } | null>(null)
+  const receiptScope = JSON.stringify([scope.organizationId, scope.companyId, scope.actorIdentity, scope.authorizationKey, scope.scope])
+  const currentReceiptScope = useRef(receiptScope)
+  currentReceiptScope.current = receiptScope
+  const currentReceipt = approvalReceipt?.scopeKey === receiptScope ? approvalReceipt.reference : null
+
+  const loadApprovalReceipt = async (expected: HumanTaskCommandExpectation) => {
+    if (expected.commandKind !== "decision" || !referenceInChat) return
+    try {
+      const response = await apiFetch(humanTaskCommandReadbackPath(scope, expected), { cache: "no-store" })
+      if (!response.ok) return
+      const payload: unknown = await response.json()
+      if (!resolveHumanTaskCommandEffect(payload, scope, expected)) return
+      const evidence = (payload as { commandEvidence?: { eventId?: unknown; resultRevision?: unknown } }).commandEvidence
+      const parsed = assistantHistoryReference.safeParse({
+        kind: "approval_receipt", taskId: expected.taskId, eventId: evidence?.eventId,
+        revision: evidence?.resultRevision, idempotencyKey: expected.idempotencyKey,
+        inputHash: expected.inputHash, workScope: scope.scope,
+        ...(expected.actingForIdentityHex ? { actingFor: expected.actingForIdentityHex } : {}),
+      })
+      if (parsed.success && currentReceiptScope.current === receiptScope && mounted.current) {
+        setApprovalReceipt({ scopeKey: receiptScope, reference: parsed.data })
+      }
+    } catch {
+      // The workflow action already reconciled. Reference availability does not change its outcome.
+    }
+  }
   const [unresolved, setUnresolved] =
     useState<HumanTaskCommandExpectation | null>(null)
   const [checkingOutcome, setCheckingOutcome] = useState(false)
@@ -384,6 +420,8 @@ export function WorkflowWorkContent({
       setActor(null)
       setComment("")
       setNotice(t("workBoard.updated"))
+      setApprovalReceipt(null)
+      if (expected?.commandKind === "decision") void loadApprovalReceipt(expected)
     } catch (cause) {
       if (!mounted.current || attempt.current !== (expected ?? preparation))
         return
@@ -535,9 +573,14 @@ export function WorkflowWorkContent({
         </p>
       )}
       {notice && (
-        <p role="status" className="text-sm">
-          {notice}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p role="status" className="text-sm">{notice}</p>
+          {currentReceipt && referenceInChat && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => referenceInChat(currentReceipt, scope.companyId)}>
+              {t("aiChat.history.useInNewChat", { defaultValue: "Use in new chat" })}
+            </Button>
+          )}
+        </div>
       )}
       {query.isError ? (
         <div role="alert" className="rounded-lg border border-destructive p-4">

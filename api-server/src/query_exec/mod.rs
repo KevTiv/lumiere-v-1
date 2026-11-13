@@ -28,9 +28,8 @@ use access_control::{
     read_roles, read_user_organization, read_user_roles, require_ui_child_read_permission,
 };
 use ai::{
-    read_ai_action_drafts, read_ai_action_drafts_inbox, read_ai_agent_runs, read_ai_chat_messages,
-    read_ai_chat_sessions, read_ai_skill_fixtures, read_ai_skill_releases, read_ai_skill_test_runs,
-    read_ai_skill_versions,
+    read_ai_action_drafts, read_ai_action_drafts_inbox, read_ai_agent_runs, read_ai_skill_fixtures,
+    read_ai_skill_releases, read_ai_skill_test_runs, read_ai_skill_versions,
 };
 pub use authoritative::execute_authorized_resource_record;
 #[cfg(test)]
@@ -236,12 +235,6 @@ async fn read_resource_query_for_company(
         "user-organization" => {
             return read_user_organization(client, resource, organization_id, identity_hex, fa)
                 .await;
-        }
-        "ai-chat-sessions" => {
-            return read_ai_chat_sessions(client, organization_id, identity_hex).await;
-        }
-        "ai-chat-messages" => {
-            return read_ai_chat_messages(client, organization_id, identity_hex).await;
         }
         "ai-action-drafts" => {
             return read_ai_action_drafts(client, organization_id, identity_hex).await;

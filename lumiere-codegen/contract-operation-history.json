@@ -5416,7 +5416,7 @@
     },
     "erp.update_ai_chat_session_title": {
       "name": "update_ai_chat_session_title",
-      "shape_fingerprint": "sha256:3f698b057a074fd7d2917d1e04b6c9eced61b28ebea24a026b013995b43365af"
+      "shape_fingerprint": "sha256:6b9ce2f52ac94855a321e8484c0bc2e91e3aaec289f1223c4358b1f5229dabf4"
     },
     "erp.update_ai_reducer_allowlist": {
       "name": "update_ai_reducer_allowlist",
@@ -6544,6 +6544,14 @@
       "current_operations_fingerprint": "sha256:a764569d9d1ed3daa08801c2d6d78551a3c4315e779a174bccf4b070bcb43d2c",
       "operation_count": 1532,
       "reason": "Add private embedding lease-proof cancellation; preserve generic queue authority and monetary holds"
+    },
+    {
+      "previous_release": "v0.3.183",
+      "previous_ir_sha256": "sha256:e3cca665e99811dfedd12a3967d50a6b21ab657c85f94194169c6b6b0798006d",
+      "previous_operations_fingerprint": "sha256:a764569d9d1ed3daa08801c2d6d78551a3c4315e779a174bccf4b070bcb43d2c",
+      "current_operations_fingerprint": "sha256:a980137af154cfbbb8e8f13fb71e1ea32e5175df4a1b3f1f6d3e66e36885168a",
+      "operation_count": 1532,
+      "reason": "release on top of v0.3.183: add none; change the shape of update_ai_chat_session_title"
     }
   ]
 }

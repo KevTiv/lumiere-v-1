@@ -578,6 +578,7 @@ export function SavedImportWorkspace({
               organizationId={scope.organizationId}
               selectedId={selectedReviewId}
               allowedReviewIds={allowedReviewIds}
+              historySource={task ? { taskId: task.requestId, sessionKey: task.conversationKey } : undefined}
               allowUpload={false}
               syncUrl={false}
               allowImport={allowImport}

@@ -26,7 +26,7 @@
     },
     {
       "path": "lumiere-codegen/reducer-exposure.json",
-      "sha256": "8e618f40c6c471bb18d8ea7bd1722327e3f82ca3cb6ac5f5b6510e7c775429b9"
+      "sha256": "7cf5fd89e96e4681df18284524e2ec2bc4db28d984364a55733b58d71479cc8e"
     },
     {
       "path": "lumiere-codegen/business-history-owner-policy.json",
@@ -50,7 +50,7 @@
     },
     {
       "path": "lumiere-codegen/operation-contracts/people-platform.json",
-      "sha256": "cf18c93bb76d1d917fca693985a2a199d52f16891ccb99a5451c3460a22d782a"
+      "sha256": "39eba5dd04bc08f980bba112a98277a562c4b7cf48e3e3eec72e4fb86ca296f1"
     },
     {
       "path": "lumiere-codegen/operation-contracts/presentation.json",

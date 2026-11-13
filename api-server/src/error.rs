@@ -32,6 +32,8 @@ pub enum ApiError {
     UnsupportedMediaType(String),
     #[error("{0}")]
     Unavailable(String),
+    #[error("{0}")]
+    RateLimited(String),
     #[error("service temporarily unavailable")]
     UnavailableSource(#[source] anyhow::Error),
     /// Compatibility boundary for upstream APIs that already return strings.
@@ -72,6 +74,7 @@ impl IntoResponse for ApiError {
             ApiError::Unprocessable(m) => (StatusCode::UNPROCESSABLE_ENTITY, m),
             ApiError::UnsupportedMediaType(m) => (StatusCode::UNSUPPORTED_MEDIA_TYPE, m),
             ApiError::Unavailable(m) => (StatusCode::SERVICE_UNAVAILABLE, m),
+            ApiError::RateLimited(m) => (StatusCode::TOO_MANY_REQUESTS, m),
             ApiError::UnavailableSource(source) => {
                 error!(error = ?source, "api dependency unavailable");
                 (

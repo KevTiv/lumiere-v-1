@@ -1,5 +1,39 @@
 import { expect, test } from "@playwright/test"
 
+for (const width of [390, 1440]) {
+  test(`finds archived conversations and preserves drafts at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto("/chat-workspace")
+    await page.getByRole("button", { name: "Ask Lumière", exact: true }).last().click()
+    const panel = page.getByTestId("erp-ai-chat-panel")
+    if (width >= 1024) await panel.getByRole("button", { name: "Open full workspace" }).click()
+    const input = panel.getByTestId("erp-ai-chat-input")
+    const history = panel.getByRole("button", { name: "History", exact: true })
+    await input.fill("Review the catalog mapping")
+    await history.click()
+    const search = panel.getByRole("searchbox", { name: "Search conversations" })
+    await expect(search).toBeFocused()
+    await search.fill("no such conversation")
+    await expect(panel.getByText("No matching conversations.")).toBeVisible()
+    await search.fill("")
+    await panel.getByRole("button", { name: "Archived", exact: true }).click()
+    await panel.getByRole("button", { name: "Warehouse stock review" }).click()
+    const restore = panel.getByRole("button", { name: "Restore", exact: true })
+    await expect(restore).toBeVisible()
+    await restore.click()
+    await expect(panel.getByRole("button", { name: "Archive", exact: true })).toBeVisible()
+    await expect(input).toHaveValue("")
+    await history.click()
+    await panel.getByRole("button", { name: "Recent", exact: true }).click()
+    await panel.getByRole("button", { name: "Products catalog import" }).click()
+    await expect(input).toHaveValue("Review the catalog mapping")
+    await history.click()
+    await panel.getByRole("button", { name: "New chat", exact: true }).click()
+    await expect(input).toHaveValue("")
+    expect(await panel.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+  })
+}
+
 // Geometry and interactions use the real shell and panel; replies are simulated.
 for (const width of [320, 390, 768, 1024, 1440]) {
   test(`keeps ERP and chat usable at ${width}px`, { tag: "@aside-fit" }, async ({ page }) => {

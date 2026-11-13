@@ -227,6 +227,27 @@ pub(crate) async fn generate_routed_for_run(
 /// Execute one catalogued generation surface through the normal routed
 /// generation provider and common GovernedProgramExecutor.
 #[allow(clippy::too_many_arguments)]
+pub(crate) async fn generation_prompt_budget_bytes(
+    store: &super::model_configuration::StdbModelConfigurationStore<'_>,
+    organization_id: u64,
+    agent: &ResolvedAgentConfig,
+    policy_ref: Option<&str>,
+) -> Result<usize> {
+    let resolver = IntelligenceRouteResolver::new(store, organization_id, agent, policy_ref)?;
+    let route = resolver.resolve(IntelligenceRole::Generation, None).await?;
+    std::iter::once(route.primary)
+        .chain(route.fallbacks)
+        .map(|profile| {
+            profile
+                .context_window
+                .saturating_sub(agent.max_tokens.min(profile.max_tokens))
+                .saturating_sub(64) as usize
+                * 3
+        })
+        .min()
+        .context("generation route has no context budget")
+}
+
 pub(crate) async fn run_catalogued_generation_surface(
     store: &super::model_configuration::StdbModelConfigurationStore<'_>,
     ledger: &dyn SpendLedger,

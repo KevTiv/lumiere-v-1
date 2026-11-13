@@ -240,7 +240,7 @@ pub(super) mod readiness_tests {
             .is_err());
     }
 
-    pub(super) fn test_config() -> Config {
+    pub(crate) fn test_config() -> Config {
         Config {
             port: 8080,
             internal_secret: None,

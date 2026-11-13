@@ -4364,6 +4364,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "update_ai_chat_session_title",
+      "exposure": "session",
+      "reason": "interactive chat rename requires active company access and authenticated session ownership"
+    },
+    {
       "name": "update_ai_reducer_allowlist",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"

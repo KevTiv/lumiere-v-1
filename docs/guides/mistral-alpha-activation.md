@@ -58,13 +58,14 @@ Generation source activation is a separate gate from contracts publication:
    immutable version, run its independent fixture envelope, review the
    certificate and promote the release. Do not overwrite an old version, copy another skill's
    certificate or turn a synthetic fixture result into live provider evidence.
-3. The persistent-operator release changes shared authentication source: current
-   chat/form/action adapters use `1.0.2` and the five Finance reviews use
-   `1.0.5`. Report analysis remains `1.0.10`. The protected-output fixes move
-   Low Stock and Report Composer to `1.0.2`. Discover exact hashes and independently
-   re-certify affected enabled surfaces against this build before advertising
-   availability. Never overwrite
-   an earlier immutable version to reuse its certificate.
+3. The combined Assistant history and persistent-operator release changes the
+   shared authentication and generation bundles. Register and independently
+   certify `rag_generation`, `form_suggestion`, and `action_draft_generation`
+   at `1.0.3`. The five Finance reviews use `1.0.6`, Report Analysis uses
+   `1.0.11`, and Low Stock and Report Composer use `1.0.3`. Discover the
+   exact hashes from the candidate gateway, certify each enabled surface, and
+   promote it through AI Skills before advertising availability. Live provider
+   acceptance uses its own activation run.
 4. RAG certification requires an immutable ordered `accessTranscript` of exact
    scoped grant and passage reads, including both release-time rechecks.
    Removing a recheck, leaving unused entries, or withdrawing access must not

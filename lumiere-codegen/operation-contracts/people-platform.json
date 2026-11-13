@@ -5612,8 +5612,8 @@
       "evidence": "spacetimedb/src/ai/agents.rs: body writes or refreshes deterministic state and safely repeats the same input"
     },
     "update_ai_chat_session_title": {
-      "semantic_kind": "internal",
-      "client_facing": false,
+      "semantic_kind": "command",
+      "client_facing": true,
       "idempotency": "idempotent",
       "codec": {
         "id": "spacetimedb-sats-json",

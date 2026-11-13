@@ -11,6 +11,7 @@ import * as assistantActions from "@lumiere/query-hooks/assistant-actions"
 import type { ApiSession } from "@/lib/api-session"
 import * as agentSelection from "../rag/agent-selection"
 import * as guideReferences from "./guide-references"
+import * as historyReferences from "./history-references"
 import * as importTaskReferences from "./import-task-references"
 import { positiveInteger } from "./positive-integer"
 import * as uiActions from "./rag-ui-actions"
@@ -29,6 +30,7 @@ function loadModule<T>(file: string, dependencies: Record<string, unknown>): T {
   runInNewContext(compiled, {
     module,
     exports: module.exports,
+    TextEncoder,
     require: (name: string) => {
       assert.ok(name in dependencies, `Unexpected dependency ${name}`)
       return dependencies[name]
@@ -257,6 +259,7 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
         },
       },
       "./guide-references": guideReferences,
+      "./history-references": historyReferences,
       "./import-task-references": importTaskReferences,
       "./rag-ui-actions": uiActions,
       "./rag-page-catalog": api,
@@ -289,11 +292,24 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
       },
     ],
   }
-  const result = await request.prepareRagPayload({ body, session, orgId: 7 })
+  const historyReference = {
+    kind: "decision",
+    sessionKey: "previous-thread",
+    messageId: "9007199254740993",
+    decisionId: "a".repeat(32),
+    revision: 2,
+  }
+  const result = await request.prepareRagPayload({
+    body: { ...body, chat_session_key: "active-thread", history_refs: [historyReference] },
+    session,
+    orgId: 7,
+  })
   assert.equal(result.ok, true)
   if (!result.ok) throw new Error("Expected a prepared RAG request")
   assert.equal(result.payload.org_id, 7)
   assert.equal(result.payload.company_id, 12)
+  assert.equal(result.payload.chat_session_key, "active-thread")
+  assert.deepEqual(plain(result.payload.history_refs), [historyReference])
   assert.deepEqual(plain(result.payload.import_task_refs), [
     { taskId: "b".repeat(32), companyId: "12" },
   ])
@@ -331,6 +347,16 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
   assert.equal(rejected.response.status, 403)
   assert.deepEqual(scopeChecks, [12, 13])
   assert.equal(requests.length, 1)
+
+  const oversized = await request.prepareRagPayload({
+    body: { ...body, query: "é".repeat(4097) },
+    session,
+    orgId: 7,
+  })
+  assert.ok(!oversized.ok)
+  assert.equal(oversized.response.status, 413)
+  assert.equal((await oversized.response.json()).code, "ai_chat_input_too_large")
+  assert.deepEqual(scopeChecks, [12, 13])
 
   const spreadsheetSelection = {
     documentId: "9007199254740993",

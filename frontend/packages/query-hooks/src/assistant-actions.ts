@@ -671,6 +671,9 @@ export function assistantActionHref(
   if (!decodeAssistantAction(action, action.scope)) return undefined
   const capability = getAssistantCapability(action.capabilityKey)!
   if (action.recordId && capability.entityType) {
+    if (capability.module === "warehouse" && capability.entityType === "stock_picking") {
+      return moduleTabHref("warehouse", "transfers", { id: action.recordId })
+    }
     return (
       resolveAiSourceHref({
         entity_type: capability.entityType,

@@ -76,7 +76,7 @@ describe("native actions in the production chat panel", () => {
     expect(onNativeAction).not.toHaveBeenCalled()
     fireEvent.click(button)
     await waitFor(() =>
-      expect(onNativeAction).toHaveBeenCalledExactlyOnceWith(nativeAction),
+      expect(onNativeAction).toHaveBeenCalledExactlyOnceWith(nativeAction, messages[0]!.id),
     )
     expect(
       (screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value,

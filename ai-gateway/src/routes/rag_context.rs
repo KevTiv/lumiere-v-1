@@ -39,6 +39,7 @@ pub struct RagSource {
     pub content_hash: Option<String>,
 }
 
+#[cfg(test)]
 pub(super) fn build_user_prompt(
     retrieved_context: &str,
     live_context: Option<&str>,
@@ -46,6 +47,23 @@ pub(super) fn build_user_prompt(
     query: &str,
     allowed_support_refs: &[EvidenceRef],
 ) -> String {
+    build_user_prompt_value(
+        retrieved_context,
+        live_context,
+        ui_block,
+        query,
+        allowed_support_refs,
+    )
+    .to_string()
+}
+
+pub(super) fn build_user_prompt_value(
+    retrieved_context: &str,
+    live_context: Option<&str>,
+    ui_block: Option<&str>,
+    query: &str,
+    allowed_support_refs: &[EvidenceRef],
+) -> Value {
     // Serialize every source-controlled string, including labels and UI metadata.
     // Delimiter-like content cannot create a sibling task or support-reference
     // field. This is provenance separation, not a prompt-injection classifier;
@@ -60,7 +78,6 @@ pub(super) fn build_user_prompt(
         },
         "allowed_support_refs": allowed_support_refs,
     })
-    .to_string()
 }
 
 #[derive(Debug, Clone)]

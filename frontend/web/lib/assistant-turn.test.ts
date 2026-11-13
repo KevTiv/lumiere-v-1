@@ -139,6 +139,29 @@ test("chunk boundaries, multiline data and UTF-8 are reconstructed before comple
   assert.equal(result.answer, "Approved: café\nline two")
 })
 
+test("an oversized unframed stream event cancels the reader before another chunk is pulled", async () => {
+  let pulls = 0
+  let cancelled = false
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulls++
+      controller.enqueue(new Uint8Array(600_000).fill(65))
+    },
+    cancel() { cancelled = true },
+  }, { highWaterMark: 0 })
+  await assert.rejects(
+    readAssistantStream(new Response(body, { headers: { "content-type": "text/event-stream" } }), metadata),
+    /event exceeds its size limit/,
+  )
+  assert.equal(pulls, 2)
+  assert.equal(cancelled, true)
+})
+
+test("bounded stream events cannot accumulate an oversized assistant answer", async () => {
+  const delta = "event: delta\ndata: " + "a".repeat(100_000) + "\n\n"
+  await assert.rejects(readAssistantStream(sse(delta.repeat(3) + complete), metadata), /answer exceeds its size limit/)
+})
+
 test("malformed JSON and SSE source envelopes retain independently prepared drafts", async () => {
   for (const sources of [[null], [{ text_snippet: null }], [{kind: "live", trust: "authoritative", text_snippet: "text", label: { private: true }}]]) {
     for (const stream of [false, true]) {

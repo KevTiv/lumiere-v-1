@@ -50,7 +50,7 @@ pub(crate) const KEYS: [&str; 3] = [
     "form_suggestion",
     "action_draft_generation",
 ];
-pub(crate) const VERSION: &str = "1.0.2";
+pub(crate) const VERSION: &str = "1.0.3";
 
 // Release helpers below the route modules and the local crates that implement
 // scoped reads/authentication. Explicit at compile time; never filesystem discovery.
@@ -69,6 +69,14 @@ const RELEASE_HELPERS: &[(&str, &[u8])] = &[
     ("qdrant_client.rs", include_bytes!("../qdrant_client.rs")),
     ("audit.rs", include_bytes!("../harness/audit.rs")),
     ("rag_context.rs", include_bytes!("../routes/rag_context.rs")),
+    (
+        "rag_conversation.rs",
+        include_bytes!("../routes/rag_conversation.rs"),
+    ),
+    (
+        "rag_history_references.rs",
+        include_bytes!("../routes/rag_history_references.rs"),
+    ),
     (
         "rag_spreadsheet.rs",
         include_bytes!("../routes/rag_spreadsheet.rs"),
@@ -953,6 +961,8 @@ mod tests {
     fn inventory_covers_release_children_and_local_authority_implementations() {
         for required in [
             "rag_context.rs",
+            "rag_conversation.rs",
+            "rag_history_references.rs",
             "rag_spreadsheet.rs",
             "rag_import_tasks.rs",
             "evidence.rs",

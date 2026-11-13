@@ -21,6 +21,7 @@ use stdb_auth::{has_resource_read_permission, registry_get};
 
 pub(crate) mod action_drafts;
 mod activity_work;
+mod chat_history;
 mod expense_allocations;
 #[cfg(test)]
 mod read_reauthorization_test;
@@ -36,7 +37,18 @@ pub(crate) struct OrgQuery {
     company_id: Option<u64>,
     #[serde(rename = "expenseId")]
     expense_id: Option<u64>,
+    #[serde(alias = "before")]
     cursor: Option<String>,
+    #[serde(rename = "sessionKey")]
+    chat_session_key: Option<String>,
+    #[serde(rename = "messageId", alias = "anchor")]
+    chat_message_id: Option<u64>,
+    #[serde(rename = "search")]
+    chat_search: Option<String>,
+    #[serde(rename = "archived")]
+    chat_archived: Option<bool>,
+    #[serde(rename = "module")]
+    chat_module: Option<String>,
     #[serde(rename = "operationKey", alias = "operation_key")]
     operation_key: Option<String>,
     limit: Option<u32>,
@@ -160,6 +172,12 @@ pub(crate) async fn get_query(
         }
     }
     context.require_current_placement(&state.organization_placements)?;
+
+    if matches!(resource.as_str(), "ai-chat-sessions" | "ai-chat-messages") {
+        let page = chat_history::read(&state.stdb, &context, &resource, &q).await?;
+        context.require_current_placement(&state.organization_placements)?;
+        return Ok(Json(page));
+    }
 
     let task_readback = crate::workflow_reads::WorkTaskReadbackRequest::parse(
         &resource,

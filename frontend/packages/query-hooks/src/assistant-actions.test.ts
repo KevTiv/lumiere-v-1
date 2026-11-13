@@ -178,6 +178,15 @@ test("lists and module navigation do not need or invent record identities", () =
   )
 })
 
+test("Warehouse Assistant actions focus the exact transfer in the alpha workspace", () => {
+  for (const text of ["Open stock transfer 42", "Review stock transfer 42"]) {
+    assert.equal(
+      assistantActionHref(action(text)),
+      "/warehouse?tab=transfers&filter=id%3A42",
+    )
+  }
+})
+
 test("workflow requests prepare exact native review without claiming execution", () => {
   const result = action("Post invoice 42")
   assert.equal(result.kind, "prepare_workflow")
