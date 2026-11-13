@@ -12,7 +12,7 @@ type SetupFailure = {
   message: string
   recoveryPath?: "/ai-skills"
 }
-export type AssistantTurnFailure = { kind: TurnFailure; setup?: SetupFailure }
+export type AssistantTurnFailure = { kind: TurnFailure; setup?: SetupFailure; retryMessage?: string }
 type TurnAttempt<T> = { kind: "ready"; value: T } | AssistantTurnFailure
 export type AssistantTurn<A, D> = {
   answer: TurnAttempt<A>
@@ -74,7 +74,12 @@ export async function coordinateAssistantTurn<A, D>(args: {
     try { return { kind: "ready", value: await run() } }
     catch (error) {
       const setup = assistantSetupFailure(error)
-      return { kind: turnFailure(error), ...(setup && { setup }) }
+      const retryMessage = error instanceof HttpResponseError
+        ? error.code === "ai_chat_input_too_large"
+          ? "Shorten your message before sending. You can attach a file separately."
+          : error.status === 429 ? "The assistant is busy. Try again in a moment." : undefined
+        : undefined
+      return { kind: turnFailure(error), ...(setup && { setup }), ...(retryMessage && { retryMessage }) }
     }
   }
   const [answer, drafts] = await Promise.all([
@@ -84,6 +89,10 @@ export async function coordinateAssistantTurn<A, D>(args: {
   if (!args.isCurrent()) return { kind: "scope_changed" }
   return { answer, drafts }
 }
+
+const MAX_ASSISTANT_STREAM_BYTES = 4 * 1024 * 1024
+const MAX_ASSISTANT_EVENT_LENGTH = 1024 * 1024
+const MAX_ASSISTANT_ANSWER_LENGTH = 256 * 1024
 
 /** Consume the gateway's already-admitted SSE response. Publish only a complete turn.
  * The gateway emits sources then done; EOF, errors and malformed metadata are uncertain.
@@ -95,17 +104,21 @@ export async function readAssistantStream<T>(response: Response, parseMetadata: 
   }
   const reader = response.body.getReader()
   const decoder = new TextDecoder("utf-8", { fatal: true })
+  let receivedBytes = 0
   let buffer = ""
   let answer = ""
   let metadata: T | undefined
   let completed = false
   const event = (raw: string) => {
+    if (raw.length > MAX_ASSISTANT_EVENT_LENGTH) throw new Error("Assistant stream event exceeds its size limit")
     const lines = raw.split(/\r?\n/)
     const name = lines.find(line => line.startsWith("event:"))?.slice(6).trim()
     const data = lines.filter(line => line.startsWith("data:")).map(line => line.slice(5).replace(/^ /, "")).join("\n")
     if (completed && name) throw new Error("Assistant stream continued after completion")
-    if (name === "delta") answer += data
-    else if (name === "sources") metadata = parseMetadata(data)
+    if (name === "delta") {
+      if (answer.length + data.length > MAX_ASSISTANT_ANSWER_LENGTH) throw new Error("Assistant answer exceeds its size limit")
+      answer += data
+    } else if (name === "sources") metadata = parseMetadata(data)
     else if (name === "error") throw new Error("Assistant stream failed")
     else if (name === "done") {
       if (!metadata || !answer.trim()) throw new Error("Assistant stream is incomplete")
@@ -115,9 +128,12 @@ export async function readAssistantStream<T>(response: Response, parseMetadata: 
   try {
     while (true) {
       const { value, done } = await reader.read()
+      receivedBytes += value?.byteLength ?? 0
+      if (receivedBytes > MAX_ASSISTANT_STREAM_BYTES) throw new Error("Assistant stream exceeds its size limit")
       buffer += done ? decoder.decode() : decoder.decode(value, { stream: true })
       const parts = buffer.split(/\r?\n\r?\n/)
       buffer = parts.pop() ?? ""
+      if (buffer.length > MAX_ASSISTANT_EVENT_LENGTH) throw new Error("Assistant stream event exceeds its size limit")
       for (const part of parts) event(part)
       if (done) break
     }
@@ -131,9 +147,9 @@ export async function readAssistantStream<T>(response: Response, parseMetadata: 
 }
 
 /** Fail closed before joining an answer to independently prepared draft cards. */
-export function assistantAnswerMetadata(value: unknown): { sources: AiRagSource[]; model?: string; run_id?: number; guides?: GuideReference[]; ui_actions?: AssistantUiProposal[]; importTasks?: ChatImportTaskStatus[] } {
+export function assistantAnswerMetadata(value: unknown): { sources: AiRagSource[]; model?: string; run_id?: number; guides?: GuideReference[]; ui_actions?: AssistantUiProposal[]; importTasks?: ChatImportTaskStatus[]; earlierContextUnavailable?: boolean } {
   if (value == null || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid assistant metadata")
-  const raw = value as { sources?: unknown; model?: unknown; run_id?: unknown; related_guides?: unknown; ui_actions?: unknown; import_task_statuses?: unknown }
+  const raw = value as { sources?: unknown; model?: unknown; run_id?: unknown; related_guides?: unknown; ui_actions?: unknown; import_task_statuses?: unknown; earlier_context_unavailable?: unknown }
   if (!Array.isArray(raw.sources)) throw new Error("Invalid assistant sources")
   for (const item of raw.sources) {
     if (item == null || typeof item !== "object" || Array.isArray(item)) throw new Error("Invalid assistant source")
@@ -164,6 +180,7 @@ export function assistantAnswerMetadata(value: unknown): { sources: AiRagSource[
     })
   }
   return { sources: raw.sources as AiRagSource[], guides, model: typeof raw.model === "string" ? raw.model : undefined, run_id: typeof raw.run_id === "number" ? raw.run_id : undefined,
+    ...(raw.earlier_context_unavailable === true ? { earlierContextUnavailable: true } : {}),
     ...(raw.ui_actions !== undefined ? { ui_actions: parseAssistantUiProposals(raw.ui_actions) } : {}),
     ...(raw.import_task_statuses !== undefined ? { importTasks: parseImportTaskStatuses(raw.import_task_statuses) } : {}),
   }

@@ -96,10 +96,15 @@
       "version": 37,
       "name": "0037_durable_projection_delta",
       "file": "0037_durable_projection_delta.sql"
+    },
+    {
+      "version": 43,
+      "name": "0043_durable_projection_delta",
+      "file": "0043_durable_projection_delta.sql"
     }
   ],
   "pending": {
-    "version": 38,
-    "name": "0038_durable_projection_delta"
+    "version": 44,
+    "name": "0044_durable_projection_delta"
   }
 }

@@ -2,7 +2,7 @@
 
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::require_company_in_organization;
+use crate::documents::knowledge_guides::require_company_membership;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -10,10 +10,10 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = ai_chat_session,
-    public,
     index(accessor = ai_chat_session_by_org, btree(columns = [organization_id])),
     index(accessor = ai_chat_session_by_company, btree(columns = [company_id])),
-    index(accessor = ai_chat_session_by_key, btree(columns = [session_key]))
+    index(accessor = ai_chat_session_by_key, btree(columns = [session_key])),
+    index(accessor = ai_chat_session_by_owner_id, btree(columns = [organization_id, company_id, create_uid, id]))
 )]
 pub struct AiChatSession {
     #[primary_key]
@@ -37,11 +37,12 @@ pub struct AiChatSession {
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = ai_chat_message,
-    public,
     index(accessor = ai_chat_message_by_org, btree(columns = [organization_id])),
     index(accessor = ai_chat_message_by_company, btree(columns = [company_id])),
     index(accessor = ai_chat_message_by_session_key, btree(columns = [session_key])),
-    index(accessor = ai_chat_message_by_created_by, btree(columns = [created_by]))
+    index(accessor = ai_chat_message_by_created_by, btree(columns = [created_by])),
+    index(accessor = ai_chat_message_by_thread_id, btree(columns = [organization_id, company_id, created_by, session_key, id])),
+    index(accessor = ai_chat_message_by_turn, btree(columns = [organization_id, company_id, created_by, session_key, turn_id, role]))
 )]
 pub struct AiChatMessage {
     #[primary_key]
@@ -60,6 +61,89 @@ pub struct AiChatMessage {
     pub created_by: Identity,
     pub create_date: Timestamp,
     pub metadata: Option<String>,
+    #[default("")]
+    pub turn_id: String,
+}
+
+const MAX_TITLE_BYTES: usize = 512;
+const MAX_BODY_BYTES: usize = 64 * 1024;
+const MAX_CONTEXT_BYTES: usize = 32 * 1024;
+
+fn valid_session_key(key: &str) -> bool {
+    !key.is_empty()
+        && key.len() <= 150
+        && key
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+}
+
+fn checked_session_key(key: &str) -> Result<&str, String> {
+    let key = key.trim();
+    valid_session_key(key)
+        .then_some(key)
+        .ok_or_else(|| "Invalid AI chat session key".into())
+}
+
+fn authorize_chat_company(ctx: &ReducerContext, org: u64, company: u64) -> Result<(), String> {
+    require_company_membership(ctx, org, company)
+        .map_err(|_| "Permission denied: AI chat company access required".into())
+}
+
+fn owned_session(
+    ctx: &ReducerContext,
+    org: u64,
+    company: u64,
+    key: &str,
+) -> Result<AiChatSession, String> {
+    ctx.db
+        .ai_chat_session()
+        .ai_chat_session_by_key()
+        .filter(&key.to_owned())
+        .find(|session| {
+            session.organization_id == org
+                && session.company_id == company
+                && session.create_uid == ctx.sender()
+        })
+        .ok_or_else(|| "AI chat session not found".into())
+}
+
+fn valid_turn_id(id: &str) -> bool {
+    id.len() == 36
+        && id.bytes().enumerate().all(|(index, byte)| {
+            if matches!(index, 8 | 13 | 18 | 23) {
+                byte == b'-'
+            } else {
+                byte.is_ascii_hexdigit()
+            }
+        })
+}
+
+fn requested_turn_id(params: &AppendAiChatMessageParams) -> Result<Option<String>, String> {
+    let metadata = params
+        .metadata
+        .as_ref()
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok());
+    let Some(turn_id) = metadata.as_ref().and_then(|value| value.get("turnId")) else {
+        return Ok(None);
+    };
+    let turn_id = turn_id
+        .as_str()
+        .filter(|id| valid_turn_id(id))
+        .ok_or("Invalid AI chat turn ID")?;
+    if !matches!(params.role.as_str(), "user" | "assistant") {
+        return Err("AI chat turn messages require a user or assistant role".into());
+    }
+    Ok(Some(turn_id.to_ascii_lowercase()))
+}
+
+fn same_message(previous: &AiChatMessage, params: &AppendAiChatMessageParams) -> bool {
+    previous.content == params.content
+        && previous.sources_json == params.sources_json
+        && previous.ui_context_json == params.ui_context_json
+        && previous.model == params.model
+        && previous.duration_ms == params.duration_ms
+        && previous.status == params.status
+        && previous.metadata == params.metadata
 }
 
 // ── Input Params ─────────────────────────────────────────────────────────────
@@ -103,21 +187,42 @@ pub fn create_ai_chat_session(
     params: CreateAiChatSessionParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_chat_session", "create")?;
-    require_company_in_organization(ctx, organization_id, company_id)?;
+    authorize_chat_company(ctx, organization_id, company_id)?;
 
-    let session_key = params.session_key.trim().to_string();
-    if session_key.is_empty() {
-        return Err("session_key is required".to_string());
+    let session_key = checked_session_key(&params.session_key)?.to_owned();
+    if params
+        .title
+        .as_ref()
+        .is_some_and(|value| value.len() > MAX_TITLE_BYTES)
+        || params
+            .route
+            .as_ref()
+            .is_some_and(|value| value.len() > 2048)
+        || params
+            .module
+            .as_ref()
+            .is_some_and(|value| value.len() > 150)
+        || params
+            .active_tab
+            .as_ref()
+            .is_some_and(|value| value.len() > 150)
+        || params
+            .metadata
+            .as_ref()
+            .is_some_and(|value| value.len() > MAX_CONTEXT_BYTES)
+    {
+        return Err("AI chat session details exceed their size limits".into());
     }
-
-    if ctx
+    if let Some(existing) = ctx
         .db
         .ai_chat_session()
         .ai_chat_session_by_key()
         .filter(&session_key)
-        .any(|s| s.organization_id == organization_id && s.company_id == company_id)
+        .find(|row| row.organization_id == organization_id && row.company_id == company_id)
     {
-        return Ok(());
+        return (existing.create_uid == ctx.sender())
+            .then_some(())
+            .ok_or_else(|| "AI chat session key is unavailable".into());
     }
 
     let session = ctx.db.ai_chat_session().insert(AiChatSession {
@@ -163,25 +268,64 @@ pub fn append_ai_chat_message(
     params: AppendAiChatMessageParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_chat_message", "create")?;
-    require_company_in_organization(ctx, organization_id, company_id)?;
+    authorize_chat_company(ctx, organization_id, company_id)?;
 
-    let session_key = params.session_key.trim().to_string();
-    if session_key.is_empty() {
-        return Err("session_key is required".to_string());
-    }
+    let session_key = checked_session_key(&params.session_key)?.to_owned();
     if params.content.trim().is_empty() {
         return Err("content is required".to_string());
     }
+    if !matches!(params.role.as_str(), "user" | "assistant" | "system") {
+        return Err("Invalid AI chat message role".into());
+    }
+    if params.content.len() > MAX_BODY_BYTES
+        || params
+            .sources_json
+            .as_ref()
+            .is_some_and(|value| value.len() > MAX_BODY_BYTES)
+        || params
+            .ui_context_json
+            .as_ref()
+            .is_some_and(|value| value.len() > MAX_CONTEXT_BYTES)
+        || params
+            .metadata
+            .as_ref()
+            .is_some_and(|value| value.len() > MAX_BODY_BYTES)
+        || params.model.as_ref().is_some_and(|value| value.len() > 256)
+        || params.status.len() > 64
+    {
+        return Err("AI chat message exceeds its size limits".into());
+    }
 
-    let session = ctx
-        .db
-        .ai_chat_session()
-        .ai_chat_session_by_key()
-        .filter(&session_key)
-        .find(|s| s.organization_id == organization_id)
-        .ok_or("AI chat session not found")?;
-    if session.company_id != company_id {
-        return Err("AI chat session does not belong to this company".to_string());
+    let session = owned_session(ctx, organization_id, company_id, &session_key)?;
+    let turn_id = requested_turn_id(&params)?;
+    if let Some(turn_id) = turn_id.as_deref() {
+        let messages = ctx.db.ai_chat_message();
+        let previous = |role: &str| {
+            messages
+                .ai_chat_message_by_turn()
+                .filter((
+                    organization_id,
+                    company_id,
+                    ctx.sender(),
+                    &session_key,
+                    turn_id,
+                    role,
+                ))
+                .next()
+        };
+        if let Some(previous) = previous(&params.role) {
+            return same_message(&previous, &params)
+                .then_some(())
+                .ok_or_else(|| {
+                    "AI chat turn already contains a different message for this role".into()
+                });
+        }
+        if params.role == "assistant" && previous("user").is_none() {
+            return Err("AI chat turn requires its user message first".into());
+        }
+    }
+    if session.archived {
+        return Err("Restore this AI chat session before sending a message".into());
     }
 
     let message = ctx.db.ai_chat_message().insert(AiChatMessage {
@@ -199,6 +343,12 @@ pub fn append_ai_chat_message(
         created_by: ctx.sender(),
         create_date: ctx.timestamp,
         metadata: params.metadata,
+        turn_id: turn_id.unwrap_or_default(),
+    });
+    ctx.db.ai_chat_session().id().update(AiChatSession {
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..session
     });
 
     write_audit_log_v2(
@@ -232,20 +382,26 @@ pub fn update_ai_chat_session_title(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_chat_session", "write")?;
 
-    let session = ctx
-        .db
-        .ai_chat_session()
-        .ai_chat_session_by_key()
-        .filter(&session_key)
-        .find(|s| s.organization_id == organization_id)
-        .ok_or("AI chat session not found")?;
-    if session.company_id != company_id {
-        return Err("AI chat session does not belong to this company".to_string());
-    }
+    authorize_chat_company(ctx, organization_id, company_id)?;
+    let key = checked_session_key(&session_key)?;
+    let session = owned_session(ctx, organization_id, company_id, key)?;
 
+    let title = params
+        .title
+        .map(|title| title.trim().to_owned())
+        .filter(|title| !title.is_empty());
+    if title
+        .as_ref()
+        .is_some_and(|value| value.len() > MAX_TITLE_BYTES)
+    {
+        return Err("AI chat title exceeds its size limit".into());
+    }
+    if session.title == title {
+        return Ok(());
+    }
     let old_title = session.title.clone();
     let updated = AiChatSession {
-        title: params.title,
+        title,
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         ..session
@@ -260,8 +416,8 @@ pub fn update_ai_chat_session_title(
             table_name: "ai_chat_session",
             record_id: updated.id,
             action: "UPDATE",
-            old_values: Some(format!("{{\"title\":{:?}}}", old_title)),
-            new_values: Some(format!("{{\"title\":{:?}}}", updated.title)),
+            old_values: Some(serde_json::json!({ "title": old_title }).to_string()),
+            new_values: Some(serde_json::json!({ "title": updated.title }).to_string()),
             changed_fields: vec!["title".to_string()],
             metadata: None,
         },
@@ -280,17 +436,13 @@ pub fn archive_ai_chat_session(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_chat_session", "write")?;
 
-    let session = ctx
-        .db
-        .ai_chat_session()
-        .ai_chat_session_by_key()
-        .filter(&session_key)
-        .find(|s| s.organization_id == organization_id)
-        .ok_or("AI chat session not found")?;
-    if session.company_id != company_id {
-        return Err("AI chat session does not belong to this company".to_string());
-    }
+    authorize_chat_company(ctx, organization_id, company_id)?;
+    let key = checked_session_key(&session_key)?;
+    let session = owned_session(ctx, organization_id, company_id, key)?;
 
+    if session.archived == archived {
+        return Ok(());
+    }
     let old_archived = session.archived;
     let updated = AiChatSession {
         archived,

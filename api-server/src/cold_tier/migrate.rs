@@ -395,6 +395,29 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: include_str!("import_native_requests_expand.sql"),
     },
+    Migration {
+        version: 41,
+        name: "assistant_chat_decisions",
+        change_set: 30,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("assistant_chat_decisions_expand.sql"),
+    },
+    Migration {
+        version: 42,
+        name: "assistant_chat_context",
+        change_set: 31,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("ai_chat_context_expand.sql"),
+    },
+    Migration {
+        version: 43,
+        name: "assistant_chat_turn_identity",
+        change_set: 32,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0043_durable_projection_delta.sql"
+        ),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

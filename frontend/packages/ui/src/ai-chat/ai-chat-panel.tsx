@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback, useId } from "react"
+import { useState, useRef, useEffect, useCallback, useId, type SetStateAction } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -34,6 +34,7 @@ import {
   Layers3,
   SlidersHorizontal,
   Search,
+  History,
 } from "lucide-react"
 import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef, ChatContext, ChatAction, ChatActionDraftPayload, ChatSkill } from "@/lib/ai-chat-types"
 import { defaultAtCommands } from "@/lib/ai-chat-types"
@@ -65,6 +66,24 @@ interface ChatReply {
   actions?: ChatAction[]
   guides?: GuideReference[]
   importTasks?: ChatImportTaskStatus[]
+  earlierContextUnavailable?: boolean
+}
+
+export type AIChatHistory = {
+  open: boolean
+  onToggle: () => void
+  content: React.ReactNode
+  title?: string
+  actions?: React.ReactNode
+  archived?: boolean
+  unavailable?: boolean
+  loading?: boolean
+  error?: boolean
+  onRetry?: () => void
+  onLoadOlder?: () => Promise<unknown>
+  onLatest?: () => Promise<unknown>
+  loadingOlder?: boolean
+  anchorMessageId?: string
 }
 
 interface AIChatPanelProps {
@@ -87,14 +106,22 @@ interface AIChatPanelProps {
   config?: Partial<AIChatConfig>
   context?: ChatContext
   initialMessages?: ChatMessage[]
+  history?: AIChatHistory
+  conversationKey?: string
+  draft?: { value: string; onChange: (value: SetStateAction<string>) => void }
+  sendPending?: boolean
+  renderMessageActions?: (message: ChatMessage) => React.ReactNode
+  renderCitation?: (source: ChatMessageSourceRef) => React.ReactNode
+  composerContext?: React.ReactNode
   /** A user-requested question is appended once without replacing unsent work or sending it. */
   composerRequest?: { id: string; text: string } | null
+  onComposerRequestApplied?: (id: string) => void
   /** Error help opens above an existing editor without closing or weakening that editor's modal. */
   modal?: boolean
   /** History persistence is separate from obtaining an answer or executing an action. */
   historySaveFailed?: boolean
   /** When set, user messages are answered via this hook (e.g. BFF → ai-gateway RAG). */
-  onSendMessage?: (userText: string) => Promise<ChatReply>
+  onSendMessage?: (userText: string, turnId?: string) => Promise<ChatReply>
   /** File-only intake attaches sources without sending or replacing the composer text. */
   onImportFiles?: (files: File[]) => Promise<void>
   /** Server-backed task cards are owned by the host, separately from text replies. */
@@ -108,6 +135,7 @@ interface AIChatPanelProps {
     userText: string,
     handlers: {
       onDelta: (delta: string) => void
+      turnId: string
       onSources: (sources: ChatMessageSourceRef[]) => void
       onActions?: (actions: ChatAction[]) => void
     },
@@ -165,7 +193,11 @@ function selectionSummaryFromContext(context?: ChatContext): string | null {
   return summary
 }
 
-export function AIChatPanel({
+export function AIChatPanel(props: AIChatPanelProps) {
+  return <AIChatConversation key={props.conversationKey} {...props} />
+}
+
+function AIChatConversation({
   open,
   onClose,
   docked: requestedDocked = false,
@@ -181,7 +213,15 @@ export function AIChatPanel({
   config,
   context,
   initialMessages,
+  history,
+  conversationKey,
+  draft,
+  sendPending,
+  renderMessageActions,
+  renderCitation,
+  composerContext,
   composerRequest,
+  onComposerRequestApplied,
   modal = false,
   historySaveFailed,
   onSendMessage,
@@ -196,8 +236,16 @@ export function AIChatPanel({
   const { t } = useTranslation()
   const docked = requestedDocked && !modal
   const managedPlacement = workspaceHost !== undefined && !modal
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [input, setInput] = useState("")
+  const [localMessages, setMessages] = useState<ChatMessage[]>([])
+  const [localInput, setLocalInput] = useState("")
+  const input = draft?.value ?? localInput
+  const setInput = draft?.onChange ?? setLocalInput
+  const readOnly = history?.archived || history?.unavailable
+  const persistedIds = new Set(initialMessages?.map(message => message.metadata?.turnId && `${message.metadata.turnId}:${message.role}`).filter(Boolean))
+  const messages = history?.unavailable ? [] : [...(initialMessages ?? []), ...localMessages.filter(message =>
+    !message.metadata?.turnId || !persistedIds.has(`${message.metadata.turnId}:${message.role}`),
+  )]
+  const [earlierContextUnavailable, setEarlierContextUnavailable] = useState(false)
   const [openTools, setOpenTools] = useState<"files" | "skills" | null>(null)
   const [contextVisible, setContextVisible] = useState(true)
   const contextId = useId()
@@ -211,7 +259,7 @@ export function AIChatPanel({
   const [isLoading, setIsLoading] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [guideError, setGuideError] = useState<string | null>(null)
-  const fileImportEnabled = config?.enableFileUpload === true && onImportFiles != null
+  const fileImportEnabled = config?.enableFileUpload === true && onImportFiles != null && !readOnly
   const fileScope = JSON.stringify([importScopeKey, context?.currentUser, context?.companyId, fileImportEnabled])
   const currentFileScope = useRef(fileScope)
   currentFileScope.current = fileScope
@@ -241,6 +289,14 @@ export function AIChatPanel({
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const lastComposerRequest = useRef<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const historyRef = useRef<HTMLElement>(null)
+  const historyToggleRef = useRef<HTMLButtonElement>(null)
+  const historyId = useId()
+  const lastHistoryOpen = useRef(false)
+  const scrollSnapshot = useRef<{ height: number; top: number } | null>(null)
+  const atBottom = useRef(true)
+  const lastAnchor = useRef<string | null>(null)
+  const previousConversationFocus = useRef<string | undefined>(undefined)
 
   const commands = config?.commands || defaultAtCommands
   const selectionSummary = selectionSummaryFromContext(context)
@@ -288,7 +344,7 @@ export function AIChatPanel({
   const moduleLabel = activeContext?.value === "current"
     ? context?.activeView ?? activeContext.label
     : activeContext?.label
-  const showContext = !docked && !modal && contextVisible
+  const showContext = !docked && !modal && !history?.open && contextVisible
   const matchingSkills = slash ? matchingChatSkills(skills, slash.query) : skills
   const focusedSkillId = matchingSkills.some(skill => skill.id === activeSkillId) ? activeSkillId : matchingSkills[0]?.id
 
@@ -345,17 +401,12 @@ export function AIChatPanel({
   const isFileDrag = (event: React.DragEvent) => Array.from(event.dataTransfer.types).includes("Files") || event.dataTransfer.files.length > 0
 
   useEffect(() => {
-    if (initialMessages) {
-      setMessages(initialMessages)
-    }
-  }, [initialMessages])
-
-  useEffect(() => {
-    if (!composerRequest || composerRequest.id === lastComposerRequest.current) return
+    if (readOnly || !composerRequest || composerRequest.id === lastComposerRequest.current) return
     lastComposerRequest.current = composerRequest.id
+    onComposerRequestApplied?.(composerRequest.id)
     setInput((current) => current.trim() ? `${current}\n\n${composerRequest.text}` : composerRequest.text)
     inputRef.current?.focus()
-  }, [composerRequest])
+  }, [composerRequest, onComposerRequestApplied, readOnly, setInput])
 
   const filteredCommands = commands.filter(
     (cmd) =>
@@ -370,13 +421,47 @@ export function AIChatPanel({
     return acc
   }, {} as Record<string, AtCommand[]>)
 
-  // Scroll to bottom on new messages
+  const historyOpen = Boolean(history?.open && !modal)
   useEffect(() => {
-    if (scrollRef.current && messages) {
-      const viewport = scrollRef.current.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]') ?? scrollRef.current
+    if (open && historyOpen && !lastHistoryOpen.current) {
+      historyRef.current?.querySelector<HTMLElement>("[data-assistant-history-search]")?.focus()
+    } else if (!historyOpen && lastHistoryOpen.current) {
+      historyToggleRef.current?.focus()
+    }
+    lastHistoryOpen.current = open && historyOpen
+  }, [open, historyOpen])
+
+  useEffect(() => {
+    if (open && !historyOpen && !history?.anchorMessageId && !readOnly && conversationKey && previousConversationFocus.current !== conversationKey) {
+      inputRef.current?.focus()
+      previousConversationFocus.current = conversationKey
+    }
+  }, [open, historyOpen, history?.anchorMessageId, readOnly, conversationKey])
+
+  useEffect(() => {
+    const viewport = scrollRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')
+    if (!viewport) return
+    const id = history?.anchorMessageId
+    const anchor = id ? viewport.querySelector<HTMLElement>(`[data-chat-message-id="${id}"]`) : null
+    if (anchor && lastAnchor.current !== id) {
+      lastAnchor.current = id ?? null
+      anchor.scrollIntoView({ block: "center" })
+      anchor.focus({ preventScroll: true })
+    } else if (scrollSnapshot.current) {
+      const { height, top } = scrollSnapshot.current
+      viewport.scrollTop = top + viewport.scrollHeight - height
+      scrollSnapshot.current = null
+    } else if (atBottom.current) {
       viewport.scrollTop = viewport.scrollHeight
     }
-  }, [messages])
+  }, [open, historyOpen, history?.anchorMessageId, initialMessages, localMessages])
+
+  const loadOlder = async () => {
+    const viewport = scrollRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')
+    if (viewport) scrollSnapshot.current = { height: viewport.scrollHeight, top: viewport.scrollTop }
+    try { await history?.onLoadOlder?.() }
+    catch { scrollSnapshot.current = null }
+  }
 
   // The shell surface handles focus on open and preserves it during responsive changes.
   useEffect(() => {
@@ -410,7 +495,7 @@ export function AIChatPanel({
     setInput(newInput)
     setShowCommands(false)
     inputRef.current?.focus()
-  }, [input])
+  }, [input, setInput])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.nativeEvent.isComposing) return
@@ -458,18 +543,22 @@ export function AIChatPanel({
   }
 
   const handleSend = async () => {
-    if ((!input.trim() && selectedSkills.length === 0) || isLoading || slash) return
+    if (readOnly || history?.loading || (!input.trim() && selectedSkills.length === 0) || isLoading || sendPending || slash) return
     const submittedInput = input
+    const turnId = crypto.randomUUID()
 
     const userMessage: ChatMessage = {
-      id: Date.now().toString(),
+      id: `${turnId}:user`,
+      metadata: { turnId },
       role: "user",
       content: [input.trim(), ...selectedSkills.map(skill => skill.prompt)].filter(Boolean).join("\n\n"),
       timestamp: new Date(),
     }
 
-    setMessages((prev) => [...prev, userMessage])
+    setMessages((prev) => [...prev.slice(-12), userMessage])
     setSendError(null)
+    setEarlierContextUnavailable(false)
+    atBottom.current = true
     setInput("")
     setIsLoading(true)
 
@@ -479,7 +568,7 @@ export function AIChatPanel({
       let assistantMessage: ChatMessage
 
       if (onStreamMessage) {
-        const assistantId = (Date.now() + 1).toString()
+        const assistantId = `${turnId}:assistant`
         let streamedContent = ""
         let streamedSources: ChatMessageSourceRef[] = []
         let streamedActions: ChatAction[] = []
@@ -490,10 +579,12 @@ export function AIChatPanel({
             role: "assistant",
             content: "",
             timestamp: new Date(),
+            metadata: { turnId },
           },
         ])
 
         const reply = await onStreamMessage(userMessage.content, {
+          turnId,
           onDelta: (delta) => {
             if (!active.current) return
             streamedContent += delta
@@ -529,6 +620,7 @@ export function AIChatPanel({
           },
         })
         if (!active.current) return
+        setEarlierContextUnavailable(Boolean(reply.earlierContextUnavailable))
         const t1 = typeof performance !== "undefined" ? performance.now() : Date.now()
         assistantMessage = {
           id: assistantId,
@@ -552,6 +644,7 @@ export function AIChatPanel({
           importTasks: reply.importTasks,
           metadata: {
             duration: Math.round(t1 - t0),
+            turnId,
             runId: reply.runId,
             companyId: context?.companyId,
           },
@@ -561,10 +654,14 @@ export function AIChatPanel({
         )
         return
       } else if (onSendMessage) {
-        const reply = await onSendMessage(userMessage.content)
+        const reply = await (conversationKey
+          ? onSendMessage(userMessage.content, turnId)
+          : onSendMessage(userMessage.content))
+        if (!active.current) return
+        setEarlierContextUnavailable(Boolean(reply.earlierContextUnavailable))
         const t1 = typeof performance !== "undefined" ? performance.now() : Date.now()
         assistantMessage = {
-          id: (Date.now() + 1).toString(),
+          id: `${turnId}:assistant`,
           role: "assistant",
           content: reply.content,
           timestamp: new Date(),
@@ -575,13 +672,14 @@ export function AIChatPanel({
           importTasks: reply.importTasks,
           metadata: {
             duration: Math.round(t1 - t0),
+            turnId,
             runId: reply.runId,
             companyId: context?.companyId,
           },
         }
       } else {
         assistantMessage = {
-          id: (Date.now() + 1).toString(),
+          id: `${turnId}:assistant`,
           role: "assistant",
           content: t("aiChat.turn.notConfigured"),
           timestamp: new Date(),
@@ -591,19 +689,16 @@ export function AIChatPanel({
       if (!active.current) return
       setMessages((prev) => [...prev, assistantMessage])
     } catch (err) {
+      if (active.current || draft) setInput((current) => current === "" ? submittedInput : current)
       if (!active.current) return
       const msg = err instanceof Error ? err.message : String(err)
       setSendError(msg)
-      setInput((current) => current === "" ? submittedInput : current)
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: msg,
-          timestamp: new Date(),
-        },
-      ])
+      setMessages((prev) => [...prev.filter(message => message.metadata?.turnId !== turnId), {
+        id: `${turnId}:error`,
+        role: "assistant",
+        content: msg,
+        timestamp: new Date(),
+      }])
     } finally {
       if (active.current) setIsLoading(false)
     }
@@ -782,7 +877,16 @@ export function AIChatPanel({
           </div>
         </div>
         <div className="flex min-w-0 items-center gap-1.5">
-          {!docked && !modal ? (
+          {history && !modal ? (
+            <Button ref={historyToggleRef} variant="ghost" size="icon" className="size-9 shrink-0"
+              aria-expanded={historyOpen} aria-controls={historyId}
+              aria-label={t("aiChat.history.title", { defaultValue: "History" })}
+              title={t("aiChat.history.title", { defaultValue: "History" })}
+              onClick={history.onToggle}>
+              <History className="size-4" aria-hidden="true" />
+            </Button>
+          ) : null}
+          {!docked && !modal && !historyOpen ? (
             <Button variant="ghost" size="icon" className="hidden size-9 @min-[58rem]/chat-workspace:inline-flex"
               aria-label={contextTitle} aria-expanded={showContext} aria-controls={contextId}
               onClick={() => setContextVisible(visible => !visible)}>
@@ -815,15 +919,62 @@ export function AIChatPanel({
       </header>
 
       <div className="flex min-h-0 flex-1">
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-        <ScrollArea className="min-h-0 flex-1" ref={scrollRef}>
+      {history ? (
+        <aside id={historyId} ref={historyRef} aria-label={t("aiChat.history.title", { defaultValue: "History" })}
+          className={cn("min-h-0 min-w-0 bg-muted/20", historyOpen
+            ? "w-full @min-[58rem]/chat-workspace:w-72 @min-[58rem]/chat-workspace:shrink-0 @min-[58rem]/chat-workspace:border-r"
+            : "hidden")}>
+          {history.content}
+        </aside>
+      ) : null}
+      <div className={cn("relative min-h-0 min-w-0 flex-1 flex-col", historyOpen
+        ? "hidden @min-[58rem]/chat-workspace:flex"
+        : "flex")}>
+        {history?.title || history?.actions ? (
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
+            <h3 className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">{history.title}</h3>
+            {!historyOpen ? history.actions : null}
+          </div>
+        ) : null}
+        <ScrollArea className="min-h-0 flex-1" ref={scrollRef} onScrollCapture={event => {
+          const target = event.target
+          if (target instanceof HTMLElement && target.dataset.slot === "scroll-area-viewport") {
+            atBottom.current = target.scrollHeight - target.scrollTop - target.clientHeight < 80
+          }
+        }}>
           <div className="mx-auto w-full max-w-[820px] px-4 py-6">
           {sendError ? <p role="alert" className="break-words text-sm text-destructive">{t("aiChat.requestFailed", { defaultValue: "The assistant request failed. Review the error and your message before sending again." })}</p> : null}
           {guideError ? <p role="alert" className="mb-4 break-words text-sm text-destructive">{guideError}</p> : null}
           {historySaveFailed ? <p role="alert" className="mb-4 break-words rounded-md border p-3 text-sm">{t("aiChat.historySaveFailed", { defaultValue: "Conversation history may not be available after leaving this page. Your answer is still here. Copy anything you need to keep. This warning does not describe whether a business action completed." })}</p> : null}
-          {importTaskContent ? <div className="mb-6 space-y-3" data-testid="erp-ai-chat-import-tasks">{importTaskContent}</div> : null}
+          {earlierContextUnavailable ? <p role="status" className="mb-4 text-sm text-muted-foreground">{t("aiChat.history.earlierUnavailable", { defaultValue: "Earlier context is temporarily unavailable." })}</p> : null}
+          {history?.loading ? <p role="status" className="mb-4 text-sm text-muted-foreground">{t("aiChat.history.loadingThread", { defaultValue: "Loading conversation…" })}</p> : null}
+          {history?.error || history?.unavailable ? (
+            <div role="alert" className="mb-4 space-y-2">
+              <p className="text-sm text-destructive">{t("aiChat.history.threadUnavailable", { defaultValue: "This conversation could not be opened." })}</p>
+              {history.onRetry ? <Button size="sm" variant="outline" onClick={history.onRetry}>{t("common.retry", { defaultValue: "Retry" })}</Button> : null}
+            </div>
+          ) : null}
+          {history?.onLoadOlder || history?.onLatest ? (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {history.onLoadOlder ? (
+                <Button variant="ghost" size="sm" disabled={history.loadingOlder} onClick={() => { void loadOlder() }}>
+                  {t("aiChat.history.olderMessages", { defaultValue: "Load older messages" })}
+                </Button>
+              ) : null}
+              {history.onLatest ? (
+                <Button variant="ghost" size="sm" disabled={history.loadingOlder} onClick={() => {
+                  atBottom.current = true
+                  scrollSnapshot.current = null
+                  void history.onLatest?.()
+                }}>
+                  {t("aiChat.history.latestMessages", { defaultValue: "Back to latest messages" })}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+          {!history?.unavailable && importTaskContent ? <div className="mb-6 space-y-3" data-testid="erp-ai-chat-import-tasks">{importTaskContent}</div> : null}
             {messages.length === 0 ? (
-              <div className={cn("flex flex-col justify-center", docked ? "py-8" : "min-h-[48vh] py-12")}>
+              history?.loading || history?.error || readOnly ? null : <div className={cn("flex flex-col justify-center", docked ? "py-8" : "min-h-[48vh] py-12")}>
                 <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                   <span className="inline-block size-1.5 rounded-full bg-primary" aria-hidden="true" />
                   {context?.activeView ?? "Your organization"}
@@ -863,6 +1014,8 @@ export function AIChatPanel({
                 {messages.map((message) => (
                   <div
                     key={message.id}
+                    data-chat-message-id={message.id}
+                    tabIndex={message.id === history?.anchorMessageId ? -1 : undefined}
                     data-testid={`erp-ai-chat-message-${message.role}`}
                     className={cn(
                       "flex w-full",
@@ -880,7 +1033,12 @@ export function AIChatPanel({
                           ? "rounded-2xl rounded-br-md border border-border/50 bg-card px-4 py-2.5 text-foreground"
                           : "text-foreground"
                       )}>
-                        <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.content}</p>
+                        {message.content ? <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.content}</p> : null}
+                        {message.metadata?.historyTruncated ? (
+                          <p className="text-sm text-muted-foreground">{t("aiChat.history.messageTruncated", {
+                            defaultValue: "Part of this saved message exceeds the history display limit.",
+                          })}</p>
+                        ) : null}
                       </div>
                       {message.role === "assistant" && message.recoveryPath === "/ai-skills" && (
                         <a className="text-sm font-medium text-primary underline underline-offset-4" href={message.recoveryPath}>
@@ -947,7 +1105,7 @@ export function AIChatPanel({
                                   >
                                     {badgeLabel}
                                   </span>
-                                  {src.source_kind === "managed_document_selection" && config?.onOpenDocumentSource ? (
+                                  {renderCitation?.(src) ?? (src.source_kind === "managed_document_selection" && config?.onOpenDocumentSource ? (
                                     <button type="button" className="text-start text-primary underline-offset-2 hover:underline"
                                       onClick={() => config.onOpenDocumentSource?.(src)}>
                                       {citationLabel}
@@ -961,7 +1119,7 @@ export function AIChatPanel({
                                     </a>
                                   ) : (
                                     citationLabel
-                                  )}
+                                  ))}
                                   {src.score != null && src.kind !== "live" ? ` · ${src.score.toFixed(2)}` : ""}
                                   {src.excerpt ? ` — ${src.excerpt}` : ""}
                                   {canCite && (
@@ -1007,13 +1165,13 @@ export function AIChatPanel({
                                 draft={action.draft}
                                 scopeKey={config?.actionDraftScopeKey}
                                 onApprove={
-                                  config?.onApproveActionDraft ? handleApproveDraft : undefined
+                                  !readOnly && config?.onApproveActionDraft ? handleApproveDraft : undefined
                                 }
                                 onReject={
-                                  config?.onRejectActionDraft ? handleRejectDraft : undefined
+                                  !readOnly && config?.onRejectActionDraft ? handleRejectDraft : undefined
                                 }
                                 onUpdateDraft={
-                                  config?.onUpdateActionDraft ? handleUpdateDraft : undefined
+                                  !readOnly && config?.onUpdateActionDraft ? handleUpdateDraft : undefined
                                 }
                                 onRefresh={config?.onRefreshActionDraft ? handleRefreshDraft : undefined}
                               />
@@ -1040,7 +1198,7 @@ export function AIChatPanel({
                             )}
                           </button>
                         )}
-                        {message.role === "assistant" && (
+                        {message.role === "assistant" && !readOnly && (
                           <button
                             type="button"
                             onClick={() => handleUseAnswerInForm(message.content)}
@@ -1057,6 +1215,7 @@ export function AIChatPanel({
                             Inspect run
                           </a>
                         ) : null}
+                        {renderMessageActions?.(message)}
                         {message.metadata?.tokens != null ? (
                           <span className="text-[11px] text-muted-foreground">
                             {message.metadata.tokens}t
@@ -1066,7 +1225,7 @@ export function AIChatPanel({
                     </div>
                   </div>
                 ))}
-                {isLoading && (
+                {(isLoading || sendPending) && (
                   <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground" role="status">
                     <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                     {t("aiChat.thinking")}
@@ -1076,7 +1235,9 @@ export function AIChatPanel({
             )}
           </div>
         </ScrollArea>
-        <div className="relative shrink-0 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+        {readOnly ? (
+          history?.archived ? <p className="shrink-0 border-t px-4 py-3 text-sm text-muted-foreground">{t("aiChat.history.restoreToContinue", { defaultValue: "Restore this conversation to continue." })}</p> : null
+        ) : <div className="relative shrink-0 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
         {!slash && showCommands && filteredCommands.length > 0 && (
             <div
               className="absolute bottom-full left-4 right-4 z-20 mb-2 overflow-auto rounded-xl border border-border bg-popover p-1 shadow-lg max-h-[240px]"
@@ -1158,6 +1319,7 @@ export function AIChatPanel({
           {fileImportError ? <p role="alert" className="mx-auto mb-2 max-w-[790px] break-words text-sm text-destructive">{fileImportError}</p> : null}
           {fileImportBusy ? <p role="status" className="mx-auto mb-2 flex max-w-[790px] items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" aria-hidden="true" />{t("aiChat.import.savingAttachments", { defaultValue: "Saving attachments…" })}</p> : null}
           {config?.enableFileUpload && importCompanyLabel ? <p className="mx-auto mb-2 max-w-[790px] truncate text-xs text-muted-foreground" title={importCompanyLabel}>{t("aiChat.import.destination", { defaultValue: "Import into {{company}}", company: importCompanyLabel })}</p> : null}
+          {composerContext}
           <div className="mx-auto w-full max-w-[790px] rounded-2xl border border-border/50 bg-muted/60 p-2 transition-colors focus-within:border-ring">
             <Textarea
               variant="plain"
@@ -1186,7 +1348,7 @@ export function AIChatPanel({
                 size="icon"
                 data-testid="erp-ai-chat-send"
                 onClick={handleSend}
-                disabled={(!input.trim() && selectedSkills.length === 0) || isLoading || slash !== null}
+                disabled={(!input.trim() && selectedSkills.length === 0) || isLoading || sendPending || history?.loading || slash !== null}
                 className="size-9 shrink-0 rounded-xl"
                 aria-label="Send message"
               >
@@ -1274,7 +1436,7 @@ export function AIChatPanel({
             Suggested actions require review. Lumière checks your current permissions.
           </p>
         </div>
-        </div>
+        </div>}
       </div>
       {!docked && !modal ? (
         <aside
@@ -1293,7 +1455,9 @@ export function AIChatPanel({
   // Error help covers the viewport while leaving the original editor mounted.
   if (modal) return <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}><DialogContent showCloseButton={false} className="left-0 top-0 h-dvh max-h-none w-full max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none p-0 ring-0 sm:max-w-none"><DialogTitle className="sr-only">{panelTitle}</DialogTitle>{panel}</DialogContent></Dialog>
   return workspaceHost ? (
-    <WorkspaceToolSurface container={workspaceHost} docked={docked} label={panelTitle} onClose={onClose} initialFocus={() => inputRef.current}>
+    <WorkspaceToolSurface container={workspaceHost} docked={docked} label={panelTitle} onClose={onClose} initialFocus={() => historyOpen
+      ? historyRef.current?.querySelector<HTMLElement>("[data-assistant-history-search]") ?? historyToggleRef.current
+      : inputRef.current ?? historyToggleRef.current}>
       {panel}
     </WorkspaceToolSurface>
   ) : panel

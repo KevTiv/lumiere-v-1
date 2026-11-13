@@ -164,12 +164,14 @@ export async function proxyAiGateway(
   path: string,
   payload: JsonObject,
   headers?: HeadersInit,
+  signal?: AbortSignal,
 ) {
   try {
     const gw = await fetchAiGateway(path, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      signal,
     })
     const responsePayload = gw.text
       ? (() => {

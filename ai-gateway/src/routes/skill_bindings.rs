@@ -40,6 +40,9 @@ fn binding(skill_key: &str) -> Option<Value> {
         "report_analysis" => harness::certification::REPORT_ANALYSIS_CERTIFICATION_VERSION,
         "report_composer" => harness::certification::REPORT_COMPOSER_CERTIFICATION_VERSION,
         "low_stock" => harness::certification::LOW_STOCK_CERTIFICATION_VERSION,
+        key if crate::orchestrator::generation_surface_certification::KEYS.contains(&key) => {
+            crate::orchestrator::generation_surface_certification::VERSION
+        }
         _ => "1.0.0",
     };
     Some(json!({
@@ -119,7 +122,10 @@ mod tests {
             let expected =
                 crate::orchestrator::generation_surface_certification::manifest(key).unwrap();
             assert_eq!(discovered["manifest"]["skill_key"], key);
-            assert_eq!(discovered["manifest"]["version"], "1.0.0");
+            assert_eq!(
+                discovered["manifest"]["version"],
+                crate::orchestrator::generation_surface_certification::VERSION
+            );
             assert_eq!(
                 discovered["manifest"]["source_hash"],
                 crate::orchestrator::generation_surface_certification::bundle_hash(key).unwrap()

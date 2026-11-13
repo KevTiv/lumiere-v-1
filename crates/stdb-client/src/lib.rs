@@ -6,7 +6,9 @@
 use anyhow::{Context, Result};
 use serde_json::Value;
 
+mod chat_history;
 mod contract;
+pub use chat_history::{chat_row_id, valid_chat_key, ChatMessagePage};
 pub use contract::{
     company_scope_paths, reducer_contract, reducer_contract_by_operation_id, reducer_names,
     CompanyScopePath, Exposure, IntoReducerCall, ReducerCall, ReducerContract,
@@ -24,6 +26,8 @@ pub enum StdbClientError {
     Http(String, String),
     #[error("failed to parse SQL response: {0}")]
     Parse(String),
+    #[error("query response exceeds byte bound")]
+    QueryByteLimit,
 }
 
 impl StdbClientError {
@@ -189,18 +193,17 @@ impl StdbClient {
         if let Some((max_rows, max_bytes)) = self.query_limits {
             let sql = bounded_read_sql(sql, max_rows)?;
             let mut response = self.post_sql(&sql).await?;
-            anyhow::ensure!(
-                response
-                    .content_length()
-                    .is_none_or(|n| n <= max_bytes as u64),
-                "query response exceeds byte bound"
-            );
+            if response
+                .content_length()
+                .is_some_and(|n| n > max_bytes as u64)
+            {
+                return Err(StdbClientError::QueryByteLimit.into());
+            }
             let mut bytes = Vec::new();
             while let Some(chunk) = response.chunk().await? {
-                anyhow::ensure!(
-                    bytes.len() + chunk.len() <= max_bytes,
-                    "query response exceeds byte bound"
-                );
+                if bytes.len() + chunk.len() > max_bytes {
+                    return Err(StdbClientError::QueryByteLimit.into());
+                }
                 bytes.extend_from_slice(&chunk);
             }
             return String::from_utf8(bytes).context("SQL body is not UTF-8");

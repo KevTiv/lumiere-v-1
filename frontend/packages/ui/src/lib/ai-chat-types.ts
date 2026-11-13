@@ -58,6 +58,8 @@ export interface ChatMessage {
     tokens?: number
     duration?: number
     runId?: number
+    turnId?: string
+    historyTruncated?: boolean
     companyId?: number
   }
 }

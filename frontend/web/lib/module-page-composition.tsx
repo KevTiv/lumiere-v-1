@@ -18,6 +18,7 @@ import { stdbQueryKey } from "@lumiere/query-hooks/hooks/stdb";
 import { fetchQueryList } from "@lumiere/query-hooks/http";
 import {
   getAssistantCapability,
+  parseAssistantActionId,
   type AssistantPageCatalog,
 } from "@lumiere/query-hooks/assistant-actions";
 import {
@@ -396,6 +397,9 @@ function ScopedModulePageHost({
     },
   );
   const searchParams = useSearchParams();
+  const tab = searchParams?.get("tab") ?? "dashboard";
+  const savedWidgetFocus = searchParams?.get("savedWidgetCompany") === scope.companyId && pageId === tab
+    ? parseAssistantActionId(searchParams.get("savedWidget")) : undefined;
   const rawPeriod = searchParams?.get("period");
   const periodTimeZone = searchParams?.get("periodTimeZone") ?? "UTC";
   const bounds = useMemo(() => {
@@ -670,6 +674,7 @@ function ScopedModulePageHost({
           isLoading={isLoading || layout.isPending}
           onSave={onSave}
           onDraftChange={setDraft}
+          focusSavedWidgetId={savedWidgetFocus}
           onCreateWidget={canCreateWidgets ? () => openEditor() : undefined}
           onConfigureWidget={
             canCreateWidgets

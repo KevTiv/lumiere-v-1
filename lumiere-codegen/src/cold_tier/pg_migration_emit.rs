@@ -444,6 +444,11 @@ fn canonical_delta_statement(table: &str, statement: &str, version: u32) -> Resu
         .strip_prefix(&alter_prefix)
         .and_then(|value| value.strip_suffix(';'))
     {
+        // The migration fills existing chat rows with the legacy turn marker.
+        // The generated schema describes column shape without data defaults.
+        if table == "ai_chat_message" && definition == "\"turn_id\" TEXT NOT NULL DEFAULT ''" {
+            return Ok(Some("    \"turn_id\" TEXT NOT NULL,".into()));
+        }
         return Ok(Some(format!("    {definition},")));
     }
 
@@ -1416,7 +1421,7 @@ mod tests {
             &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("pg-migration-ledger"),
         )
         .unwrap();
-        assert_eq!(ledger.released.len(), 19);
+        assert_eq!(ledger.released.len(), 20);
         // The v0.3.80 migration 1 that existing databases recorded.
         assert_eq!(
             checksum(&ledger.released[0].sql),
@@ -1504,11 +1509,30 @@ mod tests {
             checksum(&ledger.released[18].sql),
             "sha256:bdc1f484e7e48ff1876e603c65c659494d4dfcbe8b186dc02d5a888a0a23ee8e"
         );
+        assert_eq!(ledger.released[19].version, 43);
+        assert_eq!(
+            checksum(&ledger.released[19].sql),
+            "sha256:9b301671181f290f8bd58c33c8e200fc4eb74816f12e8f305ae4b1d595160f60"
+        );
         assert_eq!(
             (ledger.pending_version, ledger.pending_name.as_str()),
-            (38, "0038_durable_projection_delta")
+            (44, "0044_durable_projection_delta")
         );
     }
+    #[test]
+    fn assistant_turn_migration_covers_the_non_nullable_column_with_a_legacy_default() {
+        assert_eq!(
+            canonical_delta_statement(
+                "ai_chat_message",
+                "ALTER TABLE \"ai_chat_message\" ADD COLUMN IF NOT EXISTS \"turn_id\" TEXT NOT NULL DEFAULT '';",
+                43,
+            )
+            .unwrap()
+            .as_deref(),
+            Some("    \"turn_id\" TEXT NOT NULL,")
+        );
+    }
+
     #[test]
     fn an_authored_add_column_migration_covers_the_new_shape() {
         let original = fixture_manifest();

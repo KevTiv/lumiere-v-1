@@ -78,6 +78,7 @@ export interface PageCompositionProps {
   ) => void | Promise<PageWidgetCatalogItem | null | void>
   onDraftChange?: (value: PageCompositionValue) => void
   request?: PageCompositionRequest | null
+  focusSavedWidgetId?: string
   onRequestHandled?: (requestId: string) => void
   canEdit?: boolean
   isLoading?: boolean
@@ -101,6 +102,7 @@ export function PageComposition({
   onConfigureWidget,
   onDraftChange,
   request,
+  focusSavedWidgetId,
   onRequestHandled,
   canEdit = true,
   isLoading = false,
@@ -538,12 +540,37 @@ export function PageComposition({
         {editLabel}
       </Button>
     ) : null
+  const focusPlacement = focusSavedWidgetId
+    ? widgets.find(widget => widget.source === "saved" && widget.widgetId === focusSavedWidgetId)
+    : undefined
+  const focusWidgetItem = focusPlacement ? itemsByKey.get(pageWidgetKey(focusPlacement)) : undefined
+  const lastFocusedWidget = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (!focusSavedWidgetId) {
+      lastFocusedWidget.current = undefined
+      return
+    }
+    if (editing || isLoading || !focusPlacement || !focusWidgetItem?.widget
+      || focusWidgetItem.unavailableReason || lastFocusedWidget.current === focusSavedWidgetId) return
+    const target = Array.from(rootRef.current?.querySelectorAll<HTMLElement>("[data-saved-widget-id]") ?? [])
+      .find(element => element.dataset.savedWidgetId === focusSavedWidgetId)
+    if (!target) return
+    for (let ancestor = target.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      if (ancestor instanceof HTMLDetailsElement) ancestor.open = true
+    }
+    target.focus({ preventScroll: true })
+    target.scrollIntoView({ block: "nearest" })
+    lastFocusedWidget.current = focusSavedWidgetId
+  }, [editing, focusPlacement, focusSavedWidgetId, focusWidgetItem, isLoading])
+  const focusedWidgetUnavailable = focusSavedWidgetId && !editing && !isLoading
+    && (!focusPlacement || !focusWidgetItem?.widget || !!focusWidgetItem.unavailableReason)
   const headerAction =
     actionTarget && launcher ? createPortal(launcher, actionTarget) : null
   if (
     insights &&
     !editing &&
     widgets.length === 0 &&
+    !focusSavedWidgetId &&
     actionTarget !== undefined
   ) {
     return (
@@ -574,6 +601,9 @@ export function PageComposition({
       }
     >
       {headerAction}
+      {focusedWidgetUnavailable && <p role="status" className="text-sm text-muted-foreground">
+        {t("pageComposition.unavailable.description")}
+      </p>}
       {insights ? (
         <h2 className="text-lg font-semibold">
           {t("pageComposition.insights", { defaultValue: "Page insights" })}
@@ -800,6 +830,8 @@ export function PageComposition({
                   pageWidgetWidthClasses[placement.width],
                 )}
                 data-placement-id={placement.id}
+                data-saved-widget-id={placement.source === "saved" ? placement.widgetId : undefined}
+                tabIndex={focusPlacement?.id === placement.id ? -1 : undefined}
               >
                 <PageCompositionWidgetBody
                   item={itemsByKey.get(pageWidgetKey(placement))}

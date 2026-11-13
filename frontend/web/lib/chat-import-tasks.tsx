@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { ChatDecisionCard } from "@lumiere/ui"
 import type { ChatDecisionAnswer } from "@lumiere/ui/lib/chat-decision-types"
@@ -11,7 +11,7 @@ import { apiFetch } from "./api-fetch"
 import { ChatReconciliationPreview } from "./chat-reconciliation-preview"
 import { DataImportWorkspace } from "./data-import-workspace"
 import type { ImportPreparation } from "./import-preparation"
-import type { ImportTaskView } from "./import-task-navigation"
+import { importTaskHref, type ImportTaskView } from "./import-task-navigation"
 import {
   chatImportScopeKey, listChatImportTasks, parseChatImportTask, recoverChatImportPointer, recoverChatImportDecision,
   retryChatImportDecision, submitChatImportDecision, submitChatImportFiles,
@@ -25,6 +25,8 @@ function mergeTask(tasks: ChatImportTask[], task: ChatImportTask): ChatImportTas
 /** Chat coordinates durable preparation; reviewed records still use the existing import workspace. */
 export function useChatImportTasks(args: {
   identity: string | null; organizationId: number; companyId: number | null; conversationKey: string | null;
+  renderHistoryDecision?: (task: ChatImportTask) => ReactNode;
+  readonly?: boolean;
 }) {
   const { t } = useTranslation()
   const scope = useMemo<ChatImportScope | null>(() => {
@@ -64,6 +66,11 @@ export function useChatImportTasks(args: {
     try {
       const tasks = await listChatImportTasks(apiFetch, scope)
       if (!current()) return
+      if (args.readonly) {
+        authorization.current = { epoch, available: true }
+        setState(previous => ({ ...previous, key, epoch, tasks, pointer: null, decisionPointers: {}, available: true, error: null }))
+        return
+      }
       const recovered = await recoverChatImportPointer({ scope, storage: window.localStorage, fetcher: apiFetch, isCurrent: current })
       if (!current()) return
       const currentTasks = recovered.task ? mergeTask(tasks, recovered.task) : tasks
@@ -79,7 +86,7 @@ export function useChatImportTasks(args: {
     } catch (error) {
       if (current()) setState(previous => ({ ...previous, key, tasks: [], pointer: null, available: false, error: error instanceof Error ? error.message : "Saved imports could not be checked." }))
     }
-  }, [scope, key, epoch, isCurrent])
+  }, [scope, key, epoch, isCurrent, args.readonly])
 
   useEffect(() => {
     running.current = null
@@ -188,7 +195,21 @@ export function useChatImportTasks(args: {
     focusTask(task)
     setReview({ key, epoch, taskId: task.requestId, id, view, inspectionOnly: task.decision.selectedOptionId === "inspect_only" })
   }
-  const content = scope && visible ? <div className="space-y-3" data-testid="chat-import-tasks">
+  const archivedContent = scope && visible && args.readonly && visible.tasks.length > 0 ? (
+    <div className="space-y-2" data-testid="chat-import-tasks">
+      {visible.tasks.map(task => (
+        <article key={task.requestId} className="space-y-2 rounded-lg border p-3 text-sm">
+          {args.renderHistoryDecision?.(task)}
+          <a className="underline underline-offset-4" href={importTaskHref({
+            companyId: scope.companyId, taskId: task.requestId, view: "decisions",
+          })}>
+            {t("settings.importTask.openTask", { defaultValue: "Open saved task" })}
+          </a>
+        </article>
+      ))}
+    </div>
+  ) : null
+  const content = args.readonly ? archivedContent : scope && visible ? <div className="space-y-3" data-testid="chat-import-tasks">
     {visible.available ? <ChatReconciliationPreview key={key} organizationId={scope.organizationId} companyId={scope.companyId} /> : null}
     {visible.busy ? <p role="status" className="text-sm">{t("aiChat.import.savingTask", { defaultValue: "Saving files or checking the selected action…" })}</p> : null}
     {visible.error ? <p role="alert" className="text-sm text-destructive">{visible.error}</p> : null}
@@ -230,6 +251,7 @@ export function useChatImportTasks(args: {
       {task.decision.status === "approved" ? <p className="text-muted-foreground">{task.decision.selectedOptionId === "inspect_only"
         ? t("aiChat.import.inspectionApproved", { defaultValue: "You approved inspection only. No business-record import was authorized." })
         : t("aiChat.import.preparationApproved", { defaultValue: "You approved import preparation. Creating business records still requires a separate review and confirmation." })}</p> : null}
+      {args.renderHistoryDecision?.(task)}
       {task.decisionHistory.some(answer => answer.optionId === "other") ? <p className="text-muted-foreground">{t("aiChat.import.instructionsSaved", { defaultValue: "Your instructions are saved as a note. Custom instructions are not applied automatically when you choose a supported action." })}</p> : null}
       {task.decision.selectedOptionId === "other" && task.decision.otherText ? <p className="whitespace-pre-wrap">{task.decision.otherText}</p> : null}
       {visible.decisionPointers[task.requestId] ? <div className="space-y-2">
@@ -272,9 +294,9 @@ export function useChatImportTasks(args: {
   </div> : null
 
   return {
-    onImportFiles: visible?.available ? importFiles : undefined,
+    onImportFiles: visible?.available && !args.readonly ? importFiles : undefined,
     fileNames: visible?.tasks.flatMap(task => task.files.map(file => file.fileName)),
-    focusedTask,
+    focusedTask: args.readonly ? undefined : focusedTask,
     content,
   }
 }

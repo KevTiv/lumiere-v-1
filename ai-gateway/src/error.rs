@@ -26,6 +26,9 @@ pub enum AppError {
     #[error("Bad request: {0}")]
     BadRequest(String),
 
+    #[error("This question and its context exceed the Assistant input limit. Shorten the question or remove references and try again.")]
+    ChatInputTooLarge,
+
     #[error("Qdrant error: {0}")]
     Qdrant(#[from] anyhow::Error),
 
@@ -92,6 +95,7 @@ impl IntoResponse for AppError {
         let (status, message) = match &self {
             AppError::NotFound(m) => (StatusCode::NOT_FOUND, m.clone()),
             AppError::BadRequest(m) => (StatusCode::BAD_REQUEST, m.clone()),
+            AppError::ChatInputTooLarge => (StatusCode::PAYLOAD_TOO_LARGE, self.to_string()),
             AppError::Forbidden(m) => (StatusCode::FORBIDDEN, m.clone()),
             AppError::BudgetExceeded(m) => (StatusCode::PAYMENT_REQUIRED, m.clone()),
             AppError::RateLimitExceeded(m) => (StatusCode::TOO_MANY_REQUESTS, m.clone()),
@@ -113,6 +117,9 @@ impl IntoResponse for AppError {
 
         tracing::error!("Request error: {}", message);
         let mut body = json!({ "error": message });
+        if matches!(&self, Self::ChatInputTooLarge) {
+            body["code"] = json!("ai_chat_input_too_large");
+        }
         if matches!(&self, Self::GenerationSourceUnavailable(_)) {
             body["code"] = json!("ai_generation_source_unavailable");
         }
