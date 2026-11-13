@@ -521,6 +521,11 @@
       "reason": "AI Skills UI action guarded by reducer-side write permission and organization/company ownership checks"
     },
     {
+      "name": "cancel_ai_embedding_job",
+      "exposure": "denied",
+      "reason": "Private embedding-runtime recovery; exact active AI writer and current worker/token/revision proof, no generic queue grant or financial settlement"
+    },
+    {
       "name": "cancel_budget",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"

@@ -138,11 +138,13 @@ mod tests {
     }
 
     #[test]
-    fn finance_discovery_uses_the_certification_revision() {
-        let discovered = binding("finance_report_review").expect("finance adapter");
-        assert_eq!(
-            discovered["manifest"]["version"],
-            lumiere_finance_review_core::VERSION
-        );
+    fn finance_discovery_uses_the_current_immutable_adapter_version() {
+        for skill in lumiere_finance_review_core::SKILLS {
+            let discovered = binding(skill.key).expect("supported Finance source");
+            assert_eq!(
+                discovered["manifest"]["version"],
+                lumiere_finance_review_core::VERSION
+            );
+        }
     }
 }

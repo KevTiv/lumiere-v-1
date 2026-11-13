@@ -597,6 +597,14 @@ const PARAMS_CANCEL_AI_AGENT_RUN: &[ReducerParam] = &[
     ReducerParam { name: "run_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "reason", kind: ScalarKind::OptionalString, ref_target: None },
 ];
+const PARAMS_CANCEL_AI_EMBEDDING_JOB: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "job_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "worker_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "expected_revision", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "lease_token", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "reason", kind: ScalarKind::String, ref_target: None },
+];
 const PARAMS_CANCEL_BUDGET: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "budget_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -6805,6 +6813,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "bootstrap_new_tenant", contract_operation_id: "erp.bootstrap_new_tenant", params: PARAMS_BOOTSTRAP_NEW_TENANT, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "cancel_account_move", contract_operation_id: "erp.cancel_account_move", params: PARAMS_CANCEL_ACCOUNT_MOVE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "cancel_ai_agent_run", contract_operation_id: "erp.cancel_ai_agent_run", params: PARAMS_CANCEL_AI_AGENT_RUN, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "cancel_ai_embedding_job", contract_operation_id: "erp.cancel_ai_embedding_job", params: PARAMS_CANCEL_AI_EMBEDDING_JOB, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "cancel_budget", contract_operation_id: "erp.cancel_budget", params: PARAMS_CANCEL_BUDGET, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "cancel_consolidation", contract_operation_id: "erp.cancel_consolidation", params: PARAMS_CANCEL_CONSOLIDATION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "cancel_contract", contract_operation_id: "erp.cancel_contract", params: PARAMS_CANCEL_CONTRACT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -8325,6 +8334,7 @@ pub mod reducer_names {
     pub const BOOTSTRAP_NEW_TENANT: ReducerName = ReducerName::new("bootstrap_new_tenant");
     pub const CANCEL_ACCOUNT_MOVE: ReducerName = ReducerName::new("cancel_account_move");
     pub const CANCEL_AI_AGENT_RUN: ReducerName = ReducerName::new("cancel_ai_agent_run");
+    pub const CANCEL_AI_EMBEDDING_JOB: ReducerName = ReducerName::new("cancel_ai_embedding_job");
     pub const CANCEL_BUDGET: ReducerName = ReducerName::new("cancel_budget");
     pub const CANCEL_CONSOLIDATION: ReducerName = ReducerName::new("cancel_consolidation");
     pub const CANCEL_CONTRACT: ReducerName = ReducerName::new("cancel_contract");
@@ -9830,6 +9840,7 @@ macro_rules! reducer_call {
     ("bootstrap_new_tenant", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::BOOTSTRAP_NEW_TENANT, $args) };
     ("cancel_account_move", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_ACCOUNT_MOVE, $args) };
     ("cancel_ai_agent_run", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_AI_AGENT_RUN, $args) };
+    ("cancel_ai_embedding_job", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_AI_EMBEDDING_JOB, $args) };
     ("cancel_budget", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_BUDGET, $args) };
     ("cancel_consolidation", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_CONSOLIDATION, $args) };
     ("cancel_contract", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_CONTRACT, $args) };
