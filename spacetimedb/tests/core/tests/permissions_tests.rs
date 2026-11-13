@@ -2,11 +2,496 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::permissions::{
-    create_role, field_permission, grant_field_permission, policy_snapshot,
+    create_role, field_permission, grant_field_permission, org_permission, policy_snapshot,
     revoke_field_permission, role, CreateRoleParams, FieldPermissionAction,
     GrantFieldPermissionParams, PermissionSubject,
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
+
+/// Exercise raw persisted rows, not a mock policy decision. Restore the caller's
+/// pre-existing authority before the remaining registered scenarios run.
+pub fn test_persistent_operator_enrollment(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::core::{
+        audit::audit_log,
+        auth::{user_credential, UserCredential},
+        permissions::user_role_assignment,
+        platform_operator::enroll_with_policy,
+        users::{user_organization, user_profile, UserOrganization, UserProfile},
+    };
+    use lumiere_policy_core::PersistentPlatformOperatorPolicy;
+    // Tables intentionally need not implement Clone; keep copying confined to
+    // the test fixture rather than changing the production table definition.
+    fn copy_profile(p: &UserProfile) -> UserProfile {
+        UserProfile {
+            id: p.id,
+            identity: p.identity,
+            platform_user_id: p.platform_user_id.clone(),
+            organization_id: p.organization_id,
+            email: p.email.clone(),
+            email_verified: p.email_verified,
+            name: p.name.clone(),
+            first_name: p.first_name.clone(),
+            last_name: p.last_name.clone(),
+            avatar_url: p.avatar_url.clone(),
+            phone: p.phone.clone(),
+            mobile: p.mobile.clone(),
+            timezone: p.timezone.clone(),
+            language: p.language.clone(),
+            signature: p.signature.clone(),
+            notification_preferences: p.notification_preferences.clone(),
+            ui_preferences: p.ui_preferences.clone(),
+            is_active: p.is_active,
+            is_superuser: p.is_superuser,
+            created_at: p.created_at,
+            updated_at: p.updated_at,
+            last_login: p.last_login,
+            metadata: p.metadata.clone(),
+        }
+    }
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let profiles: Vec<_> = ctx
+        .db
+        .user_profile()
+        .iter()
+        .filter(|p| p.identity == ctx.sender())
+        .collect();
+    let memberships: Vec<_> = ctx
+        .db
+        .user_organization()
+        .iter()
+        .filter(|m| m.user_identity == ctx.sender())
+        .collect();
+    // Other core scenarios deliberately leave direct grants and assignments on
+    // the shared caller. Isolate all of its authority, not only memberships;
+    // the production guard must continue rejecting these supplemental grants.
+    let direct_org_grants: Vec<_> = ctx
+        .db
+        .org_permission()
+        .iter()
+        .filter(|g| matches!(g.subject, PermissionSubject::User(id) if id == ctx.sender()))
+        .collect();
+    let direct_field_grants: Vec<_> = ctx
+        .db
+        .field_permission()
+        .iter()
+        .filter(|g| matches!(g.subject, PermissionSubject::User(id) if id == ctx.sender()))
+        .collect();
+    let supplemental_roles: Vec<_> = ctx
+        .db
+        .user_role_assignment()
+        .iter()
+        .filter(|a| a.user_identity == ctx.sender())
+        .collect();
+    let authority_snapshot =
+        || {
+            let mut rows = Vec::new();
+            for row in
+                ctx.db.org_permission().iter().filter(
+                    |g| matches!(g.subject, PermissionSubject::User(id) if id == ctx.sender()),
+                )
+            {
+                rows.push(("org", spacetimedb::sats::bsatn::to_vec(&row).unwrap()));
+            }
+            for row in
+                ctx.db.field_permission().iter().filter(
+                    |g| matches!(g.subject, PermissionSubject::User(id) if id == ctx.sender()),
+                )
+            {
+                rows.push(("field", spacetimedb::sats::bsatn::to_vec(&row).unwrap()));
+            }
+            for row in ctx
+                .db
+                .user_role_assignment()
+                .iter()
+                .filter(|a| a.user_identity == ctx.sender())
+            {
+                rows.push(("role", spacetimedb::sats::bsatn::to_vec(&row).unwrap()));
+            }
+            rows.sort();
+            rows
+        };
+    let original_authority = authority_snapshot();
+    let template = copy_profile(
+        profiles
+            .iter()
+            .find(|p| p.organization_id == fixture.organization_id)
+            .ok_or("operator template missing")?,
+    );
+    let member = memberships
+        .iter()
+        .find(|m| m.organization_id == fixture.organization_id)
+        .ok_or("operator member template missing")?
+        .clone();
+    create_role(
+        ctx,
+        fixture.organization_id,
+        CreateRoleParams {
+            name: "Persistent Operator Empty Role".into(),
+            description: None,
+            parent_id: None,
+            permissions: vec![],
+            is_active: true,
+            metadata: None,
+        },
+    )?;
+    let empty_role = ctx
+        .db
+        .role()
+        .role_by_org()
+        .filter(&fixture.organization_id)
+        .find(|r| r.name == "Persistent Operator Empty Role")
+        .ok_or("empty role missing")?;
+    for p in &profiles {
+        ctx.db.user_profile().id().delete(p.id);
+    }
+    for m in &memberships {
+        ctx.db.user_organization().id().delete(m.id);
+    }
+    for grant in &direct_org_grants {
+        ctx.db.org_permission().id().delete(grant.id);
+    }
+    for grant in &direct_field_grants {
+        ctx.db.field_permission().id().delete(grant.id);
+    }
+    for assignment in &supplemental_roles {
+        ctx.db.user_role_assignment().id().delete(assignment.id);
+    }
+    let now = ctx.timestamp.to_micros_since_unix_epoch();
+    let lease = format!("lumiere-platform-bootstrap-v1:{}:{}", now - 2, now - 1);
+    let baseline = ctx.db.user_profile().insert(UserProfile {
+        platform_user_id: format!("test-persistent-operator-{}", fixture.organization_id),
+        is_active: false,
+        is_superuser: false,
+        metadata: Some(lease.clone()),
+        ..template
+    });
+    let baseline_member = ctx.db.user_organization().insert(UserOrganization {
+        role_id: empty_role.id,
+        company_id: Some(fixture.company_id),
+        is_active: false,
+        is_default: true,
+        metadata: Some(lease.clone()),
+        ..member
+    });
+    let policy = PersistentPlatformOperatorPolicy {
+        identity_hex: ctx.sender().to_hex().to_string(),
+        organization_id: fixture.organization_id,
+        company_id: fixture.company_id,
+        approval_ref: "test-reviewed-release".into(),
+    };
+    let result = (|| -> Result<(), String> {
+        let count = || {
+            ctx.db
+                .audit_log()
+                .iter()
+                .filter(|a| a.action == "persistent_platform_operator_enrollment")
+                .count()
+        };
+        let initial_count = count();
+        enroll_with_policy(ctx, false, &policy)?;
+        if count() != initial_count
+            || ctx
+                .db
+                .user_profile()
+                .id()
+                .find(baseline.id)
+                .ok_or("probe deleted profile")?
+                .is_active
+            || ctx
+                .db
+                .user_organization()
+                .id()
+                .find(baseline_member.id)
+                .ok_or("probe deleted member")?
+                .metadata
+                != Some(lease.clone())
+        {
+            return Err("probe wrote application state".into());
+        }
+        ctx.db.user_profile().id().update(UserProfile {
+            is_active: true,
+            ..copy_profile(&baseline)
+        });
+        if enroll_with_policy(ctx, true, &policy).is_ok() {
+            return Err("mixed source state enrolled".into());
+        }
+        ctx.db.user_organization().id().update(UserOrganization {
+            is_active: true,
+            ..baseline_member.clone()
+        });
+        if enroll_with_policy(ctx, false, &policy).is_ok() {
+            return Err("active source state probed successfully".into());
+        }
+        ctx.db.user_profile().id().update(copy_profile(&baseline));
+        ctx.db
+            .user_organization()
+            .id()
+            .update(baseline_member.clone());
+        for wrong in [
+            PersistentPlatformOperatorPolicy {
+                identity_hex: "ab".repeat(32),
+                ..policy.clone()
+            },
+            PersistentPlatformOperatorPolicy {
+                company_id: policy.company_id + 1,
+                ..policy.clone()
+            },
+            PersistentPlatformOperatorPolicy {
+                organization_id: policy.organization_id + 1,
+                ..policy.clone()
+            },
+        ] {
+            if enroll_with_policy(ctx, true, &wrong).is_ok() {
+                return Err("wrong sender/scope enrolled".into());
+            }
+        }
+        let active = ctx
+            .db
+            .user_profile()
+            .id()
+            .find(baseline.id)
+            .ok_or("active profile missing")?;
+        ctx.db.user_profile().id().update(UserProfile {
+            metadata: None,
+            ..copy_profile(&active)
+        });
+        if enroll_with_policy(ctx, true, &policy).is_ok() {
+            return Err("ordinary profile enrolled".into());
+        }
+        ctx.db.user_profile().id().update(copy_profile(&active));
+        let credential = ctx.db.user_credential().insert(UserCredential {
+            id: 0,
+            organization_id: policy.organization_id,
+            platform_user_id: active.platform_user_id.clone(),
+            identity: ctx.sender(),
+            email: active.email.clone(),
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+        });
+        let credential_rejected = enroll_with_policy(ctx, true, &policy).is_err();
+        ctx.db.user_credential().id().delete(credential.id);
+        if !credential_rejected {
+            return Err("credentialed principal enrolled".into());
+        }
+        let duplicate = ctx.db.user_profile().insert(UserProfile {
+            id: 0,
+            ..copy_profile(&active)
+        });
+        let duplicate_rejected = enroll_with_policy(ctx, true, &policy).is_err();
+        ctx.db.user_profile().id().delete(duplicate.id);
+        if !duplicate_rejected {
+            return Err("duplicate profile enrolled".into());
+        }
+        let duplicate_member = ctx.db.user_organization().insert(UserOrganization {
+            id: 0,
+            ..baseline_member.clone()
+        });
+        let duplicate_rejected = enroll_with_policy(ctx, true, &policy).is_err();
+        ctx.db.user_organization().id().delete(duplicate_member.id);
+        if !duplicate_rejected {
+            return Err("duplicate membership enrolled".into());
+        }
+        let existing_role = ctx
+            .db
+            .role()
+            .id()
+            .find(empty_role.id)
+            .ok_or("role missing")?;
+        ctx.db.role().id().update(crate::core::permissions::Role {
+            permissions: vec!["*:*".into()],
+            ..existing_role
+        });
+        let privileged_role_rejected = enroll_with_policy(ctx, true, &policy).is_err();
+        let existing_role = ctx
+            .db
+            .role()
+            .id()
+            .find(empty_role.id)
+            .ok_or("role missing")?;
+        ctx.db.role().id().update(crate::core::permissions::Role {
+            permissions: vec![],
+            ..existing_role
+        });
+        if !privileged_role_rejected {
+            return Err("nonempty role enrolled".into());
+        }
+        let grant = ctx
+            .db
+            .org_permission()
+            .insert(crate::core::permissions::OrgPermission {
+                id: 0,
+                organization_id: policy.organization_id,
+                subject: PermissionSubject::Role(empty_role.id),
+                role_id: Some(empty_role.id),
+                resource: "*".into(),
+                action: crate::core::permissions::PermissionAction::All,
+                effect: crate::core::permissions::PermissionEffect::Allow,
+                created_by: ctx.sender(),
+                created_at: ctx.timestamp,
+            });
+        let granted_role_rejected = enroll_with_policy(ctx, true, &policy).is_err();
+        ctx.db.org_permission().id().delete(grant.id);
+        if !granted_role_rejected {
+            return Err("OrgPermission-granted role enrolled".into());
+        }
+        // The authoritative reducer, not just its private caller, must reject
+        // every additional authority source and non-dedicated role binding.
+        let shared_member = ctx.db.user_organization().insert(UserOrganization {
+            id: 0,
+            user_identity: spacetimedb::Identity::from_byte_array([91; 32]),
+            is_active: true,
+            ..baseline_member.clone()
+        });
+        let shared_role_rejected = enroll_with_policy(ctx, true, &policy).is_err();
+        ctx.db.user_organization().id().delete(shared_member.id);
+        if !shared_role_rejected {
+            return Err("shared operator role enrolled".into());
+        }
+        for subject in [
+            PermissionSubject::Role(empty_role.id),
+            PermissionSubject::User(ctx.sender()),
+        ] {
+            let field =
+                ctx.db
+                    .field_permission()
+                    .insert(crate::core::permissions::FieldPermission {
+                        id: 0,
+                        organization_id: policy.organization_id,
+                        role_id: match subject {
+                            PermissionSubject::Role(id) => Some(id),
+                            _ => None,
+                        },
+                        subject,
+                        resource: "user_profile".into(),
+                        action: FieldPermissionAction::Write,
+                        allowed_fields: vec!["is_superuser".into()],
+                        created_by: ctx.sender(),
+                        created_at: ctx.timestamp,
+                    });
+            let field_rejected = enroll_with_policy(ctx, true, &policy).is_err();
+            ctx.db.field_permission().id().delete(field.id);
+            if !field_rejected {
+                return Err("role/direct-user field authority enrolled".into());
+            }
+        }
+        {
+            use crate::core::permissions::{user_role_assignment, UserRoleAssignment};
+            let assignment = ctx.db.user_role_assignment().insert(UserRoleAssignment {
+                id: 0,
+                user_identity: ctx.sender(),
+                role_id: baseline_member.role_id,
+                organization_id: policy.organization_id,
+                assigned_by: ctx.sender(),
+                assigned_at: ctx.timestamp,
+                expires_at: None,
+                is_active: true,
+                metadata: None,
+            });
+            let assignment_rejected = enroll_with_policy(ctx, true, &policy).is_err();
+            ctx.db.user_role_assignment().id().delete(assignment.id);
+            if !assignment_rejected {
+                return Err("active supplemental assignment enrolled".into());
+            }
+        }
+        // Inactive role history is not a current grant and must be preserved.
+        let inactive_history = ctx.db.user_organization().insert(UserOrganization {
+            id: 0,
+            user_identity: spacetimedb::Identity::from_byte_array([91; 32]),
+            is_active: false,
+            ..baseline_member.clone()
+        });
+        enroll_with_policy(ctx, false, &policy)?;
+        enroll_with_policy(ctx, true, &policy)?;
+        let enrolled = ctx
+            .db
+            .user_profile()
+            .id()
+            .find(active.id)
+            .ok_or("enrolled missing")?;
+        let enrolled_member = ctx
+            .db
+            .user_organization()
+            .id()
+            .find(baseline_member.id)
+            .ok_or("enrolled member missing")?;
+        if !enrolled.is_active
+            || !enrolled.is_superuser
+            || enrolled.email != active.email
+            || enrolled.name != active.name
+            || enrolled.platform_user_id != active.platform_user_id
+            || enrolled_member.role_id != baseline_member.role_id
+            || enrolled_member.company_id != baseline_member.company_id
+            || enrolled.metadata != enrolled_member.metadata
+            || count() != initial_count + 2
+            || !ctx
+                .db
+                .role()
+                .id()
+                .find(empty_role.id)
+                .is_some_and(|r| r.permissions.is_empty() && r.parent_id.is_none())
+        {
+            return Err("enrollment changed unrelated state or missed audits".into());
+        }
+        enroll_with_policy(ctx, true, &policy)?;
+        if count() != initial_count + 2 {
+            return Err("idempotent enrollment wrote audits".into());
+        }
+        if !ctx
+            .db
+            .user_organization()
+            .id()
+            .find(inactive_history.id)
+            .is_some_and(|row| !row.is_active)
+        {
+            return Err("inactive role history was changed".into());
+        }
+        ctx.db.user_organization().id().delete(inactive_history.id);
+        ctx.db.user_profile().id().update(UserProfile {
+            is_superuser: false,
+            ..copy_profile(&enrolled)
+        });
+        if enroll_with_policy(ctx, true, &policy).is_ok() {
+            return Err("revoked operator regranted".into());
+        }
+        ctx.db.user_profile().id().update(UserProfile {
+            is_active: false,
+            ..copy_profile(&enrolled)
+        });
+        if enroll_with_policy(ctx, false, &policy).is_ok() {
+            return Err("revoked persistent profile probed successfully".into());
+        }
+        ctx.db.user_profile().id().update(copy_profile(&enrolled));
+        ctx.db.user_organization().id().update(UserOrganization {
+            is_active: false,
+            ..enrolled_member
+        });
+        if enroll_with_policy(ctx, false, &policy).is_ok() {
+            return Err("revoked persistent membership probed successfully".into());
+        }
+        Ok(())
+    })();
+    ctx.db.user_profile().id().delete(baseline.id);
+    ctx.db.user_organization().id().delete(baseline_member.id);
+    for profile in profiles {
+        ctx.db.user_profile().insert(profile);
+    }
+    for membership in memberships {
+        ctx.db.user_organization().insert(membership);
+    }
+    for grant in direct_org_grants {
+        ctx.db.org_permission().insert(grant);
+    }
+    for grant in direct_field_grants {
+        ctx.db.field_permission().insert(grant);
+    }
+    for assignment in supplemental_roles {
+        ctx.db.user_role_assignment().insert(assignment);
+    }
+    if authority_snapshot() != original_authority {
+        return Err("operator fixture did not restore existing caller authority".into());
+    }
+    result
+}
 
 pub fn test_grant_and_revoke_field_permission(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;

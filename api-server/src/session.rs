@@ -90,7 +90,10 @@ pub async fn load_field_access_context(
         return Ok(None);
     }
 
-    if !stdb_auth::profile_bootstrap_lease_active(profile, chrono::Utc::now().timestamp_micros()) {
+    if !stdb_auth::profile_allows_interactive_session(
+        profile,
+        chrono::Utc::now().timestamp_micros(),
+    ) {
         return Ok(None);
     }
 
@@ -439,6 +442,28 @@ pub struct ApiSession {
     pub field_access: Option<FieldAccessContext>,
 }
 
+async fn require_interactive_native_principal(
+    authority: &StdbClient,
+    identity_hex: &str,
+) -> Result<(), ApiError> {
+    let identity = stdb_auth::identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let profiles = authority
+        .with_query_limits(1000, 256 * 1024)
+        .map_err(ApiError::internal)?
+        .query_sql(&format!(
+            "SELECT metadata FROM user_profile WHERE identity = {identity}"
+        ))
+        .await
+        .map_err(|_| ApiError::Unavailable("Interactive identity check unavailable".into()))?;
+    if profiles
+        .iter()
+        .any(stdb_auth::profile_is_noninteractive_operator)
+    {
+        return Err(ApiError::Unauthorized);
+    }
+    Ok(())
+}
+
 /// Resolve session (no `ensure_dev_admin` — keep parity with minimal Phase 1).
 pub async fn resolve_api_session(
     state: &AppState,
@@ -465,6 +490,7 @@ pub async fn resolve_api_session(
                     .authenticated_identity()
                     .await
                     .map_err(|_| ApiError::Unauthorized)?;
+                require_interactive_native_principal(&state.stdb, &identity_hex).await?;
                 let fa = load_field_access_context(&client, &identity_hex, org)
                     .await
                     .ok()
@@ -510,6 +536,7 @@ pub async fn resolve_api_session(
     // tables are private authority state, so resolve them with the configured
     // server credential and always constrain them to that verified identity.
     let authority_client = &state.stdb;
+    require_interactive_native_principal(authority_client, &identity_hex).await?;
     let mut organization_id: Option<u64> = None;
     let membership_sql = select_user_organization_for_identity_sql(&identity_hex, None)
         .map_err(ApiError::Internal)?;
@@ -556,6 +583,51 @@ pub(crate) mod test_support;
 mod tests {
     use super::test_support::test_config;
     use super::*;
+
+    #[tokio::test]
+    async fn persistent_operator_cannot_resolve_native_or_mock_interactive_session() {
+        use axum::{http::HeaderMap, response::IntoResponse, routing::post, Router};
+        crate::install_rustls_crypto_provider();
+        let metadata = serde_json::json!({"persistent_platform_operator_v1":{}}).to_string();
+        let app = Router::new().route("/v1/database/test-module/sql", post(move |body: String| {
+            let metadata = metadata.clone();
+            async move {
+                let value = if body.starts_with("SELECT metadata FROM user_profile ") {
+                    serde_json::json!([{
+                        "schema":{"elements":[{"name":{"some":"metadata"},"algebraic_type":{"Sum":{"variants":[
+                            {"name":{"some":"some"},"algebraic_type":{"String":[]}},
+                            {"name":{"some":"none"},"algebraic_type":{"Product":{"elements":[]}}}
+                        ]}}}]},
+                        "rows":[[[0,metadata]]]
+                    }])
+                } else {
+                    assert!(body.starts_with("SELECT id FROM organization "));
+                    serde_json::json!([{"schema":{"elements":[{"name":{"some":"id"},"algebraic_type":{"U64":[]}}]},"rows":[[1]]}])
+                };
+                let mut headers = HeaderMap::new();
+                headers.insert("spacetime-identity", "abababababababababababababababababababababababababababababababab".parse().unwrap());
+                (headers, axum::Json(value)).into_response()
+            }
+        }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let mut config = test_config(Some("synthetic-server-token"));
+        config.stdb_host = format!("http://{address}");
+        config.dev_mock_org_id = Some(1);
+        let state = AppState::new(config);
+        assert!(matches!(
+            resolve_api_session(&state, Some("Bearer synthetic-server-token"), None, None).await,
+            Err(ApiError::Unauthorized)
+        ));
+        // In production mock fallback is absent; in development it must reject
+        // the same account class instead of returning an org-bearing empty session.
+        assert!(matches!(
+            resolve_api_session(&state, None, None, None).await,
+            Err(ApiError::Unauthorized) | Ok(None)
+        ));
+        server.abort();
+    }
 
     #[test]
     fn identity_parser_accepts_only_canonical_stdb_identities() {

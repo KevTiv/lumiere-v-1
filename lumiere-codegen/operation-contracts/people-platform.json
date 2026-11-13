@@ -6260,6 +6260,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/platform_defaults.rs: immutable template and enrollment uniqueness guards preserve settings and funding on retry"
+    },
+    "enroll_persistent_platform_operator": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/platform_operator.rs: deployment-compiled caller/scope policy, exact existing bootstrap binding, atomic audited enrollment and no regrant after revocation"
     }
   }
 }

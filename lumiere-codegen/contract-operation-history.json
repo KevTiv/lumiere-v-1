@@ -2430,6 +2430,10 @@
       "name": "enroll_ai_company_defaults",
       "shape_fingerprint": "sha256:e36f1b0a57db537789d543659726ea97de76921cb5c513608707de89dd6cd2c1"
     },
+    "erp.enroll_persistent_platform_operator": {
+      "name": "enroll_persistent_platform_operator",
+      "shape_fingerprint": "sha256:4b6eab3d00017d741b9cf9448dc396e93ba5f7902e1450b9b837825f21f553c6"
+    },
     "erp.ensure_ai_managed_allowance": {
       "name": "ensure_ai_managed_allowance",
       "shape_fingerprint": "sha256:366d62ab08bf96a1ad6cc00826b5928d745e79553e513b06a352a1ff9bd204df"
@@ -6520,6 +6524,14 @@
       "current_operations_fingerprint": "sha256:a24a818d98b80c6a9b9a2c8603b4d8c209a870fc06068dd7be92cc741350e79a",
       "operation_count": 1530,
       "reason": "Add same-agent model capability repair and a no-mutation native activation authority probe; preserve tenant scope and spend history"
+    },
+    {
+      "previous_release": "v0.3.179",
+      "previous_ir_sha256": "sha256:8a84c022af77ea62f73c805d07e29fb26685deda6e5129aa591096a003520c3d",
+      "previous_operations_fingerprint": "sha256:a24a818d98b80c6a9b9a2c8603b4d8c209a870fc06068dd7be92cc741350e79a",
+      "current_operations_fingerprint": "sha256:f93aaef84c3abb0e0fc2e9943bbe015a641385699900492660469658b5e19a7c",
+      "operation_count": 1531,
+      "reason": "Add deployment-bound persistent nonhuman operator enrollment; preserve lease checks, tenant ownership and monetary history"
     }
   ]
 }

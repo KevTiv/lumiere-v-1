@@ -72,6 +72,8 @@ pub fn run_core_sod_test(ctx: &ReducerContext) -> Result<(), String> {
 
 #[spacetimedb::reducer]
 pub fn run_core_permissions_test(ctx: &ReducerContext) -> Result<(), String> {
+    permissions_tests::test_persistent_operator_enrollment(ctx)
+        .map_err(|e| format!("persistent_operator_enrollment: {e}"))?;
     permissions_tests::test_expired_operator_cannot_register_certification_runtime(ctx)
         .map_err(|e| format!("expired_operator_registration: {e}"))?;
     permissions_tests::test_setup_membership_carries_lease_without_granting_privilege(ctx)

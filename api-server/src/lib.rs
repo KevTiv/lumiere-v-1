@@ -21,6 +21,7 @@ mod middleware;
 pub mod organization_placement;
 pub mod owner_report_worker;
 pub mod platform_control;
+mod platform_operator;
 mod presentation_dictionary;
 mod presentation_projection;
 mod presentation_reads;
@@ -55,6 +56,16 @@ fn install_rustls_crypto_provider() {
 pub async fn run() -> anyhow::Result<()> {
     install_rustls_crypto_provider();
     http_app::serve().await
+}
+
+/// Dispatch the private operator command before starting any application services.
+pub async fn run_command(args: Vec<String>) -> anyhow::Result<()> {
+    if args.is_empty() {
+        return run().await;
+    }
+    let mode = platform_operator::Mode::parse(&args)?;
+    install_rustls_crypto_provider();
+    platform_operator::run(mode).await
 }
 
 /// Run the standalone scheduled owner-report worker service.

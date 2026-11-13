@@ -23,6 +23,11 @@ on:
         required: false
         default: ''
         type: string
+      persistent_platform_operator:
+        description: Exact identity:organization-id:company-id:approval-reference enrollment policy; empty denies
+        required: false
+        default: ''
+        type: string
 
 env:
   CONTRACTS_MODULE_ARTIFACT: contracts-module
@@ -54,8 +59,9 @@ jobs:
         env:
           ALPHA_FOUNDER_IDENTITIES: ${{ inputs.alpha_founder_identities }}
           ALPHA_ADDITIONAL_TENANT_APPROVAL: ${{ inputs.alpha_additional_tenant_approval }}
+          PERSISTENT_PLATFORM_OPERATOR: ${{ inputs.persistent_platform_operator }}
         run: |
-          policy_hash="$(printf '%s\0%s' "$ALPHA_FOUNDER_IDENTITIES" "$ALPHA_ADDITIONAL_TENANT_APPROVAL" | sha256sum | cut -d ' ' -f 1)"
+          policy_hash="$(printf '%s\0%s\0%s' "$ALPHA_FOUNDER_IDENTITIES" "$ALPHA_ADDITIONAL_TENANT_APPROVAL" "$PERSISTENT_PLATFORM_OPERATOR" | sha256sum | cut -d ' ' -f 1)"
           echo "digest=$policy_hash" >> "$GITHUB_OUTPUT"
 
       - name: Restore compiled contracts module
@@ -79,6 +85,7 @@ jobs:
           LUMIERE_ENABLE_DEV_REDUCERS: '0'
           LUMIERE_ALPHA_FOUNDER_IDENTITIES: ${{ inputs.alpha_founder_identities }}
           LUMIERE_ALPHA_ADDITIONAL_TENANT_APPROVAL: ${{ inputs.alpha_additional_tenant_approval }}
+          LUMIERE_PERSISTENT_PLATFORM_OPERATOR: ${{ inputs.persistent_platform_operator }}
         run: |
           if [[ '${{ inputs.production }}' == 'true' ]]; then
             make contracts-module-production-ci
