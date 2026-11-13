@@ -5,6 +5,7 @@ import { ArrowLeft, Plus, Search } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "../components/button"
 import { Input } from "../components/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/select"
 import { cn } from "../lib/utils"
 
 export type ChatHistoryEntry = {
@@ -70,12 +71,16 @@ export function ChatHistoryPanel({
           <Button variant={archived ? "secondary" : "ghost"} size="sm" aria-pressed={archived}
             onClick={() => onArchivedChange(true)}>{t("aiChat.history.archived", { defaultValue: "Archived" })}</Button>
         </div>
-        <label htmlFor={filterId} className="sr-only">{t("aiChat.history.module", { defaultValue: "Module" })}</label>
-        <select id={filterId} value={module} onChange={event => onModuleChange(event.target.value)}
-          className="min-h-9 w-full rounded-md border bg-background px-2 text-sm focus-visible:ring-2 focus-visible:ring-ring">
-          <option value="">{t("aiChat.history.allModules", { defaultValue: "All modules" })}</option>
-          {modules.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
+        <span id={filterId} className="sr-only">{t("aiChat.history.module", { defaultValue: "Module" })}</span>
+        <Select value={module || "all"} onValueChange={value => onModuleChange(value && value !== "all" ? value : "")}>
+          <SelectTrigger aria-labelledby={filterId} className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("aiChat.history.allModules", { defaultValue: "All modules" })}</SelectItem>
+            {modules.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2" aria-busy={loading}>
         <ul className="space-y-0.5">
