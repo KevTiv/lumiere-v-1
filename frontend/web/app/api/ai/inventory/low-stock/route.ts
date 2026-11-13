@@ -59,13 +59,13 @@ export async function POST(request: NextRequest) {
     const gw = await fetchAiGateway("/v1/skills/inventory/low-stock", {
       method: "POST",
       body: JSON.stringify({
-        org_id: orgId,
-        company_id: companyId,
+        orgId,
+        companyId,
         threshold,
-        location_id: locationId ?? null,
-        stdb_token: session.stdbToken,
-        identity_hex: session.identityHex,
-        org_privacy_policy: orgPrivacyPolicy,
+        locationId: locationId ?? null,
+        stdbToken: session.stdbToken,
+        identityHex: session.identityHex,
+        orgPrivacyPolicy,
       }),
     })
     const payload = gw.text

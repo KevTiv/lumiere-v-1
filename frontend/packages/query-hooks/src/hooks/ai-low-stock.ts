@@ -8,6 +8,7 @@ import type {
 } from "@lumiere/erp-shared/ai-low-stock-schemas"
 
 import { apiFetch } from "../http"
+import { parseLowStockScanResult } from "./ai-green-skill-results"
 
 export type { LowStockInput, LowStockScanResult }
 
@@ -22,7 +23,7 @@ export function useAiLowStockScan() {
         body: JSON.stringify(input),
       })
       if (!r.ok) throw new Error(await parseAiError(r))
-      return (await r.json()) as LowStockScanResult
+      return parseLowStockScanResult(await r.json())
     },
   })
 }

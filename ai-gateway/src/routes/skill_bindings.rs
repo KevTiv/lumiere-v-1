@@ -5,48 +5,41 @@
 use axum::{extract::State, Json};
 use serde_json::{json, Value};
 
-use crate::{harness, state::AppState};
+use crate::{harness, orchestrator::generation_surface_certification, state::AppState};
 
-fn binding(skill_key: &str) -> Option<Value> {
-    let (manifest, source_hash, permissions) = match skill_key {
+pub(crate) fn binding(skill_key: &str) -> Option<Value> {
+    let (manifest, version, source_hash, permissions) = match skill_key {
         "report_analysis" => (
             harness::governed_llm_skills::report_analysis_manifest(),
+            harness::certification::REPORT_ANALYSIS_CERTIFICATION_VERSION,
             harness::certification::report_analysis_certification_bundle_hash(),
             vec!["report:read"],
         ),
         "report_composer" => (
             harness::report_composer::manifest(),
+            harness::report_composer::REPORT_COMPOSER_RELEASE_VERSION,
             harness::certification::report_composer_certification_bundle_hash(),
             vec!["report:read"],
         ),
         "low_stock" => (
             harness::low_stock::manifest(),
+            harness::low_stock::LOW_STOCK_RELEASE_VERSION,
             harness::certification::low_stock_certification_bundle_hash(),
             vec!["inventory:read"],
         ),
         key if lumiere_finance_review_core::skill(key).is_ok() => (
             harness::finance_skills::manifest(key).ok()?,
+            lumiere_finance_review_core::VERSION,
             harness::finance_skills::bundle_hash(key),
             vec![],
         ),
-        key if crate::orchestrator::generation_surface_certification::KEYS.contains(&key) => (
-            crate::orchestrator::generation_surface_certification::manifest(key).ok()?,
-            crate::orchestrator::generation_surface_certification::bundle_hash(key).ok()?,
+        key if generation_surface_certification::KEYS.contains(&key) => (
+            generation_surface_certification::manifest(key).ok()?,
+            generation_surface_certification::VERSION,
+            generation_surface_certification::bundle_hash(key).ok()?,
             vec![],
         ),
         _ => return None,
-    };
-    let version = match skill_key {
-        "report_analysis" => harness::certification::REPORT_ANALYSIS_CERTIFICATION_VERSION,
-        "report_composer" => harness::certification::REPORT_COMPOSER_CERTIFICATION_VERSION,
-        "low_stock" => harness::certification::LOW_STOCK_CERTIFICATION_VERSION,
-        key if lumiere_finance_review_core::skill(key).is_ok() => {
-            lumiere_finance_review_core::VERSION
-        }
-        key if crate::orchestrator::generation_surface_certification::KEYS.contains(&key) => {
-            crate::orchestrator::generation_surface_certification::VERSION
-        }
-        _ => "1.0.0",
     };
     Some(json!({
         "skillKey": skill_key,
@@ -120,18 +113,17 @@ mod tests {
 
     #[test]
     fn generation_discovery_binds_each_surface_to_its_own_executable_source() {
-        for key in crate::orchestrator::generation_surface_certification::KEYS {
+        for key in generation_surface_certification::KEYS {
             let discovered = binding(key).expect("supported generation source");
-            let expected =
-                crate::orchestrator::generation_surface_certification::manifest(key).unwrap();
+            let expected = generation_surface_certification::manifest(key).unwrap();
             assert_eq!(discovered["manifest"]["skill_key"], key);
             assert_eq!(
                 discovered["manifest"]["version"],
-                crate::orchestrator::generation_surface_certification::VERSION
+                generation_surface_certification::VERSION
             );
             assert_eq!(
                 discovered["manifest"]["source_hash"],
-                crate::orchestrator::generation_surface_certification::bundle_hash(key).unwrap()
+                generation_surface_certification::bundle_hash(key).unwrap()
             );
             assert_eq!(
                 discovered["manifest"]["resources"],
