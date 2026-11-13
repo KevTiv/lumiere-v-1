@@ -33,6 +33,9 @@ def classify_paths(paths: list[str]) -> dict[str, str]:
             return scope(DOMAINS, "dependency configuration; full validation")
         if path.startswith("frontend/packages/presentation-core/scripts/"):
             return scope(DOMAINS, "shared presentation contract; full validation")
+        if (path.startswith(("frontend/web/app/api/ai/", "frontend/web/app/(modules)/ai-skills/"))
+                or path == "frontend/packages/query-hooks/src/hooks/ai-green-skill-results.ts"):
+            return scope(DOMAINS, "AI gateway web wire contract; full validation")
         if path.startswith("frontend/"):
             categories.add("frontend")
         elif path.startswith("docs/evidence/") or (

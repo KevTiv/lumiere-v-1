@@ -38,7 +38,9 @@ export function nativeVersionManifest(binding: NativeSkillBinding, version: stri
     || Number(version.split(".")[0]) !== binding.adapterMajor) {
     throw new Error(`Use a semantic skill version compatible with adapter ${binding.adapterMajor}.x`)
   }
-  if (!/^sha256:[a-f0-9]{64}$/.test(binding.manifest.source_hash)) {
+  // Keep the gateway's exact encoding for immutable version and certificate comparisons.
+  const sourceHash = binding.manifest.source_hash
+  if (typeof sourceHash !== "string" || !/^(?:sha256:)?[a-f0-9]{64}$/.test(sourceHash)) {
     throw new Error("The current harness did not provide a valid source binding")
   }
   return JSON.stringify(canonical({
@@ -51,11 +53,26 @@ export function nativeVersionManifest(binding: NativeSkillBinding, version: stri
   }))
 }
 
-export function nextSkillVersion(versions: Array<string | undefined>): string {
+function stableSkillVersion(version: string | undefined) {
+  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version ?? "")
+  return match ? { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]) } : null
+}
+
+export function nextSkillVersion(
+  versions: Array<string | undefined>,
+  advertisedVersion = "1.0.0",
+): string {
+  const advertised = stableSkillVersion(advertisedVersion) ?? { major: 1, minor: 0, patch: 0 }
   const stable = versions.flatMap((version) => {
-    const match = /^(1)\.(\d+)\.(\d+)$/.exec(version ?? "")
-    return match ? [[Number(match[1]), Number(match[2]), Number(match[3])]] : []
-  }).sort((a, b) => b[1]! - a[1]! || b[2]! - a[2]!)
+    const parsed = stableSkillVersion(version)
+    return parsed && parsed.major === advertised.major ? [parsed] : []
+  }).sort((a, b) => b.minor - a.minor || b.patch - a.patch)
   const latest = stable[0]
-  return latest ? `${latest[0]}.${latest[1]}.${latest[2]! + 1}` : "1.0.0"
+  if (latest && (
+    latest.minor > advertised.minor
+    || (latest.minor === advertised.minor && latest.patch >= advertised.patch)
+  )) {
+    return `${latest.major}.${latest.minor}.${latest.patch + 1}`
+  }
+  return `${advertised.major}.${advertised.minor}.${advertised.patch}`
 }

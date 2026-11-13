@@ -66,21 +66,23 @@ test.describe("AI harness policy", { tag: "@p0" }, () => {
     expect(composeRes.status()).toBe(200)
 
     const result = (await composeRes.json()) as {
-      decision?: { outcome?: string; privacy?: { rowsProcessed?: number; maskedFields?: string[] } }
+      decision?: { decision?: { outcome?: string }; privacy?: { rows_processed?: number } }
       summary?: string
       citations?: unknown[]
       audit?: { correlationId?: string; events?: unknown[] }
     }
 
-    expect(result.decision?.outcome).toBe("allow")
-    expect(result.decision?.privacy?.rowsProcessed).toBeGreaterThan(0)
+    expect(result.decision?.decision?.outcome).toBe("allow")
+    const rowsProcessed = result.decision?.privacy?.rows_processed ?? 0
+    expect(rowsProcessed).toBeGreaterThan(0)
     expect(Array.isArray(result.audit?.events)).toBe(true)
     expect(result.audit?.correlationId).toBeTruthy()
 
     // UI reflects the result.
     await expect(page.getByTestId("report-composer-result")).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText("Policy decision").first()).toBeVisible()
-    await expect(page.getByText("allow").first()).toBeVisible()
+    await expect(page.getByText("Allowed", { exact: true }).first()).toBeVisible()
+    await expect(page.getByText(`${rowsProcessed} rows`, { exact: true })).toBeVisible()
 
     await expectNoAppError(page)
   })
@@ -110,13 +112,13 @@ test.describe("AI harness policy", { tag: "@p0" }, () => {
     expect(response.ok()).toBe(true)
     const body = (await response.json()) as {
       decision?: { outcome?: string; reasons?: Array<{ code?: string }> }
-      draft_id?: number
+      draftId?: number
     }
     expect(body.decision?.outcome).toBe("deny")
     expect(body.decision?.reasons?.some((reason) => reason.code === "capability_denied")).toBe(
       true,
     )
-    expect(body.draft_id).toBeUndefined()
+    expect(body.draftId).toBeUndefined()
   })
 
   test("P4-AI-02: red action draft is bridged to a pending approval draft", async ({
@@ -154,7 +156,7 @@ test.describe("AI harness policy", { tag: "@p0" }, () => {
     expect(bridgeRes.ok()).toBe(true)
     const bridgeJson = (await bridgeRes.json()) as {
       decision?: { outcome?: string; reasons?: Array<{ code?: string }> }
-      draft_id?: number
+      draftId?: number
       error?: string
     }
 
@@ -163,6 +165,6 @@ test.describe("AI harness policy", { tag: "@p0" }, () => {
     expect(
       bridgeJson.decision?.reasons?.some((reason) => reason.code === "red_approval_required"),
     ).toBe(true)
-    expect(bridgeJson.draft_id).toBeGreaterThan(0)
+    expect(bridgeJson.draftId).toBeGreaterThan(0)
   })
 })

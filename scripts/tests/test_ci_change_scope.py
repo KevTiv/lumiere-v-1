@@ -48,6 +48,13 @@ class ChangeScopeTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assert_domains(module.classify_paths([path]), module.DOMAINS)
 
+    def test_ai_web_contract_changes_run_rust_gate(self):
+        for path in ["frontend/web/app/api/ai/inventory/low-stock/route.ts",
+                     "frontend/web/app/(modules)/ai-skills/native-skill-validation.ts",
+                     "frontend/packages/query-hooks/src/hooks/ai-green-skill-results.ts"]:
+            with self.subTest(path=path):
+                self.assert_domains(module.classify_paths([path]), module.DOMAINS)
+
     def test_mixed_changes(self):
         self.assert_domains(module.classify_paths(["frontend/web/app/page.tsx", "api-server/src/main.rs"]),
                             module.DOMAINS)

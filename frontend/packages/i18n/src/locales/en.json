@@ -14351,6 +14351,7 @@
       "errorDescription": "Could not compose the report. Please try again.",
       "decisionTitle": "Policy decision",
       "summaryTitle": "Summary",
+      "summaryWithheld": "The summary is withheld pending verification. You can review the source figures below.",
       "citationsTitle": "Citations",
       "rowsProcessed": "{{count}} rows",
       "browserTimezone": "Uses this browser’s timezone. Financial reports may use a different reporting timezone."
