@@ -40,6 +40,12 @@ fn binding(skill_key: &str) -> Option<Value> {
         "report_analysis" => harness::certification::REPORT_ANALYSIS_CERTIFICATION_VERSION,
         "report_composer" => harness::certification::REPORT_COMPOSER_CERTIFICATION_VERSION,
         "low_stock" => harness::certification::LOW_STOCK_CERTIFICATION_VERSION,
+        key if lumiere_finance_review_core::skill(key).is_ok() => {
+            lumiere_finance_review_core::VERSION
+        }
+        key if crate::orchestrator::generation_surface_certification::KEYS.contains(&key) => {
+            crate::orchestrator::generation_surface_certification::VERSION
+        }
         _ => "1.0.0",
     };
     Some(json!({
@@ -119,7 +125,10 @@ mod tests {
             let expected =
                 crate::orchestrator::generation_surface_certification::manifest(key).unwrap();
             assert_eq!(discovered["manifest"]["skill_key"], key);
-            assert_eq!(discovered["manifest"]["version"], "1.0.0");
+            assert_eq!(
+                discovered["manifest"]["version"],
+                crate::orchestrator::generation_surface_certification::VERSION
+            );
             assert_eq!(
                 discovered["manifest"]["source_hash"],
                 crate::orchestrator::generation_surface_certification::bundle_hash(key).unwrap()
@@ -134,5 +143,16 @@ mod tests {
             );
         }
         assert!(binding("unregistered_generation").is_none());
+    }
+
+    #[test]
+    fn finance_discovery_uses_the_current_immutable_adapter_version() {
+        for skill in lumiere_finance_review_core::SKILLS {
+            let discovered = binding(skill.key).expect("supported Finance source");
+            assert_eq!(
+                discovered["manifest"]["version"],
+                lumiere_finance_review_core::VERSION
+            );
+        }
     }
 }
