@@ -192,8 +192,9 @@ mod tests {
             "schemaVersion": 1, "organizationId": "7", "companyId": "9", "sessionKey": "thread",
             "revision": revision, "coveredThrough": "23", "earlierContextUnavailable": false,
             "summary": {
-                "objective": { "messageId": "1", "text": "Preserve opening balances" },
-                "questions": [{ "messageId": "3", "text": "Which rows still lack units?" }],
+                "objective": { "messageId": "1", "role": "user", "text": "Preserve opening balances" },
+                "questions": [{ "messageId": "3", "role": "user", "text": "Which rows still lack units?" }],
+                "highlights": [],
             },
             "recentTurns": [],
             "historyRefs": [{ "kind": "decision", "sessionKey": "thread", "messageId": "1", "decisionId": "a".repeat(32), "revision": 2 }],
@@ -212,6 +213,35 @@ mod tests {
         assert!(
             matches!(&context.references[..], [HistoryReference::Decision { revision: 2, message_id, .. }] if message_id == "1")
         );
+    }
+
+    #[tokio::test]
+    async fn compacted_chat_prompt_survives_provider_and_model_switch() {
+        use crate::orchestrator::model_configuration::tests::route_chat_prompt_through_provider_switch;
+
+        let mut checkpoint = envelope(2);
+        checkpoint.recent_turns = vec![
+            json!({"messageId": "24", "role": "user", "text": "Check the remaining rows."}),
+            json!({"messageId": "25", "role": "assistant", "text": "Three rows need review."}),
+        ];
+        let conversation = assemble(checkpoint, 7, 9, "thread");
+        let mut prompt = super::super::build_user_prompt_value("[]", None, None, "Resume", &[]);
+        prompt["untrusted_context"]["earlier_conversation"] = conversation.prompt.unwrap();
+
+        let sent = route_chat_prompt_through_provider_switch(prompt.to_string()).await;
+        assert_eq!(sent, prompt);
+        let history = &sent["untrusted_context"]["earlier_conversation"];
+        assert_eq!(history["instruction_trust"], "untrusted");
+        assert_eq!(history["checkpoint_revision"], 2);
+        assert_eq!(
+            history["older_conversation"]["objective"]["text"],
+            "Preserve opening balances"
+        );
+        assert_eq!(
+            history["older_conversation"]["questions"][0]["text"],
+            "Which rows still lack units?"
+        );
+        assert_eq!(history["recent_messages"][1]["messageId"], "25");
     }
 
     #[test]

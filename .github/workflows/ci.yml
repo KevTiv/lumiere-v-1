@@ -166,6 +166,13 @@ jobs:
       - name: Query authorization and field projection tests
         run: cargo test --locked -p stdb-auth --lib
 
+      - name: Assistant history pagination and context checkpoint tests
+        run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p stdb-client --lib chat_history::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::chat_history::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::chat_context::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::assistant_chat_references::tests
+
       - name: WorkOS session and profile synchronization regressions
         run: |
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib session::workos::tests

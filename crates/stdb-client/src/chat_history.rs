@@ -20,7 +20,8 @@ const MAX_SEEK_QUERIES: usize = 256;
 const PAYLOAD_BATCH_ROWS: usize = 8;
 const MAX_BATCH_BYTES: usize = 512 * 1024;
 const MAX_LEGACY_ROW_BYTES: usize = 2 * 1024 * 1024;
-const MAX_PAGE_BYTES: usize = 512 * 1024;
+// Reserve space for the response wrapper, cursor and commas between rows.
+const MAX_PAGE_BYTES: usize = 512 * 1024 - 256;
 
 pub struct ChatMessagePage {
     pub rows: Vec<Value>,
@@ -240,6 +241,13 @@ async fn read_ids(
     Ok(result)
 }
 
+fn newest_page_cursor(rows: &[Value], selected: usize, more_ids: bool) -> Result<Option<u64>> {
+    if more_ids || rows.len() < selected {
+        return rows.last().map(chat_row_id).transpose();
+    }
+    Ok(None)
+}
+
 fn exceeds_query_bytes(error: &anyhow::Error) -> bool {
     matches!(error.downcast_ref(), Some(StdbClientError::QueryByteLimit))
 }
@@ -311,7 +319,11 @@ impl StdbClient {
         module: Option<&str>,
         before: Option<u64>,
         limit: usize,
-    ) -> Result<Vec<Value>> {
+    ) -> Result<ChatMessagePage> {
+        ensure!(
+            (1..MAX_PAGE_ROWS).contains(&limit),
+            "invalid chat history limit"
+        );
         let mut scope = format!(
             "{} AND archived = {archived}",
             actor_scope(org, company, actor, "create_uid")?
@@ -321,8 +333,11 @@ impl StdbClient {
             scope.push_str(&format!(" AND module = '{module}'"));
         }
         let high = before.map_or(u64::MAX, |id| id.saturating_sub(1));
-        let ids = select_ids(self, "ai_chat_session", &scope, 1, high, limit, true).await?;
-        read_ids(
+        let mut ids = select_ids(self, "ai_chat_session", &scope, 1, high, limit + 1, true).await?;
+        let remaining = ids.len() > limit;
+        ids.truncate(limit);
+        let selected = ids.len();
+        let rows = read_ids(
             self,
             "ai_chat_session",
             SESSION_COLUMNS,
@@ -330,7 +345,9 @@ impl StdbClient {
             ids,
             MAX_PAGE_BYTES,
         )
-        .await
+        .await?;
+        let next_cursor = newest_page_cursor(&rows, selected, remaining)?;
+        Ok(ChatMessagePage { rows, next_cursor })
     }
 
     pub async fn chat_message(
@@ -411,11 +428,7 @@ impl StdbClient {
             MAX_PAGE_BYTES,
         )
         .await?;
-        let next_cursor = if remaining || rows.len() < selected {
-            rows.last().map(chat_row_id).transpose()?
-        } else {
-            None
-        };
+        let next_cursor = newest_page_cursor(&rows, selected, remaining)?;
         rows.reverse();
         Ok(ChatMessagePage { rows, next_cursor })
     }
@@ -527,6 +540,14 @@ mod tests {
             .unwrap()
             .parse()
             .unwrap()
+    }
+
+    #[test]
+    fn page_cursor_survives_payload_truncation() {
+        let rows = [json!({ "id": 40 }), json!({ "id": 30 })];
+        assert_eq!(newest_page_cursor(&rows, 3, false).unwrap(), Some(30));
+        assert_eq!(newest_page_cursor(&rows, 2, true).unwrap(), Some(30));
+        assert_eq!(newest_page_cursor(&rows, 2, false).unwrap(), None);
     }
 
     #[test]

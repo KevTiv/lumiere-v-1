@@ -810,13 +810,13 @@ mod tests {
     #[test]
     fn derived_or_malformed_assistant_replies_do_not_supply_prompt_text() {
         assert!(reusable_assistant_message(
-            &json!({"model":null,"sourcesJson":"[]","metadata":"{"turnId":"t"}"})
+            &json!({"model":null,"sourcesJson":"[]","metadata":r#"{"turnId":"t"}"#})
         ));
         assert!(!reusable_assistant_message(
             &json!({"model":"provider","sourcesJson":"[]"})
         ));
         assert!(!reusable_assistant_message(
-            &json!({"sources_json":"[{"label":"record"}]"})
+            &json!({"sources_json":r#"[{"label":"record"}]"#})
         ));
         assert!(!reusable_assistant_message(&json!({"metadata":"invalid"})));
     }

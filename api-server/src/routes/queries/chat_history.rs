@@ -177,22 +177,11 @@ pub(super) async fn read(
                     .await?
             } else {
                 let before = cursor.and_then(Cursor::before);
-                let mut rows = owner
-                    .chat_sessions_page(org, company, actor, archived, module, before, limit + 1)
+                let page = owner
+                    .chat_sessions_page(org, company, actor, archived, module, before, limit)
                     .await
                     .map_err(ApiError::internal)?;
-                let has_more = rows.len() > limit;
-                rows.truncate(limit);
-                let next = if has_more {
-                    rows.last()
-                        .map(chat_row_id)
-                        .transpose()
-                        .map_err(ApiError::internal)?
-                        .map(Cursor::Before)
-                } else {
-                    None
-                };
-                (rows, next)
+                (page.rows, page.next_cursor.map(Cursor::Before))
             }
         }
         (false, Some(key), message) => {
@@ -265,16 +254,15 @@ async fn search_sessions(
         Some(Cursor::SearchMessage { session, .. }) => session.checked_add(1),
         None => None,
     };
-    let mut rows = owner
-        .chat_sessions_page(org, company, actor, archived, module, before_session, 2)
+    let page = owner
+        .chat_sessions_page(org, company, actor, archived, module, before_session, 1)
         .await
         .map_err(ApiError::internal)?;
-    if rows.is_empty() {
+    let Some(mut session) = page.rows.into_iter().next() else {
         return Ok((Vec::new(), None));
-    }
-    let mut session = rows.remove(0);
+    };
     let id = chat_row_id(&session).map_err(ApiError::internal)?;
-    let next_session = (!rows.is_empty()).then_some(Cursor::Before(id));
+    let next_session = page.next_cursor.map(Cursor::Before);
     let query = search.to_lowercase();
     if let Some(snippet) = session
         .get("title")

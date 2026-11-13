@@ -10,12 +10,15 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use stdb_auth::{has_resource_field_read_permission, has_resource_read_permission};
+use stdb_auth::{
+    has_resource_field_read_permission, has_resource_read_permission, FieldAccessContext,
+};
 use tokio::sync::Semaphore;
 
 use crate::{
     cold_tier::pg_pool, error::ApiError, query_exec::resolve_membership_company_id,
-    state::AppState, trusted_context::TrustedOperationContext, web_session::OrgSession,
+    session::load_field_access_context, state::AppState, trusted_context::TrustedOperationContext,
+    web_session::OrgSession,
 };
 
 const MAX_SOURCE_ROWS: usize = 30;
@@ -298,13 +301,7 @@ async fn context(
         .map(Json)
 }
 
-async fn assemble(
-    state: &AppState,
-    session: OrgSession,
-    request: ContextRequest,
-) -> Result<ContextResponse, ApiError> {
-    let auth = TrustedOperationContext::for_resource_read(state, &session.session)?;
-    auth.require_current_placement(&state.organization_placements)?;
+fn require_context_read(access: &FieldAccessContext) -> Result<(), ApiError> {
     for (resource, fields) in [
         ("ai_chat_session", &["id", "session_key", "archived"][..]),
         (
@@ -322,7 +319,7 @@ async fn assemble(
             ][..],
         ),
     ] {
-        let access = Some(auth.field_access());
+        let access = Some(access);
         if !has_resource_read_permission(access, resource)
             || fields
                 .iter()
@@ -333,6 +330,41 @@ async fn assemble(
             ));
         }
     }
+    Ok(())
+}
+
+async fn recheck_context_scope(
+    state: &AppState,
+    auth: &TrustedOperationContext,
+    company: u64,
+) -> Result<(), ApiError> {
+    auth.require_current_placement(&state.organization_placements)?;
+    let org = auth.organization_id();
+    let actor = auth.actor_identity();
+    let current = load_field_access_context(&state.stdb, actor, org)
+        .await
+        .map_err(ApiError::Internal)?
+        .ok_or(ApiError::Unauthorized)?;
+    require_context_read(&current)?;
+    resolve_membership_company_id(
+        auth.client(),
+        org,
+        actor,
+        Some(company),
+        "Assistant thread is unavailable",
+    )
+    .await?;
+    auth.require_current_placement(&state.organization_placements)
+}
+
+async fn assemble(
+    state: &AppState,
+    session: OrgSession,
+    request: ContextRequest,
+) -> Result<ContextResponse, ApiError> {
+    let auth = TrustedOperationContext::for_resource_read(state, &session.session)?;
+    auth.require_current_placement(&state.organization_placements)?;
+    require_context_read(auth.field_access())?;
     let org = auth.organization_id();
     let actor = auth.actor_identity();
     let company = resolve_membership_company_id(
@@ -356,6 +388,7 @@ async fn assemble(
         ));
     }
     if request.scope_only {
+        recheck_context_scope(state, &auth, company).await?;
         return Ok(ContextResponse {
             schema_version: 1,
             organization_id: org.to_string(),
@@ -514,6 +547,7 @@ async fn assemble(
         }
         output.earlier_context_unavailable = true;
     }
+    recheck_context_scope(state, &auth, company).await?;
     tracing::debug!(
         organization_id = org,
         company_id = company,

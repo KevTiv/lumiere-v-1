@@ -9,6 +9,7 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   useAppendAiChatMessage,
   useCreateAiChatSession,
+  useUpdateAiChatSession,
 } from "./ai-memory"
 
 type CreateSessionInput = Parameters<
@@ -17,10 +18,14 @@ type CreateSessionInput = Parameters<
 type AppendMessageInput = Parameters<
   ReturnType<typeof useAppendAiChatMessage>["mutateAsync"]
 >[0]
+type UpdateSessionInput = Parameters<
+  ReturnType<typeof useUpdateAiChatSession>["mutateAsync"]
+>[0]
 type Mutation<T> = { mutationFn(params: T): Promise<void> }
 
 function fixture() {
   const requests: { path: string; body: unknown }[] = []
+  const updates: { operation: string; input: unknown }[] = []
   const dependencies = {
     "@lumiere/stdb/commands": { stdbBffCommandPost },
     "@lumiere/erp-shared/ai-create-params": { toCreateAiChatSessionParams },
@@ -31,6 +36,12 @@ function fixture() {
       useQueryClient: () => ({}),
     },
     "@lumiere/api-client/response-error": {},
+    "./stdb": {
+      callStdbOperation: async (operation: string, input: unknown) => {
+        updates.push({ operation, input: structuredClone(input) })
+        return new Response(null, { status: 200 })
+      },
+    },
     "../http": {
       apiFetch: async (path: string, init: RequestInit) => {
         requests.push({ path, body: JSON.parse(String(init.body)) })
@@ -57,6 +68,9 @@ function fixture() {
         organizationId: number,
         companyId: number | null,
       ): Mutation<AppendMessageInput>
+      useUpdateAiChatSession(
+        scope: Parameters<typeof useUpdateAiChatSession>[0],
+      ): Mutation<UpdateSessionInput>
     },
   }
   runInNewContext(compiled, {
@@ -72,10 +86,41 @@ function fixture() {
   })
   return {
     requests,
+    updates,
     create: module.exports.useCreateAiChatSession(7, 42).mutationFn,
     append: module.exports.useAppendAiChatMessage(7, 42).mutationFn,
+    update: module.exports.useUpdateAiChatSession({
+      organizationId: 7,
+      companyId: 42,
+      actor: "actor",
+    }).mutationFn,
   }
 }
+
+test("chat history updates use the company-scoped operation dispatcher", async () => {
+  const f = fixture()
+  await f.update({ sessionKey: "chat-1", title: "Catalog decisions" })
+  await f.update({ sessionKey: "chat-1", archived: true })
+  await f.update({ sessionKey: "chat-1", archived: false })
+  assert.deepEqual(f.updates, [
+    {
+      operation: "update_ai_chat_session_title",
+      input: {
+        companyId: 42,
+        sessionKey: "chat-1",
+        params: { title: { some: "Catalog decisions" } },
+      },
+    },
+    {
+      operation: "archive_ai_chat_session",
+      input: { companyId: 42, sessionKey: "chat-1", archived: true },
+    },
+    {
+      operation: "archive_ai_chat_session",
+      input: { companyId: 42, sessionKey: "chat-1", archived: false },
+    },
+  ])
+})
 
 test("chat creation sends present context as SATS options through the immutable operation", async () => {
   const f = fixture()
