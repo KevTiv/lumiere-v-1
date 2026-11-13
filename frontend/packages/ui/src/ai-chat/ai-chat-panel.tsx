@@ -924,7 +924,7 @@ function AIChatConversation({
           className={cn("min-h-0 min-w-0 bg-muted/20", historyOpen
             ? "w-full @min-[58rem]/chat-workspace:w-72 @min-[58rem]/chat-workspace:shrink-0 @min-[58rem]/chat-workspace:border-r"
             : "hidden")}>
-          {history.content}
+          {historyOpen ? history.content : null}
         </aside>
       ) : null}
       <div className={cn("relative min-h-0 min-w-0 flex-1 flex-col", historyOpen
