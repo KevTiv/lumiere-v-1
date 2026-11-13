@@ -1,3 +1,4 @@
+import { ModuleCsvHistoryDisclosure } from "../../../components/module-csv-history"
 import { Suspense } from "react"
 import { getStdbSession } from "@/lib/api-session"
 import { serverFetchQueryListState, serverPrefetchQueryLists } from "@/lib/server-query"
@@ -37,6 +38,7 @@ export default async function PurchasingPage() {
 
   return (
     <Suspense>
+      <ModuleCsvHistoryDisclosure organizationId={session.organizationId} view="purchasing" />
       <PurchasingClient
         initialOrders={orders}
         initialLines={lines}

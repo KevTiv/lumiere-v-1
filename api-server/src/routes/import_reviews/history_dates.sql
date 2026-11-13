@@ -7,6 +7,7 @@ WITH scoped AS (
       ON batch.id = item.batch_id
      AND batch.organization_id = item.organization_id
      AND batch.company_id = item.company_id
+    __SCOPE_JOINS__
     WHERE item.organization_id = $1::text::numeric
       AND item.company_id = $2::text::numeric
       __SCOPE_FILTERS__

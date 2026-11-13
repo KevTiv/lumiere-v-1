@@ -1,4 +1,18 @@
 {
+  "moduleCsvHistory": {
+    "title": "Historia ya CSV",
+    "salesDescription": "Mauzo yaliyothibitishwa katika faili za CSV. Muhtasari wa maduka na vipindi unaweza kujumuisha mauzo yale yale.",
+    "description": "Rekodi za chanzo zilizothibitishwa kutoka kwenye faili za CSV za kampuni.",
+    "search": "Tafuta katika historia ya CSV",
+    "productCustomer": "Bidhaa au mteja",
+    "location": "Mahali",
+    "quantity": "Kiasi",
+    "unitPrice": "Bei kwa kipimo",
+    "amount": "Kiasi kilichorekodiwa",
+    "sourceRow": "{{file}} · safu mlalo {{row}}",
+    "showDataset": "Onyesha safu mlalo zote katika mkusanyiko huu",
+    "openReview": "Fungua ukaguzi wa vyanzo"
+  },
   "aiHarness": {
     "platformProfile": {
       "tab": "Wasifu wa AI",

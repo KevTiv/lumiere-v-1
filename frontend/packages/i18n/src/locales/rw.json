@@ -1,4 +1,18 @@
 {
+  "moduleCsvHistory": {
+    "title": "Amateka ya CSV",
+    "salesDescription": "Ibicuruzwa byagurishijwe byemejwe muri dosiye za CSV. Raporo z’amaduka n’iz’ibihe zishobora kubariramo amakuru amwe.",
+    "description": "Amakuru yemejwe yavuye muri dosiye za CSV za sosiyete.",
+    "search": "Shakisha mu mateka ya CSV",
+    "productCustomer": "Igicuruzwa cyangwa umukiriya",
+    "location": "Aho biherereye",
+    "quantity": "Ingano",
+    "unitPrice": "Igiciro kuri kimwe",
+    "amount": "Amafaranga yanditswe",
+    "sourceRow": "{{file}} · umurongo {{row}}",
+    "showDataset": "Erekana imirongo yose y’aya makuru",
+    "openReview": "Fungura isuzuma ry’amakuru y’umwimerere"
+  },
   "aiHarness": {
     "platformProfile": {
       "tab": "Igenamiterere rya AI",
