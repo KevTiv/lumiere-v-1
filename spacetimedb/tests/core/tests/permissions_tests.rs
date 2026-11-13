@@ -49,6 +49,7 @@ pub fn test_persistent_operator_enrollment(ctx: &ReducerContext) -> Result<(), S
         }
     }
     let fixture = OrgFixture::seed_minimal(ctx)?;
+    let target = OrgFixture::seed_minimal(ctx)?;
     let profiles: Vec<_> = ctx
         .db
         .user_profile()
@@ -189,6 +190,20 @@ pub fn test_persistent_operator_enrollment(ctx: &ReducerContext) -> Result<(), S
         };
         let initial_count = count();
         enroll_with_policy(ctx, false, &policy)?;
+        let authorize = || {
+            crate::helpers::check_permission_with_operator_policy(
+                ctx,
+                target.organization_id,
+                "ai_skill",
+                "write",
+                &policy,
+            )
+        };
+        if authorize().is_ok() {
+            return Err(
+                "inactive bootstrap gained global permission from probe eligibility".into(),
+            );
+        }
         if count() != initial_count
             || ctx
                 .db
@@ -414,6 +429,148 @@ pub fn test_persistent_operator_enrollment(ctx: &ReducerContext) -> Result<(), S
             .id()
             .find(baseline_member.id)
             .ok_or("enrolled member missing")?;
+        authorize()?;
+        for (resource, action) in [
+            ("ai_skill", "create"),
+            ("ai_skill", "write"),
+            ("ai_agent", "write"),
+            ("ai_spend", "configure_meter"),
+            ("role", "write"),
+            ("field_permission", "create"),
+            ("org_permission", "create"),
+        ] {
+            crate::helpers::check_permission_with_operator_policy(
+                ctx,
+                target.organization_id,
+                resource,
+                action,
+                &policy,
+            )?;
+        }
+        if ctx
+            .db
+            .user_profile()
+            .iter()
+            .filter(|p| p.identity == ctx.sender())
+            .count()
+            != 1
+            || ctx
+                .db
+                .user_organization()
+                .iter()
+                .filter(|m| m.user_identity == ctx.sender())
+                .count()
+                != 1
+        {
+            return Err("global authorization created tenant binding".into());
+        }
+        for wrong in [
+            PersistentPlatformOperatorPolicy {
+                identity_hex: "ab".repeat(32),
+                ..policy.clone()
+            },
+            PersistentPlatformOperatorPolicy {
+                approval_ref: String::new(),
+                ..policy.clone()
+            },
+            PersistentPlatformOperatorPolicy {
+                company_id: target.company_id,
+                ..policy.clone()
+            },
+        ] {
+            if crate::helpers::check_permission_with_operator_policy(
+                ctx,
+                target.organization_id,
+                "ai_skill",
+                "write",
+                &wrong,
+            )
+            .is_ok()
+            {
+                return Err(
+                    "wrong actor, malformed policy or foreign original binding authorized".into(),
+                );
+            }
+        }
+        if crate::helpers::check_permission_with_operator_policy(
+            ctx, 0, "ai_skill", "write", &policy,
+        )
+        .is_ok()
+        {
+            return Err("invalid global target authorized".into());
+        }
+        {
+            use crate::core::organization::{organization, Organization};
+            let original = ctx
+                .db
+                .organization()
+                .id()
+                .find(target.organization_id)
+                .ok_or("target missing")?;
+            for (is_active, organization_id) in
+                [(false, original.id), (true, fixture.organization_id)]
+            {
+                ctx.db.organization().id().update(Organization {
+                    is_active,
+                    organization_id,
+                    ..original.clone()
+                });
+                let rejected = authorize().is_err();
+                ctx.db.organization().id().update(original.clone());
+                if !rejected {
+                    return Err("inactive or foreign-owned global target authorized".into());
+                }
+            }
+        }
+        for metadata in [None, Some(lease.clone()), Some("{malformed".into())] {
+            ctx.db.user_profile().id().update(UserProfile {
+                metadata,
+                ..copy_profile(&enrolled)
+            });
+            let rejected = authorize().is_err();
+            ctx.db.user_profile().id().update(copy_profile(&enrolled));
+            if !rejected {
+                return Err("ordinary, bootstrap or malformed state authorized globally".into());
+            }
+        }
+        {
+            use crate::core::reconstruction::{
+                organization_reconstruction_fence, OrganizationReconstructionFence,
+            };
+            ctx.db
+                .organization_reconstruction_fence()
+                .insert(OrganizationReconstructionFence {
+                    organization_id: target.organization_id,
+                    run_id: "operator-target-fence".into(),
+                    placement_generation: 1,
+                    target_watermark: 0,
+                    target_commit_checksum: String::new(),
+                    state: "restoring".into(),
+                    started_at: ctx.timestamp,
+                    updated_at: ctx.timestamp,
+                    completed_at: None,
+                    failure: None,
+                    current_restore_order: None,
+                    last_completed_restore_order: 0,
+                    next_batch_ordinal: 0,
+                });
+            let denied = authorize().is_err();
+            let readable = crate::helpers::check_permission_with_operator_policy(
+                ctx,
+                target.organization_id,
+                "ai_skill",
+                "read",
+                &policy,
+            )
+            .is_ok();
+            ctx.db
+                .organization_reconstruction_fence()
+                .organization_id()
+                .delete(target.organization_id);
+            if !denied || !readable {
+                return Err("global permission bypassed target write fence or fenced reads".into());
+            }
+        }
         if !enrolled.is_active
             || !enrolled.is_superuser
             || enrolled.email != active.email
@@ -450,6 +607,9 @@ pub fn test_persistent_operator_enrollment(ctx: &ReducerContext) -> Result<(), S
             is_superuser: false,
             ..copy_profile(&enrolled)
         });
+        if authorize().is_ok() {
+            return Err("revoked root authorized globally".into());
+        }
         if enroll_with_policy(ctx, true, &policy).is_ok() {
             return Err("revoked operator regranted".into());
         }
@@ -457,6 +617,9 @@ pub fn test_persistent_operator_enrollment(ctx: &ReducerContext) -> Result<(), S
             is_active: false,
             ..copy_profile(&enrolled)
         });
+        if authorize().is_ok() {
+            return Err("inactive persistent operator authorized globally".into());
+        }
         if enroll_with_policy(ctx, false, &policy).is_ok() {
             return Err("revoked persistent profile probed successfully".into());
         }
@@ -467,6 +630,9 @@ pub fn test_persistent_operator_enrollment(ctx: &ReducerContext) -> Result<(), S
         });
         if enroll_with_policy(ctx, false, &policy).is_ok() {
             return Err("revoked persistent membership probed successfully".into());
+        }
+        if authorize().is_ok() {
+            return Err("revoked membership authorized globally".into());
         }
         Ok(())
     })();

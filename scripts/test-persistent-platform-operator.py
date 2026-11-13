@@ -243,6 +243,36 @@ class Proof:
         pid, mid = fixture(a, platform)
         c, _ = self.new_identity()
         fixture(c, "p_local_history_" + suffix)
+        # The operator's original binding and the tenant being configured must
+        # differ. Same-organization admin tests miss a tenant-profile lookup.
+        self.stage("cross-organization native fixture")
+        # Reuse the registered fixture owner so company/currency/role foreign
+        # keys are complete, rather than manually inventing partial ERP rows.
+        self.call(bt, "run_core_permissions_test", [])
+        companies = self.rows("company")
+        targets = [(membership["organization_id"], company_row["id"])
+                   for membership in self.rows("user_organization")
+                   if identity(membership["user_identity"]) == b
+                   and membership["organization_id"] != org and membership["is_active"]
+                   for company_row in companies
+                   if company_row["organization_id"] == membership["organization_id"]]
+        require(bool(targets))
+        target_org, target_company = targets[0]
+        self.stage("cross-organization agent fixture")
+        self.call(bt, "create_ai_agent", [target_org, {"some": target_company}, {
+            "name": "cross-org operator proof", "model": "mistral-small-2603",
+            "provider": "mistral", "temperature": 0.0, "max_tokens": 256,
+            "rate_limit_per_minute": 1, "cost_per_1_k_tokens": 0.0,
+            "context_window": 4096, "top_p": 1.0, "frequency_penalty": 0.0,
+            "presence_penalty": 0.0, "is_active": True, "is_default": False,
+            "allowed_models": ["mistral-small-2603"], "allowed_actions": ["chat"],
+            "description": NONE, "api_key_reference": NONE, "system_prompt": NONE,
+            "monthly_budget": NONE, "metadata": NONE,
+        }])
+        target_agents = [r for r in self.rows("ai_agent")
+                         if r["organization_id"] == target_org]
+        require(len(target_agents) == 1)
+        target_agent = target_agents[0]["id"]
         before = {t: self.rows(t) for t in (
             "user_profile", "user_organization", "role", "ai_spend_budget",
             "ai_spend_reservation", "user_credential")}
@@ -400,6 +430,51 @@ VALUES ({quote(platform)},{quote(a)},'operator@local.invalid',false,false,
                     and some(audit["company_id"]) == company
                     and some(audit["metadata"]) == some(p["metadata"]))
         self.passed("plan/check/apply/check/replay verified; two exact audits, no credentials or budget changes")
+        self.stage("cross-organization native configuration")
+        self.call(self.owner, "check_ai_agent_activation", [target_org, target_agent, True])
+        self.call(self.owner, "check_ai_agent_activation",
+                  [target_org + 1_000_000, target_agent, True], ok=False)
+        self.call(self.owner, "set_ai_agent_model",
+                  [target_org, target_agent, "mistral-embed", True])
+        for action in ("embedding_query", "embedding_index"):
+            self.call(self.owner, "set_ai_agent_action",
+                      [target_org, target_agent, action, True])
+        self.call(self.owner, "configure_ai_metered_price", [
+            target_org, target_agent, {"model": "mistral-embed", "unit": "tokens",
+                                       "currency": "USD", "units_per_1_k": 100}])
+        self.call(self.owner, "create_ai_skill", [target_org, {
+            "skill_key": "embedding_query", "name": "Cross-org embedding query",
+            "description": NONE, "category": "infrastructure", "prompt_template": "",
+            "required_tools": [], "optional_tools": [], "default_max_steps": 1,
+            "default_max_tool_calls": 1, "output_schema": NONE, "config_schema": NONE,
+            "dataset_specs": NONE, "allowed_action_drafts": [],
+            "is_active": True, "is_system": False, "metadata": NONE,
+        }])
+        self.call(self.owner, "create_role", [target_org, {
+            "name": "cross-org runtime role", "description": NONE, "parent_id": NONE,
+            "permissions": ["ai_spend:reserve"], "is_active": True, "metadata": NONE,
+        }])
+        target_roles = [r for r in self.rows("role")
+                        if r["organization_id"] == target_org
+                        and r["name"] == "cross-org runtime role"]
+        require(len(target_roles) == 1)
+        self.call(self.owner, "update_role", [target_roles[0]["id"], {
+            "name": NONE, "description": NONE,
+            "permissions": {"some": ["ai_spend:reserve", "ai_spend:settle"]},
+            "is_active": NONE, "metadata": NONE,
+        }])
+        configured = next(r for r in self.rows("ai_agent") if r["id"] == target_agent)
+        require(configured["allowed_models"] == ["mistral-small-2603", "mistral-embed"])
+        require(configured["allowed_actions"] == ["chat", "embedding_query", "embedding_index"])
+        prices = [r for r in self.rows("ai_metered_price")
+                  if r["organization_id"] == target_org and r["agent_id"] == target_agent]
+        require(len(prices) == 1 and prices[0]["units_per_1_k"] == 100)
+        for table, column in (("user_profile", "identity"),
+                              ("user_organization", "user_identity")):
+            bindings = [r for r in self.rows(table) if identity(r[column]) == a]
+            require(len(bindings) == 1 and bindings[0]["organization_id"] == org)
+        require(cli("check")["canonicalCoherent"] is True)
+        self.passed("cross-org activation, model/actions, meter, catalog and role update work without a tenant binding")
         self.stage("native administrative authority and revocation")
         d, _ = self.new_identity()
         self.call(self.owner, "register_cold_tier_service_identity", [
@@ -415,6 +490,10 @@ VALUES ({quote(platform)},{quote(a)},'operator@local.invalid',false,false,
         revoked = {t: self.rows(t) for t in before}
         revoked_audits = self.rows("audit_log")
         cli("apply", ok=False)
+        self.call(self.owner, "check_ai_agent_activation",
+                  [target_org, target_agent, True], ok=False)
+        self.call(self.owner, "set_ai_agent_action",
+                  [target_org, target_agent, "embedding_query", False], ok=False)
         rejected = {t: self.rows(t) for t in before}
         for table in revoked:
             require(len(rejected[table]) == len(revoked[table]))

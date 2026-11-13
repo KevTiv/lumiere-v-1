@@ -865,6 +865,10 @@ fn ensure_identity_may_grant_permissions(
     actor: Identity,
     permissions: &[String],
 ) -> Result<(), String> {
+    if actor == ctx.sender() && crate::core::platform_operator::is_persistent_platform_operator(ctx)
+    {
+        return crate::helpers::check_global_operator_target(ctx, organization_id, "write");
+    }
     let profile = find_user_profile_for_organization(ctx, actor, organization_id)
         .filter(|p| p.is_active)
         .ok_or("Administrator profile is inactive")?;

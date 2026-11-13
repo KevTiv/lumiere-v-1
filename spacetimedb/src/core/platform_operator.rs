@@ -31,6 +31,33 @@ fn source_lease(raw: &str, now: i64) -> Result<(), String> {
     }
 }
 
+/// Only release-compiled policy can supply global native authority.
+pub(crate) fn is_persistent_platform_operator(ctx: &ReducerContext) -> bool {
+    option_env!("LUMIERE_PERSISTENT_PLATFORM_OPERATOR")
+        .and_then(|raw| PersistentPlatformOperatorPolicy::parse(raw).ok())
+        .is_some_and(|policy| is_persistent_operator_with_policy(ctx, &policy))
+}
+
+/// Internal persisted-test seam; enrollment probes alone are not authority:
+/// a disabled bootstrap is eligible for recovery but must never authorize.
+pub(crate) fn is_persistent_operator_with_policy(
+    ctx: &ReducerContext,
+    policy: &PersistentPlatformOperatorPolicy,
+) -> bool {
+    ctx.db.user_profile().iter().any(|p| {
+        p.identity == ctx.sender()
+            && p.is_active
+            && p.is_superuser
+            && p.metadata.as_deref().is_some_and(|raw| {
+                serde_json::from_str::<serde_json::Value>(raw)
+                    .ok()
+                    .is_some_and(|value| {
+                        value[PERSISTENT_PLATFORM_OPERATOR_METADATA_KEY].is_object()
+                    })
+            })
+    }) && enroll_with_policy(ctx, false, policy).is_ok()
+}
+
 /// Crate-only seam for persisted test scenarios; no runtime policy reducer exists.
 pub(crate) fn enroll_with_policy(
     ctx: &ReducerContext,
