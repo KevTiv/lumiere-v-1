@@ -310,6 +310,13 @@ jobs:
       - name: ai-gateway unit tests
         run: cargo test --locked -p ai-gateway --bin gateway
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: AI gateway web wire contract
+        run: python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --bin gateway wire_contract_tests -- --ignored
+
   contracts-module:
     name: Contracts module
     needs: scope

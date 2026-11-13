@@ -36,7 +36,6 @@ import {
   DialogTitle,
 } from "@lumiere/ui/components/dialog"
 import { NativeSkillVersionForm } from "./native-skill-version-form"
-import { nextSkillVersion } from "./native-skill-validation"
 import {
   Select,
   SelectContent,
@@ -370,7 +369,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
             {selectedSkill ? <NativeSkillVersionForm
               key={`${organizationId}:${effectiveSkillId}:${skillVersions.map((version) => version.version).join(",")}`}
               skillKey={selectedSkill.skill_key}
-              initialVersion={nextSkillVersion(skillVersions.map((version) => version.version))}
+              existingVersions={skillVersions.map((version) => version.version)}
               pending={createVersion.isPending}
               onCreate={(manifestJson, reviewNotes, metadata) => createVersion.mutateAsync({
                 skillId: BigInt(effectiveSkillId), manifestJson, reviewNotes, metadata,

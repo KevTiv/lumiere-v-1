@@ -4,11 +4,11 @@ import { useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { apiFetch } from "@lumiere/query-hooks/http"
 import { Button, Input } from "@lumiere/ui"
-import { nativeVersionManifest, type NativeSkillBinding, type NativeSkillBindings } from "./native-skill-validation"
+import { nativeVersionManifest, nextSkillVersion, type NativeSkillBinding, type NativeSkillBindings } from "./native-skill-validation"
 
 interface Props {
   skillKey: string
-  initialVersion: string
+  existingVersions: Array<string | undefined>
   pending: boolean
   onCreate: (manifestJson: string, reviewNotes: string, metadata: string) => Promise<void>
 }
@@ -23,13 +23,18 @@ async function currentBinding(skillKey: string) {
   return { binding, runtimeHash: result.runtimeHash }
 }
 
-export function NativeSkillVersionForm({ skillKey, initialVersion, pending, onCreate }: Props) {
+export function NativeSkillVersionForm({ skillKey, existingVersions, pending, onCreate }: Props) {
   const { t } = useTranslation()
-  const [version, setVersion] = useState(initialVersion)
+  const [editedVersion, setEditedVersion] = useState<string | null>(null)
   const [note, setNote] = useState("")
-  const [prepared, setPrepared] = useState<{ binding: NativeSkillBinding; runtimeHash: string } | null>(null)
+  const [prepared, setPrepared] = useState<{
+    binding: NativeSkillBinding
+    runtimeHash: string
+    version: string
+  } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const version = editedVersion ?? prepared?.version ?? nextSkillVersion(existingVersions)
   const label = (key: string, defaultValue: string) => t(`aiSkills.registry.validation.${key}`, { defaultValue })
 
   async function prepare() {
@@ -38,8 +43,9 @@ export function NativeSkillVersionForm({ skillKey, initialVersion, pending, onCr
     setPrepared(null)
     try {
       const current = await currentBinding(skillKey)
-      nativeVersionManifest(current.binding, version)
-      setPrepared(current)
+      const candidateVersion = editedVersion ?? nextSkillVersion(existingVersions, current.binding.manifest.version)
+      nativeVersionManifest(current.binding, candidateVersion)
+      setPrepared({ ...current, version: candidateVersion })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
@@ -77,8 +83,9 @@ export function NativeSkillVersionForm({ skillKey, initialVersion, pending, onCr
         <span>{label("version", "Skill version")}</span>
         <Input
           value={version}
+          disabled={loading || pending}
           onChange={(event) => {
-            setVersion(event.target.value)
+            setEditedVersion(event.target.value)
             setPrepared(null)
           }}
         />

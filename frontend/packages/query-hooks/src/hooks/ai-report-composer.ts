@@ -8,6 +8,7 @@ import type {
 } from "@lumiere/erp-shared/ai-report-composer-schemas"
 
 import { apiFetch } from "../http"
+import { parseReportComposerResult } from "./ai-green-skill-results"
 
 export type { ReportComposerInput, ReportComposerResult }
 
@@ -22,7 +23,7 @@ export function useAiReportComposer() {
         body: JSON.stringify(input),
       })
       if (!r.ok) throw new Error(await parseAiError(r))
-      return (await r.json()) as ReportComposerResult
+      return parseReportComposerResult(await r.json())
     },
   })
 }

@@ -47,9 +47,10 @@ Generation source activation is a separate gate from contracts publication:
    certificate or turn a synthetic fixture result into live provider evidence.
 3. The persistent-operator release changes shared authentication source: current
    chat/form/action adapters use `1.0.1` and the five Finance reviews use
-   `1.0.5`. Report analysis remains `1.0.10`; low-stock/report composition remain
-   `1.0.1`. Discover exact hashes and independently re-certify affected enabled
-   surfaces against this build before advertising availability. Never overwrite
+   `1.0.5`. Report analysis remains `1.0.10`. The protected-output fixes move
+   Low Stock and Report Composer to `1.0.2`. Discover exact hashes and independently
+   re-certify affected enabled surfaces against this build before advertising
+   availability. Never overwrite
    an earlier immutable version to reuse its certificate.
 4. RAG certification requires an immutable ordered `accessTranscript` of exact
    scoped grant and passage reads, including both release-time rechecks.
