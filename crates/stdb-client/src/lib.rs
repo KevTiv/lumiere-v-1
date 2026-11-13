@@ -44,7 +44,7 @@ impl StdbClientError {
     pub fn response_body(&self) -> Option<&str> {
         match self {
             Self::Http(_, body) => Some(body),
-            Self::Parse(_) => None,
+            Self::Parse(_) | Self::QueryByteLimit => None,
         }
     }
 }
