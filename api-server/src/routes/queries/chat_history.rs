@@ -258,11 +258,11 @@ async fn search_sessions(
         .chat_sessions_page(org, company, actor, archived, module, before_session, 1)
         .await
         .map_err(ApiError::internal)?;
+    let next_session = page.next_cursor.map(Cursor::Before);
     let Some(mut session) = page.rows.into_iter().next() else {
-        return Ok((Vec::new(), None));
+        return Ok((Vec::new(), next_session));
     };
     let id = chat_row_id(&session).map_err(ApiError::internal)?;
-    let next_session = page.next_cursor.map(Cursor::Before);
     let query = search.to_lowercase();
     if let Some(snippet) = session
         .get("title")

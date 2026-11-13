@@ -16,6 +16,7 @@ const SESSION_PREVIEW_COLUMNS: &str =
     "id, organization_id, company_id, session_key, archived, create_date, write_date";
 const MAX_CONTEXT_BYTES: usize = 512 * 1024;
 const MAX_PAGE_ROWS: usize = 64;
+const MODULE_SESSION_SCAN_ROWS: usize = 30;
 const MAX_SEEK_QUERIES: usize = 256;
 const PAYLOAD_BATCH_ROWS: usize = 8;
 const MAX_BATCH_BYTES: usize = 512 * 1024;
@@ -324,20 +325,34 @@ impl StdbClient {
             (1..MAX_PAGE_ROWS).contains(&limit),
             "invalid chat history limit"
         );
-        let mut scope = format!(
+        ensure!(module.is_none_or(valid_chat_key), "invalid chat module");
+        let scope = format!(
             "{} AND archived = {archived}",
             actor_scope(org, company, actor, "create_uid")?
         );
-        if let Some(module) = module {
-            ensure!(valid_chat_key(module), "invalid chat module");
-            scope.push_str(&format!(" AND module = '{module}'"));
-        }
         let high = before.map_or(u64::MAX, |id| id.saturating_sub(1));
-        let mut ids = select_ids(self, "ai_chat_session", &scope, 1, high, limit + 1, true).await?;
-        let remaining = ids.len() > limit;
-        ids.truncate(limit);
+        // A module is a SATS Option<String>. Native SQL cannot compare it to
+        // a text literal. Read one bounded page and filter the decoded rows.
+        // A filtered page can be empty while older IDs remain.
+        let scan_limit = if module.is_some() {
+            limit.max(MODULE_SESSION_SCAN_ROWS)
+        } else {
+            limit
+        };
+        let mut ids = select_ids(
+            self,
+            "ai_chat_session",
+            &scope,
+            1,
+            high,
+            scan_limit + 1,
+            true,
+        )
+        .await?;
+        let remaining = ids.len() > scan_limit;
+        ids.truncate(scan_limit);
         let selected = ids.len();
-        let rows = read_ids(
+        let mut rows = read_ids(
             self,
             "ai_chat_session",
             SESSION_COLUMNS,
@@ -346,7 +361,14 @@ impl StdbClient {
             MAX_PAGE_BYTES,
         )
         .await?;
-        let next_cursor = newest_page_cursor(&rows, selected, remaining)?;
+        let mut next_cursor = newest_page_cursor(&rows, selected, remaining)?;
+        if let Some(module) = module {
+            rows.retain(|row| row.get("module").and_then(Value::as_str) == Some(module));
+            if rows.len() > limit {
+                rows.truncate(limit);
+                next_cursor = rows.last().map(chat_row_id).transpose()?;
+            }
+        }
         Ok(ChatMessagePage { rows, next_cursor })
     }
 
@@ -540,6 +562,80 @@ mod tests {
             .unwrap()
             .parse()
             .unwrap()
+    }
+
+    #[tokio::test]
+    async fn module_filter_reads_native_options_and_keeps_skipped_page_cursor() {
+        let app = Router::new().route(
+            "/v1/database/test/sql",
+            post(|sql: String| async move {
+                assert!(!sql.contains("module ="), "{sql}");
+                assert!(sql.contains("company_id = 4 AND create_uid = 0x"), "{sql}");
+                assert!(sql.contains("AND archived = false"), "{sql}");
+                let limit = number_after(&sql, "LIMIT ") as usize;
+                let id_field = json!({ "name": { "some": "id" }, "algebraic_type": { "U64": [] } });
+                let (columns, rows) = if sql.starts_with("SELECT id FROM") {
+                    let low = number_after(&sql, "id >= ");
+                    let high = number_after(&sql, "id <= ");
+                    let rows = (1..=32)
+                        .filter(|id| (low..=high).contains(id))
+                        .take(limit)
+                        .map(|id| json!([id]))
+                        .collect::<Vec<_>>();
+                    (vec![id_field], rows)
+                } else {
+                    let fields = vec![
+                        id_field,
+                        json!({
+                            "name": { "some": "module" },
+                            "algebraic_type": { "Sum": { "variants": [
+                                { "name": { "some": "some" }, "algebraic_type": { "String": [] } },
+                                { "name": { "some": "none" }, "algebraic_type": { "Product": { "elements": [] } } }
+                            ] } }
+                        }),
+                    ];
+                    let rows = (1..=32)
+                        .filter(|id| {
+                            sql.contains(&format!("id = {id})"))
+                                || sql.contains(&format!("id = {id} OR"))
+                                || sql.contains(&format!("id = {id} LIMIT"))
+                        })
+                        .take(limit)
+                        .map(|id| {
+                            let module = if id <= 2 { json!([0, "products"]) } else { json!([1, []]) };
+                            json!([id, module])
+                        })
+                        .collect::<Vec<_>>();
+                    (fields, rows)
+                };
+                axum::Json(json!([{ "schema": { "elements": columns }, "rows": rows }]))
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let client = StdbClient::new(format!("http://{address}"), "test".into(), "owner".into());
+        let actor = "ab".repeat(32);
+        let first = client
+            .chat_sessions_page(1, 4, &actor, false, Some("products"), None, 1)
+            .await
+            .unwrap();
+        assert!(first.rows.is_empty());
+        assert_eq!(first.next_cursor, Some(3));
+        let second = client
+            .chat_sessions_page(1, 4, &actor, false, Some("products"), first.next_cursor, 1)
+            .await
+            .unwrap();
+        assert_eq!(second.rows[0]["id"], 2);
+        assert_eq!(second.rows[0]["module"], "products");
+        assert_eq!(second.next_cursor, Some(2));
+        let third = client
+            .chat_sessions_page(1, 4, &actor, false, Some("products"), second.next_cursor, 1)
+            .await
+            .unwrap();
+        assert_eq!(third.rows[0]["id"], 1);
+        assert_eq!(third.next_cursor, None);
+        server.abort();
     }
 
     #[test]

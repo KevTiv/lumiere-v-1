@@ -484,8 +484,12 @@ async function main() {
   report.seedMs = Math.round(performance.now() - seedStarted)
   const originalMessage = await collectHistory(admin, companyId, sessionKey)
 
-  const found = await query(admin, "ai-chat-sessions", { companyId, module: "products", search: recentMarker })
+  const newerWarehouseKey = `${sessionKey}-warehouse-unrelated`
+  await createThread(admin, companyId, newerWarehouseKey, recentMarker, "warehouse")
+  const matches = { companyId, module: "products", search: recentMarker }
+  const found = await query(admin, "ai-chat-sessions", matches)
   assert.ok(found.value.data.some((row) => (row.sessionKey ?? row.session_key) === sessionKey))
+  assert.ok(found.value.data.every((row) => (row.sessionKey ?? row.session_key) !== newerWarehouseKey))
   const denied = await query(reader, "ai-chat-messages", { companyId, sessionKey }, [200, 403, 404])
   assert.equal(denied.value?.data?.length ?? 0, 0, "Another actor must not read this transcript")
   await operation(reader, "archive_ai_chat_session", { companyId, sessionKey, archived: true }, [403, 404, 422])
@@ -520,7 +524,7 @@ async function main() {
 
   for (let cycle = 0; cycle < repeats; cycle++) {
     const [search, transcript, ...contexts] = await Promise.all([
-      query(admin, "ai-chat-sessions", { companyId, module: "products", search: recentMarker }),
+      query(admin, "ai-chat-sessions", matches),
       query(admin, "ai-chat-messages", { companyId, sessionKey, limit: "30" }),
       ...Array.from({ length: concurrency }, () => getContext(env, admin, companyId, sessionKey, [200, 429, 503])),
     ])
