@@ -9,6 +9,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 
 import type { AiUiContext } from "../ai-ui-context"
 import { apiFetch } from "../http"
+import { callStdbOperation } from "./stdb"
 
 export type { AiUiContext } from "../ai-ui-context"
 
@@ -310,14 +311,13 @@ export function useUpdateAiChatSession(scope: AiChatReadScope) {
     mutationFn: async (change: { sessionKey: string } & ({ archived: boolean } | { title: string })) => {
       const { companyId } = scope
       if (companyId == null || companyId <= 0) throw new Error("companyId is required")
-      const { urlPath, init } = "archived" in change
-        ? stdbBffCommandPost("archive_ai_chat_session", { companyId, sessionKey: change.sessionKey, archived: change.archived })
-        : stdbBffCommandPost("update_ai_chat_session_title", {
+      const response = await ("archived" in change
+        ? callStdbOperation("archive_ai_chat_session", { companyId, sessionKey: change.sessionKey, archived: change.archived })
+        : callStdbOperation("update_ai_chat_session_title", {
             companyId,
             sessionKey: change.sessionKey,
             params: stdbParamsToJson({ title: { some: change.title } }, "UpdateAiChatSessionTitleParams"),
-          })
-      const response = await apiFetch(urlPath, init)
+          }))
       if (!response.ok) throw await httpResponseError(response)
     },
     onSuccess: async () => {
