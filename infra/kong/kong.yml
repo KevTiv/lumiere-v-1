@@ -353,6 +353,18 @@ services:
         methods: [POST]
         regex_priority: 10
         strip_path: false
+      - name: web-ai-alpha-chat-history
+        paths:
+          - '~/api/ai/chat/(?:decisions|widget-receipts)$'
+        methods: [GET, POST]
+        regex_priority: 10
+        strip_path: false
+      - name: web-ai-alpha-chat-reference-resolution
+        paths:
+          - '~/api/ai/chat/references/resolve$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
       - name: web-ai-alpha-document-evidence
         paths:
           - '~/api/ai/evidence/ingestion/documents(?:/lifecycle)?$'
