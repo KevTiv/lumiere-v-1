@@ -175,6 +175,29 @@ test("untrusted, malformed or unauthorized page scope cannot cause widget discov
   assert.deepEqual(requests, [])
 })
 
+test("all privileged Alpha action offers satisfy the Gateway identifier and count limits", () => {
+  const offers = uiActions.serverRagUiActionOffers(
+    {
+      ...session,
+      fieldAccess: { ...session.fieldAccess!, isSuperuser: true },
+    },
+    { moduleId: "overview", pageId: "dashboard", widgets: [] },
+  )
+  const keys = offers.map((offer) => offer.capability_key)
+  const identifier = /^[a-z][a-z0-9_.]{0,159}$/
+
+  assert.ok(offers.length <= 128)
+  assert.equal(new Set(keys).size, keys.length)
+  for (const offer of offers) {
+    assert.match(offer.capability_key, identifier)
+    if (offer.entity_type) assert.match(offer.entity_type, identifier)
+  }
+  assert.ok(keys.includes("accounting.overdue_invoices.navigate"))
+  assert.ok(keys.includes("accounting.draft_bills.navigate"))
+  assert.ok(keys.includes("warehouse.low_stock.navigate"))
+  assert.ok(keys.includes("overview.widget.add"))
+})
+
 test("empty, denied and unavailable saved-widget reads preserve bare edit and add actions", async () => {
   const reads: Array<() => Promise<QueryResourceState<unknown>>> = [
     async () => ({ status: "empty", rows: [] }),

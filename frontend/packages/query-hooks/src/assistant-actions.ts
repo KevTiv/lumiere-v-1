@@ -478,9 +478,9 @@ const SURFACES: readonly AssistantSurface[] = [
   ...ASSISTANT_SUPPORT_SURFACES,
 ]
 const OWNER_QUEUE_ACTIONS = [
-  { key: "accounting.overdue-invoices.navigate", queue: "overdueInvoices", aliases: ["overdue invoices", "overdue customer balances"], label: "Open overdue invoices", module: "accounting", resource: "account_move" },
-  { key: "accounting.draft-bills.navigate", queue: "draftBills", aliases: ["draft bills", "draft vendor bills"], label: "Open draft vendor bills", module: "accounting", resource: "account_move" },
-  { key: "warehouse.low-stock.navigate", queue: "lowStockProducts", aliases: ["low stock", "low stock alerts", "low-stock alerts"], label: "Open low-stock alerts", module: "warehouse", resource: "module:inventory" },
+  { key: "accounting.overdue_invoices.navigate", queue: "overdueInvoices", aliases: ["overdue invoices", "overdue customer balances"], label: "Open overdue invoices", module: "accounting", resource: "account_move" },
+  { key: "accounting.draft_bills.navigate", queue: "draftBills", aliases: ["draft bills", "draft vendor bills"], label: "Open draft vendor bills", module: "accounting", resource: "account_move" },
+  { key: "warehouse.low_stock.navigate", queue: "lowStockProducts", aliases: ["low stock", "low stock alerts", "low-stock alerts"], label: "Open low-stock alerts", module: "warehouse", resource: "module:inventory" },
 ] as const satisfies readonly { key: string; queue: OwnerQueue; aliases: readonly string[]; label: string; module: AssistantSurface; resource: string }[]
 
 const capabilities: AssistantCapability[] = SURFACES.map((module) => ({
