@@ -3,6 +3,8 @@
 use serde_json::Value;
 use stdb_client::StdbClient;
 
+use crate::wire_decode::{row_u64, snake_to_camel};
+
 use super::{
     daily_briefing, distributor_controls, governed_llm_skills, import_mapping, insights_scan,
     low_stock,

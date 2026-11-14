@@ -557,17 +557,7 @@ mod tests {
                 !statement.contains("is_default"),
                 "company binding must win"
             );
-            let rows = if case == "unprovisioned" && statement.contains("FROM ai_skill ") {
-                vec![]
-            } else if let Some(rows) =
-                crate::orchestrator::skill_loader::tests::generation_source_rows(
-                    &statement,
-                    "rag_generation",
-                    "active",
-                )
-            {
-                rows
-            } else if statement.contains("FROM ai_skill_config ") {
+            let rows = if statement.contains("FROM ai_skill_config ") {
                 vec![json!({
                     "id": 7, "company_id": 3, "is_enabled": case != "disabled",
                     "config_json": "{\"defaultAgentId\":42}"
@@ -577,7 +567,9 @@ mod tests {
                 if case == "unprovisioned" {
                     vec![]
                 } else {
-                    vec![json!({ "id": 8, "skill_key": "rag_generation" })]
+                    vec![json!({
+                        "id": 8, "skill_key": "rag_generation", "organization_id": 1, "is_active": true
+                    })]
                 }
             } else if statement.contains("FROM ai_team_member ") {
                 vec![json!({ "id": 9, "ai_agent_id": 55 })]
