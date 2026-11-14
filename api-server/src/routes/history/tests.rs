@@ -70,6 +70,7 @@ pub(super) fn request(cursor: Option<String>, limit: u32) -> HistoryQuery {
         company_id: 7,
         cursor,
         limit: Some(limit),
+        event_id: None,
     }
 }
 
@@ -467,7 +468,10 @@ pub(super) async fn server(
                 {
                     assert!(sql.contains("resource = 'hr_expense_sheet'"));
                 }
-                assert!(sql.contains("record_id = 9"));
+                let exact = bound(&sql, " AND id <= ")
+                    .zip(bound(&sql, " AND id > "))
+                    .is_some_and(|(end, after)| end.saturating_sub(after) == 1);
+                assert!(exact || sql.contains("record_id = 9"));
                 assert!(!sql.contains("audit_log"));
                 fixture.evidence_read.store(true, Ordering::SeqCst);
                 let after = bound(&sql, " AND id > ").unwrap();

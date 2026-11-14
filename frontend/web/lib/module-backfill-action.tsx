@@ -3,7 +3,13 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
-import { moduleBackfillHref, type BackfillModule } from "./module-backfill-navigation"
+import { useTranslation } from "@lumiere/i18n"
+import {
+  isModuleBackfillRecordId,
+  moduleBackfillHref,
+  moduleBackfillRecordHref,
+  type BackfillModule,
+} from "./module-backfill-navigation"
 import { apiFetch } from "./api-fetch"
 import type { ReviewDetail, ReviewRow } from "./import-review-model"
 
@@ -111,6 +117,7 @@ function BackfillAction({
   module: BackfillModule
   disabled: boolean
 }) {
+  const { t } = useTranslation()
   const cache = useQueryClient()
   const [overrides, setOverrides] = useState<Record<string, string>>({})
   const [showMatches, setShowMatches] = useState(false)
@@ -208,10 +215,28 @@ function BackfillAction({
     )?.results.filter(
       (row) => row.status === "held" || row.status === "conflict",
     ) ?? []
-  const matched =
-    write.data?.results.filter((row) => row.status === "matched").length ?? 0
-  const saved =
-    write.data?.results.filter((row) => row.status === "saved").length ?? 0
+  const results = write.variables === false ? write.data?.results ?? [] : []
+  const matched = results.filter((row) => row.status === "matched").length
+  const saved = results.filter((row) => row.status === "saved").length
+  const recordLinks = results.flatMap((row) => {
+    if (
+      (row.status !== "saved" && row.status !== "matched") ||
+      !isModuleBackfillRecordId(row.recordId)
+    )
+      return []
+    return [
+      {
+        itemId: row.itemId,
+        label: items.find((item) => item.id === row.itemId)?.source.label,
+        // A matched record may have been stored by an earlier import.
+        href: moduleBackfillRecordHref(module, {
+          companyId,
+          recordId: row.recordId,
+          taskId: row.status === "saved" ? taskId : undefined,
+        }),
+      },
+    ]
+  })
   return (
     <div className="space-y-2 rounded-lg border p-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
@@ -303,6 +328,17 @@ function BackfillAction({
           {saved} saved · {matched} matched existing records · {held.length}{" "}
           need attention
         </p>
+      ) : null}
+      {recordLinks.length ? (
+        <ul className="max-h-60 list-disc space-y-1 overflow-y-auto pl-5">
+          {recordLinks.map(({ itemId, label, href }) => (
+            <li key={itemId}>
+              <a className="underline underline-offset-4" href={href}>
+                {label ?? t("moduleRecords.recordHistory")}
+              </a>
+            </li>
+          ))}
+        </ul>
       ) : null}
       {held.length ? (
         <ul className="list-disc pl-5">

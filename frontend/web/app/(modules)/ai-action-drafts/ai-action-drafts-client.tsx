@@ -177,6 +177,7 @@ function AiActionDraftsLoaded({ organizationId }: { organizationId: number }) {
                 draft_id: nextDraft.draftId,
               })
               patchDraft(nextDraft.draftId, observed)
+              return observed
             }}
             onReject={async (nextDraft, reason) => {
               const observed = await rejectDraft.mutateAsync({
@@ -185,6 +186,7 @@ function AiActionDraftsLoaded({ organizationId }: { organizationId: number }) {
                 companyId: nextDraft.companyId ?? draft.companyId,
               })
               patchDraft(nextDraft.draftId, observed)
+              return observed
             }}
             onUpdateDraft={async (nextDraft) => {
               const observed = await updateDraft.mutateAsync({
@@ -194,6 +196,7 @@ function AiActionDraftsLoaded({ organizationId }: { organizationId: number }) {
                 companyId: nextDraft.companyId ?? draft.companyId,
               })
               patchDraft(nextDraft.draftId, observed)
+              return observed
             }}
           />
           </div>

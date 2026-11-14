@@ -16,6 +16,7 @@ import {
 import { useErpSession } from "@lumiere/erp-session"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useTranslation } from "@lumiere/i18n"
+import { HistoryFieldDiff } from "@lumiere/ui/entity-views/history-field-diff"
 import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
 import { resolveIdentityLabel } from "@lumiere/ui/lib/identity-label"
 import { Button } from "@/components/ui/button"
@@ -54,6 +55,7 @@ import {
   type ProductReviewReference,
 } from "./import-review-product-references"
 import {
+  canUndoReviewDecision,
   confirmedReviewFields,
   reviewIssueGroups,
   undoReviewDecision,
@@ -64,6 +66,7 @@ import {
 import { ImportReviewEditor, ReviewRequestError } from "./import-review-editor"
 import { ImportReviewBulk } from "./import-review-bulk"
 import { ModuleBackfillAction } from "./module-backfill-action"
+import { reviewDecisionDiff, reviewSourceDate, reviewSourceLabel } from "./import-review-decision-diff"
 import { ImportReviewDecisionSummary } from "./import-review-decision-summary"
 import { resetHistoryQueries } from "./history-data"
 import { sourceHistoryLink } from "./source-observation"
@@ -333,8 +336,6 @@ function ReviewWorkspace({
   const currentPage = Math.min(page, pages - 1)
   const visible = matching.slice(currentPage * 50, currentPage * 50 + 50)
   const unavailable = busy || locked || uncertainUndo
-  const sourceLabel = (item: ReviewRow) =>
-    `${item.source.source.file} · ${t(item.source.source.rowBasis === "import_row" ? "settings.importReview.importRow" : "settings.importReview.sourceLine", { row: item.source.source.row })}`
   const chooseBatch = (id: string) => {
     requireCurrentScope()
     if (allowedReviewIds && !allowedReviewIds.includes(id)) return
@@ -883,7 +884,7 @@ function ReviewWorkspace({
                       />
                     </TableCell>
                     <TableCell>{item.source.label}</TableCell>
-                    <TableCell>{sourceLabel(item)}</TableCell>
+                    <TableCell>{reviewSourceLabel(item, t)}</TableCell>
                     <TableCell className="max-w-sm whitespace-normal">
                       {item.source.issue}
                     </TableCell>
@@ -979,23 +980,77 @@ function ReviewWorkspace({
             {history.error ? <p role="alert">{history.error.message}</p> : null}
             {pinnedReview && history.isPending ? <p role="status">{t("businessHistory.savedReviewLoading")}</p> : null}
             {pinnedReview && !history.isPending && !history.error && !pinnedEntry ? <p role="status">{t("businessHistory.savedReviewUnavailable")}</p> : null}
-            <ul className="mt-2 flex flex-col gap-2 text-sm">
+            <ul className="mt-2 flex flex-col gap-3 text-sm">
               {historyEntries.map((entry) => {
-                const item = detail.data.items.find(
-                  (item) => item.id === entry.itemId,
+                const item = detail.data.items.find((item) => item.id === entry.itemId)
+                const fields = reviewDecisionDiff(
+                  {
+                    values: entry.previousValues,
+                    confirmedFields: entry.previousConfirmedFields,
+                    state: entry.previousState,
+                  },
+                  entry,
+                  item?.source.fields ?? [],
+                  t,
                 )
+                const changedFields = new Set(fields.map(({ id }) => id))
+                const savedValues = pinnedReview
+                  ? Object.entries(entry.values).filter(([key]) => !changedFields.has(`value:${key}`))
+                  : []
                 return (
                   <li
-                    className="flex flex-wrap items-center gap-2"
+                    className="min-w-0 space-y-2 rounded-lg border p-3"
                     key={`${entry.itemId}:${entry.revision}`}
                   >
-                    <span>
-                      {pinnedReview ? `${t("businessHistory.reviewReference", { item: entry.itemId, revision: entry.revision })} · ` : ""}
-                      {item?.source.label} · {entry.createdAt} ·{" "}
-                      {resolveIdentityLabel(entry.actor, identityLabels)} ·{" "}
-                      {entry.reason}
-                    </span>
-                    {pinnedReview && <dl className="w-full space-y-2 rounded border p-3">{Object.entries(entry.values).map(([field, value]) => <div key={field} className="grid min-w-0 gap-1 sm:grid-cols-2"><dt className="break-words text-muted-foreground">{item?.source.fields.find((sourceField) => sourceField.key === field)?.label ?? field}</dt><dd className="whitespace-pre-wrap break-all">{value === null ? t("recordChanges.noValue") : value === "" ? t("recordChanges.emptyText") : value}</dd></div>)}</dl>}
+                    <details open={pinnedReview || historyId ? true : undefined}>
+                      <summary className="cursor-pointer break-words">
+                        <span className="font-medium">
+                          {t("businessHistory.reviewReference", { item: entry.itemId, revision: entry.revision })}
+                        </span>
+                        {item && <span className="text-muted-foreground"> · {item.source.label}</span>}
+                      </summary>
+                      <div className="mt-3 space-y-2">
+                        <p className="break-words text-muted-foreground">
+                          {item && <>{reviewSourceLabel(item, t)} · </>}
+                          <time dateTime={entry.createdAt}>{entry.createdAt}</time>
+                          {" · "}{resolveIdentityLabel(entry.actor, identityLabels)}
+                        </p>
+                        {item?.source.businessDate && (
+                          <p className="text-muted-foreground">
+                            {t("availableHistory.businessDate")}{" · "}{reviewSourceDate(item.source.businessDate, t)}
+                          </p>
+                        )}
+                        {entry.reason && (
+                          <p className="whitespace-pre-wrap break-words">
+                            <span className="font-medium">{t("settings.importReview.reason")}</span>{" · "}{entry.reason}
+                          </p>
+                        )}
+                        {fields.length > 0 ? (
+                          <HistoryFieldDiff fields={fields} />
+                        ) : (
+                          <p className="text-muted-foreground">
+                            {t("settings.importReview.grouped.noDecisionChanges")}
+                          </p>
+                        )}
+                        {savedValues.length > 0 && (
+                          <details>
+                            <summary className="cursor-pointer text-muted-foreground">
+                              {t("settings.importReview.grouped.reviewValues", { count: savedValues.length })}
+                            </summary>
+                            <dl className="mt-2 space-y-2">
+                              {savedValues.map(([key, value]) => (
+                                <div key={key} className="grid min-w-0 gap-1 sm:grid-cols-2">
+                                  <dt>{item?.source.fields.find((field) => field.key === key)?.label ?? key}</dt>
+                                  <dd className="whitespace-pre-wrap [overflow-wrap:anywhere]">
+                                    {value === null ? t("recordChanges.noValue") : value === "" ? t("recordChanges.emptyText") : value}
+                                  </dd>
+                                </div>
+                              ))}
+                            </dl>
+                          </details>
+                        )}
+                      </div>
+                    </details>
                     {historySource && referenceInChat && selectedId && detail.data.targetEntity === "product" && entry.state === "confirmed" && (
                       <Button type="button" variant="ghost" size="sm" onClick={() => referenceInChat({
                         kind: "import_mapping", ...historySource, batchId: selectedId,
@@ -1004,9 +1059,7 @@ function ReviewWorkspace({
                         {t("aiChat.history.useInNewChat", { defaultValue: "Use in new chat" })}
                       </Button>
                     )}
-                    {!pinnedReview && item &&
-                    entry.previousValues &&
-                    item.revision === entry.revision ? (
+                    {!pinnedReview && item && canUndoReviewDecision(item, entry) ? (
                       <Button
                         variant="outline"
                         size="sm"

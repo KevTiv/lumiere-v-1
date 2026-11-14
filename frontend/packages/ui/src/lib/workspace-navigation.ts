@@ -60,6 +60,7 @@ export function moduleTabHref(pathname: string, search: string, tabId: string, d
   params.delete("ownerQueue")
   params.delete("backfillTask")
   params.delete("backfillCompany")
+  params.delete("backfillRecord")
   if (tabId === defaultTab) params.delete("tab")
   else params.set("tab", tabId)
   const query = params.toString()

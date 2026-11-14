@@ -95,6 +95,58 @@ fn closed_alpha_adapters_use_existing_registry_owners() {
 }
 
 #[test]
+fn inventory_activity_reuses_canonical_sources_without_duplicating_overview() {
+    let inventory = activity_adapters("inventory");
+    let all = activity_adapters("overview");
+    let shared_tables: HashSet<_> = activity_adapters("products")
+        .into_iter()
+        .chain(activity_adapters("warehouse"))
+        .map(|adapter| adapter.table)
+        .collect();
+
+    assert!(shared_tables.contains("product"));
+    assert!(shared_tables.contains("stock_picking"));
+    assert_eq!(inventory.len(), shared_tables.len());
+    for source in inventory {
+        assert!(shared_tables.contains(source.table));
+        assert_eq!(
+            record_adapter(source.resource).unwrap().module,
+            source.module
+        );
+        assert_eq!(
+            all.iter()
+                .filter(|other| other.table == source.table)
+                .count(),
+            1,
+            "{}",
+            source.table
+        );
+    }
+    assert!(activity_adapters("inventory-extra").is_empty());
+}
+
+#[test]
+fn inventory_activity_uses_independent_product_and_warehouse_read_permissions() {
+    let inventory = activity_adapters("inventory");
+    let product = inventory
+        .iter()
+        .find(|source| source.table == "product")
+        .unwrap();
+    let transfer = inventory
+        .iter()
+        .find(|source| source.table == "stock_picking")
+        .unwrap();
+    let product_access = access(&["business_history:read", "product:read"], None);
+    let transfer_access = access(&["business_history:read", "stock_picking:read"], None);
+
+    assert!(visible_fields(&product_access, product).is_ok());
+    assert!(visible_fields(&product_access, transfer).is_err());
+    assert!(visible_fields(&transfer_access, transfer).is_ok());
+    assert!(visible_fields(&transfer_access, product).is_err());
+    assert!(visible_fields(&access(&["product:read"], None), product).is_err());
+}
+
+#[test]
 fn private_supporting_sources_use_their_owner_permissions_and_fail_closed_field_rules() {
     let task = record_adapter("workflow_human_task").unwrap();
     let context = access(&["business_history:read", "workflow:read"], None);
@@ -245,6 +297,7 @@ fn cursor_rejects_table_module_company_and_actor_reuse() {
         company_id: 7,
         cursor: Some("gh1.42.7.sale_order:9.actor.601.9".into()),
         limit: Some(20),
+        event_id: None,
     };
     assert_eq!(
         provider_positions(&query, "gh1.42.7.sale_order:9.actor.").unwrap(),
@@ -501,6 +554,56 @@ async fn generic_pagination_reaches_sparse_history_beyond_organization_latest_50
     }
     assert_eq!(ids, ["1", "601", "1000000000"]);
     assert!(cursor.is_none());
+}
+
+#[tokio::test]
+async fn exact_activity_reads_a_single_provider_without_scanning_older_events() {
+    use super::super::tests as fixture;
+    let mut public = evidence(json!([{"field":"name","before":"seed","after":"renamed"}]));
+    public["id"] = json!(1_000_000_000_u64);
+    public["resource"] = json!("product");
+    public["subject_resource"] = json!("product");
+    let mut organization = public.clone();
+    organization.as_object_mut().unwrap().remove("company_id");
+    organization["operation"] = json!("update_org_product");
+    let server = fixture::server(vec![public, organization], None, true, true, false).await;
+    let context = fixture::context(
+        &server,
+        fixture::access(&["business_history:read", "product:read"], None),
+    );
+    for (module, id, count) in [
+        ("inventory", "1000000000", 1),
+        ("inventory", "org:1000000000", 1),
+        ("inventory", "1000000001", 0),
+    ] {
+        let mut query = fixture::request(None, 1);
+        query.event_id = Some(id.into());
+        let page = read_general(
+            &server.owner,
+            &context,
+            &activity_adapters(module),
+            None,
+            Some(module),
+            &query,
+        )
+        .await
+        .unwrap();
+        assert_eq!(page.data.len(), count);
+        if let Some(event) = page.data.first() {
+            assert_eq!(event.entry.id, id);
+            assert_eq!(event.resource, "product");
+        }
+        assert!(page.next_cursor.is_none());
+    }
+    let mut query = fixture::request(Some("ignored".into()), 10);
+    query.event_id = Some("1000000000".into());
+    assert!(activity_event(&query, Some("inventory")).is_err());
+    query.cursor = None;
+    assert!(activity_event(&query, None).is_err());
+    for invalid in ["0", "org:0", "org:0001", "1 OR 1=1", "18446744073709551616"] {
+        query.event_id = Some(invalid.into());
+        assert!(activity_event(&query, Some("inventory")).is_err());
+    }
 }
 
 #[tokio::test]

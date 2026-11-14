@@ -80,6 +80,9 @@ export interface ChatActionDraftPayload {
   executionRecordId?: number | string | null
   executionRecordHref?: string
   expiresAt?: string | null
+  proposedAt?: string | null
+  reviewedAt?: string | null
+  executedAt?: string | null
   sourceQuery?: string | null
   companyId?: number
   workflowInstanceId?: number | string

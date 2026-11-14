@@ -839,6 +839,7 @@ function AIChatConversation({
       if (!config?.onApproveActionDraft) return
       const observed = await config.onApproveActionDraft(draft)
       if (observed) patchDraftInMessages(draft.draftId, observed)
+      return observed
     },
     [config, patchDraftInMessages],
   )
@@ -848,6 +849,7 @@ function AIChatConversation({
       if (!config?.onRejectActionDraft) return
       const observed = await config.onRejectActionDraft(draft, reason)
       if (observed) patchDraftInMessages(draft.draftId, observed)
+      return observed
     },
     [config, patchDraftInMessages],
   )
@@ -857,6 +859,7 @@ function AIChatConversation({
       if (!config?.onUpdateActionDraft) return
       const observed = await config.onUpdateActionDraft(draft)
       if (observed) patchDraftInMessages(draft.draftId, observed)
+      return observed
     },
     [config, patchDraftInMessages],
   )

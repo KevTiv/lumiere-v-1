@@ -225,6 +225,18 @@ pub(super) fn record_adapters() -> Vec<RecordAdapter> {
         .collect()
 }
 
+fn activity_adapters(module: &str) -> Vec<RecordAdapter> {
+    record_adapters()
+        .into_iter()
+        .filter(|adapter| match module {
+            "overview" => true,
+            "inventory" => matches!(adapter.module, "products" | "warehouse"),
+            "tasks" => adapter.module == module || adapter.table == "activity",
+            _ => adapter.module == module,
+        })
+        .collect()
+}
+
 fn permission_resource(adapter: &RecordAdapter) -> &str {
     // The existing private workflow source owner gates virtual human tasks on
     // workflow:read, then applies candidate, assignment and delegation scope.
@@ -716,6 +728,34 @@ fn provider_unavailable(error: ApiError) -> ApiError {
     }
 }
 
+#[derive(Clone, Copy)]
+struct ActivityEvent {
+    id: u64,
+    organization: bool,
+}
+
+fn activity_event(
+    query: &HistoryQuery,
+    module: Option<&str>,
+) -> Result<Option<ActivityEvent>, ApiError> {
+    let Some(value) = query.event_id.as_deref() else {
+        return Ok(None);
+    };
+    if module.is_none() || query.cursor.is_some() {
+        return Err(ApiError::BadRequest(
+            "An exact activity event cannot be combined with a record route or cursor".into(),
+        ));
+    }
+    let organization_id = value.strip_prefix("org:");
+    let id = decimal_id(organization_id.unwrap_or(value))
+        .filter(|id| *id > 0)
+        .ok_or_else(|| ApiError::BadRequest("Invalid activity event ID".into()))?;
+    Ok(Some(ActivityEvent {
+        id,
+        organization: organization_id.is_some(),
+    }))
+}
+
 async fn scan_provider(
     owner: &StdbClient,
     context: &TrustedOperationContext,
@@ -725,6 +765,7 @@ async fn scan_provider(
     organization: bool,
     mut after: u64,
     limit: usize,
+    exact: Option<ActivityEvent>,
     source_rows: &mut HashMap<&'static str, Vec<Value>>,
 ) -> Result<ProviderPage, ApiError> {
     let permitted = selection
@@ -732,7 +773,7 @@ async fn scan_provider(
         .copied()
         .filter(|adapter| !organization || organization_scope(adapter))
         .collect::<Vec<_>>();
-    if permitted.is_empty() {
+    if permitted.is_empty() || exact.is_some_and(|event| event.organization != organization) {
         return Ok(ProviderPage {
             entries: VecDeque::new(),
             after,
@@ -769,13 +810,18 @@ async fn scan_provider(
     let mut data = VecDeque::new();
     let mut probes = 0;
     'windows: for _ in 0..MAX_WINDOWS {
-        let Some(witness) = reader.witness(after, None).await? else {
-            break;
+        let end = if let Some(event) = exact {
+            after = event.id - 1;
+            event.id
+        } else {
+            let Some(witness) = reader.witness(after, None).await? else {
+                break;
+            };
+            reader
+                .seek_window_start(&mut after, witness, &mut probes)
+                .await?;
+            after.saturating_add(ID_WINDOW)
         };
-        reader
-            .seek_window_start(&mut after, witness, &mut probes)
-            .await?;
-        let end = after.saturating_add(ID_WINDOW);
         let mut rows = owner
             .query_sql(&reader.window_sql(&columns, after, end))
             .await
@@ -872,11 +918,11 @@ async fn scan_provider(
             }
         }
         after = end;
-        if after == u64::MAX {
+        if exact.is_some() || after == u64::MAX {
             break;
         }
     }
-    let more = reader.witness(after, None).await?.is_some();
+    let more = exact.is_none() && reader.witness(after, None).await?.is_some();
     Ok(ProviderPage {
         entries: data,
         after,
@@ -958,7 +1004,8 @@ async fn read_general(
     module: Option<&str>,
     query: &HistoryQuery,
 ) -> Result<GeneralPage, ApiError> {
-    let limit = query.validate(record.unwrap_or(1))?;
+    let limit = query.validate_page(record.unwrap_or(1))?;
+    let exact = activity_event(query, module)?;
     require_history_access(context.field_access())?;
     let org = context.organization_id();
     let company = query.company_id;
@@ -998,6 +1045,7 @@ async fn read_general(
         false,
         starts.0,
         limit,
+        exact,
         &mut source_rows,
     )
     .await
@@ -1011,6 +1059,7 @@ async fn read_general(
         true,
         starts.1,
         limit,
+        exact,
         &mut source_rows,
     )
     .await
@@ -1148,14 +1197,7 @@ pub(super) async fn activity_get(
     Query(query): Query<HistoryQuery>,
     OrgSession { session, .. }: OrgSession,
 ) -> Result<Json<GeneralPage>, ApiError> {
-    let selection = record_adapters()
-        .into_iter()
-        .filter(|adapter| {
-            module == "overview"
-                || adapter.module == module
-                || (module == "tasks" && adapter.table == "activity")
-        })
-        .collect::<Vec<_>>();
+    let selection = activity_adapters(&module);
     if selection.is_empty() {
         return Err(ApiError::NotFound("History module not available".into()));
     }

@@ -21,7 +21,17 @@
     "emptyCounts": "No counts have been saved.",
     "emptyFiltered": "No records match the selected dates or import.",
     "otherCompany": "Switch to the company used for this import to see its records.",
-    "loadError": "Could not load records."
+    "loadError": "Could not load records.",
+    "recordHistory": "View history",
+    "recordHistoryLabel": "View history for {{file}} row {{row}}",
+    "savedSale": "Saved customer sales summary",
+    "savedCount": "Saved physical count",
+    "recordUnavailable": "This saved record is unavailable in your current workspace.",
+    "sourceCustomer": "Source customer name",
+    "unit": "Source unit",
+    "currency": "Currency",
+    "savedAt": "Saved at",
+    "sourceRevision": "Revision {{revision}}"
   },
   "activation": {
     "tasks": {
@@ -76,6 +86,10 @@
     }
   },
   "recordChanges": {
+    "valueAbsent": "Field absent",
+    "valueRestricted": "Restricted",
+    "valueUnavailable": "Value not recorded",
+    "savedChange": "Saved change",
     "title": "Changes",
     "permission": "Business change history",
     "loading": "Loading changes…",
@@ -14236,6 +14250,12 @@
       }
     },
     "draft": {
+      "applied": "Applied",
+      "proposedValue": "Proposed value",
+      "beforeProposal": "Before proposal",
+      "proposedAt": "Proposed",
+      "reviewedAt": "Reviewed",
+      "appliedAt": "Applied",
       "title": "ERP action draft",
       "intent": {
         "createTask": "Create task",
@@ -16322,6 +16342,10 @@
       "referenceHint": "Choose from this organization. Enter quantities and prices for the chosen unit.",
       "importSetup": "Advanced import settings",
       "grouped": {
+        "rowStatus": "Row status",
+        "fieldConfirmation": "{{field}} confirmation",
+        "noDecisionChanges": "No captured values or review statuses changed.",
+        "proposedAfter": "After this decision",
         "unavailableValue": "{{value}} (unavailable)",
         "editor": "Review {{name}}",
         "independentFields": "Confirm each value you know. Unknown weight, original unit and cost can remain unresolved. Choosing a unit never changes quantities or prices.",
@@ -19334,6 +19358,9 @@
     }
   },
   "businessHistory": {
+    "allActivity": "All activity",
+    "openChange": "Open change",
+    "eventUnavailable": "This change is unavailable for the current company or your access.",
     "title": "History & sources",
     "changes": "Changes",
     "activity": "Activity",

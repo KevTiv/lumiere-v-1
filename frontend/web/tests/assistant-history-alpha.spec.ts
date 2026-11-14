@@ -1,5 +1,6 @@
 import { writeFile } from "node:fs/promises"
 
+import type { BusinessHistoryActivityPage } from "@lumiere/query-hooks/hooks/business-history-model"
 import { devices, expect, test, type Page } from "@playwright/test"
 import { buildNavGroups } from "@lumiere/ui/lib/navigation-catalog"
 import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
@@ -14,10 +15,70 @@ const alphaRoutes = buildNavGroups((key) => key, { workspaceProfile: profile })
   .flatMap(({ items }) => items)
   .map(({ surfaceId, href }) => ({ surfaceId, href }))
 
-async function openHistory(page: Page, route: string, mode: "side" | "full") {
-  const response = await page.goto(route, { waitUntil: "domcontentloaded" })
-  expect(response?.ok(), `Alpha route ${route} must load`).toBe(true)
-  await expect(page).toHaveURL((url) => url.pathname === route)
+async function openActivity(page: Page, module: string, companyId: string, checkEventLink: boolean) {
+  const requestPath = `/api/history/activity/${module}`
+  const [response] = await Promise.all([
+    page.waitForResponse(
+      (response) => response.request().method() === "GET" && new URL(response.url()).pathname === requestPath,
+    ),
+    page.getByTestId("module-history-open").click(),
+  ])
+  await expect(page).toHaveURL((url) => url.searchParams.get("history") === "activity")
+  expect(response.ok(), `${module} Activity must return the authorized company page`).toBe(true)
+  const history = (await response.json()) as BusinessHistoryActivityPage
+  expect(history).toMatchObject({ module, companyId, coverage: { status: "partial" } })
+
+  const dialog = page.getByRole("dialog", { name: "Activity", exact: true })
+  const changes = dialog.getByTestId("record-changes")
+  const coverage = changes.getByTestId("record-changes-coverage")
+  await expect(coverage.getByText("Partial history", { exact: false })).toBeVisible()
+  await coverage.locator("summary").click()
+  await expect(coverage.getByText(history.coverage.message, { exact: true })).toBeVisible()
+  await expect(changes.getByTestId("record-change-summary")).toHaveCount(history.data.length)
+  await expect(changes.getByTestId("record-changes-more")).toHaveCount(history.nextCursor ? 1 : 0)
+
+  const firstEvent = history.data[0]
+  if (firstEvent) {
+    const event = changes.getByTestId(`record-change-${firstEvent.id}`)
+    await expect(event.locator("time")).toHaveAttribute("datetime", firstEvent.occurredAt)
+    if (checkEventLink) {
+      const details = event.locator(":scope > details")
+      await details.locator(":scope > summary").click()
+      const [exactResponse] = await Promise.all([
+        page.waitForResponse((response) => {
+          const url = new URL(response.url())
+          return response.request().method() === "GET" &&
+            url.pathname === requestPath && url.searchParams.get("eventId") === firstEvent.id
+        }),
+        event.getByRole("link", { name: "Open change", exact: true }).click(),
+      ])
+      expect(exactResponse.ok(), "The saved event must resolve by exact identity").toBe(true)
+      expect(await exactResponse.json()).toMatchObject({ module, companyId, data: [firstEvent], nextCursor: null })
+      await expect(page).toHaveURL((url) =>
+        url.searchParams.get("history") === "activity" &&
+        url.searchParams.get("historyEvent") === firstEvent.id &&
+        url.searchParams.get("historyCompany") === companyId,
+      )
+      await expect(changes.getByTestId("record-change-summary")).toHaveCount(1)
+      await expect(details).toHaveAttribute("open", "")
+    }
+  } else {
+    await expect(changes.getByTestId("record-changes-empty")).toHaveText(
+      history.nextCursor
+        ? "No visible changes on this page. Continue to inspect the next page."
+        : "No captured changes are available for this record.",
+    )
+  }
+
+  await page.keyboard.press("Escape")
+  await expect(dialog).toBeHidden()
+  await expect(page).toHaveURL((url) =>
+    !["history", "historyEvent", "historyCompany"].some((param) => url.searchParams.has(param)),
+  )
+  return Boolean(firstEvent)
+}
+
+async function openAssistantHistory(page: Page, mode: "side" | "full") {
   await openErpAiChat(page)
   const assistant = page.getByTestId("erp-ai-chat-panel")
   if (mode === "full") {
@@ -30,20 +91,48 @@ async function openHistory(page: Page, route: string, mode: "side" | "full") {
   await expectNoAppError(page)
 }
 
-test("opens personal Assistant history across the complete Finance Alpha profile", async ({ page }, info) => {
+test("opens company Activity and personal Assistant history across Finance Alpha", async ({ page }, info) => {
   test.setTimeout(240_000)
+  const companyId = process.env.ASSISTANT_HISTORY_COMPANY
+  if (!companyId) throw new Error("Run with the seeded assistant-history CI fixture")
   expect(alphaRoutes).toContainEqual({ surfaceId: "inventory", href: "/inventory" })
   expect(new Set(alphaRoutes.map(({ surfaceId }) => surfaceId)).size).toBe(alphaRoutes.length)
   expect(isWorkspaceSurfaceVisible(profile, "ai-assistant")).toBe(true)
+  const anonymousActivity = await page.request.get(`/api/history/activity/overview?companyId=${companyId}`)
+  expect(anonymousActivity.status()).toBe(401)
   await signIn(page)
+
+  let checkedEventLink = false
   const visited: string[] = []
   for (const { surfaceId, href } of alphaRoutes) {
-    await test.step(surfaceId, () => openHistory(page, href, "side"))
+    await test.step(surfaceId, async () => {
+      const response = await page.goto(href, { waitUntil: "domcontentloaded" })
+      expect(response?.ok(), `Alpha route ${href} must load`).toBe(true)
+      await expect(page).toHaveURL((url) => url.pathname === href)
+      const hasEvent = await openActivity(page, surfaceId, companyId, !checkedEventLink)
+      if (hasEvent) checkedEventLink = true
+      await openAssistantHistory(page, "side")
+    })
     visited.push(surfaceId)
   }
-  await test.step("ai-assistant", () => openHistory(page, "/overview", "full"))
+  await test.step("ai-assistant", async () => {
+    await page.goto("/overview", { waitUntil: "domcontentloaded" })
+    await openAssistantHistory(page, "full")
+  })
   visited.push("ai-assistant")
   await writeFile(info.outputPath("alpha-history-surfaces.json"), JSON.stringify(visited))
+})
+
+test("denies Alpha Activity to a signed-in actor without history permission", async ({ request }) => {
+  const companyId = process.env.ASSISTANT_HISTORY_COMPANY
+  const password = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD
+  if (!companyId || !password) throw new Error("Run with the seeded assistant-history CI fixture")
+  const session = await request.post("/api/auth/signin", {
+    data: { email: "fixture.reader@example.test", password },
+  })
+  expect(session.ok(), "The limited reader fixture must sign in").toBe(true)
+  const activity = await request.get(`/api/history/activity/overview?companyId=${companyId}`)
+  expect(activity.status()).toBe(403)
 })
 
 async function readTransfer(page: Page, id: number) {
