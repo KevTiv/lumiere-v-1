@@ -49,6 +49,7 @@ function Fixture() {
     <section role="tabpanel" aria-label="Expense reports">
       <EntityTable config={{ mode: 'table', rowKey: 'id', rowSelectionToggleOnClick: false,
         searchable: true,
+        searchKeys: ['name'],
         columns: [
           {
             key: 'name',
