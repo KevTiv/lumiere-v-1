@@ -11,6 +11,7 @@ use crate::core::permissions::{
 use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::helpers::{resolve_permission, PermissionResolution};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
+use lumiere_policy_core::ai_skills::BUILTIN_SKILL_KEYS;
 use spacetimedb::{ReducerContext, Table};
 
 pub fn test_platform_defaults(ctx: &ReducerContext) -> Result<(), String> {
@@ -110,6 +111,30 @@ pub fn test_platform_defaults(ctx: &ReducerContext) -> Result<(), String> {
         created_at: ctx.timestamp,
     });
     set_ai_platform_default(ctx, Some(template.id))?;
+    let catalog_snapshot = || {
+        let mut rows: Vec<_> = ctx
+            .db
+            .ai_skill()
+            .ai_skill_by_org()
+            .filter(&0u64)
+            .filter(|row| BUILTIN_SKILL_KEYS.contains(&row.skill_key.as_str()))
+            .map(|row| (row.skill_key, row.id, row.is_active, row.is_system))
+            .collect();
+        rows.sort();
+        rows
+    };
+    let catalog = catalog_snapshot();
+    if !catalog
+        .iter()
+        .map(|(key, ..)| key.as_str())
+        .eq(BUILTIN_SKILL_KEYS.iter().copied())
+    {
+        return Err("platform default did not provision every built-in skill exactly once".into());
+    }
+    set_ai_platform_default(ctx, Some(template.id))?;
+    if catalog != catalog_snapshot() {
+        return Err("platform default reconciliation changed existing built-in rows".into());
+    }
     enroll_ai_company_defaults(ctx, first.organization_id, first.company_id)?;
     let enrollment = ctx
         .db

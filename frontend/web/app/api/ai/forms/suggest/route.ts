@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
     entity_type: entityType,
     fields,
     identity_hex: session.identityHex,
+    stdb_token: session.stdbToken,
   }
   if (rawText) gwPayload.raw_text = rawText
   if (documentJobId !== undefined) gwPayload.document_job_id = documentJobId

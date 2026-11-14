@@ -5,6 +5,7 @@
 //! then creates an immutable skill version. Certification and release remain the
 //! responsibility of the existing skill registry gates.
 
+use lumiere_policy_core::{ai_skills::is_builtin_skill, skill_projection::SkillProjection};
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
@@ -128,6 +129,11 @@ pub fn propose_ai_knowledge_skill_promotion(
     require_promotable_knowledge(ctx, &version)?;
 
     let manifest = validate_manifest(&params.manifest_json, params.skill_key.trim())?;
+    let projection = validate_promotion_executor(
+        organization_id,
+        params.skill_key.trim(),
+        &params.manifest_json,
+    )?;
     let lineage_hash = knowledge_lineage_hash(&version);
     if manifest.source_hash.trim_start_matches("sha256:") != lineage_hash {
         return Err(
@@ -136,6 +142,9 @@ pub fn propose_ai_knowledge_skill_promotion(
     }
     if let Some(skill_id) = params.skill_id {
         let skill = load_org_skill(ctx, organization_id, skill_id)?;
+        if projection && skill.is_system {
+            return Err("draft testing is only available for tenant-authored skills".into());
+        }
         if skill.skill_key != params.skill_key.trim() {
             return Err("existing skill key does not match the promotion skill_key".to_string());
         }
@@ -252,8 +261,18 @@ pub fn review_ai_knowledge_skill_promotion(
         return Err("knowledge lineage changed after promotion was proposed".to_string());
     }
     let manifest = validate_manifest(&row.manifest_json, &row.skill_key)?;
+    let projection =
+        validate_promotion_executor(organization_id, &row.skill_key, &row.manifest_json)?;
     let skill = match row.requested_skill_id {
-        Some(id) => load_org_skill(ctx, organization_id, id)?,
+        Some(id) => {
+            let skill = load_org_skill(ctx, organization_id, id)?;
+            if projection && (skill.is_system || skill.skill_key != row.skill_key) {
+                return Err(
+                    "draft testing is only available for the selected tenant-authored skill".into(),
+                );
+            }
+            skill
+        }
         None => create_candidate_skill(ctx, &row, &manifest)?,
     };
     let version_key = format!("{}:{}:{}", organization_id, skill.id, manifest.version);
@@ -298,6 +317,20 @@ pub fn review_ai_knowledge_skill_promotion(
         .update(row.clone());
     audit(ctx, &row, "REVIEW");
     Ok(())
+}
+
+fn validate_promotion_executor(
+    organization_id: u64,
+    skill_key: &str,
+    manifest_json: &str,
+) -> Result<bool, String> {
+    let manifest = serde_json::from_str(manifest_json)
+        .map_err(|error| format!("invalid skill manifest: {error}"))?;
+    let projection = SkillProjection::from_manifest(&manifest)?.is_some();
+    if projection && (organization_id == 0 || is_builtin_skill(skill_key)) {
+        return Err("draft testing is only available for tenant-authored skills".into());
+    }
+    Ok(projection)
 }
 
 fn require_promotable_knowledge(

@@ -14,9 +14,9 @@
 //!   the step. The server computes the canonical node-content hash itself; the
 //!   caller never supplies a hash, a run, a tenant or a review status.
 //! - Publication rechecks every staged row (content hash, accepted decisions,
-//!   current reviewed claims, dependencies, tenant scope) and binds the step
-//!   into `AiArtifactComponent` through the same helpers `bind_ai_artifact_component`
-//!   uses. Any failure returns `Err`, which rolls the whole publication back.
+//!   current reviewed claims, dependencies, tenant scope) and requires a
+//!   completed draft simulation of the same graph before binding the steps
+//!   into `AiArtifactComponent`. Any failure rolls the publication back.
 //! - There is no second lineage table: the durable record is the component
 //!   `workflow-version:<version_id>` / `node:<node_key>`.
 //!
@@ -42,10 +42,12 @@ use crate::ai::evidence_lineage::{
 use crate::ai::skills::ai_agent_run;
 use crate::core::organization::require_company_in_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::workflow::authorization::require_workflow_company_access;
 use crate::workflow::definitions::{
     canonical_node_hash, load_draft, nodes_for_version, workflow_node, workflow_version,
     WorkflowNode, WorkflowNodeKind, WorkflowVersion,
 };
+use crate::workflow::simulation::require_complete_draft_simulation;
 
 pub const ARTIFACT_PREFIX: &str = "workflow-version:";
 pub const COMPONENT_KEY_PREFIX: &str = "node:";
@@ -386,12 +388,14 @@ pub(crate) fn enforce_on_publish(
     ctx: &ReducerContext,
     version: &WorkflowVersion,
     nodes: &[WorkflowNode],
+    definition_hash: &str,
 ) -> Result<(), String> {
     let Some(generation) = find_generation(ctx, version.id) else {
         return Ok(());
     };
     let company_id = generation_company(&generation, version)?;
     let organization_id = version.organization_id;
+    require_workflow_company_access(ctx, organization_id, company_id, ctx.sender())?;
     let artifact_ref = version_artifact_ref(version.id);
 
     // Phase one verifies every step without writing anything, so a failing
@@ -453,6 +457,8 @@ pub(crate) fn enforce_on_publish(
             .map_err(|error| format!("generated workflow step '{}': {error}", node.node_key))?,
         }
     }
+    require_complete_draft_simulation(ctx, version, company_id, definition_hash)?;
+
     // Phase two binds through the shared helper; its own validation is the
     // last word, and any error still rolls the reducer back.
     for params in to_bind {
@@ -646,7 +652,10 @@ pub(crate) fn require_component_matches_workflow_node(
 
 // ── Internals ────────────────────────────────────────────────────────────────
 
-fn find_generation(ctx: &ReducerContext, workflow_version_id: u64) -> Option<AiWorkflowGeneration> {
+pub(crate) fn find_generation(
+    ctx: &ReducerContext,
+    workflow_version_id: u64,
+) -> Option<AiWorkflowGeneration> {
     ctx.db
         .ai_workflow_generation()
         .workflow_version_id()

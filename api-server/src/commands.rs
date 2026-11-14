@@ -284,7 +284,7 @@ fn ai_skill_certification_request_args(
     ]
 }
 
-/// Admit only an enqueue request from the protected certification route.
+/// Admit only a draft test request from the protected certification route.
 /// Claim/completion reducers stay private; membership is checked with the
 /// session credential before the module derives the requester from ctx.sender().
 pub(crate) async fn dispatch_ai_skill_certification_request(
