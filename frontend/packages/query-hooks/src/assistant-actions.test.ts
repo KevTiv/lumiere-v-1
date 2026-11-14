@@ -179,18 +179,40 @@ test("lists and module navigation do not need or invent record identities", () =
 })
 
 test("Warehouse Assistant actions focus the exact transfer in the alpha workspace", () => {
-  for (const text of ["Open stock transfer 42", "Review stock transfer 42"]) {
-    assert.equal(
-      assistantActionHref(action(text)),
-      "/warehouse?tab=transfers&filter=id%3A42",
-    )
+  assert.equal(assistantActionHref(action("Open stock transfer 42")), "/warehouse?tab=transfers&filter=id%3A42")
+  assert.equal(assistantActionHref(action("Open cycle count wizard")), "/warehouse?tab=cycle-wizard")
+  assert.equal(request("Open cycle count 42").kind, "clarify")
+  for (const text of ["Review stock transfer 42", "Validate stock transfer 42", "Receive stock transfer 42"]) {
+    const review = action(text)
+    assert.equal(review.kind, "prepare_workflow")
+    assert.equal(assistantActionHref(review), "/inventory/transfers/42?tab=operations")
+    assert.equal(getAssistantCapability(review.capabilityKey)?.permission.action, "read")
+  }
+})
+
+test("operations actions open exact report output and vehicle review tabs", () => {
+  assert.equal(
+    assistantActionHref(action("Open report 9007199254740993")),
+    "/reports?tab=reports&report=9007199254740993",
+  )
+  assert.equal(assistantActionHref(action("Open catalog item 42")), "/products?tab=products&filter=id%3A42")
+  assert.equal(assistantActionHref(action("Open vehicle 42")), "/fleet/vehicles/42")
+  for (const [text, key, tab] of [
+    ["Service vehicle 42", "fleet.vehicle.service", "service"],
+    ["Maintain vehicle 42", "fleet.vehicle.maintain", "service"],
+    ["Inspect vehicle 42", "fleet.vehicle.inspect", "inspections"],
+  ] as const) {
+    const review = action(text)
+    assert.equal(review.kind, "prepare_workflow")
+    assert.equal(review.capabilityKey, key)
+    assert.equal(assistantActionHref(review), `/fleet/vehicles/42?tab=${tab}`)
   }
 })
 
 test("workflow requests prepare exact native review without claiming execution", () => {
   const result = action("Post invoice 42")
   assert.equal(result.kind, "prepare_workflow")
-  assert.equal(result.capabilityKey, "accounting.invoice.review")
+  assert.equal(result.capabilityKey, "accounting.invoice.post")
   assert.equal(result.prompt, "Post invoice 42")
   assert.equal(
     getAssistantCapability(result.capabilityKey)?.permission.action,
@@ -199,6 +221,27 @@ test("workflow requests prepare exact native review without claiming execution",
   assert.match(getAssistantCapability(result.capabilityKey)!.label, /^Review /)
   assert.equal(request("Renew subscription").kind, "clarify")
   assert.equal(request("Pay vehicle 42").kind, "clarify")
+})
+
+test("finance handoffs name the requested effect and reach its native owner", () => {
+  for (const [prompt, label, href] of [
+    ["Post invoice 42", "Review invoice posting", "/accounting/invoices/42"],
+    ["Pay vendor bill 7", "Review vendor bill payment", "/accounting/invoices/7"],
+    ["Post journal entry 42", "Review journal entry posting", "/accounting?tab=journal-entries&filter=id%3A42"],
+    ["Submit expense report 42", "Review expense report submission", "/expenses/reports/42"],
+    ["Confirm sales order 42", "Review sales order confirmation", "/sales/orders/42"],
+    ["Convert lead 42", "Review lead conversion", "/crm?tab=leads&filter=id%3A42"],
+    ["Receive purchase order 42", "Review purchase receipt", "/purchasing/orders/42?tab=lines"],
+    ["Amend subscription 42", "Review subscription amendment", "/subscriptions/42?tab=amendments"],
+  ] as const) {
+    const result = action(prompt)
+    assert.equal(result.kind, "prepare_workflow")
+    assert.equal(getAssistantCapability(result.capabilityKey)?.label, label)
+    assert.equal(assistantActionHref(result), href)
+  }
+  assert.equal(assistantActionHref(action("Open sale order 42")), "/sales/orders/42")
+  assert.equal(assistantActionHref(action("Open purchase order 42")), "/purchasing/orders/42")
+  assert.equal(assistantActionHref(action("Review invoice 42")), "/accounting/invoices/42")
 })
 
 test("unsupported and advisory requests cannot silently reach hidden task mutations", () => {
@@ -216,6 +259,27 @@ test("unsupported and advisory requests cannot silently reach hidden task mutati
     "Open manufacturing order 42",
   ])
     assert.equal(request(text).kind === "action", false, text)
+})
+
+test("support actions hand off to company-bound native records and existing settings and overview destinations", () => {
+  for (const [text, expected] of [
+    ["Open my work", "/tasks"],
+    ["Open task 42", "/tasks?source=projects&taskId=42&taskCompany=7"],
+    ["Review task 42", "/tasks?source=projects&taskId=42&taskCompany=7&taskView=edit"],
+    ["Assign task 42", "/tasks?source=projects&taskId=42&taskCompany=7&taskView=assign"],
+    ["Approve approval request 42", "/approvals?taskId=42&taskCompany=7"],
+    ["Open document 42", "/documents/42"],
+    ["Open calendar event 42", "/calendar/events/42"],
+    ["Open saved imports", "/settings?section=imports"],
+    ["Open overdue invoices", "/accounting?tab=invoices&ownerQueue=overdue-invoices"],
+    ["Review draft bills", "/accounting?tab=bills&ownerQueue=draft-bills"],
+    ["Open low-stock alerts", "/warehouse?tab=stock&ownerQueue=low-stock"],
+  ]) {
+    assert.equal(assistantActionHref(action(text!)), expected, text)
+  }
+  assert.equal(action("Approve approval request 42").kind, "prepare_workflow")
+  assert.equal(request("Review approval request").kind, "clarify")
+  assert.deepEqual(request("Open overdue invoices or draft bills").kind, "none")
 })
 
 test("captured actions are actor, organization and company bound", () => {

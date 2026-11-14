@@ -500,12 +500,14 @@ function InventoryClientLoaded({
   const readEnabled = (resource: string) => isInventoryWorkspaceReadEnabled(workspace, resource);
   const { t } = useTranslation();
   const { checkPermission, permissionsReady, currentUser } = useRBAC();
-  const { identity, organizationId: sessionOrganizationId } = useErpSession();
+  const { identity, organizationId: sessionOrganizationId, activeCompanyReady } = useErpSession();
   const { askForm, cancelForm, formDialog } = useFormDialog();
   const { orgId } = orgBigInts(organizationId);
   const selectedOperatingCompanyId =
     useDefaultOperatingCompanyBigInt(organizationId);
   const operatingCompanyId = selectedOperatingCompanyId ?? 0n;
+  const warehouseCompanyId = workspace === 'warehouse' && activeCompanyReady ? selectedOperatingCompanyId : undefined;
+  const warehouseReady = workspace !== 'warehouse' || warehouseCompanyId !== undefined;
   const [quickActionForm, setQuickActionForm] = useState<{
     form: FormConfig;
     action: string;
@@ -591,7 +593,7 @@ function InventoryClientLoaded({
   const stockQuantsRead = moduleCollection(useStockQuants(orgId, initialStockQuants, readEnabled('stock-quants')));
   const stockQuants = stockQuantsRead.rows;
   const stockQuantsLoading = stockQuantsRead.state.status === 'loading';
-  const transfersRead = moduleCollection(useStockPickings(orgId, initialTransfers, readEnabled('stock-pickings')));
+  const transfersRead = moduleCollection(useStockPickings(orgId, warehouseReady ? initialTransfers : undefined, warehouseReady && readEnabled('stock-pickings'), warehouseCompanyId));
   const transfers = transfersRead.rows;
   const transfersLoading = transfersRead.state.status === 'loading';
   const warehousesRead = moduleCollection(useWarehouses(orgId, initialWarehouses, readEnabled('warehouses')));
@@ -627,7 +629,7 @@ function InventoryClientLoaded({
   const stockRoutes = stockRoutesRead.rows;
   const stockRulesRead = moduleCollection(useStockRules(orgId, undefined, readEnabled('stock-rules')));
   const stockRules = stockRulesRead.rows;
-  const stockMovesRead = moduleCollection(useStockMoves(orgId, initialStockMoves, readEnabled('stock-moves')));
+  const stockMovesRead = moduleCollection(useStockMoves(orgId, warehouseReady ? initialStockMoves : undefined, warehouseReady && readEnabled('stock-moves'), warehouseCompanyId));
   const stockMoves = stockMovesRead.rows;
   const inventoryValuationsRead = moduleCollection(useInventoryValuations(orgId, initialInventoryValuations, readEnabled('inventory-valuations')));
   const inventoryValuations = inventoryValuationsRead.rows;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { AI_WORKSPACE_SCOPES, resolveAiWorkspaceScope } from "./ai-workspace-scope"
+import { AI_WORKSPACE_SCOPES, aiWorkspaceScopesForProfile, resolveAiWorkspaceScope } from "./ai-workspace-scope"
 
 const selectedOrder = {
   entityType: "sale_order",
@@ -49,4 +49,15 @@ test("all modules and unknown choices default to safe explicit contexts", () => 
     usesCurrentPage: true,
   })
   assert.equal(new Set(AI_WORKSPACE_SCOPES.map((scope) => scope.value)).size, AI_WORKSPACE_SCOPES.length)
+})
+
+test("Finance Alpha offers every active workspace and omits the full-profile modules", () => {
+  const options = aiWorkspaceScopesForProfile("finance-alpha")
+  const modules = options.filter(option => option.group === "Modules").map(option => option.value)
+  assert.deepEqual(modules.sort(), [
+    "accounting", "approvals", "calendar", "crm", "documents", "expenses", "fleet", "overview",
+    "products", "purchasing", "reports", "sales", "settings", "subscriptions", "tasks", "warehouse",
+  ].map(module => `module:${module}`).sort())
+  assert.equal(resolveAiWorkspaceScope("module:manufacturing", "/crm", null, options).pathname, "/crm")
+  assert.ok(aiWorkspaceScopesForProfile("full").some(option => option.value === "module:manufacturing"))
 })

@@ -1,5 +1,6 @@
 'use client';
 
+import { AskAboutRecordButton } from '@/components/ask-about-record-button';
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -542,6 +543,7 @@ function PurchaseOrderPageLoaded({
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <AskAboutRecordButton entityType="purchase_order" recordId={orderId} label={label} activeTab={activeTab} />
             <RecordWorkflowActions
               actions={headerActions}
               record={record}

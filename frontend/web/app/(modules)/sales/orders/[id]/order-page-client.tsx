@@ -1,5 +1,6 @@
 'use client';
 
+import { AskAboutRecordButton } from '@/components/ask-about-record-button';
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -694,6 +695,7 @@ function SaleOrderPageLoaded({
         }
         actions={
           <>
+            <AskAboutRecordButton entityType="sale_order" recordId={orderId} label={label} activeTab={activeTab} />
             <RecordWorkflowActions
               actions={recordActions.filter((action) => action.id !== recommendedAction?.id && (linesReady || !['sales.order.confirm', 'sales.order.send-quotation', 'sales.order.create-invoice', 'sales.order.accept-quotation'].includes(action.id)))}
               record={record}

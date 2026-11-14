@@ -12,6 +12,9 @@ import { decodeAccountMovesQueryResponse } from "@lumiere/stdb/resource-reads"
 
 import { GeneralLedgerView } from "./general-ledger-view"
 
+const search = vi.hoisted(() => ({ params: null as URLSearchParams | null }))
+vi.mock("next/navigation", () => ({ useSearchParams: () => search.params }))
+
 vi.mock("@lumiere/i18n", () => ({
   useTranslation: () => ({
     t: (key: string, options?: { defaultValue?: string; id?: string }) =>
@@ -31,9 +34,37 @@ vi.mock("../lib/currency-context", () => ({
   }),
 }))
 
-afterEach(cleanup)
+afterEach(() => {
+  search.params = null
+  cleanup()
+})
 
 describe("GeneralLedgerView accounting migration actions", () => {
+  it("shows only the authorized-company journal rows in an import batch link", () => {
+    search.params = new URLSearchParams(
+      "importEntryCompany=3&importEntryIds=7,8",
+    )
+    const move = { state: "Draft", moveType: "Entry" }
+    render(
+      <GeneralLedgerView
+        moves={[
+          { ...move, id: 7, companyId: 3, name: "Imported journal" },
+          { ...move, id: 8, companyId: 4, name: "Different company" },
+          { ...move, id: 9, companyId: 3, name: "Different imported batch" },
+        ]}
+      />,
+    )
+    expect(
+      screen.getByRole("button", { name: "Imported journal" }),
+    ).toBeTruthy()
+    expect(screen.queryByText("Different company")).toBeNull()
+    expect(screen.queryByText("Different imported batch")).toBeNull()
+    expect(
+      screen
+        .getByRole("link", { name: "Show all journal entries" })
+        .getAttribute("href"),
+    ).toBe("/accounting?tab=journal-entries")
+  })
   it("exposes residual-only import while payment replay is not callable", () => {
     const onImportOutstandingDocumentsCsv = vi.fn()
 

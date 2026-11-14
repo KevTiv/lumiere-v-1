@@ -3,6 +3,7 @@
 import type { AssistantAction } from "@lumiere/query-hooks/assistant-actions"
 import type { GuideReference, OpenGuideRequest } from "./assistant-guide-types"
 import type { ChatImportTaskStatus } from "./import-task-status"
+import type { AssistantNativeFormPresentationOutcome } from "../components/assistant-native-form-provider"
 
 export type CitationKind = "live" | "passage" | "activity" | "web"
 export type CitationTrust = "authoritative" | "persisted" | "retrieved"
@@ -53,6 +54,8 @@ export interface ChatMessage {
   guides?: GuideReference[]
   /** Fresh, deterministic server status cards; never restored as current from chat text. */
   importTasks?: ChatImportTaskStatus[]
+  /** Saved selectors whose current status must be checked by the import workspace. */
+  importTaskIds?: string[]
   metadata?: {
     model?: string
     tokens?: number
@@ -94,6 +97,9 @@ export interface ChatAction {
   draft?: ChatActionDraftPayload
 }
 
+/** Acknowledgement of a native UI handoff. It has no authority over saved effects. */
+export type ChatNativeActionOutcome = AssistantNativeFormPresentationOutcome | "editor_opened" | "requested"
+
 export interface AtCommand {
   id: string
   name: string
@@ -132,7 +138,10 @@ export interface AIChatConfig {
   onApproveActionDraft?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload | void>
   onRejectActionDraft?: (draft: ChatActionDraftPayload, reason?: string) => Promise<ChatActionDraftPayload | void>
   onUpdateActionDraft?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload | void>
-  onNativeAction?: (action: AssistantAction, messageId: string) => Promise<void> | void
+  onNativeAction?: (
+    action: AssistantAction,
+    messageId: string,
+  ) => ChatNativeActionOutcome | void | Promise<ChatNativeActionOutcome | void>
   onRefreshActionDraft?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload>
   /** User asserts they're relying on a cited passage as evidence (AIH-13/14). */
   onCiteSource?: (args: { messageId: string; source: ChatMessageSourceRef }) => Promise<void>

@@ -105,7 +105,18 @@ pub(super) async fn load(
     task: &str,
     proposal: i64,
 ) -> Result<SavedProposal, ApiError> {
-    let row = tx.query_opt(&format!("SELECT {COLUMNS} FROM lumiere_platform.import_workflow_proposal WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND task_request_id=$4 AND id=$5 FOR UPDATE"), &[&scope.organization.to_string(), &scope.company.to_string(), &scope.actor, &task, &proposal]).await.map_err(ApiError::internal)?
+    read_proposal(tx, scope, task, proposal, true).await
+}
+
+pub(super) async fn read_proposal(
+    tx: &Transaction<'_>,
+    scope: StorageScope<'_>,
+    task: &str,
+    proposal: i64,
+    lock: bool,
+) -> Result<SavedProposal, ApiError> {
+    let lock = if lock { " FOR UPDATE" } else { "" };
+    let row = tx.query_opt(&format!("SELECT {COLUMNS} FROM lumiere_platform.import_workflow_proposal WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND task_request_id=$4 AND id=$5{lock}"), &[&scope.organization.to_string(), &scope.company.to_string(), &scope.actor, &task, &proposal]).await.map_err(ApiError::internal)?
         .ok_or_else(|| ApiError::NotFound("import proposal not found".into()))?;
     SavedProposal::from_row(&row)
 }

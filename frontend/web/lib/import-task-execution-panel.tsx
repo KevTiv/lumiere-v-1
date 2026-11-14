@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useErpSession } from "@lumiere/erp-session"
+import { accountMoveBatchHref } from "@lumiere/erp-shared/record-links"
 import { useTranslation } from "@lumiere/i18n"
 import { useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting/accounts"
 import { useAccountJournals } from "@lumiere/query-hooks/hooks/accounting/journals"
@@ -1201,7 +1202,7 @@ function ProposalDetails({
                 <li key={id}>
                   <a
                     className="underline"
-                    href={`/accounting/invoices/${id}?companyId=${companyId}`}
+                    href={accountMoveBatchHref([id], companyId)}
                   >
                     {proposal.entries[index]?.reference ??
                       t("settings.importWorkflow.record", { id })}

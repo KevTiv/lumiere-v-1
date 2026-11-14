@@ -60,12 +60,7 @@ function ErpAiRouteContextBridge({ children }: { children: ReactNode }) {
   const urlActiveTab = searchParams.get("tab")
   const settingsSection = pathname === "/settings" ? searchParams.get("section") : null
   const selectionState = useErpAiSelectionState()
-  const selectionReporter = useErpAiSelectionReporter()
   const activeTab = selectionState.activeTab ?? urlActiveTab ?? settingsSection
-
-  useEffect(() => {
-    selectionReporter?.setActiveTab(null)
-  }, [pathname, selectionReporter])
 
   const value = useMemo(
     () => ({
@@ -80,8 +75,12 @@ function ErpAiRouteContextBridge({ children }: { children: ReactNode }) {
 }
 
 export function ErpAiRouteContextProvider({ children }: { children: ReactNode }) {
+  const { identity, organizationId } = useErpSession()
+  const companyId = useOperatingCompanyId(organizationId)
+  const pathname = usePathname()
+  const scopeKey = JSON.stringify([assistantHistoryScope(identity, organizationId, companyId), pathname])
   return (
-    <ErpAiSelectionStateProvider>
+    <ErpAiSelectionStateProvider scopeKey={scopeKey}>
       <ErpAiRouteContextBridge>{children}</ErpAiRouteContextBridge>
     </ErpAiSelectionStateProvider>
   )

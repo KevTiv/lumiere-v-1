@@ -1,28 +1,10 @@
 import { parseStrictU64 } from "@lumiere/erp-shared/u64";
+import { ownerQueueRoutes, type OwnerQueue } from "@lumiere/erp-shared/record-links";
 import { normalizedTag } from "@lumiere/erp-workflows";
 import { unwrapEntityValue } from "@lumiere/ui/lib/entity-row-values";
 import { kpiDate } from "@lumiere/ui/lib/kpi-tiles";
 
-export const ownerQueueRoutes = {
-  overdueInvoices: {
-    pathname: "/accounting",
-    tab: "invoices",
-    value: "overdue-invoices",
-  },
-  draftBills: { pathname: "/accounting", tab: "bills", value: "draft-bills" },
-  lowStockProducts: {
-    pathname: "/warehouse",
-    tab: "stock",
-    value: "low-stock",
-  },
-} as const;
-
-export type OwnerQueue = keyof typeof ownerQueueRoutes;
-
-export function ownerQueueHref(queue: OwnerQueue): string {
-  const { pathname, tab, value } = ownerQueueRoutes[queue];
-  return `${pathname}?tab=${tab}&ownerQueue=${value}`;
-}
+export { ownerQueueHref, ownerQueueRoutes, type OwnerQueue } from "@lumiere/erp-shared/record-links";
 
 export function isOwnerQueue(
   queue: OwnerQueue,

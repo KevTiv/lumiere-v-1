@@ -43,13 +43,7 @@ export function selectedReport<Row extends ReportRow>(rows: readonly Row[], id: 
   return matches.length === 1 ? matches[0]! : null
 }
 
-export function reportWorkspaceHref(query: string, id?: string): string {
-  const params = new URLSearchParams(query)
-  params.set("tab", "reports")
-  params.delete("report")
-  if (id) params.set("report", id)
-  return `/reports?${params.toString()}`
-}
+export { reportWorkspaceHref } from "@lumiere/erp-shared/record-links"
 
 export function reportDate(raw: unknown, locale: string): string {
   const micros = stbTimestampMicros(raw)

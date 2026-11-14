@@ -1,5 +1,7 @@
 'use client';
 
+import { AskAboutRecordButton } from '@/components/ask-about-record-button';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -300,6 +302,7 @@ function CalendarEventPageLoaded({
         navigation={navigation}
         actions={
           <>
+            <AskAboutRecordButton entityType="calendar_event" recordId={eventId} label={label} activeTab={activeTab} />
             {stateActions.confirm ? (
               <Button
                 size="sm"

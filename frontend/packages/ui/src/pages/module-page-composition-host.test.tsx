@@ -8,6 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ModulePageCompositionProvider,
@@ -135,6 +136,7 @@ const clients: QueryClient[] = [];
 
 function Assistant() {
   const composer = useModulePageComposition()!;
+  const [outcome, setOutcome] = useState<string>();
   return (
     <>
       <button
@@ -146,6 +148,7 @@ function Assistant() {
             pageId: "dashboard",
             kind: "add_widget",
             widgetKey: "saved:42",
+            onPresentationOutcome: setOutcome,
           });
         }}
       >
@@ -154,6 +157,7 @@ function Assistant() {
       <output data-testid="registered-page">
         {composer.page?.moduleId}:{composer.page?.pageId}
       </output>
+      <output data-testid="page-presentation-outcome">{outcome}</output>
     </>
   );
 }
@@ -451,6 +455,7 @@ describe("module page production host", () => {
     details.open = false;
     click("Add from chat");
     await screen.findByRole("button", { name: "Done" });
+    expect(screen.getByTestId("page-presentation-outcome").textContent).toBe("editor_opened");
     expect(details.open).toBe(true);
     expect(writes).toHaveLength(0);
   });

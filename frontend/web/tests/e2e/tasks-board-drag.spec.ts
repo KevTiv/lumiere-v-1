@@ -205,5 +205,17 @@ test.describe("Tasks board drag and drop @tasks", () => {
     await page.reload()
     await expect(page.getByTestId("kanban-column-Approved").getByTestId(`kanban-card-${taskId}`)).toBeVisible()
     await expectNoAppError(page)
+
+    const exactReads = page.waitForResponse((response) =>
+      response.request().method() === "GET" &&
+      new URL(response.url()).pathname === `/api/authoritative/tasks/${taskId}`,
+    )
+    await gotoModule(page, `/tasks?source=projects&taskId=${taskId}&taskCompany=${companyId}&taskView=edit`)
+    expect((await exactReads).ok()).toBe(true)
+    const linkedTask = page.getByRole("region", { name: "Linked task" })
+    await expect(linkedTask.getByRole("heading", { name: taskName })).toBeVisible()
+    await expect(linkedTask.getByText("Approved", { exact: false })).toBeVisible()
+    await expect(linkedTask.getByRole("button", { name: "Review task changes" })).toBeVisible()
+    await expect(linkedTask.getByRole("button", { name: "Ask Lumière" })).toBeVisible()
   })
 })

@@ -2,6 +2,22 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { taskAttachmentCounts, taskBoardItemInState, taskProgressPercent, toTaskBoardItem } from './task-board-items';
+import { matchesTaskRecord, taskRecordTarget } from './task-record-link';
+
+test('task link resolves an exact ID only within its active company', () => {
+  const link = { id: '9007199254740993', companyId: '7', view: 'edit' as const };
+  assert.equal(taskRecordTarget(link, 7n), link.id);
+  assert.equal(taskRecordTarget(link, 8n), undefined);
+  assert.equal(taskRecordTarget({ ...link, id: '8e1' }, 7n), undefined);
+});
+
+test('linked task readback verifies record identity and scope without rounding IDs', () => {
+  const row = { id: '9007199254740993', organization_id: '3', companyId: '7' };
+  assert.equal(matchesTaskRecord(row, row.id, 3n, 7n), true);
+  assert.equal(matchesTaskRecord(row, row.id, 3n, 8n), false);
+  assert.equal(matchesTaskRecord(row, row.id, 4n, 7n), false);
+  assert.equal(matchesTaskRecord({ ...row, id: 9007199254740992 }, row.id, 3n, 7n), false);
+});
 
 const lookups = {
   projectNames: new Map([['7', 'Website']]),

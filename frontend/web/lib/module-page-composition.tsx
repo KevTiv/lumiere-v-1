@@ -90,7 +90,10 @@ export interface AssistantPageRequest {
   widgetKey?: string;
   prompt?: string;
   origin?: { sessionKey: string; messageId: string };
+  onPresentationOutcome?: (status: AssistantPagePresentationOutcome) => void;
 }
+
+type AssistantPagePresentationOutcome = "editor_opened" | "unavailable" | "scope_changed";
 
 interface RegisteredPage extends AssistantPageCatalog {
   owner: string;
@@ -104,7 +107,7 @@ interface CompositionEnvironment {
   requestPage: (
     request: AssistantPageRequest,
   ) => "pending" | "busy" | "scope_changed";
-  settle: (requestId: string) => void;
+  settle: (requestId: string, status: AssistantPagePresentationOutcome) => void;
   register: (page: RegisteredPage) => () => void;
   isCurrent: (scope: string) => boolean;
 }
@@ -143,10 +146,12 @@ export function ModulePageCompositionProvider({
       setPage((previous) => (previous?.owner === next.owner ? null : previous));
     };
   }, []);
-  const settle = useCallback((requestId: string) => {
-    if (pendingRef.current?.requestId !== requestId) return;
+  const settle = useCallback((requestId: string, status: AssistantPagePresentationOutcome) => {
+    const request = pendingRef.current;
+    if (request?.requestId !== requestId || request.scopeKey !== currentScope.current) return;
     pendingRef.current = null;
     setPending(null);
+    request.onPresentationOutcome?.(status);
   }, []);
   const requestPage = useCallback((request: AssistantPageRequest) => {
     if (
@@ -160,13 +165,19 @@ export function ModulePageCompositionProvider({
       pendingRef.current.expiresAt > Date.now()
     )
       return "busy" as const;
+    const previous = pendingRef.current;
+    previous?.onPresentationOutcome?.(previous.scopeKey === currentScope.current ? "unavailable" : "scope_changed");
     const next = { ...request, expiresAt: Date.now() + 15_000 };
     pendingRef.current = next;
     setPending(next);
     return "pending" as const;
   }, []);
   useEffect(() => {
-    if (pendingRef.current?.scopeKey !== scopeKey) pendingRef.current = null;
+    const request = pendingRef.current;
+    if (request && request.scopeKey !== scopeKey) {
+      pendingRef.current = null;
+      request.onPresentationOutcome?.("scope_changed");
+    }
     setPending((previous) =>
       previous?.scopeKey === scopeKey ? previous : null,
     );
@@ -181,8 +192,8 @@ export function ModulePageCompositionProvider({
           pending.scopeKey !== currentScope.current
         )
           return;
-        settle(pending.requestId);
-        toast.warning(t("aiChat.native.pageUnavailable"));
+        settle(pending.requestId, "unavailable");
+        if (!pending.onPresentationOutcome) toast.warning(t("aiChat.native.pageUnavailable"));
       },
       Math.max(0, pending.expiresAt - Date.now()),
     );
@@ -683,7 +694,7 @@ function ScopedModulePageHost({
       if (pendingWidgetOrigins.current.size >= 64) pendingWidgetOrigins.current.clear();
       pendingWidgetOrigins.current.set(requestId, pending.origin);
     }
-    settle(requestId);
+    settle(requestId, "editor_opened");
   };
   if (!permitted) return <>{children}</>;
   const insights = placement === "insights";

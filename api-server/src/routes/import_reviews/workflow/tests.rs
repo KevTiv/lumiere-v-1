@@ -70,6 +70,58 @@ fn saved(definition: Definition) -> SavedProposal {
 }
 
 #[test]
+fn current_posting_status_is_separate_from_the_verified_draft_receipt() -> Result<()> {
+    let scope = scoped();
+    let task = "d".repeat(32);
+    let rows = (0..11)
+        .map(|index| {
+            let amount = if index == 10 { "82400" } else { "50000" };
+            reviewed(index + 1, index as u32 + 2, amount)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let proposal = saved(build_definition(&rows, &configuration(), 0)?);
+    let mut moves = proposal
+        .definition
+        .entries
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| {
+            json!({
+                "id": (100 + index).to_string(),
+                "organization_id": "42",
+                "company_id": "5",
+                "state": if index < 6 { "Posted" } else { "Draft" },
+                "move_type": "Entry",
+                "metadata": json!({
+                    "lumiere_import_proposal": native::source_binding(scope, &task, &proposal, entry, "header")
+                }).to_string()
+            })
+        })
+        .collect::<Vec<_>>();
+    let result = VerifiedResult {
+        verified_at: "2026-11-07T12:02:00Z".into(),
+        company_id: "5".into(),
+        currency_id: "2".into(),
+        record_count: 11,
+        line_count: 22,
+        total_debit: "582400".into(),
+        total_credit: "582400".into(),
+        record_ids: (100..111).map(|id| id.to_string()).collect(),
+        line_ids: (200..222).map(|id| id.to_string()).collect(),
+        posted_count: 0,
+    };
+    let status = native::posting_status(scope, &task, &proposal, &result, &moves)?;
+    ensure!(status["postedCount"] == 6 && status["draftCount"] == 5);
+    ensure!(result.posted_count == 0);
+    moves[0]["company_id"] = json!("7");
+    moves[1]["metadata"] = json!("{}");
+    moves.push(moves[2].clone());
+    let changed = native::posting_status(scope, &task, &proposal, &result, &moves)?;
+    ensure!(changed["postedCount"] == 3 && changed["unavailableCount"] == 3);
+    Ok(())
+}
+
+#[test]
 fn partial_confirmation_uses_only_known_facts_and_exact_decimal_totals() -> Result<()> {
     let definition = build_definition(
         &[reviewed(1, 8, "0.1")?, reviewed(2, 9, "0.2")?],
