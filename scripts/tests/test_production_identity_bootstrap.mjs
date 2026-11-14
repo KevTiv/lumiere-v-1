@@ -49,7 +49,6 @@ test('partitions credentials by service without leaking unrelated worker tokens'
     issued,
     targets,
     adminToken: 'owner-token',
-    runtimeHash: `sha256:${identity('c')}`,
     bootstrapSecrets: {},
   })
   assert.deepEqual(result.get('projection-worker'), {
@@ -68,7 +67,7 @@ test('tenant enrollment sends public worker identities only to the API', () => {
     bindings:['expense_integration_worker']}]
   const result = buildServiceSecrets({targets,
     issued:new Map([['STDB_EXPENSE_WORKER_TOKEN',{token:'private-worker-token',identity:identity('e')}]]),
-    adminToken:'owner-token',runtimeHash:`sha256:${identity('f')}`,bootstrapSecrets:{}})
+    adminToken:'owner-token',bootstrapSecrets:{}})
   assert.equal(result.get('expense-integration-worker').STDB_EXPENSE_WORKER_TOKEN, 'private-worker-token')
   assert.deepEqual(JSON.parse(result.get('api-server').LUMIERE_TENANT_SERVICE_IDENTITIES),
     {expense_integration_worker:identity('e')})
@@ -83,7 +82,6 @@ const baseEnv = {
   DOPPLER_API_TOKEN: 'doppler-token',
   DOPPLER_PROJECT: 'lumiere-v1',
   DOPPLER_CONFIG_MAP_JSON: '{"projection-worker":"prd_projection"}',
-  AI_CERTIFICATION_RUNTIME_HASH: `sha256:${identity('d')}`,
   LUMIERE_IDENTITY_RUN_ID: 'release-2026-10-14',
 }
 

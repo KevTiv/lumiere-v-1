@@ -153,7 +153,7 @@ grep -Fq 'ai-gateway has no configured EU replica' "$TMP/ai-region.out"
 
 # A selected pilot must have one replica and distinct service credentials.
 jq '. + [{id:"service-ai-gateway",name:"ai-gateway",regions:[{name:"europe-west4",configured:1}]}]' "$TMP/services.json" >"$TMP/ai-services.json"
-jq -n '{LUMIERE_BIN:"gateway",LUMIERE_ENV:"production",STDB_HOST:"http://spacetimedb.railway.internal:3000",STDB_MODULE:"lumiere-v1",STDB_TOKEN:null,AI_SPEND_READ_STDB_TOKEN:null,AI_CERTIFICATION_STDB_TOKEN:null,AI_EXECUTION_ENVELOPE_KEY:null,LUMIERE_AI_GATEWAY_INTERNAL_SECRET:null,MISTRAL_API_KEY:null,AI_CERTIFICATION_RUNTIME_HASH:"sha256:0123456789abcdef"}' >"$TMP/ai-gateway.variables.json"
+jq -n '{LUMIERE_BIN:"gateway",LUMIERE_ENV:"production",STDB_HOST:"http://spacetimedb.railway.internal:3000",STDB_MODULE:"lumiere-v1",STDB_TOKEN:null,AI_SPEND_READ_STDB_TOKEN:null,AI_EXECUTION_ENVELOPE_KEY:null,LUMIERE_AI_GATEWAY_INTERNAL_SECRET:null,MISTRAL_API_KEY:null}' >"$TMP/ai-gateway.variables.json"
 env "${common_env[@]}" RAILWAY_ENABLE_AI=true TEST_SERVICES_FILE="$TMP/ai-services.json" bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST"
 # Never-deployed services use their explicit EU configuration, not empty
 # deployment metadata. Runtime gates still require the exact Metal location.

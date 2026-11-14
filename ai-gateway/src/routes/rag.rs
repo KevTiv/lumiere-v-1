@@ -850,11 +850,9 @@ pub async fn post_rag(
         )
     };
     if let Some(Err(error)) = &query_vector {
-        if error.is::<crate::error::GenerationSourceUnavailable>() {
-            // Revoked source is an activation failure, not optional retrieval.
-            return Err(AppError::GenerationSourceUnavailable(
-                crate::error::GenerationSourceUnavailable,
-            ));
+        if error.is::<crate::error::SkillUnavailable>() {
+            // Stop the chat turn when the skill has been disabled.
+            return Err(AppError::SkillUnavailable(crate::error::SkillUnavailable));
         }
     }
     let mut retrieval_degraded = false;

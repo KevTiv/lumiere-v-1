@@ -13,7 +13,7 @@ use crate::{
         data_scope_resolver::ResourceRegistry,
         policy_engine::{PolicyControlledRequest, PolicyEngine},
         red_action_drafts::CREATE_SALE_ORDER_DRAFT_SKILL_KEY,
-        release_registry::load_active_manifest,
+        release_registry::load_builtin_execution_manifest,
         skill_registry::SkillRegistry,
     },
     orchestrator::skill_loader::{complete_run, create_or_recover_generation_surface_run},
@@ -68,15 +68,19 @@ pub async fn post_bridge(
     }))
     .map_err(|error| AppError::BadRequest(format!("invalid run inputs: {error}")))?;
 
-    // Built-in Phase 1 red action-draft skills are loaded directly; org-promoted
-    // skills are resolved through the release registry.
+    // Other built-in skills also check the effective tenant and company binding.
     let registry = if skill_key == CREATE_SALE_ORDER_DRAFT_SKILL_KEY {
         SkillRegistry::built_in()
     } else {
-        let manifest =
-            load_active_manifest(&state.stdb, organization_id, &skill_key, skill_version)
-                .await
-                .map_err(AppError::Forbidden)?;
+        let manifest = load_builtin_execution_manifest(
+            &state.stdb,
+            organization_id,
+            company_id,
+            &skill_key,
+            skill_version,
+        )
+        .await
+        .map_err(AppError::Forbidden)?;
         SkillRegistry::exact(manifest)
     };
 

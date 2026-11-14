@@ -31,11 +31,9 @@ pub const PROMOTION_REJECTED: &str = "rejected";
 pub const PROMOTION_INVALIDATED: &str = "invalidated";
 
 pub const CERTIFICATION_NOT_REQUESTED: &str = "not_requested";
-pub const CERTIFICATION_QUEUED: &str = "queued";
 pub const CERTIFICATION_RUNNING: &str = "running";
 pub const CERTIFICATION_EVIDENCE_RECORDED: &str = "evidence_recorded";
 pub const CERTIFICATION_FAILED: &str = "failed";
-pub const CERTIFICATION_CERTIFIED: &str = "certified";
 pub const CERTIFICATION_INVALIDATED: &str = "invalidated";
 
 fn promotion_status_allows_runtime(status: &str) -> bool {

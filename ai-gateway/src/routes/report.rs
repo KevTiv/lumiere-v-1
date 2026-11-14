@@ -9,7 +9,7 @@ use crate::{
         data_scope_resolver::ResourceRegistry,
         manifest::OrgPrivacyPolicy,
         policy_engine::PolicyEngine,
-        release_registry::load_active_manifest,
+        release_registry::load_builtin_execution_manifest,
         report_composer::{
             compose_report, ReportComposerInput, ReportComposerResult, REPORT_COMPOSER_SKILL_KEY,
             REPORT_COMPOSER_SKILL_VERSION,
@@ -59,9 +59,10 @@ pub async fn post_compose(
     let identity_hex = req
         .identity_hex
         .unwrap_or_else(|| "report-composer".to_string());
-    let manifest = load_active_manifest(
+    let manifest = load_builtin_execution_manifest(
         &state.stdb,
         req.org_id,
+        req.company_id,
         REPORT_COMPOSER_SKILL_KEY,
         REPORT_COMPOSER_SKILL_VERSION,
     )

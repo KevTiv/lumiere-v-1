@@ -14,7 +14,7 @@ use crate::{
         },
         manifest::OrgPrivacyPolicy,
         policy_engine::PolicyEngine,
-        release_registry::load_active_manifest,
+        release_registry::load_builtin_execution_manifest,
         skill_registry::SkillRegistry,
     },
     state::AppState,
@@ -56,9 +56,10 @@ pub async fn post_credit_hold_summary(
             "minimum_outstanding must be a finite non-negative number".into(),
         ));
     }
-    let manifest = load_active_manifest(
+    let manifest = load_builtin_execution_manifest(
         &state.stdb,
         req.org_id,
+        req.company_id,
         CREDIT_HOLD_SKILL_KEY,
         DISTRIBUTOR_CONTROL_SKILL_VERSION,
     )
@@ -88,9 +89,10 @@ pub async fn post_delivery_run_summary(
     Json(req): Json<GatewayDeliveryRunSummaryRequest>,
 ) -> AppResult<Json<DeliveryRunSummaryResult>> {
     validate_context(req.org_id, req.company_id, &req.stdb_token)?;
-    let manifest = load_active_manifest(
+    let manifest = load_builtin_execution_manifest(
         &state.stdb,
         req.org_id,
+        req.company_id,
         DELIVERY_RUN_SKILL_KEY,
         DISTRIBUTOR_CONTROL_SKILL_VERSION,
     )

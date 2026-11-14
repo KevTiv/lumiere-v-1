@@ -46,12 +46,6 @@ export const IDENTITY_TARGETS = Object.freeze([
     services: ['ai-gateway'],
     bindings: [],
   },
-  {
-    secretName: 'AI_CERTIFICATION_STDB_TOKEN',
-    services: ['ai-gateway'],
-    bindings: [],
-    certificationExecutor: true,
-  },
 ])
 
 const SHARED_SECRETS = Object.freeze({
@@ -180,17 +174,6 @@ export function createSpacetimeClient({ fetchImpl = fetch, host, moduleName, adm
         { __identity__: `0x${identity}` },
       ])
     },
-    async registerCertificationProfile({ organizationId, runId, runtimeHash, identity }) {
-      await reducer(ownerToken, 'register_ai_skill_certification_runtime_profile', [
-        organizationId,
-        {
-          profile_key: `production-${runId}`,
-          runtime_hash: runtimeHash,
-          executor_identity: { __identity__: `0x${identity}` },
-          metadata: JSON.stringify({ source: 'production-identity-bootstrap', runId }),
-        },
-      ])
-    },
   }
 }
 
@@ -232,7 +215,7 @@ export function parseConfigMap(value) {
   return result
 }
 
-export function buildServiceSecrets({ issued, targets = IDENTITY_TARGETS, adminToken, runtimeHash, bootstrapSecrets }) {
+export function buildServiceSecrets({ issued, targets = IDENTITY_TARGETS, adminToken, bootstrapSecrets }) {
   const byService = new Map()
   const assign = (service, name, value) => {
     if (!byService.has(service)) byService.set(service, {})
@@ -261,7 +244,6 @@ export function buildServiceSecrets({ issued, targets = IDENTITY_TARGETS, adminT
       if (value) assign(service, name, value)
     }
   }
-  assign('ai-gateway', 'AI_CERTIFICATION_RUNTIME_HASH', runtimeHash)
   return byService
 }
 
@@ -285,10 +267,6 @@ export async function bootstrapProductionIdentities({
     throw new Error('rotation requires LUMIERE_ROTATION_DRAINED=1 after affected workers are drained')
   }
   const runId = assertSafeRunId(env.LUMIERE_IDENTITY_RUN_ID)
-  const runtimeHash = required(env.AI_CERTIFICATION_RUNTIME_HASH, 'AI_CERTIFICATION_RUNTIME_HASH')
-  if (!/^sha256:[0-9a-f]{64}$/u.test(runtimeHash)) {
-    throw new Error('AI_CERTIFICATION_RUNTIME_HASH must be sha256: plus 64 lowercase hex characters')
-  }
   const configMap = parseConfigMap(env.DOPPLER_CONFIG_MAP_JSON)
   const selectedTargets = IDENTITY_TARGETS.filter((target) => target.services.some((service) => configMap.has(service)))
   if (selectedTargets.length === 0) throw new Error('DOPPLER_CONFIG_MAP_JSON does not select any identity-consuming service')
@@ -321,7 +299,6 @@ export async function bootstrapProductionIdentities({
     issued,
     targets: selectedTargets,
     adminToken: required(env.STDB_SERVER_TOKEN, 'STDB_SERVER_TOKEN'),
-    runtimeHash,
     bootstrapSecrets,
   })
   const doppler = createDopplerClient({
@@ -341,14 +318,6 @@ export async function bootstrapProductionIdentities({
     for (const organizationId of organizations) {
       for (const serviceName of target.bindings) {
         await stdb.registerBinding({ organizationId, runId, serviceName, identity: credential.identity })
-      }
-      if (target.certificationExecutor) {
-        await stdb.registerCertificationProfile({
-          organizationId,
-          runId,
-          runtimeHash,
-          identity: credential.identity,
-        })
       }
     }
   }

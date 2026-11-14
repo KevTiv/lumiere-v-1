@@ -5,26 +5,25 @@ use stdb_client::StdbClient;
 
 use crate::skills::{compose_prompt, load_bundled_skill};
 
-/// Only executable generation surfaces require a certified current source.
-/// Embedding and indexing adapters are bounded infrastructure, not executables.
-pub(crate) async fn require_generation_source(
+/// Recheck the effective catalog and company binding at the point of use.
+pub(crate) async fn require_enabled_skill(
     stdb: &StdbClient,
     organization_id: u64,
+    company_id: u64,
     skill_key: &str,
 ) -> Result<()> {
-    if !matches!(
-        skill_key,
-        "rag_generation" | "form_suggestion" | "action_draft_generation"
-    ) {
-        return Ok(());
-    }
-    if organization_id == 0 {
-        return Err(crate::error::GenerationSourceUnavailable.into());
-    }
-    crate::harness::release_registry::load_active_manifest(stdb, organization_id, skill_key, 1)
+    let row = load_effective_catalog_skill(stdb, organization_id, skill_key)
         .await
-        .map(|_| ())
-        .map_err(|_| crate::error::GenerationSourceUnavailable.into())
+        .map_err(|error| error.context(crate::error::SkillUnavailable))?
+        .ok_or(crate::error::SkillUnavailable)?;
+    if load_skill_config(stdb, organization_id, company_id, row_u64(&row, "id"))
+        .await
+        .map_err(|error| error.context(crate::error::SkillUnavailable))?
+        .is_some_and(|config| !row_bool(&config, "isEnabled"))
+    {
+        return Err(crate::error::SkillUnavailable.into());
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -483,7 +482,6 @@ pub async fn create_generation_surface_run(
             "generation surface skill '{skill_key}' is not registered in the governed program catalog"
         ))?;
     let run_key = uuid::Uuid::new_v4().to_string();
-    require_generation_source(stdb, org_id, skill_key).await?;
     create_run_with_program_ref(
         stdb,
         org_id,
@@ -547,7 +545,6 @@ pub async fn create_or_recover_generation_surface_run(
         return Ok(run);
     }
 
-    require_generation_source(stdb, org_id, skill_key).await?;
     let create_result = create_run_with_program_ref(
         stdb,
         org_id,
@@ -948,41 +945,26 @@ pub async fn sync_bundled_skills(stdb: &StdbClient, organization_id: u64) -> Res
 pub(crate) mod tests {
     use super::*;
 
-    /// SQL rows, not a resolver bypass: all release/source validation runs normally.
-    pub(crate) fn generation_source_rows(
+    pub(crate) fn skill_availability_rows(
         statement: &str,
         key: &str,
         case: &str,
     ) -> Option<Vec<Value>> {
         use serde_json::json;
-        if statement.contains("FROM ai_skill_release ") {
-            assert!(statement.contains("organization_id = 1"));
-            return Some(if case == "missing" {
-                vec![]
-            } else {
-                vec![json!({"skill_version_id": 90})]
-            });
-        }
-        if statement.contains("FROM ai_skill_version ") {
-            assert!(statement.contains("organization_id = 1"));
-            let manifest = super::super::generation_surface_certification::manifest(key).unwrap();
+        if statement.contains("FROM ai_skill_config ") {
             return Some(vec![json!({
-                "id": 90, "organization_id": 1, "skill_id": 8, "skill_key": key,
-                "version": "1.0.0", "risk": "green",
-                "max_steps": manifest.limits.max_steps,
-                "max_tool_calls": manifest.limits.max_tool_calls,
-                "resources": manifest.named_resources, "output_types": [manifest.output_type],
-                "source_hash": if case == "stale" { "a".repeat(64) } else {
-                    super::super::generation_surface_certification::bundle_hash(key).unwrap()
-                }
+                "id": 1, "company_id": 3, "is_enabled": case != "disabled"
             })]);
         }
         if statement.contains("FROM ai_skill ") {
             assert!(statement.contains("LIMIT 2"));
             assert!(!statement.contains("is_active ="));
+            if case == "missing" {
+                return Some(vec![]);
+            }
             return Some(vec![json!({
                 "id": 8, "organization_id": if case == "foreign" { 999 } else { 1 },
-                "skill_key": key, "is_active": true
+                "skill_key": key, "is_active": case != "inactive"
             })]);
         }
         None
@@ -1062,14 +1044,17 @@ pub(crate) mod tests {
                 assert!(load_skill(&stdb, 1, 3, "rag_generation").await.is_err());
                 assert_eq!(state.lock().unwrap().2.len(), reads);
                 state.lock().unwrap().2.clear();
-                assert!(crate::harness::release_registry::load_active_manifest(
-                    &stdb,
-                    1,
-                    "rag_generation",
-                    1
-                )
-                .await
-                .is_err());
+                assert!(
+                    crate::harness::release_registry::load_builtin_execution_manifest(
+                        &stdb,
+                        1,
+                        3,
+                        "rag_generation",
+                        1
+                    )
+                    .await
+                    .is_err()
+                );
                 assert_eq!(state.lock().unwrap().2.len(), reads);
             }
         }
@@ -1089,7 +1074,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn generation_source_gate_uses_current_scoped_release_and_exempts_infrastructure() {
+    async fn built_in_generation_uses_catalog_and_company_binding_without_release_queries() {
         use axum::{extract::State, routing::post, Json, Router};
         use std::sync::{Arc, Mutex};
         async fn sql(
@@ -1097,18 +1082,10 @@ pub(crate) mod tests {
             statement: String,
         ) -> Json<Value> {
             let (key, case) = *state.lock().unwrap();
-            let rows = generation_source_rows(&statement, key, case).unwrap_or_else(|| {
-                if statement.contains("FROM ai_skill_config ")
-                    || statement.contains("FROM ai_agent_run ")
-                {
-                    vec![]
-                } else if statement.contains("FROM ai_skill ") {
-                    vec![serde_json::json!({"id": 8, "skill_key": key})]
-                } else {
-                    panic!("unexpected source/run query: {statement}")
-                }
-            });
-            Json(sats_rows(rows))
+            Json(sats_rows(
+                skill_availability_rows(&statement, key, case)
+                    .unwrap_or_else(|| panic!("unexpected skill query: {statement}")),
+            ))
         }
         let state = Arc::new(Mutex::new(("rag_generation", "active")));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1121,52 +1098,19 @@ pub(crate) mod tests {
             .route("/v1/database/fixture/sql", post(sql))
             .with_state(state.clone());
         let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        for key in [
-            "rag_generation",
-            "form_suggestion",
-            "action_draft_generation",
-        ] {
-            for case in ["missing", "stale", "foreign", "active"] {
+        for key in super::super::generation_surface_certification::KEYS {
+            for case in ["active", "disabled", "inactive", "missing", "foreign"] {
                 *state.lock().unwrap() = (key, case);
-                let result = require_generation_source(&stdb, 1, key).await;
-                if case == "active" {
-                    result.unwrap();
-                    // Revoke/change a source after admission: no cached success.
-                    for changed in ["missing", "stale"] {
-                        *state.lock().unwrap() = (key, changed);
-                        assert!(require_generation_source(&stdb, 1, key)
-                            .await
-                            .unwrap_err()
-                            .is::<crate::error::GenerationSourceUnavailable>());
-                    }
-                } else {
-                    assert!(result
-                        .unwrap_err()
-                        .is::<crate::error::GenerationSourceUnavailable>());
-                }
+                let result = require_enabled_skill(&stdb, 1, 3, key).await;
+                assert_eq!(result.is_ok(), case == "active", "{key}: {case}");
+                let manifest = crate::harness::release_registry::load_builtin_execution_manifest(
+                    &stdb, 1, 3, key, 1,
+                )
+                .await;
+                assert_eq!(manifest.is_ok(), case == "active", "{key}: {case}");
             }
-            *state.lock().unwrap() = (key, "missing");
-            assert!(
-                create_generation_surface_run(&stdb, 1, 3, key, 42, None, "{}", "actor",)
-                    .await
-                    .unwrap_err()
-                    .is::<crate::error::GenerationSourceUnavailable>()
-            );
-            assert!(create_or_recover_generation_surface_run(
-                &stdb, 1, 3, key, 42, None, "new-run", "{}", "actor",
-            )
-            .await
-            .unwrap_err()
-            .is::<crate::error::GenerationSourceUnavailable>());
         }
         server.abort();
-        for key in [
-            "embedding_query",
-            "document_embeddings",
-            "activity_indexing",
-        ] {
-            require_generation_source(&stdb, 1, key).await.unwrap();
-        }
     }
 
     fn legacy_analytics_skill(skill_key: &str) -> LoadedSkill {

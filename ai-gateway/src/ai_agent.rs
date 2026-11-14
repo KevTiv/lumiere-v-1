@@ -120,7 +120,6 @@ pub async fn resolve_surface_agent(
     if scope_rows.len() != 1 || !agent_company_matches(&scope_rows[0], company_id) {
         anyhow::bail!("AI agent is unavailable for this company");
     }
-    crate::orchestrator::skill_loader::require_generation_source(stdb, org_id, skill_key).await?;
     Ok(agent)
 }
 

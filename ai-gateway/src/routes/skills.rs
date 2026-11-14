@@ -172,9 +172,15 @@ impl CompanySetup {
         Self {
             company_id,
             status,
-            stage: "platform_activation_required",
+            stage: "company_defaults_checked",
             execution_readiness: "not_verified",
-            message: "Binding/catalog setup only; chat execution is not verified. Existing custom settings and disabled features are preserved. A platform administrator must finish activation and verify approved models, embedding query, metering, writer/index, catalog and releases. Repeating tenant setup does not complete platform activation.",
+            message: match status {
+                "profile_required" => {
+                    "Ask a platform administrator to publish a default AI profile for this company."
+                }
+                "preserved" => "Existing company AI settings were preserved.",
+                _ => "Company AI defaults are configured. Open the Assistant to verify chat.",
+            },
         }
     }
 }
@@ -435,12 +441,8 @@ pub async fn post_run(Json(req): Json<GatewayRunSkillRequest>) -> Response {
 
     let replacement_path = governed_skill_replacement(skill_key);
     let error = match replacement_path {
-        Some(path) => format!(
-            "skill '{skill_key}' has migrated from /v1/skills/run; use {path}"
-        ),
-        None => format!(
-            "skill '{skill_key}' has no governed execution adapter; register and certify one before execution"
-        ),
+        Some(path) => format!("skill '{skill_key}' has migrated from /v1/skills/run; use {path}"),
+        None => format!("skill '{skill_key}' has no governed execution adapter."),
     };
     (
         StatusCode::GONE,
@@ -463,12 +465,17 @@ mod tests {
         for status in ["bindings_applied", "preserved", "profile_required"] {
             let setup = serde_json::to_value(CompanySetup::binding_setup(7, status)).unwrap();
             assert_eq!(setup["status"], status);
-            assert_eq!(setup["stage"], "platform_activation_required");
+            assert_eq!(setup["stage"], "company_defaults_checked");
             assert_eq!(setup["execution_readiness"], "not_verified");
+            let expected_message = match status {
+                "profile_required" => "publish a default AI profile",
+                "preserved" => "settings were preserved",
+                _ => "verify chat",
+            };
             assert!(setup["message"]
                 .as_str()
                 .unwrap()
-                .contains("platform administrator"));
+                .contains(expected_message));
         }
     }
 

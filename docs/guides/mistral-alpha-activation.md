@@ -48,34 +48,9 @@ an expired final attempt can successfully dead-letter the job instead. Missing,
 expired or mismatched readback stops processing without another claim or paid
 request.
 
-Generation source activation is a separate gate from contracts publication:
-
-1. Discover each exact manifest from the candidate gateway's skill-binding
-   discovery endpoint. `gateway certification-bundles` also prints the current
-   compiled hashes for chat, forms, action drafts, report analysis, low-stock
-   and report composition. Never copy a hash from a different build.
-2. Through the canonical skill-version/certification owner, register a new
-   immutable version, run its independent fixture envelope, review the
-   certificate and promote the release. Do not overwrite an old version, copy another skill's
-   certificate or turn a synthetic fixture result into live provider evidence.
-3. The combined Assistant history and persistent-operator release changes the
-   shared authentication and generation bundles. Register and independently
-   certify `rag_generation`, `form_suggestion`, and `action_draft_generation`
-   at `1.0.3`. The five Finance reviews use `1.0.6`, Report Analysis uses
-   `1.0.11`, and Low Stock and Report Composer use `1.0.3`. Discover the
-   exact hashes from the candidate gateway, certify each enabled surface, and
-   promote it through AI Skills before advertising availability. Live provider
-   acceptance uses its own activation run.
-4. RAG certification requires an immutable ordered `accessTranscript` of exact
-   scoped grant and passage reads, including both release-time rechecks.
-   Removing a recheck, leaving unused entries, or withdrawing access must not
-   produce a passing supported answer.
-5. Runtime checks the effective tenant-local catalog first, including explicit
-   disablement, and rechecks current generation source before new runs and
-   each paid generation, RAG query embedding and review attempt. Old source
-   releases therefore fail closed during an incoherent rollout. Coordinate
-   gateway deployment and certification promotion; retain coherent rollback
-   artifacts instead of disabling these checks.
+Built-in skills use the execution policies shipped in the gateway. An active
+catalog entry and the company’s effective binding control availability. Verify
+the enabled surfaces with the deployed gateway and an authorized company session.
 
 ## Provider and index configuration
 
@@ -111,7 +86,7 @@ is compatible, and query callers check readiness before paying for embeddings.
 
 ## Identities, prices and company bindings
 
-Retain separate writer, spend-reader and certification identities. Register the
+Retain separate writer and spend-reader identities. Register the
 existing writer's verified identity as the exact active `ai_spend_writer`
 organization binding through the platform-owned service registration operation.
 The registering administrator must be distinct from that writer. Give the
@@ -128,9 +103,7 @@ authority and its separate permission; a caller-supplied approval label alone
 does not grant that authority. A writer rotation retains old holds for approved
 reconciliation rather than transferring dispatch ownership silently.
 
-Use existing catalog records for the following infrastructure bindings. They
-identify bounded native services and do not manufacture executable skill
-certificates:
+Use existing catalog records for the following infrastructure bindings. They identify bounded native services:
 
 | Company binding | Agent action |
 | --- | --- |
@@ -142,15 +115,12 @@ certificates:
 The agent's allowed models must include `mistral-embed`, the exact OCR model,
 and the reviewed generation/review models. Chat uses its own `rag_generation`
 company binding; forms and action drafts use `form_suggestion` and
-`action_draft_generation`. Generative bindings require their current matching
-source versions, independent certificates, capability grants and model policy.
-One skill's activation does not activate another.
+`action_draft_generation`. Generative bindings require their own capability grants and model policy.
 
 Create a private manifest for `scripts/provision-mistral-capabilities.mjs` using
 its validated fields: `version: 1`, `organizationId`, `companyId`, `agentId`,
 `intelligencePolicyRef`, `currency`, `pricesReviewedAt`, `surfaces` and `meters`.
-Each surface contains `skillKey` and `skillId`; generative surfaces also require
-their exact `sourceHash`. Each meter contains `model`, `unit` and `unitsPer1k`.
+Each surface contains `skillKey` and `skillId`. Each meter contains `model`, `unit` and `unitsPer1k`.
 Prices are integer currency microunits per 1,000 tokens or per 1,000 OCR pages.
 Obtain current prices; no price or funding amount is inferred from this runbook.
 
@@ -183,7 +153,7 @@ JavaScript flag or successful SQL read grants these permissions.
 Apply adds only missing reviewed model/action entries, verifies that unrelated
 agent fields and scope are preserved, then writes missing prices and bindings
 and reads back the unchanged allowance. A stale schema, missing writer,
-catalog, certificate or operator authority blocks activation. The tool does not
+catalog or operator authority blocks activation. The tool does not
 create those prerequisites or repair them by granting privileges.
 
 ```sh
@@ -195,7 +165,7 @@ node scripts/provision-mistral-capabilities.mjs --check /private/capabilities.js
 ```
 
 Plan is offline; check is read-only. Apply never creates an agent, budget,
-funding, certificate or organization default. Existing explicit disablement and
+funding or organization default. Existing explicit disablement and
 conflicting configuration block writes. Keep credentials in the existing server
 environment. An uncertain write stops; inspect exact state before another apply.
 Provision the current UTC monthly period without resetting previous use or holds.
@@ -247,7 +217,7 @@ request/run/reservation IDs and private receipts while proving:
    callers dispatch once. Unknown outcomes retain spend and require recovery.
 5. Embedding, OCR and chat share the same cap and prepaid balance; exhausted
    allowance blocks before provider I/O, including indexing queries and retries.
-6. Disabled providers, incompatible collections, missing pricing/certificates and
+6. Disabled providers, incompatible collections, missing pricing and
    unavailable dependencies show a limitation while ordinary ERP remains usable.
 7. Chat-to-native-form and saved-guide save/reload/retrieval preserve actor scope,
    dirty work and exact saved identities on the integrated signed-in release.
