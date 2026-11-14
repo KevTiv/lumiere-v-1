@@ -7,6 +7,7 @@ pub mod handoff;
 #[allow(dead_code)] // descriptor route consumes the manifest types later
 pub mod instance;
 pub mod llm;
+mod openai_responses;
 pub mod parser;
 pub mod vision;
 pub mod web_search;
@@ -270,6 +271,7 @@ pub(super) mod readiness_tests {
             ollama_llm_model: "llm".into(),
             ollama_supports_tool_calling: false,
             mistral_api_key: None,
+            openai_api_key: None,
             mistral_reasoning_effort: None,
             mistral_reasoning_models: Vec::new(),
             google_api_key: None,

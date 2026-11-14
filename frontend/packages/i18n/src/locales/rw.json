@@ -25,6 +25,7 @@
       "active": "Igenamiterere risanzwe: {{key}}, verisiyo {{version}}",
       "empty": "Nta genamiterere risanzwe ryatangajwe. Tegura kandi utangaze igenamiterere kugira ngo amashyirahamwe ategurwe mu buryo bwikora.",
       "chooseProvider": "Hitamo utanga AI",
+      "chooseModel": "Hitamo modeli",
       "limits": "Imipaka y’ishyirahamwe",
       "budgetHint": "Ingengo y’imari ya buri kwezi isangirwa na sosiyete zose z’ishyirahamwe. Ingengo y’imari n’ibiciro biri mu duce duto tw’ifaranga: 1.000.000 tungana n’ifaranga rimwe ryatoranyijwe.",
       "publishHint": "Gutangaza bikora verisiyo idahinduka ikaba isanzwe ku mashyirahamwe mashya. Ibyari byateguwe, igenamiterere ryihariye n’ibikorwa byahagaritswe biragumaho.",

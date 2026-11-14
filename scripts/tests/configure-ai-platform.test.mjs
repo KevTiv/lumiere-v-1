@@ -33,6 +33,22 @@ test('platform template is tenant independent and contains bounded approved poli
   assert.deepEqual(params.generation_profile.allowed_roles, ['decision', 'reasoning', 'generation'])
   assert.equal(Object.keys(params).some(key => /organization|company|agent/.test(key) && key !== 'max_enrolled_organizations'), false)
 })
+test('OpenAI platform template admits supported models with provider-default sampling', () => {
+  const config = {
+    ...manifest(),
+    generation: { ...profile('gpt-6-luna'), provider: 'openai' },
+    review: { ...profile('gpt-6-sol'), provider: 'openai' },
+  }
+  const params = templateParams(config)
+  assert.equal(params.generation_profile.provider, 'openai')
+  assert.equal(params.review_profile.model, 'gpt-6-sol')
+  assert.deepEqual(params.generation_profile.temperature, { none: [] })
+  assert.deepEqual(params.review_profile.top_p, { none: [] })
+  assert.throws(() => templateParams({
+    ...config,
+    review: { ...config.review, model: 'gpt-6.1-sol' },
+  }), /unsupported review OpenAI model/)
+})
 test('register does not activate; activate verifies and is repeatable', async () => {
   const { client, calls } = fixture()
   assert.deepEqual(await configurePlatform(manifest(), client), { registered: false, active: false, billableCalls: 0 })

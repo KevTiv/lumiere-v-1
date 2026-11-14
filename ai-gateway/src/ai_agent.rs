@@ -489,9 +489,11 @@ fn row_to_agent_config(
 
 fn validate_provider(provider: &str) -> Result<()> {
     match normalize_provider(provider).as_str() {
-        "mistral" | "gemini" | "ollama" => Ok(()),
+        "mistral" | "gemini" | "openai" | "ollama" => Ok(()),
         other => {
-            anyhow::bail!("Unsupported provider '{other}'. Configure Mistral, Gemini, or Ollama.")
+            anyhow::bail!(
+                "Unsupported provider '{other}'. Configure Mistral, Gemini, OpenAI, or Ollama."
+            )
         }
     }
 }

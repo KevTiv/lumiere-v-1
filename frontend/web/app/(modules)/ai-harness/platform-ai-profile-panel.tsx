@@ -9,7 +9,16 @@ import { Label } from "@lumiere/ui/components/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 import { apiFetch } from "@/lib/api-fetch"
 import { responseErrorMessage } from "@lumiere/api-client/response-error"
-import { parsePlatformAiProfile, parsePlatformAiProfileState, type PlatformAiProfile, type PlatformAiProfileState, type PlatformModelProfile } from "@/lib/ai-platform-profile"
+import {
+  openAiPlatformModels,
+  openAiOutputLimits,
+  parsePlatformAiProfile,
+  parsePlatformAiProfileState,
+  platformModelProviders,
+  type PlatformAiProfile,
+  type PlatformAiProfileState,
+  type PlatformModelProfile,
+} from "@/lib/ai-platform-profile"
 
 const roles = ["generation_profile", "review_profile"] as const
 const numericModelFields = ["max_tokens", "context_window", "timeout_ms", "max_concurrency", "input_cost_per_1k_microunits", "output_cost_per_1k_microunits"] as const
@@ -115,20 +124,38 @@ export function PlatformAiProfileForm({ state, pending, error, saved, onPublish 
 
 function ModelProfileFields({ role, profile }: { role: (typeof roles)[number]; profile?: PlatformModelProfile }) {
   const { t } = useTranslation()
+  const [provider, setProvider] = useState<string>(profile?.provider ?? "")
   return <fieldset className="space-y-4 border-t pt-5">
     <legend className="px-1 font-medium">{t(`aiHarness.platformProfile.roles.${role}`)}</legend>
     <div className="space-y-2">
       <Label htmlFor={`${role}-provider`}>{t("aiHarness.platformProfile.fields.provider")}</Label>
-      <Select name={`${role}.provider`} required defaultValue={profile?.provider}>
+      <Select name={`${role}.provider`} required value={provider} onValueChange={setProvider}>
         <SelectTrigger id={`${role}-provider`}><SelectValue placeholder={t("aiHarness.platformProfile.chooseProvider")} /></SelectTrigger>
-        <SelectContent>{["mistral", "gemini", "ollama"].map((provider) => <SelectItem key={provider} value={provider}>{provider}</SelectItem>)}</SelectContent>
+        <SelectContent>{platformModelProviders.map(({ value, label }) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
       </Select>
     </div>
-    <div className="space-y-2"><Label htmlFor={`${role}-model`}>{t("aiHarness.platformProfile.fields.model")}</Label><Input id={`${role}-model`} name={`${role}.model`} required maxLength={128} defaultValue={profile?.model ?? ""} /></div>
-    <div className="grid gap-4 sm:grid-cols-2">{numericModelFields.map((field) => <div key={field} className="space-y-2">
-      <Label htmlFor={`${role}-${field}`}>{t(`aiHarness.platformProfile.fields.${field}`)}</Label>
-      <Input id={`${role}-${field}`} name={`${role}.${field}`} type="number" min={field.includes("cost") ? 0 : 1} step={1} max={field.includes("cost") ? 1_000_000_000_000 : 0xffffffff} required defaultValue={profile?.[field] ?? ""} />
-    </div>)}</div>
+    <div className="space-y-2">
+      <Label htmlFor={`${role}-model`}>{t("aiHarness.platformProfile.fields.model")}</Label>
+      {provider === "openai" ? (
+        <Select name={`${role}.model`} required defaultValue={profile?.provider === "openai" ? profile.model : undefined}>
+          <SelectTrigger id={`${role}-model`}>
+            <SelectValue placeholder={t("aiHarness.platformProfile.chooseModel")} />
+          </SelectTrigger>
+          <SelectContent>{openAiPlatformModels.map((model) => <SelectItem key={model} value={model}>{model}</SelectItem>)}</SelectContent>
+        </Select>
+      ) : (
+        <Input id={`${role}-model`} name={`${role}.model`} required maxLength={128} defaultValue={profile?.provider === "openai" ? "" : profile?.model ?? ""} />
+      )}
+    </div>
+    <div className="grid gap-4 sm:grid-cols-2">{numericModelFields.map((field) => {
+      const limits = provider === "openai" && field === "max_tokens"
+        ? openAiOutputLimits
+        : field.includes("cost") ? { min: 0, max: 1_000_000_000_000 } : { min: 1, max: 0xffffffff }
+      return <div key={field} className="space-y-2">
+        <Label htmlFor={`${role}-${field}`}>{t(`aiHarness.platformProfile.fields.${field}`)}</Label>
+        <Input id={`${role}-${field}`} name={`${role}.${field}`} type="number" min={limits.min} step={1} max={limits.max} required defaultValue={profile?.[field] ?? ""} />
+      </div>
+    })}</div>
     <p className="text-sm text-muted-foreground">{t("aiHarness.platformProfile.modelHint")}</p>
   </fieldset>
 }

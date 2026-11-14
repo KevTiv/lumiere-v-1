@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use super::llm::normalize_provider;
+use super::llm::{normalize_provider, OPENAI_MODELS};
 use crate::config::Config;
 
 /// Protocol families the gateway can actually dispatch. `OpenAiCompatible` is
@@ -27,6 +27,7 @@ use crate::config::Config;
 pub enum ProviderDriver {
     Mistral,
     Gemini,
+    OpenAi,
     OpenAiCompatible,
     Ollama,
 }
@@ -36,6 +37,7 @@ impl ProviderDriver {
         match self {
             Self::Mistral => "mistral",
             Self::Gemini => "gemini",
+            Self::OpenAi => "openai",
             Self::OpenAiCompatible => "openai_compatible",
             Self::Ollama => "ollama",
         }
@@ -45,6 +47,7 @@ impl ProviderDriver {
         match normalize_provider(raw).as_str() {
             "mistral" => Some(Self::Mistral),
             "gemini" => Some(Self::Gemini),
+            "openai" => Some(Self::OpenAi),
             "ollama" => Some(Self::Ollama),
             "openai_compatible" | "openai-compatible" | "kong" => Some(Self::OpenAiCompatible),
             _ => None,
@@ -312,6 +315,21 @@ impl ProviderRegistry {
                 None,
                 BTreeMap::from([("*".to_string(), tools(None))]),
             ));
+        }
+        if configured(&config.openai_api_key) {
+            let mut instance = default_instance(
+                "default-openai",
+                ProviderDriver::OpenAi,
+                Some("env:OPENAI_API_KEY"),
+                None,
+                OPENAI_MODELS
+                    .into_iter()
+                    .map(|model| (model.to_string(), tools(None)))
+                    .collect(),
+            );
+            instance.allowed_models =
+                AllowedModels::Only(OPENAI_MODELS.into_iter().map(str::to_string).collect());
+            registry.insert_unchecked(instance);
         }
         if configured(&config.kong_llm_url) {
             registry.insert_unchecked(default_instance(

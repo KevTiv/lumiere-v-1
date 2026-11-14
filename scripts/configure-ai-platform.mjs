@@ -11,6 +11,8 @@ const fields = ['templateKey', 'templateVersion', 'generation', 'review', 'skill
   'monthlyLimitUnits', 'rateLimitPerMinute', 'maxEnrolledOrganizations']
 const profileFields = ['provider', 'model', 'maxTokens', 'contextWindow', 'timeoutMs', 'maxConcurrency',
   'inputUnitsPer1k', 'outputUnitsPer1k']
+const platformProviders = ['mistral', 'gemini', 'ollama', 'openai']
+const openAiModels = ['gpt-6-luna', 'gpt-6-sol']
 
 export function templateParams(config) {
   ensure(config && typeof config === 'object' && !Array.isArray(config)
@@ -27,21 +29,24 @@ export function templateParams(config) {
     const input = config[role]
     ensure(input && typeof input === 'object' && !Array.isArray(input)
       && Object.keys(input).every(key => profileFields.includes(key)), `invalid ${role} profile`)
-    ensure(['mistral', 'gemini', 'ollama'].includes(input.provider), `unsupported ${role} provider`)
+    ensure(platformProviders.includes(input.provider), `unsupported ${role} provider`)
     ensure(label(input.model) && !/-latest$/i.test(input.model)
       && !/^(ACCOUNT_VISIBLE|REPLACE|PLACEHOLDER)/i.test(input.model), `${role} requires an exact reviewed model`)
+    const isOpenAi = input.provider === 'openai'
+    ensure(!isOpenAi || openAiModels.includes(input.model), `unsupported ${role} OpenAI model`)
     for (const key of profileFields.slice(2)) {
       const valid = key.includes('Units')
         ? Number.isSafeInteger(input[key]) && input[key] >= 0 && input[key] <= 1_000_000_000_000
         : integer(input[key])
       ensure(valid, `invalid ${role}.${key}`)
     }
+    ensure(!isOpenAi || (input.maxTokens >= 16 && input.maxTokens <= 128_000), `invalid ${role} OpenAI output token limit`)
     ensure(input.maxTokens < input.contextWindow, `${role} output ceiling must leave input capacity`)
     return {
       profile_key: `${config.templateKey}-${role}`, profile_version: config.templateVersion,
       provider: input.provider, model: input.model,
       allowed_roles: role === 'generation' ? ['decision', 'reasoning', 'generation'] : ['review'],
-      temperature: option(0), top_p: option(null), max_tokens: input.maxTokens,
+      temperature: option(isOpenAi ? null : 0), top_p: option(null), max_tokens: input.maxTokens,
       context_window: input.contextWindow, timeout_ms: input.timeoutMs,
       max_retries: 0, max_concurrency: input.maxConcurrency, supports_tool_calling: true,
       supports_structured_output: true, supports_parallel_requests: false,

@@ -25,6 +25,7 @@
       "active": "Profil actuel : {{key}}, version {{version}}",
       "empty": "Aucun profil par défaut n’est publié. Configurez et publiez un profil pour préparer automatiquement les organisations.",
       "chooseProvider": "Choisir un fournisseur",
+      "chooseModel": "Choisir un modèle",
       "limits": "Limites par organisation",
       "budgetHint": "Le budget mensuel est partagé entre les sociétés de chaque organisation. Le budget et les tarifs sont en micro-unités : 1 000 000 équivaut à une unité de la devise choisie.",
       "publishHint": "La publication crée une version immuable et la définit par défaut pour les nouvelles inscriptions. Les inscriptions existantes, les paramètres personnalisés et les fonctions désactivées sont conservés.",

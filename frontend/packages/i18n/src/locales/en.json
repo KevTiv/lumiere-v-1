@@ -14267,6 +14267,7 @@
       "active": "Current default: {{key}}, version {{version}}",
       "empty": "No platform default is published. Configure and publish a profile to enable automatic tenant setup.",
       "chooseProvider": "Select a provider",
+      "chooseModel": "Select a model",
       "limits": "Organization usage limits",
       "budgetHint": "The monthly budget is shared by all companies in each organization. Budget and model prices use micro-units: 1,000,000 equals one unit of the selected currency.",
       "publishHint": "Publishing creates an immutable version and makes it the default for new enrollments. Existing enrollments, custom settings and disabled features are preserved.",
