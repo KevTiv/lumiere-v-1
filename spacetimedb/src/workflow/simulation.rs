@@ -3,24 +3,33 @@
 //! The planner reads immutable definition rows and an immutable subject
 //! snapshot, then emits an ordered trace. The reducer persists only simulation
 //! result/step rows; runtime tokens, timers, outbox intents, queue jobs and
-//! domain records are never created here.
+//! domain records are never created here. For generated drafts, only tests
+//! that complete the selected scenario can be used for publication.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::ai::workflow_provenance::find_generation;
 use crate::helpers::check_permission;
+use crate::workflow::authorization::require_workflow_company_access;
 use crate::workflow::definitions::{
     canonical_definition_hash, validate_workflow_graph, workflow, workflow_edge, workflow_node,
     workflow_version, Workflow, WorkflowBranchKind, WorkflowEdge, WorkflowNode, WorkflowNodeKind,
     WorkflowVersion, WorkflowVersionStatus,
 };
-use crate::workflow::evaluator::{evaluate_condition_program, ConditionSnapshot};
+use crate::workflow::evaluator::{
+    canonical_condition_snapshot_hash, evaluate_condition_program, validate_condition_snapshot,
+    ConditionSnapshot,
+};
 
 const MAX_SIMULATION_NODES: usize = 512;
 const MAX_SIMULATION_STEPS: usize = 4096;
 const MAX_SIMULATION_KEY_LEN: usize = 128;
+// A slash is outside the caller's simulation key grammar. Older simulation
+// rows and ordinary preview requests cannot claim this evidence marker.
+const DRAFT_TEST_PREFIX: &str = "draft-test/";
 
 /// Stable categories used by persisted and in-memory simulation traces.
 #[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
@@ -113,7 +122,7 @@ pub struct WorkflowSimulationStep {
     pub detail: String,
 }
 
-/// Simulate one immutable version and persist only its ordered trace.
+/// Simulate one saved graph and persist only its ordered trace.
 #[reducer]
 pub fn simulate_workflow(
     ctx: &ReducerContext,
@@ -132,6 +141,21 @@ pub fn simulate_workflow(
         .ok_or_else(|| "workflow version not found".to_string())?;
     if version.organization_id != organization_id {
         return Err("workflow version does not belong to this organization".to_string());
+    }
+    let mut snapshot = params.snapshot;
+    let mut simulation_key = params.simulation_key;
+    let is_draft = version.status == WorkflowVersionStatus::Draft;
+    let is_generated_draft = is_draft && find_generation(ctx, workflow_version_id).is_some();
+    if is_generated_draft {
+        let company_id = version
+            .company_id
+            .ok_or("generated workflow company is missing")?;
+        require_workflow_company_access(ctx, organization_id, company_id, ctx.sender())?;
+        validate_condition_snapshot(&version.snapshot_fields, &snapshot)
+            .map_err(|error| error.to_string())?;
+        snapshot.subject_revision_hash =
+            canonical_condition_snapshot_hash(&snapshot).map_err(|error| error.to_string())?;
+        simulation_key.insert_str(0, DRAFT_TEST_PREFIX);
     }
     let definition = ctx
         .db
@@ -152,16 +176,31 @@ pub fn simulate_workflow(
         .filter(&workflow_version_id)
         .collect();
 
+    // Draft scenarios may exercise different signals along the same path.
+    let signals: Vec<_> = match params.signal_key.as_deref() {
+        Some(signal) if is_draft => {
+            let signals: Vec<_> = signal
+                .split(',')
+                .map(str::trim)
+                .take(MAX_SIMULATION_NODES + 1)
+                .collect();
+            if signals.len() > MAX_SIMULATION_NODES {
+                return Err(format!(
+                    "A draft test can use up to {MAX_SIMULATION_NODES} signals."
+                ));
+            }
+            signals
+        }
+        Some(signal) => vec![signal],
+        None => vec![],
+    };
     // Complete the pure plan before inserting anything. Any planner failure
     // therefore leaves even the simulation tables unchanged.
-    let trace = plan_workflow_simulation(
-        &definition,
-        &version,
-        &nodes,
-        &edges,
-        &params.snapshot,
-        params.signal_key.as_deref(),
-    )?;
+    let trace =
+        plan_workflow_simulation(&definition, &version, &nodes, &edges, &snapshot, &signals)?;
+    if is_generated_draft && !simulation_reaches_end(&trace) {
+        return Err("Test draft reached a dead end. Check the sample inputs, signals and workflow branches.".to_string());
+    }
     let trace_bytes = canonical_simulation_trace_bytes(&trace)?;
     let trace_hash = format!("sha256:{:x}", Sha256::digest(trace_bytes));
     let step_count = u32::try_from(trace.steps.len())
@@ -176,7 +215,7 @@ pub fn simulate_workflow(
             company_id: version.company_id,
             workflow_id: version.workflow_id,
             workflow_version_id,
-            simulation_key: params.simulation_key,
+            simulation_key,
             definition_hash: trace.definition_hash.clone(),
             subject_model: trace.subject_model.clone(),
             subject_id: trace.subject_id,
@@ -206,6 +245,62 @@ pub fn simulate_workflow(
     Ok(())
 }
 
+/// A test can authorize publication only for the same persisted draft and
+/// executable graph. An unchanged graph in a different draft needs its own test.
+pub(crate) fn require_complete_draft_simulation(
+    ctx: &ReducerContext,
+    version: &WorkflowVersion,
+    company_id: u64,
+    definition_hash: &str,
+) -> Result<(), String> {
+    let tested = ctx
+        .db
+        .workflow_simulation_result()
+        .workflow_simulation_result_by_version()
+        .filter(&version.id)
+        .any(|result| {
+            result.organization_id == version.organization_id
+                && result.company_id == Some(company_id)
+                && result.workflow_id == version.workflow_id
+                && result.definition_hash == definition_hash
+                && result.simulation_key.starts_with(DRAFT_TEST_PREFIX)
+        });
+    if !tested {
+        return Err(
+            "Run Test draft successfully on the current generated workflow before publishing."
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
+fn simulation_reaches_end(trace: &WorkflowSimulationTrace) -> bool {
+    let completed: BTreeSet<_> = trace
+        .steps
+        .iter()
+        .filter(|step| {
+            matches!(
+                step.kind,
+                WorkflowSimulationStepKind::EndReached | WorkflowSimulationStepKind::EdgeTaken
+            )
+        })
+        .filter_map(|step| step.node_key.as_deref())
+        .collect();
+    trace
+        .steps
+        .iter()
+        .any(|step| step.kind == WorkflowSimulationStepKind::EndReached)
+        && trace
+            .steps
+            .iter()
+            .filter(|step| step.kind == WorkflowSimulationStepKind::NodeEntered)
+            .all(|step| {
+                step.node_key
+                    .as_deref()
+                    .is_some_and(|key| completed.contains(key))
+            })
+}
+
 /// Produce an ordered simulation trace without reading or mutating database
 /// state. Runtime uses the same condition evaluator and ordering contract.
 #[allow(clippy::too_many_arguments)]
@@ -215,7 +310,7 @@ pub fn plan_workflow_simulation(
     nodes: &[WorkflowNode],
     edges: &[WorkflowEdge],
     snapshot: &ConditionSnapshot,
-    signal_key: Option<&str>,
+    signals: &[&str],
 ) -> Result<WorkflowSimulationTrace, String> {
     if workflow.id != version.workflow_id {
         return Err("workflow version belongs to a different definition".to_string());
@@ -304,12 +399,21 @@ pub fn plan_workflow_simulation(
         )?;
         push_proposal_step(&mut steps, node)?;
 
+        let candidates = outgoing
+            .get(node_key)
+            .map(Vec::as_slice)
+            .unwrap_or_default();
+        let selected_signal = signals.iter().copied().find(|signal| {
+            candidates
+                .iter()
+                .any(|edge| edge.signal_key.as_deref() == Some(*signal))
+        });
         let mut selected = Vec::new();
-        for edge in outgoing.get(node_key).into_iter().flatten() {
+        for edge in candidates.iter().copied() {
             let signal_matches = edge
                 .signal_key
                 .as_deref()
-                .is_none_or(|required| signal_key == Some(required));
+                .is_none_or(|required| selected_signal == Some(required));
             let (outcome, detail) = if !signal_matches {
                 (false, "signal_not_matched".to_string())
             } else if let Some(program) = edge.condition.as_ref() {
@@ -339,7 +443,7 @@ pub fn plan_workflow_simulation(
                 detail,
             )?;
             if outcome {
-                selected.push(*edge);
+                selected.push(edge);
                 if node.kind == WorkflowNodeKind::Decision
                     || node.split_kind == WorkflowBranchKind::Xor
                 {

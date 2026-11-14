@@ -30,6 +30,8 @@ use crate::workflow::definitions::{
     UpsertWorkflowNodeParams, WorkflowBranchKind, WorkflowNodeKind, WorkflowTimerKind,
     WorkflowTimerPolicy, WorkflowTrigger, WorkflowVersionStatus,
 };
+use crate::workflow::evaluator::ConditionSnapshot;
+use crate::workflow::simulation::{simulate_workflow, SimulateWorkflowParams};
 
 use super::evidence_provenance_test::{
     accept, assert_eq_str, change, expect_err, hand_claim_to_another_creator,
@@ -268,6 +270,29 @@ fn publish(ctx: &ReducerContext, f: &OrgFixture, version_id: u64) -> Result<(), 
         f.organization_id,
         version_id,
         revision(ctx, version_id)?,
+    )
+}
+
+fn test_draft(
+    ctx: &ReducerContext,
+    f: &OrgFixture,
+    version_id: u64,
+    signal_key: Option<&str>,
+) -> Result<(), String> {
+    simulate_workflow(
+        ctx,
+        f.organization_id,
+        version_id,
+        SimulateWorkflowParams {
+            simulation_key: format!("draft-test-{}", revision(ctx, version_id)?),
+            signal_key: signal_key.map(str::to_string),
+            snapshot: ConditionSnapshot {
+                subject_model: "purchase_order".into(),
+                subject_id: 0,
+                subject_revision_hash: "fixture".into(),
+                fields: vec![],
+            },
+        },
     )
 }
 
@@ -553,6 +578,8 @@ pub fn test_generated_workflow_binds_every_step(ctx: &ReducerContext) -> Result<
     let (org, company) = (f.organization_id, f.company_id);
     let base = seed_foundation(ctx, &f, "bind-src")?;
     let version = build_draft(ctx, &f, "wf.bind", &["collect", "approve"])?;
+    // A preview recorded before the trusted generation marker is not a draft test.
+    test_draft(ctx, &f, version, None)?;
     let run = seed_run(ctx, org, company, "running");
     begin(ctx, &f, version, run)?;
 
@@ -604,6 +631,30 @@ pub fn test_generated_workflow_binds_every_step(ctx: &ReducerContext) -> Result<
         return Err("staging retries were not idempotent or lost the run".into());
     }
 
+    expect_err(
+        publish(ctx, &f, version),
+        "Run Test draft",
+        "untested draft",
+    )?;
+    test_draft(ctx, &f, version, None)?;
+    let mut signaled = edge("e0", "start", "collect", 1);
+    signaled.signal_key = Some("continue".into());
+    upsert_workflow_edge(ctx, org, version, revision(ctx, version)?, signaled)?;
+    let mut approval = edge("e1", "collect", "approve", 2);
+    approval.signal_key = Some("review".into());
+    upsert_workflow_edge(ctx, org, version, revision(ctx, version)?, approval)?;
+    expect_err(publish(ctx, &f, version), "Run Test draft", "edited graph")?;
+    expect_err(
+        test_draft(ctx, &f, version, None),
+        "reached a dead end",
+        "incomplete test",
+    )?;
+    expect_err(
+        publish(ctx, &f, version),
+        "Run Test draft",
+        "failed test cannot authorize publication",
+    )?;
+    test_draft(ctx, &f, version, Some("continue,review"))?;
     publish(ctx, &f, version)?;
     if !is_published(ctx, version) {
         return Err("a fully provenanced workflow did not publish".into());
@@ -771,6 +822,7 @@ pub fn test_clone_and_edit_preserve_ancestry_and_exact_hash_confirmation(
         vec![base.decision_id],
         vec![base.claim_id],
     )?;
+    test_draft(ctx, &f, v1, None)?;
     publish(ctx, &f, v1)?;
     let v1_component = current_component(ctx, org, v1, "review")?;
 
@@ -803,7 +855,9 @@ pub fn test_clone_and_edit_preserve_ancestry_and_exact_hash_confirmation(
     {
         return Err("the cloned component lost its parent lineage".into());
     }
-    // Unchanged clone republishes with its links intact.
+    // The clone retains its links but must be tested independently.
+    expect_err(publish(ctx, &f, v2), "Run Test draft", "untested clone")?;
+    test_draft(ctx, &f, v2, None)?;
     publish(ctx, &f, v2)?;
 
     // A second clone edits the step: content changed, so links read `changed`.
@@ -957,6 +1011,7 @@ pub fn test_clone_and_edit_preserve_ancestry_and_exact_hash_confirmation(
         "publishing before the second review",
     )?;
     confirm(ctx, latest.id, Some(second_hash.clone()))?;
+    test_draft(ctx, &f, v3, None)?;
     publish(ctx, &f, v3)?;
     let published = current_component(ctx, org, v3, "review")?;
     assert_eq_str(
@@ -1017,6 +1072,7 @@ pub fn test_source_revocation_flags_and_blocks_workflow_reuse(
         vec![base.decision_id],
         vec![base.claim_id],
     )?;
+    test_draft(ctx, &f, v1, None)?;
     publish(ctx, &f, v1)?;
     let version = ctx.db.workflow_version().id().find(&v1).ok_or("version")?;
     require_version_provenance_current(ctx, &version)?;
@@ -1128,6 +1184,7 @@ pub fn test_source_revocation_flags_and_blocks_workflow_reuse(
             expected_content_hash: Some(node_hash(ctx, v2, "review")?),
         },
     )?;
+    test_draft(ctx, &f, v2, None)?;
     publish(ctx, &f, v2)?;
 
     // Revocation is not recoverable by reaffirmation: it fails closed.

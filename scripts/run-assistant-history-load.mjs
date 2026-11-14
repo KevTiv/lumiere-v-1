@@ -449,6 +449,7 @@ async function main() {
     E2E_FIRST_ORG_PERSONA_PASSWORD: password,
   }
   delete env.NODE_ENV
+  delete env.AI_SPEND_READ_STDB_TOKEN
   for (const [base, path] of [[web, "/sign-in"], [api, "/health"], [gateway, "/health"], [stdb, "/v1/identity"]]) {
     let occupied = false
     try { await fetch(base + path, { signal: AbortSignal.timeout(1000) }); occupied = true } catch {}
@@ -510,11 +511,12 @@ async function main() {
     const result = await request(web, path, {
       actor: admin,
       body: { query: "Which mapping did we confirm?", companyId, chat_session_key: sessionKey },
-      expected: [400, 404, 409, 422, 503],
+      expected: 503,
     })
-    assert.ok(
-      ["ai_default_agent_not_provisioned", "ai_surface_skill_not_provisioned"].includes(result.value?.code),
-      `The isolated Gateway must reach its model setup boundary after building context. ${path} returned ${result.status} (${result.value?.code ?? "no error code"}).`,
+    assert.equal(
+      result.value?.code,
+      "ai_generation_admission_unavailable",
+      `The isolated Gateway must reach spend admission after building context. ${path} returned ${result.status} (${result.value?.code ?? "no error code"}).`,
     )
     const checkpoint = (await getContext(env, admin, companyId, sessionKey)).value
     assert.ok(checkpoint.revision >= previousRevision + 2, "Both the Gateway path and the direct probe must advance the checkpoint")

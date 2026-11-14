@@ -5,6 +5,7 @@ mod admin;
 mod ai_capabilities;
 mod ai_certifications;
 mod ai_evidence;
+mod ai_skill_user_access;
 mod assistant_chat_references;
 pub(crate) mod auth;
 mod billing;
@@ -49,6 +50,7 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(ai_capabilities::router())
         .merge(ai_certifications::router())
         .merge(ai_evidence::router())
+        .merge(ai_skill_user_access::router())
         .merge(assistant_chat_references::router())
         .merge(chat_context::router())
         .merge(crate::evidence_ingestion::router())

@@ -55,6 +55,31 @@
     }
   },
   "aiSkills": {
+    "userAccess": {
+      "title": "Accès des utilisateurs",
+      "description": "Gérez l’accès individuel aux compétences intégrées dans cette organisation.",
+      "catalogError": "Impossible de charger les compétences intégrées.",
+      "loadingSkills": "Chargement des compétences intégrées…",
+      "noSkills": "Aucune compétence intégrée disponible.",
+      "skill": "Compétence intégrée",
+      "chooseSkill": "Choisir une compétence",
+      "searchSkills": "Rechercher des compétences",
+      "person": "Membre de l’organisation",
+      "choosePerson": "Choisir un membre",
+      "searchPeople": "Rechercher des membres",
+      "noPeople": "Aucun membre actif disponible.",
+      "peopleDenied": "L’accès à l’annuaire de l’organisation est requis.",
+      "peopleError": "Impossible de charger l’annuaire des membres.",
+      "accessError": "Impossible de vérifier l’accès du membre à cette compétence.",
+      "saving": "Enregistrement de l’accès…",
+      "revoked": "L’accès de ce membre a été révoqué.",
+      "revokedLabel": "Révoqué",
+      "defaultAccess": "Ce membre hérite de l’accès par défaut de l’organisation.",
+      "loadingAccess": "Vérification de l’accès…",
+      "restore": "Rétablir l’accès par défaut",
+      "revoke": "Révoquer l’accès",
+      "saveError": "Impossible de confirmer la modification. Vérifiez l’accès actuel avant de réessayer."
+    },
     "setup": {
       "title": "Configuration des fonctions d’IA",
       "action": "Configurer les fonctions d’IA",

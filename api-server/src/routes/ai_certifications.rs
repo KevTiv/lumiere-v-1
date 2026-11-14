@@ -1,20 +1,24 @@
 //! Protected AI skill certification request and status routes.
 //!
-//! The browser may enqueue and inspect certification work. Only the separately
-//! authenticated gateway executor can claim or complete requests.
+//! Tenant draft tests run synchronously in the module. The legacy gateway
+//! executor remains the owner of previously queued certification work.
 
 use std::{collections::HashMap, sync::Arc};
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::HeaderMap,
     routing::get,
     Json, Router,
 };
+use lumiere_policy_core::{
+    ai_skills::is_builtin_skill,
+    skill_projection::{SkillProjection, MAX_JSON_BYTES},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use stdb_auth::FieldAccessContext;
+use stdb_auth::{permission_allowed, FieldAccessContext};
 use stdb_config::runtime_is_production;
 use tower_cookies::Cookies;
 
@@ -33,7 +37,7 @@ const MAX_STATUS_ROWS: usize = 500;
 const MAX_PROMOTION_TEXT_LEN: usize = 65_536;
 const STATUS_COLUMNS: &str = "id, organization_id, company_id, skill_id, skill_version_id, \
     fixture_id, status, requested_at, requester_superuser_bypass, runtime_profile_id, \
-    certification_environment_id, attempt_count, claimed_at, terminal_at, error_code";
+    certification_environment_id, attempt_count, claimed_by, claimed_at, terminal_at, error_code";
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -49,14 +53,7 @@ fn ensure_ai_skill_access(
     if field_access.is_none() && !runtime_is_production() {
         return Ok(());
     }
-    let allowed = field_access.is_some_and(|access| {
-        access.is_superuser
-            || access.role_permissions.iter().any(|permission| {
-                permission == "*:*"
-                    || permission == "ai_skill:*"
-                    || permission == &format!("ai_skill:{action}")
-            })
-    });
+    let allowed = field_access.is_some_and(|access| permission_allowed(access, "ai_skill", action));
     if allowed {
         Ok(())
     } else {
@@ -220,9 +217,16 @@ fn certification_request_key(
     Ok(format!("{organization_id}:{identity}:sha256:{digest:x}"))
 }
 
-fn certification_status_sql(organization_id: u64, request_id: Option<u64>) -> String {
+fn certification_status_sql(
+    organization_id: u64,
+    request_id: Option<u64>,
+    skill_version_id: Option<u64>,
+) -> String {
     let request_filter = request_id
         .map(|id| format!(" AND id = {id}"))
+        .unwrap_or_default();
+    let version_filter = skill_version_id
+        .map(|id| format!(" AND skill_version_id = {id} AND attempt_count = 0"))
         .unwrap_or_default();
     let limit = if request_id.is_some() {
         1
@@ -232,7 +236,7 @@ fn certification_status_sql(organization_id: u64, request_id: Option<u64>) -> St
     format!(
         "SELECT {STATUS_COLUMNS} \
          FROM ai_skill_certification_request \
-         WHERE organization_id = {organization_id}{request_filter} LIMIT {limit}"
+         WHERE organization_id = {organization_id}{request_filter}{version_filter} LIMIT {limit}"
     )
 }
 
@@ -240,14 +244,29 @@ async fn load_certification_status(
     client: &stdb_client::StdbClient,
     organization_id: u64,
     request_id: Option<u64>,
+    skill_version_id: Option<u64>,
 ) -> Result<Vec<Value>, ApiError> {
     let mut rows = client
-        .query_sql(&certification_status_sql(organization_id, request_id))
+        .query_sql(&certification_status_sql(
+            organization_id,
+            request_id,
+            skill_version_id,
+        ))
         .await
         .map_err(|error| {
             ApiError::Internal(format!("load AI skill certification status: {error}"))
         })?;
-    add_current_passing_evidence(client, organization_id, &mut rows).await?;
+    if skill_version_id.is_some() {
+        rows.retain_mut(|row| {
+            let Some(readiness) = projection_readiness(row) else {
+                return false;
+            };
+            set_current_passing_evidence(row, &readiness, Value::Null);
+            true
+        });
+    } else {
+        add_current_passing_evidence(client, organization_id, &mut rows).await?;
+    }
     rows.sort_by_key(|row| std::cmp::Reverse(row_id(row)));
     Ok(rows)
 }
@@ -339,19 +358,69 @@ async fn add_current_passing_evidence(
             .and_then(|request_id| evidence_by_request.get(&request_id).copied())
             .cloned()
             .unwrap_or(Value::Null);
-        if let Some(object) = request.as_object_mut() {
-            object.insert(
-                "hasCurrentPassingEvidence".to_string(),
-                Value::Bool(readiness.ready),
-            );
-            object.insert(
-                "readiness".to_string(),
-                serde_json::to_value(&readiness).expect("readiness is serializable"),
-            );
-            object.insert("evidence".to_string(), evidence);
-        }
+        set_current_passing_evidence(request, &readiness, evidence);
     }
     Ok(())
+}
+
+fn set_current_passing_evidence(
+    request: &mut Value,
+    readiness: &CertificationReadiness,
+    evidence: Value,
+) {
+    if let Some(object) = request.as_object_mut() {
+        object.insert(
+            "hasCurrentPassingEvidence".into(),
+            Value::Bool(readiness.ready),
+        );
+        object.insert(
+            "readiness".into(),
+            serde_json::to_value(readiness).expect("readiness is serializable"),
+        );
+        object.insert("evidence".into(), evidence);
+    }
+}
+
+fn projection_readiness(request: &Value) -> Option<CertificationReadiness> {
+    let status = value_string(request, "status", "status")
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if value_u64(request, "attemptCount", "attempt_count") == Some(0)
+        && value_u64(request, "runtimeProfileId", "runtime_profile_id").is_none()
+        && value_u64(
+            request,
+            "certificationEnvironmentId",
+            "certification_environment_id",
+        )
+        .is_none()
+        && request
+            .get("claimedBy")
+            .or_else(|| request.get("claimed_by"))
+            .is_some_and(Value::is_null)
+        && request
+            .get("claimedAt")
+            .or_else(|| request.get("claimed_at"))
+            .is_some_and(Value::is_null)
+        && request
+            .get("terminalAt")
+            .or_else(|| request.get("terminal_at"))
+            .is_some_and(|timestamp| !timestamp.is_null())
+    {
+        match (
+            status.as_str(),
+            value_string(request, "errorCode", "error_code").as_deref(),
+        ) {
+            ("completed", None) => return Some(readiness(true, "projection_passed")),
+            ("errored", Some("projection_assertion_failed")) => {
+                return Some(readiness(false, "projection_assertion_failed"))
+            }
+            ("errored", Some("projection_input_invalid")) => {
+                return Some(readiness(false, "projection_input_invalid"))
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 fn certification_readiness(
@@ -362,6 +431,9 @@ fn certification_readiness(
     fixture_by_id: &HashMap<u64, &Value>,
     environment_by_fixture: &HashMap<u64, &Value>,
 ) -> CertificationReadiness {
+    if let Some(result) = projection_readiness(request) {
+        return result;
+    }
     let status = value_string(request, "status", "status")
         .unwrap_or_default()
         .to_ascii_lowercase();
@@ -592,10 +664,17 @@ fn row_id(row: &Value) -> u64 {
         .unwrap_or_default()
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CertificationListQuery {
+    skill_version_id: Option<u64>,
+}
+
 async fn list_certifications(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     cookies: Cookies,
+    Query(query): Query<CertificationListQuery>,
 ) -> Result<Json<Value>, ApiError> {
     let session = resolve_session(&state, &headers, &cookies)
         .await?
@@ -603,7 +682,14 @@ async fn list_certifications(
     let organization_id = require_org(&session)?;
     ensure_ai_skill_access(session.field_access.as_ref(), "read")?;
     let _context = TrustedOperationContext::for_resource_read(&state, &session)?;
-    let rows = load_certification_status(&state.stdb, organization_id, None).await?;
+    if query.skill_version_id == Some(0) {
+        return Err(ApiError::BadRequest(
+            "skillVersionId must be positive".into(),
+        ));
+    }
+    let rows =
+        load_certification_status(&state.stdb, organization_id, None, query.skill_version_id)
+            .await?;
     Ok(Json(json!({ "data": rows })))
 }
 
@@ -624,7 +710,7 @@ async fn get_certification(
     let organization_id = require_org(&session)?;
     ensure_ai_skill_access(session.field_access.as_ref(), "read")?;
     let _context = TrustedOperationContext::for_resource_read(&state, &session)?;
-    let row = load_certification_status(&state.stdb, organization_id, Some(request_id))
+    let row = load_certification_status(&state.stdb, organization_id, Some(request_id), None)
         .await?
         .into_iter()
         .next()
@@ -751,8 +837,195 @@ async fn review_knowledge_promotion(
     Ok(Json(json!({ "ok": true })))
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct RunPublishedSkillBody {
+    company_id: u64,
+    input: Value,
+}
+
+async fn run_published_skill(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Path(skill_id): Path<u64>,
+    Json(body): Json<RunPublishedSkillBody>,
+) -> Result<Json<Value>, ApiError> {
+    if skill_id == 0 || body.company_id == 0 {
+        return Err(ApiError::BadRequest(
+            "skillId and companyId must be positive".into(),
+        ));
+    }
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    let organization_id = require_org(&session)?;
+    ensure_ai_skill_access(session.field_access.as_ref(), "read")?;
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?
+        .with_company_scope(vec![body.company_id])?;
+    authorize_membership_company_ids(
+        &state.stdb,
+        organization_id,
+        context.actor_identity(),
+        &[body.company_id],
+        "Cannot run a skill for another company",
+    )
+    .await?;
+    context.require_current_placement(&state.organization_placements)?;
+    let client = context.client();
+
+    let skills = client
+        .query_sql(&format!(
+            "SELECT skill_key, is_active, is_system FROM ai_skill \
+             WHERE organization_id = {organization_id} AND id = {skill_id} LIMIT 2"
+        ))
+        .await
+        .map_err(ApiError::internal)?;
+    let [skill] = skills.as_slice() else {
+        return Err(ApiError::NotFound("tenant skill not found".into()));
+    };
+    let skill_key = value_string(skill, "skillKey", "skill_key")
+        .ok_or_else(|| ApiError::Internal("skill key is missing".into()))?;
+    if is_builtin_skill(&skill_key)
+        || skill
+            .get("isSystem")
+            .or_else(|| skill.get("is_system"))
+            .and_then(Value::as_bool)
+            != Some(false)
+        || skill
+            .get("isActive")
+            .or_else(|| skill.get("is_active"))
+            .and_then(Value::as_bool)
+            != Some(true)
+    {
+        return Err(ApiError::Forbidden(
+            "skill is unavailable for tenant execution".into(),
+        ));
+    }
+
+    let configs = client
+        .query_sql(&format!(
+            "SELECT company_id, is_enabled FROM ai_skill_config \
+         WHERE organization_id = {organization_id} AND skill_id = {skill_id}"
+        ))
+        .await
+        .map_err(ApiError::internal)?;
+    let company = body.company_id;
+    let mut company_configs = configs
+        .iter()
+        .filter(|row| value_u64(row, "companyId", "company_id") == Some(company));
+    let company_config = company_configs.next();
+    let mut default_configs = configs.iter().filter(|row| {
+        row.get("companyId")
+            .or_else(|| row.get("company_id"))
+            .is_some_and(Value::is_null)
+    });
+    let default_config = default_configs.next();
+    if company_configs.next().is_some()
+        || default_configs.next().is_some()
+        || company_config.or(default_config).is_some_and(|row| {
+            row.get("isEnabled")
+                .or_else(|| row.get("is_enabled"))
+                .and_then(Value::as_bool)
+                != Some(true)
+        })
+    {
+        return Err(ApiError::Forbidden(
+            "skill is unavailable for this company".into(),
+        ));
+    }
+
+    let releases = client.query_sql(&format!(
+        "SELECT id, skill_version_id FROM ai_skill_release \
+         WHERE organization_id = {organization_id} AND skill_id = {skill_id} AND is_active = true LIMIT 2"
+    )).await.map_err(ApiError::internal)?;
+    let [release] = releases.as_slice() else {
+        return Err(ApiError::Forbidden(
+            "skill requires exactly one active published version".into(),
+        ));
+    };
+    let version_id = value_u64(release, "skillVersionId", "skill_version_id")
+        .filter(|id| *id > 0)
+        .ok_or_else(|| ApiError::Internal("published skill version is missing".into()))?;
+    let versions = client.query_sql(&format!(
+        "SELECT manifest_json FROM ai_skill_version \
+         WHERE organization_id = {organization_id} AND skill_id = {skill_id} AND id = {version_id} LIMIT 2"
+    )).await.map_err(ApiError::internal)?;
+    let [version] = versions.as_slice() else {
+        return Err(ApiError::Forbidden(
+            "the published skill version is unavailable".into(),
+        ));
+    };
+    let manifest = value_string(version, "manifestJson", "manifest_json")
+        .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+        .ok_or_else(|| ApiError::Internal("published skill manifest is invalid".into()))?;
+    let projection = SkillProjection::from_manifest(&manifest)
+        .map_err(|error| ApiError::BadRequest(error.into()))?
+        .ok_or_else(|| {
+            ApiError::BadRequest("this published skill has no supported executor".into())
+        })?;
+    ensure_published_projection_tests(client, organization_id, skill_id, version_id).await?;
+    context.require_current_placement(&state.organization_placements)?;
+    let output = projection
+        .execute(&body.input)
+        .map_err(|error| ApiError::BadRequest(error.into()))?;
+    Ok(Json(
+        json!({ "data": { "skillVersionId": version_id, "output": output } }),
+    ))
+}
+
+async fn ensure_published_projection_tests(
+    client: &stdb_client::StdbClient,
+    organization_id: u64,
+    skill_id: u64,
+    version_id: u64,
+) -> Result<(), ApiError> {
+    let fixtures = client
+        .query_sql(&format!(
+            "SELECT id, metadata FROM ai_skill_fixture \
+             WHERE organization_id = {organization_id} AND skill_id = {skill_id}"
+        ))
+        .await
+        .map_err(ApiError::internal)?;
+    let fixture_ids: std::collections::HashSet<u64> = fixtures
+        .iter()
+        .filter(|fixture| {
+            value_string(fixture, "metadata", "metadata")
+                .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+                .and_then(|metadata| metadata.get("draftVersionId").and_then(Value::as_u64))
+                == Some(version_id)
+        })
+        .filter_map(|fixture| value_u64(fixture, "id", "id"))
+        .collect();
+    let unavailable =
+        || ApiError::Forbidden("published skill version requires passing draft tests".into());
+    if fixture_ids.is_empty() {
+        return Err(unavailable());
+    }
+
+    let requests =
+        load_certification_status(client, organization_id, None, Some(version_id)).await?;
+    let supported_fixture_ids: std::collections::HashSet<u64> = requests
+        .iter()
+        .filter(|request| {
+            value_u64(request, "skillId", "skill_id") == Some(skill_id)
+                && projection_readiness(request).is_some_and(|result| result.ready)
+        })
+        .filter_map(|request| value_u64(request, "fixtureId", "fixture_id"))
+        .collect();
+    if !fixture_ids.is_subset(&supported_fixture_ids) {
+        return Err(unavailable());
+    }
+    Ok(())
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
+        .route(
+            "/ai/skills/published/:skill_id/run",
+            axum::routing::post(run_published_skill)
+                .layer(axum::extract::DefaultBodyLimit::max(MAX_JSON_BYTES + 1024)),
+        )
         .route(
             "/ai/skills/certifications",
             get(list_certifications).post(request_certification),
@@ -971,15 +1244,41 @@ mod tests {
     }
 
     #[test]
+    fn projection_readiness_requires_a_module_terminal_result() {
+        let result = json!({
+            "id": 1,
+            "attemptCount": 0,
+            "runtimeProfileId": null,
+            "certificationEnvironmentId": null,
+            "claimedBy": null,
+            "claimedAt": null,
+            "terminalAt": "2026-11-14T14:00:00Z",
+            "status": "Completed",
+        });
+        assert!(projection_readiness(&result).unwrap().ready);
+        let mut worker_result = result.clone();
+        worker_result["attemptCount"] = json!(1);
+        assert!(projection_readiness(&worker_result).is_none());
+        let mut mismatch = result;
+        mismatch["status"] = json!("Errored");
+        mismatch["errorCode"] = json!("projection_assertion_failed");
+        assert!(!projection_readiness(&mismatch).unwrap().ready);
+    }
+
+    #[test]
     fn certification_status_query_is_always_organization_scoped() {
-        let list = certification_status_sql(41, None);
+        let list = certification_status_sql(41, None, None);
         assert!(list.contains("organization_id = 41"));
         assert!(!list.contains("AND id ="));
         assert!(list.ends_with("LIMIT 500"));
 
-        let one = certification_status_sql(41, Some(73));
+        let one = certification_status_sql(41, Some(73), None);
         assert!(one.contains("organization_id = 41"));
         assert!(one.contains("AND id = 73"));
         assert!(one.ends_with("LIMIT 1"));
+
+        let draft = certification_status_sql(41, None, Some(79));
+        assert!(draft.contains("organization_id = 41"));
+        assert!(draft.contains("AND skill_version_id = 79 AND attempt_count = 0"));
     }
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import type { TFunction } from "i18next"
+import type { JsonObject } from "@lumiere/api-client/json-object"
 import {
   Button,
   Dialog,
@@ -18,6 +19,7 @@ import type { UseMutationResult } from "@tanstack/react-query"
 import type {
   SignalWorkflowInput,
   StartWorkflowInput,
+  WorkflowSimulationInput,
 } from "@lumiere/query-hooks/hooks/workflows"
 import type {
   CancelWorkflowOutboxParams,
@@ -26,7 +28,6 @@ import type {
   FireWorkflowTimerParams,
   MigrateWorkflowInstanceParams,
   PreflightWorkflowMigrationParams,
-  SimulateWorkflowParams,
 } from "@lumiere/stdb/types"
 import { instanceStateTag, versionStatusTag } from "@/lib/workflow-enum"
 import {
@@ -70,6 +71,27 @@ function num(row: Record<string, unknown>, ...keys: string[]): number {
   return 0
 }
 
+function isJsonObject(value: unknown): value is JsonObject {
+  return !!value && typeof value === "object" && !Array.isArray(value)
+}
+
+function parseSampleFields(json: string): WorkflowSimulationInput["sampleFields"] {
+  if (!json.trim()) return undefined
+  let fields: unknown
+  try {
+    fields = JSON.parse(json)
+  } catch {
+    throw new Error("Sample fields must be valid JSON.")
+  }
+  if (!isJsonObject(fields)) throw new Error("Enter sample fields as a JSON object.")
+  return Object.entries(fields).map(([fieldKey, value]) => {
+    if (!isJsonObject(value) || Object.keys(value).length !== 1) {
+      throw new Error(`Choose a value type for '${fieldKey}', such as {"integer":100}.`)
+    }
+    return { fieldKey, value }
+  })
+}
+
 export type WorkflowRowTab =
   | "workflows"
   | "versions"
@@ -104,7 +126,7 @@ export interface WorkflowMutationsBundle {
   simulateWorkflow: UseMutationResult<
     unknown,
     Error,
-    { workflowVersionId: bigint | number | string; params: SimulateWorkflowParams },
+    WorkflowSimulationInput,
     unknown
   >
   setPlanActive: UseMutationResult<
@@ -150,6 +172,9 @@ export function WorkflowsRowDialog({
   const [startSubjectId, setStartSubjectId] = useState("")
   const [singletonTriggerKey, setSingletonTriggerKey] = useState("")
   const [signalKey, setSignalKey] = useState("")
+  const [sampleInputs, setSampleInputs] = useState("")
+  const [testSignals, setTestSignals] = useState("")
+  const [testCompleted, setTestCompleted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const canStartWorkflow = usePermission("workflow_instance", "create")
   const canSignalWorkflow = usePermission("workflow_instance", "write")
@@ -163,6 +188,7 @@ export function WorkflowsRowDialog({
     tabId === "versions" ? Number(id) : num(row, "workflowVersionId", "workflow_version_id")
   const subjectModel = String(row.subjectModel ?? row.subject_model ?? row.model ?? "").trim()
   const subjectId = num(row, "subjectId", "subject_id")
+  const isDraft = versionStatusTag(row.status) === "Draft" || row.statusTag === "Draft"
   const isPublished =
     versionStatusTag(row.status) === "Published" || row.statusTag === "Published"
   const isActive = instanceStateTag(row.state) === "Active" || row.stateTag === "Active"
@@ -181,14 +207,36 @@ export function WorkflowsRowDialog({
     .filter((e) => String(e.instanceId ?? e.instance_id) === id)
     .slice(0, 12)
 
-  const run = async (fn: () => Promise<unknown>) => {
+  const run = async (fn: () => Promise<unknown>, close = true) => {
     setError(null)
     try {
       await fn()
-      onOpenChange(false)
+      if (close) onOpenChange(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
+  }
+
+  const simulateVersion = () => {
+    setTestCompleted(false)
+    return run(async () => {
+      await mutations.simulateWorkflow.mutateAsync({
+        workflowVersionId: id,
+        sampleFields: isDraft ? parseSampleFields(sampleInputs) : undefined,
+        params: {
+          simulationKey: newKey("sim"),
+          signalKey: isDraft ? testSignals.trim() || undefined : undefined,
+          snapshot: {
+            subjectModel,
+            subjectId: BigInt(0),
+            subjectRevisionHash:
+              "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            fields: [],
+          },
+        },
+      })
+      if (isDraft) setTestCompleted(true)
+    }, !isDraft)
   }
 
   return (
@@ -232,6 +280,7 @@ export function WorkflowsRowDialog({
             <p
               className="rounded border border-destructive/40 bg-destructive/5 px-3 py-2 text-destructive"
               data-testid="workflow-row-dialog-error"
+              role="alert"
             >
               {error}
             </p>
@@ -313,8 +362,51 @@ export function WorkflowsRowDialog({
                   </Button>
                 </div>
               ) : null}
+              {isDraft ? (
+                <details className="rounded border p-3">
+                  <summary className="cursor-pointer font-medium">Draft test inputs</summary>
+                  <div className="mt-3 space-y-2">
+                    <Label htmlFor="workflow-draft-sample">Sample fields (optional)</Label>
+                    <textarea
+                      id="workflow-draft-sample"
+                      className="w-full rounded-md border bg-background p-2 font-mono text-sm"
+                      placeholder={'{"amount":{"money":{"minor_units":12500,"currency":"EUR"}}}'}
+                      value={sampleInputs}
+                      disabled={mutations.simulateWorkflow.isPending}
+                      aria-describedby="workflow-draft-sample-help"
+                      onChange={(event) => {
+                        setSampleInputs(event.target.value)
+                        setTestCompleted(false)
+                      }}
+                    />
+                    <p id="workflow-draft-sample-help" className="text-muted-foreground">
+                      Enter sample values as JSON, with each field wrapped in its workflow type.
+                    </p>
+                    {signalKeys.length > 0 ? (
+                      <>
+                        <Label htmlFor="workflow-draft-test-signals">Signals (optional)</Label>
+                        <Input
+                          id="workflow-draft-test-signals"
+                          placeholder={signalKeys.join(", ")}
+                          value={testSignals}
+                          disabled={mutations.simulateWorkflow.isPending}
+                          aria-describedby="workflow-draft-test-signals-help"
+                          onChange={(event) => {
+                            setTestSignals(event.target.value)
+                            setTestCompleted(false)
+                          }}
+                        />
+                        <p id="workflow-draft-test-signals-help" className="text-muted-foreground">
+                          Separate signals with commas. Each step uses the first signal that matches.
+                        </p>
+                      </>
+                    ) : null}
+                  </div>
+                </details>
+              ) : null}
+              {testCompleted ? <p role="status">Draft test completed.</p> : null}
               <div className="flex flex-wrap gap-2 pt-2">
-                {versionStatusTag(row.status) === "Draft" || row.statusTag === "Draft" ? (
+                {isDraft ? (
                   <Button
                     size="sm"
                     data-testid="workflow-version-publish"
@@ -328,7 +420,7 @@ export function WorkflowsRowDialog({
                         }),
                       )
                     }
-                    disabled={mutations.publishVersion.isPending}
+                    disabled={mutations.publishVersion.isPending || mutations.simulateWorkflow.isPending}
                   >
                     Publish
                   </Button>
@@ -355,27 +447,10 @@ export function WorkflowsRowDialog({
                   size="sm"
                   variant="outline"
                   data-testid="workflow-version-simulate"
-                  onClick={() =>
-                    void run(() =>
-                      mutations.simulateWorkflow.mutateAsync({
-                        workflowVersionId: id,
-                        params: {
-                          simulationKey: newKey("sim"),
-                          signalKey: undefined,
-                          snapshot: {
-                            subjectModel: String(row.model ?? "e2e.subject"),
-                            subjectId: BigInt(0),
-                            subjectRevisionHash:
-                              "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-                            fields: [],
-                          },
-                        },
-                      }),
-                    )
-                  }
-                  disabled={mutations.simulateWorkflow.isPending}
+                  onClick={() => void simulateVersion()}
+                  disabled={!subjectModel || mutations.simulateWorkflow.isPending || mutations.publishVersion.isPending}
                 >
-                  Simulate
+                  {isDraft ? "Test draft" : "Simulate"}
                 </Button>
                 {versionStatusTag(row.status) === "Published" ||
                 row.statusTag === "Published" ? (
