@@ -16,8 +16,13 @@ use super::{
     scope,
 };
 use crate::{
-    cold_tier::pg_pool, error::ApiError, query_exec::row_u64, state::AppState,
-    trusted_context::TrustedOperationContext, web_session::OrgSession,
+    cold_tier::pg_pool,
+    error::ApiError,
+    query_exec::{execute_resource_query_for_company, row_u64},
+    routes::queries::require_owner_read_permission,
+    state::AppState,
+    trusted_context::TrustedOperationContext,
+    web_session::OrgSession,
 };
 
 #[derive(Clone, Copy, Deserialize, Serialize)]
@@ -321,33 +326,36 @@ fn prepare<'a>(
 }
 
 async fn load_customers(
+    state: &AppState,
     context: &TrustedOperationContext,
     company: u64,
 ) -> Result<Vec<Value>, ApiError> {
     context.require_company_scope(&[company])?;
-    let organization = context.organization_id();
-    let rows = context
-        .client()
-        .query_sql(&format!(
-            "SELECT id,name,company_id,deleted_at,merge_target_id FROM contact
-             WHERE organization_id = {organization} AND is_customer = true"
-        ))
-        .await
-        .map_err(ApiError::internal)?;
+    require_owner_read_permission("contacts", context)?;
+    // Contacts are private in SpaceTimeDB. Use the same company-scoped,
+    // permission-checked resource read as the CRM screen.
+    let rows = execute_resource_query_for_company(
+        &state.stdb,
+        "contacts",
+        context.organization_id(),
+        context.actor_identity(),
+        Some(context.field_access()),
+        Some(company),
+    )
+    .await?;
+    Ok(backfill_customers(rows))
+}
 
-    Ok(rows
-        .into_iter()
-        .filter(|row| match row_u64(row, "companyId", "company_id") {
-            Ok(None | Some(0)) => true,
-            Ok(Some(id)) => id == company,
-            Err(_) => false,
-        })
+fn backfill_customers(rows: Vec<Value>) -> Vec<Value> {
+    rows.into_iter()
         .filter(|row| {
-            row["deleted_at"].is_null()
-                && row["deletedAt"].is_null()
+            row.get("isCustomer")
+                .or_else(|| row.get("is_customer"))
+                .and_then(Value::as_bool)
+                == Some(true)
                 && row_u64(row, "mergeTargetId", "merge_target_id").is_ok_and(|id| id.is_none())
         })
-        .collect())
+        .collect()
 }
 
 pub(super) async fn write(
@@ -380,7 +388,7 @@ pub(super) async fn write(
         return Err(ApiError::BadRequest("duplicate reviewed row IDs".into()));
     }
     let contacts = match body.module {
-        Module::Sales => load_customers(&ctx, company).await?,
+        Module::Sales => load_customers(&state, &ctx, company).await?,
         Module::Warehouse => Vec::new(),
     };
     let org = org.to_string();
@@ -586,6 +594,20 @@ mod tests {
         assert_eq!(result["currency"], "RWF");
         assert!(result["unit"].is_null());
         assert_eq!(result["reportedPayment"], "PAYEMENT CHEQ");
+    }
+
+    #[test]
+    fn customer_lookup_excludes_vendors_and_merged_contacts() {
+        let rows = backfill_customers(vec![
+            json!({"id":1,"name":"Lemigo Hotel","is_customer":true,"merge_target_id":{"none":[]}}),
+            json!({"id":2,"name":"Lemigo Vendor","is_customer":false}),
+            json!({"id":3,"name":"Lemigo Duplicate","isCustomer":true,"mergeTargetId":{"some":[1]}}),
+        ]);
+        assert_eq!(
+            customer(&rows, "Lemigo", None),
+            Some(("1".into(), "Lemigo Hotel"))
+        );
+        assert!(customer(&rows, "Lemigo", Some("3")).is_none());
     }
 
     #[test]
