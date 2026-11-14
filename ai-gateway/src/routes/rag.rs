@@ -1159,9 +1159,10 @@ pub async fn post_rag(
             id: selection.digest.clone(),
         });
     }
-    let spend_reader = state.spend_read_stdb.as_deref().ok_or_else(|| {
-        AppError::Internal("spend_read_stdb is required for routed generation".into())
-    })?;
+    let spend_reader = state
+        .spend_read_stdb
+        .as_deref()
+        .ok_or(AppError::GenerationAdmissionUnavailable)?;
     let run_inputs = json!({
         "surface": "rag_generation",
         "query": req.query.clone(),
