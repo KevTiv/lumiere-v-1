@@ -1,3 +1,4 @@
+import { ModuleCsvHistoryDisclosure } from "../../../components/module-csv-history"
 import { getStdbSession } from "@/lib/api-session"
 import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { ReportsClient } from "./reports-client"
@@ -23,15 +24,18 @@ export default async function ReportsPage() {
     await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
-    <ReportsClient
-      initialReports={reports}
-      initialBalances={balances}
-      initialReportTemplates={templates}
-      initialScheduledReports={scheduled}
-      initialAnalyticsMetrics={metrics}
-      initialDashboards={dashboards}
-      initialDashboardWidgets={widgets}
-      organizationId={session.organizationId}
-    />
+    <>
+      <ModuleCsvHistoryDisclosure organizationId={session.organizationId} view="reports" />
+      <ReportsClient
+        initialReports={reports}
+        initialBalances={balances}
+        initialReportTemplates={templates}
+        initialScheduledReports={scheduled}
+        initialAnalyticsMetrics={metrics}
+        initialDashboards={dashboards}
+        initialDashboardWidgets={widgets}
+        organizationId={session.organizationId}
+      />
+    </>
   )
 }

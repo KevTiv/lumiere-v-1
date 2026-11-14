@@ -1,3 +1,4 @@
+import { ModuleCsvHistoryDisclosure } from "../../../components/module-csv-history"
 import { getStdbSession } from "@/lib/api-session"
 import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { FleetClient } from "./fleet-client"
@@ -13,9 +14,12 @@ export default async function FleetPage() {
   const [vehicles] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
-    <FleetClient
-      initialVehicles={vehicles}
-      organizationId={session.organizationId}
-    />
+    <>
+      <ModuleCsvHistoryDisclosure organizationId={session.organizationId} view="fleet" />
+      <FleetClient
+        initialVehicles={vehicles}
+        organizationId={session.organizationId}
+      />
+    </>
   )
 }

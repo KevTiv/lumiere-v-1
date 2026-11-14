@@ -35,3 +35,10 @@ test("prepared row evidence explains individual source cells without changing th
   assert.deepEqual(JSON.parse(original), ["customer", "100", "CREDIT", "MOMO HQ"])
   assert.deepEqual(interpretSourceCells('[{"type":"credit"}]'), [])
 })
+
+test("source row links reopen exactly one row in the same company and batch", () => {
+  const url = new URL(sourceHistoryLink(7, "11", "9007199254740993"), "https://example.test")
+  assert.deepEqual(sourceHistorySelection(url.search, 7), { batchId: "11", rowId: "9007199254740993", verifiedOnly: true })
+  assert.deepEqual(sourceHistorySelection(url.search, 8), { batchId: null, verifiedOnly: false })
+  assert.throws(() => sourceHistoryLink(7, undefined, "42"), /source row/)
+})
