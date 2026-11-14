@@ -1,6 +1,6 @@
-import { chooseSelectOptionByTriggerValue } from "./helpers-legacy"
 import { expect, test } from "@playwright/test"
 import { expectNoAppError, openErpAiChat } from "./helpers"
+import { chooseSelectOptionByTriggerValue } from "./helpers-legacy"
 
 // Authenticated layout/keyboard coverage. This suite makes no provider request;
 // real Mistral and durable spend acceptance belongs to GOV00 and the pilot smoke.
@@ -13,22 +13,19 @@ test.describe("AI chat workspace", { tag: ["@p0", "@ai-workspace"] }, () => {
       await openErpAiChat(page)
       const panel = page.getByTestId("erp-ai-chat-panel")
       const input = page.getByTestId("erp-ai-chat-input")
+      const context = panel.getByRole("combobox", { name: "Assistant context" })
       await expect(panel).toHaveAttribute("data-mode", width === 1440 ? "side" : "full")
       await expect(input).toBeFocused()
       const question = "Preserve this question while changing context. " + "long-token-".repeat(100)
       await input.fill(question)
-      await chooseSelectOptionByTriggerValue(
-        page,
-        panel.getByRole("combobox", { name: "Assistant context" }),
-        "module:inventory",
-      )
+      await chooseSelectOptionByTriggerValue(page, context, "module:warehouse")
       if (width === 1440) {
         await panel.getByRole("button", { name: "Open full workspace" }).click()
       }
       await expect(panel).toHaveAttribute("data-mode", "full")
       await expect(input).toHaveValue(question)
       if (width === 1440) await expect(input).toBeFocused()
-      await expect(panel.getByRole("combobox", { name: "Assistant context" })).toContainText("Inventory")
+      await expect(context).toHaveText("Warehouse")
       const bounds = await panel.boundingBox()
       expect(bounds).not.toBeNull()
       expect(bounds!.x).toBeGreaterThanOrEqual(0)

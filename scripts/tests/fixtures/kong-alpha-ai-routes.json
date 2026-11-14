@@ -33,14 +33,19 @@
     "/api/ai/evidence/reviews",
     "/api/ai/evidence/runs/export",
     "/api/ai/knowledge/skill-promotions",
-    "/api/ai/knowledge/skill-promotions/42/review"
+    "/api/ai/knowledge/skill-promotions/42/review",
+    "/api/ai/chat/decisions",
+    "/api/ai/chat/widget-receipts",
+    "/api/ai/chat/references/resolve"
   ],
   "get": [
     "/api/ai/harness/profile",
     "/api/ai/skills/certifications",
     "/api/ai/skills/certifications/42",
     "/api/ai/skills/user-access",
-    "/api/ai/knowledge/skill-promotions/company/42"
+    "/api/ai/knowledge/skill-promotions/company/42",
+    "/api/ai/chat/decisions",
+    "/api/ai/chat/widget-receipts"
   ],
   "put": [
     "/api/ai/skills/user-access"
