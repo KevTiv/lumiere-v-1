@@ -135,7 +135,7 @@ async function missingSurfaceBindings(client, org, companyId) {
       surfaces.push({ key, status: overridden ? 'blocked_override' : 'missing' })
     } else {
       // Configured is not execution readiness: dispatch still checks scope,
-      // actions, funding, provider and any required release.
+      // actions, funding and provider availability.
       surfaces.push({ key, status: 'configured' })
     }
   }
@@ -150,13 +150,11 @@ export async function provision(config, client, apply = false) {
   await client.verifyTarget(org)
   const company = exactlyOne(await client.sql(`SELECT id, organization_id FROM company WHERE id = ${config.companyId}`), 'company')
   requireValue(Number(company.organization_id) === org, 'company belongs to another organization')
-  const skills = await client.sql(`SELECT * FROM ai_skill WHERE skill_key = 'report_analysis' AND is_active = true`)
+  const skills = await client.sql(`SELECT * FROM ai_skill WHERE skill_key = 'report_analysis'`)
   const local = skills.filter(row => Number(row.organization_id) === org)
   const skill = exactlyOne(local.length ? local : skills.filter(row => Number(row.organization_id) === 0), 'report_analysis skill')
-  const release = exactlyOne(await client.sql(`SELECT * FROM ai_skill_release WHERE organization_id = ${org} AND skill_id = ${positive(Number(skill.id), 'skill id')} AND is_active = true`), 'certified report_analysis release')
-  requireValue(Number(release.skill_version_id) > 0, 'release lacks a version')
-  // Promotion stays owned by the existing certification path. Provisioning
-  // cannot invent a passed certificate or activate an unreviewed skill.
+  const skillId = positive(Number(skill.id), 'skill id')
+  requireValue(skill.skill_key === 'report_analysis' && skill.is_active === true, 'report_analysis skill is inactive or invalid')
   const expectedProfiles = profilesFor(config)
   const surfaceSetup = await missingSurfaceBindings(client, org, config.companyId)
   const missing = surfaceSetup.missing
@@ -191,10 +189,11 @@ export async function provision(config, client, apply = false) {
     requireValue(Array.isArray(agents[0].allowed_actions) && agents[0].allowed_actions.includes('skill_run'), 'pilot agent lacks skill_run')
   }
   else missing.push('pilot agent')
-  const configs = await client.sql(`SELECT * FROM ai_skill_config WHERE organization_id = ${org} AND skill_id = ${skill.id}`)
+  const configs = await client.sql(`SELECT * FROM ai_skill_config WHERE organization_id = ${org} AND skill_id = ${skillId}`)
   const scoped = configs.filter(row => Number(unwrap(row.company_id)) === config.companyId)
-  requireValue(scoped.length <= 1, 'duplicate company skill config')
-  const previous = scoped[0]
+  const inherited = configs.filter(row => unwrap(row.company_id) == null)
+  requireValue(scoped.length <= 1 && inherited.length <= 1, 'duplicate report analysis skill config')
+  const previous = scoped[0] ?? inherited[0]
   const settings = previous ? JSON.parse(previous.config_json) : {}
   requireValue(settings && typeof settings === 'object' && !Array.isArray(settings), 'invalid skill settings')
   const ref = `${config.policyKey}@${config.policyVersion}`
@@ -203,7 +202,7 @@ export async function provision(config, client, apply = false) {
   requireValue(!previous || previous.is_enabled === true, 'pilot skill is explicitly disabled')
   // Preserve all existing non-policy settings and overrides.
   settings.intelligencePolicyRef = ref
-  if (!previous || previousRef !== ref) missing.push('company skill policy binding')
+  if (!scoped.length || previousRef !== ref) missing.push('company skill policy binding')
   const period = new Date().toISOString().slice(0, 7)
   async function budgetFor(agentId) {
     const rows = await client.sql(`SELECT * FROM ai_spend_budget_read WHERE organization_id = ${org} AND agent_id = ${agentId} AND billing_period = '${period}'`, 'spend')
@@ -230,7 +229,7 @@ export async function provision(config, client, apply = false) {
   for (const role of ['primary', 'review']) if (!await priceFor(config[role])) missing.push(`price:${role}`)
   const calibration = await client.sql(`SELECT id FROM ai_calibration_profile WHERE organization_id = ${org} AND profile_name = 'report-attention' AND profile_version = 1`)
   if (calibration.length !== 1) missing.push('governed bootstrap')
-  const plan = { organizationId: org, companyId: config.companyId, agentId, skillId: Number(skill.id), policyRef: ref, billingPeriod: period, provider: 'mistral', models, apiKeyRequired: true, generationSurfaces: surfaceSetup.surfaces }
+  const plan = { organizationId: org, companyId: config.companyId, agentId, skillId, policyRef: ref, billingPeriod: period, provider: 'mistral', models, apiKeyRequired: true, generationSurfaces: surfaceSetup.surfaces }
   if (!apply) {
     if (!missing.length) await client.runtime({ orgId: org, companyId: config.companyId, agentId, intelligencePolicyRef: ref }, models)
     return { ...plan, applied: false, readyForKey: missing.length === 0, missing }
@@ -256,7 +255,7 @@ export async function provision(config, client, apply = false) {
   await client.bootstrap({ orgId: org, intelligencePolicyRef: ref })
   settings.defaultAgentId = agentId
   await client.call('upsert_ai_skill_config', [org, {
-    company_id: some(config.companyId), skill_id: Number(skill.id), is_enabled: true,
+    company_id: some(config.companyId), skill_id: skillId, is_enabled: true,
     config_json: JSON.stringify(settings), custom_instructions: previous?.custom_instructions ?? none(),
     tool_overrides: previous?.tool_overrides ?? [], metadata: previous?.metadata ?? none(),
   }])
