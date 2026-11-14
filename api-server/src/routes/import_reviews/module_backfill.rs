@@ -17,7 +17,7 @@ use super::{
 };
 use crate::{
     cold_tier::pg_pool, error::ApiError, query_exec::row_u64, state::AppState,
-    web_session::OrgSession,
+    trusted_context::TrustedOperationContext, web_session::OrgSession,
 };
 
 #[derive(Clone, Copy, Deserialize, Serialize)]
@@ -320,6 +320,36 @@ fn prepare<'a>(
     }
 }
 
+async fn load_customers(
+    context: &TrustedOperationContext,
+    company: u64,
+) -> Result<Vec<Value>, ApiError> {
+    context.require_company_scope(&[company])?;
+    let organization = context.organization_id();
+    let rows = context
+        .client()
+        .query_sql(&format!(
+            "SELECT id,name,company_id,deleted_at,merge_target_id FROM contact
+             WHERE organization_id = {organization} AND is_customer = true"
+        ))
+        .await
+        .map_err(ApiError::internal)?;
+
+    Ok(rows
+        .into_iter()
+        .filter(|row| match row_u64(row, "companyId", "company_id") {
+            Ok(None | Some(0)) => true,
+            Ok(Some(id)) => id == company,
+            Err(_) => false,
+        })
+        .filter(|row| {
+            row["deleted_at"].is_null()
+                && row["deletedAt"].is_null()
+                && row_u64(row, "mergeTargetId", "merge_target_id").is_ok_and(|id| id.is_none())
+        })
+        .collect())
+}
+
 pub(super) async fn write(
     State(state): State<Arc<AppState>>,
     OrgSession { session, .. }: OrgSession,
@@ -349,27 +379,9 @@ pub(super) async fn write(
     if selected.len() != body.rows.len() {
         return Err(ApiError::BadRequest("duplicate reviewed row IDs".into()));
     }
-    let contacts = if let Module::Sales = body.module {
-        let contacts = ctx.client().query_sql(&format!(
-            "SELECT id,name,company_id,deleted_at,merge_target_id FROM contact WHERE organization_id = {org} AND is_customer = true"
-        )).await.map_err(ApiError::internal)?;
-        let contacts = contacts
-            .into_iter()
-            .filter(|row| {
-                matches!(
-                    row_u64(row, "companyId", "company_id"),
-                    Ok(None) | Ok(Some(0))
-                ) || row_u64(row, "companyId", "company_id").ok().flatten() == Some(company)
-            })
-            .filter(|row| {
-                row["deleted_at"].is_null()
-                    && row["deletedAt"].is_null()
-                    && row_u64(row, "mergeTargetId", "merge_target_id").is_ok_and(|id| id.is_none())
-            })
-            .collect::<Vec<_>>();
-        contacts
-    } else {
-        Vec::new()
+    let contacts = match body.module {
+        Module::Sales => load_customers(&ctx, company).await?,
+        Module::Warehouse => Vec::new(),
     };
     let org = org.to_string();
     let company = company.to_string();
