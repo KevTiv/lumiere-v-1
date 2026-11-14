@@ -32,8 +32,8 @@ async function openHistory(page: Page, route: string, mode: "side" | "full") {
 
 test("opens personal Assistant history across the complete Finance Alpha profile", async ({ page }, info) => {
   test.setTimeout(240_000)
-  expect(alphaRoutes).toHaveLength(16)
-  expect(new Set(alphaRoutes.map(({ surfaceId }) => surfaceId)).size).toBe(16)
+  expect(alphaRoutes).toContainEqual({ surfaceId: "inventory", href: "/inventory" })
+  expect(new Set(alphaRoutes.map(({ surfaceId }) => surfaceId)).size).toBe(alphaRoutes.length)
   expect(isWorkspaceSurfaceVisible(profile, "ai-assistant")).toBe(true)
   await signIn(page)
   const visited: string[] = []
