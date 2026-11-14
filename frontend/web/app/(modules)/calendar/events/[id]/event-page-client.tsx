@@ -1,6 +1,6 @@
 'use client';
 
-import { AskAboutRecordButton } from '@/components/ask-about-record-button';
+import { AskAboutRecordButton } from '../../../../../components/ask-about-record-button';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';

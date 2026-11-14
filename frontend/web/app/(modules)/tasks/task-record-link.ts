@@ -15,8 +15,9 @@ export function taskRecordTarget(link: TaskRecordLink | undefined, activeCompany
 
 export function matchesTaskRecord(row: unknown, id: string, organizationId: bigint, companyId: bigint): boolean {
   if (!row || typeof row !== "object" || Array.isArray(row)) return false
-  const task = row as Record<string, unknown>
-  return parseStrictU64(task.id)?.toString() === id
-    && parseStrictU64(task.organizationId ?? task.organization_id) === organizationId
-    && parseStrictU64(task.companyId ?? task.company_id) === companyId
+  const organization = "organizationId" in row ? row.organizationId : undefined
+  const company = "companyId" in row ? row.companyId : undefined
+  return "id" in row && parseStrictU64(row.id)?.toString() === id
+    && parseStrictU64(organization ?? ("organization_id" in row ? row.organization_id : undefined)) === organizationId
+    && parseStrictU64(company ?? ("company_id" in row ? row.company_id : undefined)) === companyId
 }

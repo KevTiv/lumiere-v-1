@@ -1,5 +1,5 @@
 'use client';
-import { AskAboutRecordButton } from '@/components/ask-about-record-button';
+import { AskAboutRecordButton } from '../../../../../components/ask-about-record-button';
 import { CurrencyFormatProvider } from '@lumiere/ui';
 import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
 import { entityScalarText } from '@lumiere/ui/lib/entity-row-values';

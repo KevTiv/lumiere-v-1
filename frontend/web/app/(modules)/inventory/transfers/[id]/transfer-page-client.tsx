@@ -413,6 +413,7 @@ function TransferPageLoaded({
                   id="transfer-detailed-operations"
                   testId="transfer-detailed-operations"
                   isLoading={moveLineState.status === 'loading'}
+                  error={null}
                   rows={operationRows}
                   emptyMessage={t('inventory.transfers.detailedOperationsEmpty', {
                     defaultValue: 'No detailed operations yet. They appear once the transfer is reserved or processed.',

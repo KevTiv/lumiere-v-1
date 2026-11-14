@@ -1,6 +1,6 @@
 'use client';
 
-import { AskAboutRecordButton } from '@/components/ask-about-record-button';
+import { AskAboutRecordButton } from '../../../../components/ask-about-record-button';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useErpSession } from '@lumiere/erp-session';
