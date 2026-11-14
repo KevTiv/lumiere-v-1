@@ -18472,76 +18472,48 @@
     },
     "registry": {
       "validation": {
-        "title": "Validate a new skill version",
-        "description": "Attach this skill to the running harness. Skill versions can change independently; fixture certification checks the current adapter before activation.",
-        "version": "Skill version",
-        "note": "Validation note",
-        "prepare": "Prepare validation",
-        "attached": "Attached to current harness",
-        "runtime": "Certification runtime",
-        "create": "Create version for validation",
         "advanced": "Advanced manifest",
         "reviewActivate": "Review and activate",
-        "approvalPolicy": "Owners and organization administrators can approve their own certified skills. Other authors and reviewers need an independent approver. The decision and validation note are recorded.",
-        "confirm": "I reviewed the skill and its passing fixture evidence and approve activation for this organization.",
-        "activate": "Activate certified skill"
+        "approvalNote": "Approval note",
+        "releaseApprovalPolicy": "Owners and organization administrators can approve their own skill versions. Other authors and reviewers need an independent approver.",
+        "confirmRelease": "I reviewed this skill version and approve its activation for this organization.",
+        "activateVersion": "Activate skill version"
       },
       "actions": {
         "accept": "Accept",
-        "createFixture": "Create fixture",
         "createReviewedVersion": "Create reviewed version",
         "promote": "Promote",
         "proposeForReview": "Propose for review",
         "proposing": "Proposing…",
         "reject": "Reject",
         "retry": "Retry",
-        "retryCertification": "Retry certification",
-        "rollBackToThis": "Roll back to this",
-        "runCertification": "Run certification"
+        "rollBackToThis": "Roll back to this"
       },
       "activeRelease": "Active release #{{releaseNumber}} · version id {{versionId}}",
-      "certification": {
-        "blockedFixtureRequired": " · certification blocked: fixture required",
-        "evidenceSummary": "evidence #{{evidenceId}} · {{status}} · {{hash}}",
-        "noExecutionHash": "no execution hash",
-        "passed": "Passed",
-        "passedSuffix": " · certification passed",
-        "pendingSuffix": " · certification pending",
-        "queued": "Queued",
-        "requestSummary": "v{{version}} · request #{{requestId}} · {{status}} · {{readinessCode}}",
-        "running": "Running"
-      },
-      "description": "Review immutable skill versions, run server-owned fixture certification, and manage release history.",
+      "description": "Review and publish tenant skill versions.",
       "empty": {
-        "noFixtures": "No fixtures yet.",
         "noPromotions": "No persisted knowledge promotions.",
         "noReleases": "No releases recorded.",
-        "noSkillsForCertification": "No persisted skills are available for certification.",
-        "noTerminalEvidence": "No terminal evidence has been persisted.",
-        "noVersions": "No versions for this skill yet."
+        "noVersions": "No versions for this skill yet.",
+        "noSkillVersionsAvailable": "No tenant-created skills available."
       },
       "errors": {
         "invalidKnowledgeVersion": "Enter a positive approved knowledge version id and select a skill",
-        "loadCertification": "Failed to load persisted certification state",
-        "loadPromotions": "Failed to load knowledge promotions."
+        "loadPromotions": "Failed to load knowledge promotions.",
+        "loadVersions": "Could not load skill versions."
       },
       "fields": {
         "approvedKnowledgeVersionId": "Approved knowledge version id",
         "skill": "Skill"
       },
       "knowledge": {
-        "description": "Independent acceptance creates an unreleased skill version. The server binds the reviewed knowledge lineage; certification and release remain gated above.",
+        "description": "Independent acceptance creates an unpublished version linked to the reviewed knowledge.",
         "promotionSummary": "Knowledge version {{versionId}} → {{skillName}}",
-        "statusSummary": "{{status}} · certification {{certification}}",
-        "title": "Knowledge promotion"
-      },
-      "messages": {
-        "selectCompanyForCertification": "Select an operating company before requesting certification."
+        "title": "Knowledge promotion",
+        "reviewStatus": "{{status}}"
       },
       "noActiveRelease": "No active release",
       "placeholders": {
-        "fixtureKey": "fixture key",
-        "name": "name",
         "reviewNote": "Independent review note"
       },
       "release": {
@@ -18549,18 +18521,15 @@
         "version": "version {{versionId}}"
       },
       "sections": {
-        "addFixture": "Add fixture",
         "createVersion": "Create version",
-        "fixturesAndRuns": "Fixtures & test runs",
         "releaseHistory": "Release history",
         "versions": "Versions"
       },
       "states": {
-        "loadingCertification": "Loading persisted certification state…",
-        "loadingPromotions": "Loading persisted promotions…"
+        "loadingPromotions": "Loading persisted promotions…",
+        "loadingVersions": "Loading skill versions…"
       },
       "status": {
-        "certified": "Certified",
         "accepted": "Accepted",
         "completed": "Completed",
         "draft": "Draft",
@@ -18573,7 +18542,9 @@
         "rejected": "Rejected",
         "running": "Running",
         "rolledBack": "Rolled back",
-        "unknown": "unknown"
+        "unknown": "unknown",
+        "reviewed": "Reviewed",
+        "superseded": "Superseded"
       },
       "title": "Skill registry"
     },

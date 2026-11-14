@@ -7,20 +7,6 @@ const organizationId = 17
 const companyId = 23
 const identityHex = 'a'.repeat(64)
 
-if (process.argv[2] === 'bindings') {
-  const { nativeVersionManifest } = await import(
-    new URL('app/(modules)/ai-skills/native-skill-validation.ts', root)
-  )
-  const bindings = JSON.parse(readFileSync(0, 'utf8'))
-  for (const binding of bindings) {
-    const manifest = JSON.parse(nativeVersionManifest(binding, binding.manifest.version))
-    assert.equal(manifest.skill_key, binding.skillKey)
-    assert.equal(manifest.source_hash, binding.manifest.source_hash)
-    assert.equal(manifest.version, binding.manifest.version)
-  }
-  process.exit(0)
-}
-
 if (process.argv[2] === 'results') {
   const { parseLowStockScanResult, parseReportComposerResult } = await import(
     new URL('../packages/query-hooks/src/hooks/ai-green-skill-results.ts', root)
@@ -41,13 +27,12 @@ if (process.argv[2] === 'results') {
   process.exit(0)
 }
 
-assert.equal(process.argv[2], 'requests')
-
 // Only replace the framework and authenticated session dependencies. The real
 // BFF handlers, scope checks, serializers and gateway transport run below.
 const stubs = new Map([
   ['next/server', 'export const NextResponse = Response'],
   ['server-only', ''],
+  ['@/lib/api-server-forward', 'export async function forwardToApiServerRequired() { throw new Error("unexpected API server call") }'],
   ['@/lib/api-session', `export async function resolveApiSession() {
     return { organizationId: ${organizationId}, stdbToken: 'test-token', identityHex: '${identityHex}' }
   }`],
@@ -77,6 +62,33 @@ registerHooks({
 process.env.LUMIERE_AI_ENABLED = 'true'
 process.env.LUMIERE_AI_GATEWAY_URL = 'https://gateway.invalid'
 process.env.LUMIERE_AI_GATEWAY_INTERNAL_SECRET = 'test-gateway-secret'
+if (process.argv[2] === 'bindings') {
+  const payload = {
+    bindings: JSON.parse(readFileSync(0, 'utf8')),
+    runtimeHash: null,
+    certificationConfigured: false,
+  }
+  let requests = 0
+  globalThis.fetch = async (url, init) => {
+    assert.equal(String(url), 'https://gateway.invalid/v1/internal/harness/skill-bindings')
+    assert.equal(init.method, 'GET')
+    assert.equal(init.headers.get('x-lumiere-gateway-secret'), 'test-gateway-secret')
+    requests++
+    return Response.json(payload)
+  }
+  const { GET } = await import(new URL('app/api/ai/skills/certifications/route.ts', root))
+  const url = new URL('https://web.invalid/api/ai/skills/certifications?view=native-bindings')
+  const request = Object.assign(new Request(url), { nextUrl: url })
+  const response = await GET(request)
+  assert.equal(response.status, 200)
+  assert.equal(response.headers.get('cache-control'), 'no-store')
+  assert.deepEqual(await response.json(), payload)
+  assert.equal(requests, 1)
+  process.exit(0)
+}
+
+assert.equal(process.argv[2], 'requests')
+
 const forwarded = []
 globalThis.fetch = async (url, init) => {
   const target = new URL(url)

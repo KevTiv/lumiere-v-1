@@ -15,7 +15,6 @@ const fields = (value, allowed, name) => check(plain(value) && Object.keys(value
 const label = value => typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(value)
 const exactModel = value => label(value) && !/latest/i.test(value) && !/^(REPLACE|PLACEHOLDER|ACCOUNT_VISIBLE)/i.test(value)
 const hash = value => typeof value === 'string' && /^(sha256:)?[a-f0-9]{64}$/.test(value)
-const sameHash = (a, b) => hash(a) && hash(b) && a.replace(/^sha256:/, '') === b.replace(/^sha256:/, '')
 const integer = value => Number.isSafeInteger(Number(value)) && Number(value) >= 0
 const number = (value, name) => { check(integer(value), `invalid ${name}`); return Number(value) }
 const budgetSnapshot = rows => [...rows].sort((a, b) =>
@@ -30,12 +29,6 @@ const parsedObject = (raw, name) => {
   check(plain(value), `invalid ${name}`)
   return value
 }
-const passed = value => typeof value === 'string' ? value.toLowerCase() === 'passed'
-  // Raw SpacetimeDB SQL encodes AiSkillTestRunStatus::Passed as [0, []].
-  : Array.isArray(value) ? value.length === 2 && value[0] === 0
-    && Array.isArray(value[1]) && value[1].length === 0
-  : plain(value) && Object.keys(value).length === 1 && ['Passed', 'passed'].some(key => Array.isArray(value[key]) && value[key].length === 0)
-
 export function validateManifest(config) {
   fields(config, ['version', 'organizationId', 'companyId', 'agentId', 'intelligencePolicyRef',
     'currency', 'pricesReviewedAt', 'surfaces', 'meters', 'agentCapabilities'], 'manifest')
@@ -63,8 +56,7 @@ export function validateManifest(config) {
     check(label(surface.skillKey), 'invalid surface key'); id(surface.skillId, 'skillId')
     check(!keys.has(surface.skillKey) && !ids.has(surface.skillId), 'duplicate surface')
     keys.add(surface.skillKey); ids.add(surface.skillId)
-    check(infrastructure.has(surface.skillKey) ? surface.sourceHash === undefined : hash(surface.sourceHash),
-      'generative surfaces require exact sourceHash; infrastructure bindings do not assert certification')
+    check(surface.sourceHash === undefined || hash(surface.sourceHash), 'invalid legacy sourceHash')
   }
   check(Array.isArray(config.meters) && config.meters.length <= 8, 'bounded meters are required')
   const meters = new Set()
@@ -94,7 +86,7 @@ export function planCapabilities(config) {
       'missing configure_ai_metered_price', 'missing company upsert_ai_skill_config'],
     remainingGates: ['immutable contract release and aligned deployment', 'provider usage and billing acceptance', 'signed-in company isolation and recovery acceptance'],
     prerequisites: ['existing company-compatible agent and current-month monetary pool', 'reviewed model policy', 'exact platform-registered ai_spend_writer matching the gateway identity',
-      'matching active certificates for generative surfaces', 'explicit existing infrastructure skill catalog entries'] }
+      'active skill catalog entries'] }
 }
 
 function requiredAction(skillKey) {
@@ -192,31 +184,6 @@ async function inspectCapabilities(config, client, now) {
     const skill = one(await client.sql(`SELECT * FROM ai_skill WHERE id = ${surface.skillId}`), `${surface.skillKey} catalog entry`)
     check(number(skill.id, 'skill id') === surface.skillId && skill.skill_key === surface.skillKey && skill.is_active === true
       && [0, org].includes(number(skill.organization_id, 'skill organization')), 'skill catalog scope/key mismatch')
-    if (!infrastructure.has(surface.skillKey)) {
-      const release = one(await client.sql(`SELECT * FROM ai_skill_release WHERE organization_id = ${org} AND skill_id = ${surface.skillId} AND is_active = true`), `${surface.skillKey} active release`)
-      check(release.is_active === true && number(release.organization_id, 'release organization') === org
-        && number(release.skill_id, 'release skill') === surface.skillId, 'active release scope mismatch')
-      const versionId = id(number(release.skill_version_id, 'released version'), 'released version')
-      const version = one(await client.sql(`SELECT * FROM ai_skill_version WHERE organization_id = ${org} AND id = ${versionId}`), 'released version')
-      check(number(version.organization_id, 'version organization') === org && number(version.id, 'version id') === versionId
-        && number(version.skill_id, 'version skill') === surface.skillId && version.skill_key === surface.skillKey
-        && sameHash(version.source_hash, surface.sourceHash), 'active source hash differs from reviewed runtime source')
-      const fixtures = await client.sql(`SELECT id, organization_id, skill_id FROM ai_skill_fixture WHERE organization_id = ${org} AND skill_id = ${surface.skillId}`)
-      check(fixtures.length > 0 && new Set(fixtures.map(row => id(number(row.id, 'fixture id'), 'fixture id'))).size === fixtures.length,
-        'released skill must have unambiguous certification fixtures')
-      const evidence = await client.sql(`SELECT * FROM ai_skill_certification_evidence WHERE organization_id = ${org} AND skill_version_id = ${versionId}`)
-      for (const fixture of fixtures) {
-        check(number(fixture.organization_id, 'fixture organization') === org && number(fixture.skill_id, 'fixture skill') === surface.skillId,
-          'certification fixture scope mismatch')
-        const matches = evidence.filter(row => number(row.fixture_id, 'certification fixture') === Number(fixture.id))
-        check(new Set(matches.map(row => number(row.id, 'certification id'))).size === matches.length, 'ambiguous certification evidence')
-        const latest = matches.reduce((a, b) => !a || number(b.id, 'certification id') > number(a.id, 'certification id') ? b : a, null)
-        check(latest && number(latest.organization_id, 'certification organization') === org
-          && number(latest.company_id, 'certification company') === companyId && number(latest.skill_id, 'certification skill') === surface.skillId
-          && number(latest.skill_version_id, 'certification version') === versionId && passed(latest.status)
-          && sameHash(latest.source_hash, surface.sourceHash), 'matching current passed company certification is required')
-      }
-    }
     const rows = await client.sql(`SELECT * FROM ai_skill_config WHERE organization_id = ${org} AND skill_id = ${surface.skillId}`)
     check(rows.every(row => number(row.organization_id, 'binding organization') === org && number(row.skill_id, 'binding skill') === surface.skillId), 'skill binding read scope mismatch')
     const scoped = rows.filter(row => Number(unwrap(row.company_id)) === companyId)

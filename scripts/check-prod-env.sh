@@ -81,8 +81,6 @@ Production checklist (set on the host / orchestrator before docker compose up):
     STDB_SERVER_TOKEN
     STDB_FINALIZATION_TOKEN      (dedicated projection/finalization identity, distinct from STDB_SERVER_TOKEN)
     STDB_TOKEN                    (ai-gateway service token, distinct from STDB_SERVER_TOKEN)
-    AI_CERTIFICATION_STDB_TOKEN   (dedicated certification executor identity)
-    AI_CERTIFICATION_RUNTIME_HASH (sha256: plus 64 lowercase hex characters)
     LUMIERE_AI_GATEWAY_INTERNAL_SECRET
 
   api-server (NODE_ENV=production or LUMIERE_ENV=production):
@@ -128,12 +126,6 @@ validate() {
     missing+=("STDB_FINALIZATION_TOKEN (must be distinct from STDB_SERVER_TOKEN)")
   fi
   require_nonempty STDB_TOKEN || true
-  require_nonempty AI_CERTIFICATION_STDB_TOKEN || true
-  if require_nonempty AI_CERTIFICATION_RUNTIME_HASH; then
-    if [[ ! "${AI_CERTIFICATION_RUNTIME_HASH}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-      missing+=("AI_CERTIFICATION_RUNTIME_HASH (must be sha256: plus 64 lowercase hex characters)")
-    fi
-  fi
   require_nonempty LUMIERE_AI_GATEWAY_INTERNAL_SECRET || true
 
   # api-server Config::from_env production rules

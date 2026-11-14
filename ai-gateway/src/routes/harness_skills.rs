@@ -31,7 +31,7 @@ use crate::{
         },
         manifest::OrgPrivacyPolicy,
         policy_engine::PolicyEngine,
-        release_registry::load_active_manifest,
+        release_registry::load_builtin_execution_manifest,
         skill_registry::SkillRegistry,
         ActorCredentials,
     },
@@ -218,6 +218,7 @@ pub async fn post_import_mapping(
     let policy = policy_for(
         &state,
         req.org_id,
+        req.company_id,
         IMPORT_MAPPING_SKILL_KEY,
         IMPORT_MAPPING_SKILL_VERSION,
         req.org_privacy_policy,
@@ -266,6 +267,7 @@ pub async fn post_insights_scan(
     let policy = policy_for(
         &state,
         req.org_id,
+        req.company_id,
         INSIGHTS_SCAN_SKILL_KEY,
         INSIGHTS_SCAN_SKILL_VERSION,
         req.org_privacy_policy,
@@ -314,6 +316,7 @@ pub async fn post_daily_briefing(
     let policy = policy_for(
         &state,
         req.org_id,
+        req.company_id,
         DAILY_BRIEFING_SKILL_KEY,
         DAILY_BRIEFING_SKILL_VERSION,
         req.org_privacy_policy,
@@ -477,6 +480,7 @@ async fn run_llm_with_context(
     let policy = policy_for(
         state,
         actor.organization_id,
+        actor.company_id,
         skill_key,
         LLM_BUNDLED_SKILL_VERSION,
         org_privacy_policy,
@@ -500,13 +504,15 @@ async fn run_llm_with_context(
 async fn policy_for(
     state: &AppState,
     org_id: u64,
+    company_id: u64,
     skill_key: &str,
     skill_version: u32,
     org_privacy_policy: OrgPrivacyPolicy,
 ) -> AppResult<PolicyEngine> {
-    let manifest = load_active_manifest(&state.stdb, org_id, skill_key, skill_version)
-        .await
-        .map_err(AppError::Forbidden)?;
+    let manifest =
+        load_builtin_execution_manifest(&state.stdb, org_id, company_id, skill_key, skill_version)
+            .await
+            .map_err(AppError::Forbidden)?;
     Ok(
         PolicyEngine::new(SkillRegistry::exact(manifest), ResourceRegistry::built_in())
             .with_org_privacy(org_privacy_policy),

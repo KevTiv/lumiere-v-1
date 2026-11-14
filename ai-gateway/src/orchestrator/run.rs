@@ -70,7 +70,7 @@ use crate::{
         policy_engine::{
             ExecutionMetadata, ExecutionPlan, PlannedToolCall, PolicyEngine, PolicyExecutionRequest,
         },
-        release_registry::load_active_manifest,
+        release_registry::load_builtin_execution_manifest,
         skill_registry::SkillRegistry,
         ActorCredentials,
     },
@@ -815,9 +815,15 @@ pub async fn run_skill_admitted(
 
     // Complete immutable manifest/policy admission before persisting a new
     // run. Invalid reviewed calls must fail without creating runtime state.
-    let manifest = load_active_manifest(&stdb, req.org_id, &skill_key, req.skill_version)
-        .await
-        .map_err(|message| anyhow::anyhow!(message))?;
+    let manifest = load_builtin_execution_manifest(
+        &stdb,
+        req.org_id,
+        req.company_id,
+        &skill_key,
+        req.skill_version,
+    )
+    .await
+    .map_err(|message| anyhow::anyhow!(message))?;
     let max_steps = req
         .max_steps
         .unwrap_or(manifest.limits.max_steps)

@@ -148,7 +148,7 @@ test("existing full synchronization also refreshes the persisted registry", asyn
 
 
 test("company setup validates read-back scope and refreshes agent permissions", async () => {
-  const configured = { ...result, company_setup: { company_id: 42, status: "bindings_applied", message: "Bindings only", stage: "platform_activation_required", execution_readiness: "not_verified" } }
+  const configured = { ...result, company_setup: { company_id: 42, status: "bindings_applied", message: "Bindings only", stage: "company_defaults_checked", execution_readiness: "not_verified" } }
   const f = fixture(configured)
   const mutation = f.hooks.useProvisionAiSurfaces(7, 42)
   assert.deepEqual(JSON.parse(JSON.stringify(await mutation.mutationFn())), configured)

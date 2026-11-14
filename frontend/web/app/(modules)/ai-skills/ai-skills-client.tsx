@@ -371,7 +371,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1 space-y-1">
             <h2 id="ai-feature-setup-title" className="text-sm font-semibold">AI binding and catalog setup</h2>
-            <p className="text-sm text-muted-foreground">Apply eligible company defaults without replacing custom or disabled bindings. This does not activate or verify chat execution.</p>
+            <p className="text-sm text-muted-foreground">Apply eligible company defaults while preserving custom settings and disabled skills.</p>
           </div>
           <Button
             type="button"
@@ -383,7 +383,6 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
             {provisionSurfaces.isPending ? "Applying bindings…" : "Apply binding/catalog defaults"}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">Platform activation is managed by the platform administrator, not tenants. No model calls are made by this setup check.</p>
         {!operatingCompanyId ? (
           <p className="text-sm text-muted-foreground">{t("aiSkills.setup.companyRequired")}</p>
         ) : null}
@@ -392,7 +391,6 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
         ) : null}
         {companySetup ? (
           <div role="status" className="space-y-2 text-sm">
-            <p>Platform activation required — chat execution not verified.</p>
             <p>{companySetup.message}</p>
             <ul className="space-y-1">
               {provisionSurfaces.data?.skills.map((skill) => (
@@ -474,7 +472,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
       <SkillRegistryPanel
         organizationId={orgId}
         companyId={operatingCompanyId}
-        skills={sortedSkills.filter((skill) => skill.id > 0)}
+        skills={sortedSkills.filter((skill) => !skill.is_system && !skill.execution_route)}
       />
 
       <section className="rounded-xl border border-border bg-card">

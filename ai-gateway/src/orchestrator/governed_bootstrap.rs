@@ -42,7 +42,6 @@ pub(crate) struct GovernedReadiness {
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ReportReadinessBlocker {
     CompanyScope,
-    ReleaseNotReady,
     SkillBinding,
     AgentUnavailable,
     ModelPolicy,
@@ -161,20 +160,11 @@ pub(crate) async fn inspect_governed_readiness(
     if !(company.len() == 1) {
         return Err(ReportReadinessBlocker::CompanyScope.into());
     }
-    crate::harness::release_registry::load_active_manifest(
-        writer,
-        organization_id,
-        crate::harness::governed_llm_skills::REPORT_ANALYSIS_SKILL_KEY,
-        1,
-    )
-    .await
-    .map_err(anyhow::Error::msg)
-    .context(ReportReadinessBlocker::ReleaseNotReady)?;
     let skill =
         super::skill_loader::load_skill(writer, organization_id, company_id, "report_analysis")
             .await
             .context(ReportReadinessBlocker::SkillBinding)?;
-    if !(skill.enabled) {
+    if skill.id == 0 || !skill.enabled {
         return Err(ReportReadinessBlocker::SkillBinding.into());
     }
     if !(super::skill_loader::skill_agent_id(&skill.config_json, None, None)? == Some(agent_id)) {
@@ -401,14 +391,6 @@ mod tests {
                 } else {
                     vec![json!({"id": 3})]
                 }
-            } else if statement.contains("FROM ai_skill_release ") {
-                vec![json!({"skill_version_id": 1})]
-            } else if statement.contains("FROM ai_skill_version ") {
-                vec![
-                    json!({"version": if case == "release" {"2.0.0"} else {crate::harness::certification::REPORT_ANALYSIS_CERTIFICATION_VERSION}, "risk": "green",
-                    "max_steps": 8, "max_tool_calls": 12, "resources": ["analytics.report_analysis.v1"],
-                    "output_types": ["analytics.report_analysis.result.v1"], "source_hash": if case == "source" { format!("sha256:{}", "a".repeat(64)) } else { crate::harness::certification::report_analysis_certification_bundle_hash() }}),
-                ]
             } else if statement.contains("FROM ai_skill_config ") {
                 vec![
                     json!({"id": 1, "is_enabled": case != "disabled", "config_json": "{\"intelligencePolicyRef\":\"pilot@1\",\"defaultAgentId\":7}"}),
@@ -472,8 +454,6 @@ mod tests {
             "ready",
             "company",
             "agent-company",
-            "release",
-            "source",
             "disabled",
             "bootstrap",
             "budget",
@@ -502,9 +482,6 @@ mod tests {
                 "ready" => {
                     assert_eq!(typed.status, "ready");
                     assert_eq!(typed.code, None);
-                }
-                "source" | "release" => {
-                    assert_eq!(typed.code, Some(ReportReadinessBlocker::ReleaseNotReady))
                 }
                 "disabled" => assert_eq!(typed.code, Some(ReportReadinessBlocker::SkillBinding)),
                 "company" => assert_eq!(typed.code, Some(ReportReadinessBlocker::CompanyScope)),

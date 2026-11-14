@@ -1,15 +1,13 @@
-//! SpacetimeDB-backed active-release gate for built-in harness skills.
-//!
-//! The gateway keeps only the executable adapter for a skill in code. The
-//! organization-specific active release remains authoritative for whether that
-//! adapter may run and for its risk, resources, output types, and limits.
+//! Compiled execution manifests and legacy fixture readback.
 
 use serde_json::Value;
 use stdb_client::StdbClient;
 
+use crate::wire_decode::{row_u64, snake_to_camel};
+
 use super::{
-    certification, daily_briefing, distributor_controls, governed_llm_skills, import_mapping,
-    insights_scan, low_stock,
+    daily_briefing, distributor_controls, governed_llm_skills, import_mapping, insights_scan,
+    low_stock,
     manifest::{ExecutionLimits, RiskClass, SkillManifest},
     report_composer,
 };
@@ -141,65 +139,34 @@ pub async fn load_candidate_certification_environment(
     parse_candidate_environment(&rows[0])
 }
 
-pub async fn load_active_manifest(
+/// Built-in execution policy ships with the gateway. Tenant catalog and
+/// company bindings still control whether the compiled skill may run.
+pub(crate) async fn load_builtin_execution_manifest(
     stdb: &StdbClient,
     organization_id: u64,
+    company_id: u64,
     skill_key: &str,
-    expected_version: u32,
+    adapter_version: u32,
 ) -> Result<SkillManifest, String> {
-    let skill = crate::orchestrator::skill_loader::load_effective_catalog_skill(
+    let manifest = builtin_manifest(skill_key)?;
+    if manifest.skill.version != adapter_version {
+        return Err(format!(
+            "skill '{skill_key}' does not support adapter v{adapter_version}"
+        ));
+    }
+    crate::orchestrator::skill_loader::require_enabled_skill(
         stdb,
         organization_id,
+        company_id,
         skill_key,
     )
     .await
-    .map_err(|error| error.to_string())?
-    .ok_or_else(|| "skill has no active catalog entry".to_string())?;
-    let skill_id =
-        row_u64(&skill, "id", "id").ok_or_else(|| "skill catalog entry has no id".to_string())?;
-    let skill_key = sql_literal(skill_key)?;
+    .map_err(|error| error.to_string())?;
+    Ok(manifest)
+}
 
-    let releases = stdb
-        .query_sql(&format!(
-            "SELECT skill_version_id FROM ai_skill_release WHERE organization_id = {organization_id} AND skill_id = {skill_id} AND is_active = true LIMIT 2"
-        ))
-        .await
-        .map_err(|error| format!("load active AI skill release: {error}"))?;
-    if releases.len() != 1 {
-        return Err("skill must have exactly one active organization release".to_string());
-    }
-    let version_id = row_u64(&releases[0], "skillVersionId", "skill_version_id")
-        .ok_or_else(|| "active skill release has no version".to_string())?;
-    let versions = stdb
-        .query_sql(&format!(
-            "SELECT id, organization_id, skill_id, skill_key, version, risk, max_steps, max_tool_calls, resources, output_types, source_hash FROM ai_skill_version WHERE id = {version_id} AND organization_id = {organization_id} LIMIT 2"
-        ))
-        .await
-        .map_err(|error| format!("load active AI skill version: {error}"))?;
-    if versions.len() != 1 {
-        return Err("active skill version must resolve exactly once".to_string());
-    }
-    let version = versions
-        .first()
-        .ok_or_else(|| "active skill version does not belong to this organization".to_string())?;
-    if crate::orchestrator::generation_surface_certification::KEYS.contains(&skill_key.as_str())
-        && (row_u64(version, "id", "id") != Some(version_id)
-            || row_u64(version, "organizationId", "organization_id") != Some(organization_id)
-            || row_u64(version, "skillId", "skill_id") != Some(skill_id)
-            || row_string(version, "skillKey", "skill_key").as_deref() != Some(skill_key.as_str()))
-    {
-        return Err("active generation source does not match the exact tenant skill".to_string());
-    }
-    let release_version = row_string(version, "version", "version")
-        .ok_or_else(|| "active skill version is missing a semantic version".to_string())?;
-    let source_hash = row_string(version, "sourceHash", "source_hash")
-        .ok_or_else(|| "active skill version is missing its source hash".to_string())?;
-    if !valid_source_hash(&source_hash) {
-        return Err("active skill version has an invalid source hash".to_string());
-    }
-    validate_active_adapter_binding(&skill_key, &release_version, expected_version, &source_hash)?;
-
-    let manifest = match skill_key.as_str() {
+fn builtin_manifest(skill_key: &str) -> Result<SkillManifest, String> {
+    let manifest = match skill_key {
         distributor_controls::CREDIT_HOLD_SKILL_KEY => distributor_controls::credit_hold_manifest(),
         distributor_controls::DELIVERY_RUN_SKILL_KEY => {
             distributor_controls::delivery_run_manifest()
@@ -225,47 +192,15 @@ pub async fn load_active_manifest(
         key if crate::orchestrator::generation_surface_certification::KEYS.contains(&key) => {
             crate::orchestrator::generation_surface_certification::manifest(key)?
         }
-        _ => return Err("gateway has no executable adapter for this released skill".to_string()),
+        _ => return Err("gateway has no built-in executable adapter for this skill".to_string()),
     };
-    overlay_release_policy(
-        manifest,
-        parse_risk(&row_string(version, "risk", "risk").unwrap_or_default())?,
-        row_u64(version, "maxSteps", "max_steps").unwrap_or_default() as u32,
-        row_u64(version, "maxToolCalls", "max_tool_calls").unwrap_or_default() as u32,
-        string_array(version, "resources")
-            .ok_or_else(|| "active skill version is missing resources".to_string())?,
-        string_array(version, "outputTypes")
-            .ok_or_else(|| "active skill version is missing output types".to_string())?,
-    )
+    Ok(manifest)
 }
 
 pub(crate) fn candidate_policy_manifest(
     version: &CandidateSkillVersion,
 ) -> Result<SkillManifest, String> {
-    let manifest = match version.skill_key.as_str() {
-        low_stock::LOW_STOCK_SKILL_KEY => low_stock::manifest(),
-        report_composer::REPORT_COMPOSER_SKILL_KEY => report_composer::manifest(),
-        import_mapping::IMPORT_MAPPING_SKILL_KEY => import_mapping::manifest(),
-        insights_scan::INSIGHTS_SCAN_SKILL_KEY => insights_scan::manifest(),
-        daily_briefing::DAILY_BRIEFING_SKILL_KEY => daily_briefing::manifest(),
-        governed_llm_skills::REPORT_ANALYSIS_SKILL_KEY => {
-            governed_llm_skills::report_analysis_manifest()
-        }
-        governed_llm_skills::PROCESS_RESEARCH_SKILL_KEY => {
-            governed_llm_skills::process_research_manifest()
-        }
-        governed_llm_skills::PRICE_SEARCH_SKILL_KEY => governed_llm_skills::price_search_manifest(),
-        governed_llm_skills::SUPPLIER_DISCOVERY_SKILL_KEY => {
-            governed_llm_skills::supplier_discovery_manifest()
-        }
-        key if lumiere_finance_review_core::skill(key).is_ok() => {
-            super::finance_skills::manifest(key)?
-        }
-        key if crate::orchestrator::generation_surface_certification::KEYS.contains(&key) => {
-            crate::orchestrator::generation_surface_certification::manifest(key)?
-        }
-        _ => return Err("candidate has no canonical built-in policy manifest".to_string()),
-    };
+    let manifest = builtin_manifest(&version.skill_key)?;
     overlay_release_policy(
         manifest,
         version.risk,
@@ -303,49 +238,6 @@ fn overlay_release_policy(
     Ok(manifest)
 }
 
-fn validate_active_adapter_binding(
-    skill_key: &str,
-    release_version: &str,
-    expected_version: u32,
-    source_hash: &str,
-) -> Result<(), String> {
-    if !adapter_version_compatible(release_version, expected_version) {
-        return Err(format!(
-            "active skill version '{release_version}' is incompatible with gateway adapter v{expected_version}"
-        ));
-    }
-    let expected_source_hash = match skill_key {
-        key if lumiere_finance_review_core::skill(key).is_ok() => {
-            Some(super::finance_skills::bundle_hash(key))
-        }
-        low_stock::LOW_STOCK_SKILL_KEY => {
-            Some(certification::low_stock_certification_bundle_hash())
-        }
-        report_composer::REPORT_COMPOSER_SKILL_KEY => {
-            Some(certification::report_composer_certification_bundle_hash())
-        }
-        governed_llm_skills::REPORT_ANALYSIS_SKILL_KEY => {
-            Some(certification::report_analysis_certification_bundle_hash())
-        }
-        key if crate::orchestrator::generation_surface_certification::KEYS.contains(&key) => {
-            Some(crate::orchestrator::generation_surface_certification::bundle_hash(key)?)
-        }
-        _ => None,
-    };
-    if expected_source_hash
-        .as_deref()
-        .is_some_and(|expected| source_hash != expected)
-    {
-        return Err(
-            "active built-in skill source hash does not match the dispatched gateway adapter"
-                .to_string(),
-        );
-    }
-    Ok(())
-}
-
-/// Skill release revisions are independent of the compiled adapter revision.
-/// Compatibility never substitutes for the exact certified source binding.
 pub(crate) fn adapter_version_compatible(version: &str, adapter_major: u32) -> bool {
     let core = version.split(['-', '+']).next().unwrap_or_default();
     let parts: Vec<_> = core.split('.').collect();
@@ -533,15 +425,6 @@ fn required_string_array(row: &Value, field: &str, label: &str) -> Result<Vec<St
     string_array(row, field).ok_or_else(|| format!("{label} is missing"))
 }
 
-fn sql_literal(value: &str) -> Result<String, String> {
-    if value.is_empty() || value.len() > 120 || value.chars().any(char::is_control) {
-        return Err("invalid skill key".to_string());
-    }
-    Ok(value.replace('\'', "''"))
-}
-
-use crate::wire_decode::{row_u64, snake_to_camel};
-
 fn row_string(row: &Value, camel: &str, snake: &str) -> Option<String> {
     row.get(camel)
         .or_else(|| row.get(snake))
@@ -703,46 +586,9 @@ mod tests {
     }
 
     #[test]
-    fn built_in_dispatch_accepts_skill_revisions_but_requires_current_bundle_hash() {
-        let report_hash = certification::report_analysis_certification_bundle_hash();
-        assert!(validate_active_adapter_binding(
-            "report_analysis",
-            certification::REPORT_ANALYSIS_CERTIFICATION_VERSION,
-            1,
-            &report_hash
-        )
-        .is_ok());
-        assert!(
-            validate_active_adapter_binding("report_analysis", "1.12.3", 1, &report_hash).is_ok()
-        );
-        assert!(validate_active_adapter_binding(
-            "report_analysis",
-            certification::REPORT_ANALYSIS_CERTIFICATION_VERSION,
-            1,
-            &format!("sha256:{}", "f".repeat(64))
-        )
-        .is_err());
-        let low_stock_hash = certification::low_stock_certification_bundle_hash();
-        assert!(validate_active_adapter_binding(
-            low_stock::LOW_STOCK_SKILL_KEY,
-            "1.0.0",
-            1,
-            &low_stock_hash,
-        )
-        .is_ok());
-        assert!(validate_active_adapter_binding(
-            low_stock::LOW_STOCK_SKILL_KEY,
-            "2.0.0",
-            1,
-            &low_stock_hash,
-        )
-        .is_err());
-        assert!(validate_active_adapter_binding(
-            low_stock::LOW_STOCK_SKILL_KEY,
-            "1.0.0",
-            1,
-            &format!("sha256:{}", "f".repeat(64)),
-        )
-        .is_err());
+    fn only_compiled_skills_supply_live_execution_policy() {
+        let manifest = builtin_manifest("report_analysis").unwrap();
+        assert_eq!(manifest.skill.version, 1);
+        assert!(builtin_manifest("tenant_created_skill").is_err());
     }
 }

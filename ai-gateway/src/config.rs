@@ -163,11 +163,6 @@ impl Config {
         )?;
         let ai_execution_envelope_key =
             validate_execution_envelope_key(std::env::var("AI_EXECUTION_ENVELOPE_KEY").ok())?;
-        if runtime_is_production() && ai_certification_stdb_token.is_none() {
-            anyhow::bail!(
-                "AI_CERTIFICATION_STDB_TOKEN and AI_CERTIFICATION_RUNTIME_HASH are required in production"
-            );
-        }
         if runtime_is_production() && ai_execution_envelope_key.is_none() {
             anyhow::bail!("AI_EXECUTION_ENVELOPE_KEY is required in production");
         }

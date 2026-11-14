@@ -13,10 +13,10 @@ pub struct SurfaceSkillNotProvisioned {
 #[error("AI setup is incomplete. Ask an administrator to apply the harness AI profile for this company.")]
 pub struct DefaultAgentNotProvisioned;
 
-/// Platform activation is authoritative; never expose release SQL or source errors.
+/// Keep internal catalog and binding errors out of the public response.
 #[derive(Error, Debug, Clone)]
-#[error("AI generation is unavailable pending platform activation of its current source release. Contact platform support to activate this AI feature.")]
-pub struct GenerationSourceUnavailable;
+#[error("This AI skill is currently unavailable for the selected company.")]
+pub struct SkillUnavailable;
 
 #[derive(Error, Debug)]
 pub enum AppError {
@@ -61,13 +61,13 @@ pub enum AppError {
     DefaultAgentNotProvisioned(#[from] DefaultAgentNotProvisioned),
 
     #[error(transparent)]
-    GenerationSourceUnavailable(#[from] GenerationSourceUnavailable),
+    SkillUnavailable(#[from] SkillUnavailable),
 }
 
 impl AppError {
-    /// Preserve platform source failures even when a release changes after setup.
+    /// Preserve skill availability failures during execution.
     pub fn from_generation(error: anyhow::Error) -> Self {
-        if error.is::<GenerationSourceUnavailable>() {
+        if error.is::<SkillUnavailable>() {
             Self::from_agent_resolution(error)
         } else {
             Self::Internal(error.to_string())
@@ -77,8 +77,8 @@ impl AppError {
     /// Missing catalog setup is unavailable, while other agent validation
     /// failures retain their existing bad-request behavior.
     pub fn from_agent_resolution(error: anyhow::Error) -> Self {
-        if error.is::<GenerationSourceUnavailable>() {
-            return Self::GenerationSourceUnavailable(GenerationSourceUnavailable);
+        if error.is::<SkillUnavailable>() {
+            return Self::SkillUnavailable(SkillUnavailable);
         }
         match error.downcast::<SurfaceSkillNotProvisioned>() {
             Ok(error) => Self::SkillNotProvisioned(error),
@@ -104,9 +104,7 @@ impl IntoResponse for AppError {
             AppError::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m.clone()),
             AppError::Unavailable(m) => (StatusCode::SERVICE_UNAVAILABLE, m.clone()),
             AppError::RetrievalUnavailable => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
-            AppError::GenerationSourceUnavailable(_) => {
-                (StatusCode::SERVICE_UNAVAILABLE, self.to_string())
-            }
+            AppError::SkillUnavailable(_) => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
             AppError::DefaultAgentNotProvisioned(error) => {
                 (StatusCode::SERVICE_UNAVAILABLE, error.to_string())
             }
@@ -120,8 +118,8 @@ impl IntoResponse for AppError {
         if matches!(&self, Self::ChatInputTooLarge) {
             body["code"] = json!("ai_chat_input_too_large");
         }
-        if matches!(&self, Self::GenerationSourceUnavailable(_)) {
-            body["code"] = json!("ai_generation_source_unavailable");
+        if matches!(&self, Self::SkillUnavailable(_)) {
+            body["code"] = json!("ai_skill_unavailable");
         }
         if matches!(&self, Self::RetrievalUnavailable) {
             body["code"] = json!("ai_retrieval_unavailable");
@@ -152,10 +150,9 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn source_unavailable_is_typed_sanitized_and_platform_actionable() {
+    async fn skill_unavailable_is_typed_and_sanitized() {
         for during_generation in [false, true] {
-            let error =
-                anyhow::Error::new(GenerationSourceUnavailable).context("private SQL detail");
+            let error = anyhow::Error::new(SkillUnavailable).context("private SQL detail");
             let response = if during_generation {
                 AppError::from_generation(error)
             } else {
@@ -167,12 +164,9 @@ mod tests {
                 .await
                 .unwrap();
             let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
-            assert_eq!(body["code"], "ai_generation_source_unavailable");
-            assert_eq!(body["error"], GenerationSourceUnavailable.to_string());
-            assert!(body["error"]
-                .as_str()
-                .unwrap()
-                .contains("platform activation"));
+            assert_eq!(body["code"], "ai_skill_unavailable");
+            assert_eq!(body["error"], SkillUnavailable.to_string());
+            assert!(body["error"].as_str().unwrap().contains("selected company"));
             assert!(!body.to_string().contains("private SQL"));
             assert!(body.get("recovery_path").is_none());
         }

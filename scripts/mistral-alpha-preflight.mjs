@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { decodeSqlRows, normalizeIdentity } from './lib/production-identity-bootstrap.mjs'
 
 const ROLES = ['decision', 'reasoning', 'generation', 'review']
-const TOKEN_NAMES = ['STDB_TOKEN', 'AI_SPEND_READ_STDB_TOKEN', 'AI_CERTIFICATION_STDB_TOKEN']
+const TOKEN_NAMES = ['STDB_TOKEN', 'AI_SPEND_READ_STDB_TOKEN']
 const SECRET_NAMES = [...TOKEN_NAMES, 'MISTRAL_API_KEY', 'AI_EXECUTION_ENVELOPE_KEY', 'LUMIERE_AI_GATEWAY_INTERNAL_SECRET']
 const key = (value) => typeof value === 'string' && /^[a-z0-9][a-z0-9_-]{0,63}$/u.test(value)
 const positive = (value) => Number.isSafeInteger(value) && value > 0
@@ -22,17 +22,17 @@ export function validateManifest(input) {
   requireThat(input.schemaVersion === 1, 'unsupported manifest schemaVersion')
   requireThat(/^[0-9a-f]{40}$/u.test(input.sourceCommit ?? ''), 'sourceCommit must be an exact commit SHA')
   requireThat(/^\d+\.\d+\.\d+$/u.test(input.contractVersion ?? ''), 'contractVersion must be an exact release')
-  requireThat(/^sha256:[0-9a-f]{64}$/u.test(input.runtimeHash ?? ''), 'runtimeHash must be an exact certification digest')
+  requireThat(input.runtimeHash === undefined || /^sha256:[0-9a-f]{64}$/u.test(input.runtimeHash), 'invalid legacy runtimeHash')
   object(input.deployment, ['projectId', 'environment', 'region', 'stdbModule'], 'deployment')
   requireThat(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(input.deployment.projectId ?? ''), 'deployment.projectId must be an exact UUID')
   requireThat(key(input.deployment.environment) && key(input.deployment.region) && key(input.deployment.stdbModule), 'deployment requires exact environment, region and module')
   for (const field of ['organizationId', 'companyId', 'agentId']) requireThat(positive(input[field]), `${field} must be a positive safe integer`)
   object(input.skill, ['key', 'releaseId'], 'skill')
-  requireThat(input.skill.key === 'report_analysis' && positive(input.skill.releaseId), 'pilot requires report_analysis and an exact active releaseId')
+  requireThat(input.skill.key === 'report_analysis', 'pilot requires the built-in report_analysis skill')
   object(input.identities, ['writer', 'spendReader', 'certification'], 'identities')
-  const identities = Object.values(input.identities)
-  requireThat(identities.length === 3 && identities.every((identity) => /^[0-9a-f]{64}$/u.test(identity)), 'three exact server-verified identities are required')
-  requireThat(new Set(identities).size === 3, 'writer, spend reader and certification identities must be distinct')
+  const identities = [input.identities.writer, input.identities.spendReader]
+  requireThat(identities.every((identity) => /^[0-9a-f]{64}$/u.test(identity ?? '')), 'writer and spend-reader identities are required')
+  requireThat(new Set(identities).size === identities.length, 'writer and spend-reader identities must be distinct')
   requireThat(Array.isArray(input.profiles) && input.profiles.length >= 2 && input.profiles.length <= 8, 'pilot requires two to eight profiles')
   for (const profile of input.profiles) {
     object(profile, ['key', 'version', 'model', 'roles', 'maxTokens', 'contextWindow', 'timeoutMs', 'maxConcurrency'], 'profile')
@@ -68,8 +68,8 @@ export function provisioningPlan(input) {
   const m = validateManifest(input)
   return {
     schemaVersion: 1, mode: 'review-only', sourceCommit: m.sourceCommit, contractVersion: m.contractVersion,
-    runtimeHash: m.runtimeHash, deployment: m.deployment, organizationId: m.organizationId, companyId: m.companyId,
-    agentId: m.agentId, skill: m.skill, requiredAllowedModels: [...new Set(m.profiles.map(({ model }) => model))],
+    deployment: m.deployment, organizationId: m.organizationId, companyId: m.companyId,
+    agentId: m.agentId, skill: { key: m.skill.key }, requiredAllowedModels: [...new Set(m.profiles.map(({ model }) => model))],
     // These are Rust parameter names, not generated HTTP/SATS wire encodings.
     parameterFormat: 'rust-source-fields; serialize through matching released contracts before applying',
     profiles: m.profiles.map((p) => ({ reducer: 'register_ai_model_profile', organization_id: m.organizationId, params: {
@@ -92,7 +92,7 @@ export function provisioningPlan(input) {
     bootstrap: { method: 'POST', path: '/v1/harness/governed/bootstrap',
       body: { orgId: m.organizationId, intelligencePolicyRef: `${m.policy.key}@${m.policy.version}` } },
     warnings: ['configure_ai_spend creates a new immutable price snapshot on every call; compare readback and apply only reviewed changes',
-      'plan does not create an agent, grant permissions, certify a skill, or prove deployed state'],
+      'plan does not create an agent, grant permissions, or prove deployed state'],
   }
 }
 
@@ -102,18 +102,17 @@ export function checkEnvironment(input, env) {
   for (const name of SECRET_NAMES) requireThat(typeof env[name] === 'string' && env[name].trim().length >= 32 && !/replace|placeholder|change-me|changeme/iu.test(env[name]), `${name} is missing or invalid`)
   const tokens = TOKEN_NAMES.map((name) => env[name])
   if (env.STDB_SERVER_TOKEN) tokens.push(env.STDB_SERVER_TOKEN)
-  requireThat(new Set(tokens).size === tokens.length, 'gateway, spend-reader, certification and any owner tokens must differ')
+  requireThat(new Set(tokens).size === tokens.length, 'gateway, spend-reader and any owner tokens must differ')
   requireThat(!env.KONG_LLM_URL?.trim(), 'direct Mistral pilot requires KONG_LLM_URL to be unset')
   requireThat(env.STDB_MODULE === m.deployment.stdbModule, 'STDB_MODULE differs from manifest')
-  requireThat(env.AI_CERTIFICATION_RUNTIME_HASH === m.runtimeHash, 'certification runtime digest differs from manifest')
   requireThat(env.LUMIERE_ENV === 'production' && env.LUMIERE_BIN === 'gateway', 'pilot requires the production gateway runtime')
   let url
   try { url = new URL(env.STDB_HOST) } catch { throw new Error('STDB_HOST is invalid') }
   requireThat(!url.username && !url.password && !url.search && !url.hash && (url.pathname === '/' || url.pathname === ''), 'STDB_HOST must be a credential-free origin')
   requireThat(url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname.endsWith('.railway.internal')), 'STDB_HOST requires HTTPS or Railway private HTTP')
   return { configuration: 'passed', deploymentAcceptance: false,
-    unverified: ['deployed commit/contracts/region', 'writer reserve/settle grants', 'active skill release and capability admission',
-      'agent/company/model/policy binding', 'certification runtime registration', 'provider completion and spend settlement', 'browser denial/reconnect/recovery'],
+    unverified: ['deployed commit/contracts/region', 'writer reserve/settle grants', 'skill availability and capability admission',
+      'agent/company/model/policy binding', 'provider completion and spend settlement', 'browser denial/reconnect/recovery'],
     providerDependencies: { embedding: env.EMBEDDING_PROVIDER ?? 'ollama', vision: env.VISION_PROVIDER ?? 'ollama' } }
 }
 
@@ -143,7 +142,7 @@ export async function checkCatalog(input, env, fetchImpl = fetch) {
 
 export async function checkIdentities(input, env, fetchImpl = fetch) {
   checkEnvironment(input, env)
-  const names = ['writer', 'spendReader', 'certification']
+  const names = ['writer', 'spendReader']
   for (let index = 0; index < TOKEN_NAMES.length; index += 1) {
     const { response } = await safeResponse(fetchImpl, `${env.STDB_HOST.replace(/\/$/u, '')}/v1/database/${encodeURIComponent(env.STDB_MODULE)}/sql`, {
       method: 'POST', headers: { Authorization: `Bearer ${env[TOKEN_NAMES[index]]}`, 'Content-Type': 'text/plain' },

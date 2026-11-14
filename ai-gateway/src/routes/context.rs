@@ -121,7 +121,7 @@ pub(crate) async fn admitted_query_vector(
     query: &str,
     _operation_ref: &str,
     agent: Option<&ResolvedAgentConfig>,
-    generation_source_key: Option<&str>,
+    generation_skill_key: Option<&str>,
 ) -> Result<Vec<f32>> {
     if query.trim().is_empty() || query.len() > 8192 || !state.config.embedding_enabled() {
         anyhow::bail!("query embeddings are disabled or outside their input bound");
@@ -195,24 +195,25 @@ pub(crate) async fn admitted_query_vector(
         state.providers.embedder.as_ref(),
         scope,
         query,
-        generation_source_key,
+        generation_skill_key,
     )
     .await
 }
 
-/// The paid embedding boundary; the source key is supplied only by server code.
+/// The paid embedding boundary; the skill key is supplied only by server code.
 async fn execute_query_embedding(
     stdb: &stdb_client::StdbClient,
     reader: &stdb_client::StdbClient,
     embedder: &dyn crate::providers::EmbedProvider,
     scope: MeteredScope,
     query: &str,
-    generation_source_key: Option<&str>,
+    generation_skill_key: Option<&str>,
 ) -> Result<Vec<f32>> {
-    if let Some(key) = generation_source_key {
-        crate::orchestrator::skill_loader::require_generation_source(
+    if let Some(key) = generation_skill_key {
+        crate::orchestrator::skill_loader::require_enabled_skill(
             stdb,
             scope.organization_id,
+            scope.company_id,
             key,
         )
         .await?;
@@ -576,8 +577,8 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn revoked_or_stale_rag_source_blocks_embedding_before_spend_or_io() {
-        use crate::orchestrator::skill_loader::tests::{generation_source_rows, sats_rows};
+    async fn disabled_rag_skill_blocks_embedding_before_spend_or_io() {
+        use crate::orchestrator::skill_loader::tests::{sats_rows, skill_availability_rows};
         use axum::{extract::State, routing::post, Router};
         use std::sync::{Arc, Mutex};
 
@@ -585,10 +586,10 @@ mod tests {
         #[async_trait::async_trait]
         impl crate::providers::EmbedProvider for NeverEmbed {
             async fn embed(&self, _: &str) -> Result<Vec<f32>> {
-                panic!("revoked source must not embed")
+                panic!("disabled skill must not embed")
             }
             async fn embed_batch(&self, _: &[String]) -> Result<Vec<Vec<f32>>> {
-                panic!("revoked source must not embed")
+                panic!("disabled skill must not embed")
             }
             fn dimensions(&self) -> u64 {
                 1
@@ -602,8 +603,8 @@ mod tests {
             statement: String,
         ) -> Json<serde_json::Value> {
             Json(sats_rows(
-                generation_source_rows(&statement, "rag_generation", *case.lock().unwrap())
-                    .expect("source rejection must precede any spend SQL"),
+                skill_availability_rows(&statement, "rag_generation", *case.lock().unwrap())
+                    .expect("skill availability check must precede any spend SQL"),
             ))
         }
         let case = Arc::new(Mutex::new("active"));
@@ -617,10 +618,10 @@ mod tests {
             .route("/v1/database/fixture/sql", post(sql))
             .with_state(case.clone());
         let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        crate::orchestrator::skill_loader::require_generation_source(&stdb, 1, "rag_generation")
+        crate::orchestrator::skill_loader::require_enabled_skill(&stdb, 1, 3, "rag_generation")
             .await
             .unwrap();
-        for changed in ["missing", "stale"] {
+        for changed in ["missing", "disabled"] {
             *case.lock().unwrap() = changed;
             let error = execute_query_embedding(
                 &stdb,
@@ -642,7 +643,7 @@ mod tests {
             )
             .await
             .unwrap_err();
-            assert!(error.is::<crate::error::GenerationSourceUnavailable>());
+            assert!(error.is::<crate::error::SkillUnavailable>());
         }
         server.abort();
     }
