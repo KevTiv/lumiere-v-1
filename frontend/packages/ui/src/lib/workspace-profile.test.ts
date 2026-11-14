@@ -12,9 +12,9 @@ const ids = (options: Parameters<typeof buildNavGroups>[1]) =>
   buildNavGroups((key) => key, options).flatMap((group) => group.items.map((item) => item.surfaceId))
 
 describe("Finance Alpha global discovery", () => {
-  it("keeps Finance, bounded Product/Warehouse/Fleet and support entry points and removes empty groups", () => {
+  it("keeps Finance, inventory operations and support entry points and removes empty groups", () => {
     expect(ids({ workspaceProfile: "finance-alpha" }).sort()).toEqual([
-      "accounting", "approvals", "calendar", "crm", "documents", "expenses", "fleet",
+      "accounting", "approvals", "calendar", "crm", "documents", "expenses", "fleet", "inventory",
       "overview", "products", "purchasing", "reports", "sales", "settings", "subscriptions", "tasks", "warehouse",
     ].sort())
     expect(buildNavGroups((key) => key, { workspaceProfile: "finance-alpha" })
@@ -51,7 +51,8 @@ describe("Finance Alpha global discovery", () => {
     expect(isWorkspaceFormModuleVisible("finance-alpha", "fleet")).toBe(true)
     expect(isWorkspaceFormModuleVisible("finance-alpha", "products")).toBe(true)
     expect(isWorkspaceFormModuleVisible("finance-alpha", "warehouse")).toBe(true)
-    for (const id of ["inventory", "hr", "projects", "manufacturing", "helpdesk", "proposals", "forensic"]) {
+    expect(visible.map((module) => module.id)).toContain("inventory")
+    for (const id of ["hr", "projects", "manufacturing", "helpdesk", "proposals", "forensic"]) {
       expect(visible.map((module) => module.id)).not.toContain(id)
       expect(formRegistry.getByModule(id).length).toBeGreaterThan(0)
     }
@@ -71,7 +72,7 @@ describe("Finance Alpha global discovery", () => {
     expect(ids({})).toContain("inventory")
     expect(ids({ workspaceProfile: "full" })).toEqual(ids({}))
     expect(isWorkspaceHrefVisible("finance-alpha", "/accounting?tab=assets")).toBe(true)
-    expect(isWorkspaceHrefVisible("finance-alpha", "/inventory/transfers/1")).toBe(false)
+    expect(isWorkspaceHrefVisible("finance-alpha", "/inventory/transfers/1")).toBe(true)
     expect(isWorkspaceHrefVisible("full", "/inventory/transfers/1")).toBe(true)
     expect(isWorkspaceHrefVisible("finance-alpha", "/products?tab=categories")).toBe(true)
     expect(isWorkspaceHrefVisible("finance-alpha", "/warehouse?tab=stock")).toBe(true)
@@ -87,7 +88,7 @@ describe("Finance Alpha global discovery", () => {
     expect(alpha.filter((id) => id === "products")).toHaveLength(1)
     expect(alpha).toContain("fleet")
     expect(alpha.filter((id) => id === "warehouse")).toHaveLength(1)
-    expect(alpha).not.toContain("inventory")
+    expect(alpha.filter((id) => id === "inventory")).toHaveLength(1)
     expect(alpha).not.toContain("map")
   })
 })

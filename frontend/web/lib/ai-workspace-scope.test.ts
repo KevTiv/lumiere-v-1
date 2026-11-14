@@ -55,7 +55,7 @@ test("Finance Alpha offers every active workspace and omits the full-profile mod
   const options = aiWorkspaceScopesForProfile("finance-alpha")
   const modules = options.filter(option => option.group === "Modules").map(option => option.value)
   assert.deepEqual(modules.sort(), [
-    "accounting", "approvals", "calendar", "crm", "documents", "expenses", "fleet", "overview",
+    "accounting", "approvals", "calendar", "crm", "documents", "expenses", "fleet", "inventory", "overview",
     "products", "purchasing", "reports", "sales", "settings", "subscriptions", "tasks", "warehouse",
   ].map(module => `module:${module}`).sort())
   assert.equal(resolveAiWorkspaceScope("module:manufacturing", "/crm", null, options).pathname, "/crm")

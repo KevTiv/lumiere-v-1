@@ -155,10 +155,10 @@ describe("ErpCommandPalette records", () => {
     }
   })
 
-  it("does not query or offer hidden modules under the Finance Alpha provider", () => {
+  it("offers Inventory and searches readable records under the Finance Alpha provider", () => {
     render(<WorkspaceProfileProvider value="finance-alpha"><ErpCommandPalette recordHref={recordHref} /></WorkspaceProfileProvider>)
     act(() => { fireEvent.keyDown(window, { key: "k", ctrlKey: true }) })
-    expect(screen.queryByRole("option", { name: "Inventory" })).toBeNull()
+    expect(screen.getByRole("option", { name: "Inventory", exact: true })).toBeTruthy()
     type("acme")
     expect(hookCalls.names).toContain("sale_order")
     expect(hookCalls.names).toContain("product")
