@@ -34,6 +34,7 @@ import {
   type ImportProposal,
   type ImportWorkflow,
 } from "./import-workflow"
+import { ModuleBackfillAction } from "./module-backfill-action"
 import { useImportProposalAttempt } from "./use-import-proposal-attempt"
 import { importTaskHref } from "./import-task-navigation"
 import { importWorkflowKey, useImportWorkflow } from "./use-import-workflow"
@@ -354,6 +355,10 @@ function ExecutionPanel({
         <>
           {!reviewId && <p>{t("settings.importWorkflow.chooseSource")}</p>}
           {review.error && <p role="alert">{review.error.message}</p>}
+          {review.data && !review.isError && (
+            <ModuleBackfillAction detail={review.data} organizationId={organizationId}
+              companyId={companyId} actor={actor} disabled={busy || preparationLocked} />
+          )}
           {nativeHandoff && (
             <div className="space-y-2">
               <p>{t("settings.importWorkflow.nativeHandoff")}</p>
@@ -634,6 +639,13 @@ function ExecutionPanel({
           }}
         />
       )}
+      {view === "results" && workflow.data?.backfilledRecords?.map(({ module, count }) => (
+        <p key={module}>
+          <a className="underline underline-offset-4" href={module === "sales" ? "/sales#backfilled-records" : "/warehouse#backfilled-records"}>
+            {count} {module === "sales" ? "verified customer sales" : "verified inventory counts"}
+          </a>
+        </p>
+      ))}
       {view === "results" && nativeResults.length > 0 && (
         <section
           className="space-y-3"

@@ -1,6 +1,7 @@
 import { getStdbSession } from "@/lib/api-session"
 import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { SalesClient } from "./sales-client"
+import { ModuleBackfillRecords } from "../../../components/module-backfill-records"
 import { SourceHistoryLink } from "../../../components/source-history-link"
 
 const SSR_RESOURCES = [
@@ -69,6 +70,7 @@ export default async function SalesPage() {
         initialReturnOrderLines={returnOrderLines}
         organizationId={session.organizationId}
       />
+      <ModuleBackfillRecords organizationId={session.organizationId} module="sales" />
     </>
   )
 }

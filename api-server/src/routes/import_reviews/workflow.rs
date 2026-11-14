@@ -45,11 +45,12 @@ async fn read(
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
     let proposals = storage::list(&tx, scoped, &task).await?;
+    let backfilled_records = super::module_backfill::task_results(&tx, scoped, &task).await?;
     tx.commit().await.map_err(ApiError::internal)?;
     let (native_results, native_results_more) =
         super::native_requests::list(&context, query.company_id, &task).await?;
     Ok(Json(
-        json!({"version":1,"organizationId":context.organization_id().to_string(),"requestId":task,"companyId":query.company_id.to_string(),"capabilities":super::capabilities::catalog(),"proposals":proposals,"nativeResults":native_results,"nativeResultsMore":native_results_more}),
+        json!({"version":1,"organizationId":context.organization_id().to_string(),"requestId":task,"companyId":query.company_id.to_string(),"capabilities":super::capabilities::catalog(),"proposals":proposals,"nativeResults":native_results,"nativeResultsMore":native_results_more,"backfilledRecords":backfilled_records}),
     ))
 }
 

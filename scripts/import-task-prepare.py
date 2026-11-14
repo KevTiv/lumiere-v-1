@@ -855,6 +855,35 @@ def observation_items(file, blocks, *, inspection_only=False):
             item["businessDate"], kind = supplementary[record_index]
             fields.append(field("observation_kind", kind))
             proposed["observation_kind"] = kind
+            structured = []
+            if kind == "historical_customer_sales_summary":
+                period_start = item["businessDate"].get("from")
+                exclusive_end = item["businessDate"].get("toExclusive")
+                period_end = (date.fromisoformat(exclusive_end) - timedelta(days=1)).isoformat() if exclusive_end else None
+                structured = [
+                    ("customer_label", "Source customer label", cells[2], "text"),
+                    ("period_start", "Period start (YYYY-MM-DD)", period_start, "date"),
+                    ("period_end", "Period end (YYYY-MM-DD)", period_end, "date"),
+                    ("quantity", "Recorded quantity (unit to confirm)", cells[3], "decimal"),
+                    ("unit_price", "Recorded price per source unit (RWF)", cells[4], "decimal"),
+                    ("sales_total", "Recorded sales total (RWF)", cells[5], "decimal"),
+                    ("source_unit", "Source quantity unit", None, "text"),
+                    ("product_scope", "Product or summary scope", None, "text"),
+                    ("payment_comment", "Source payment comment", cells[6], "text"),
+                ]
+                label = cells[2].strip()
+            elif kind == "historical_inventory_count":
+                structured = [
+                    ("count_date", "Count date (YYYY-MM-DD)", item["businessDate"].get("from"), "date"),
+                    ("product_label", "Source product label", cells[2], "text"),
+                    ("pieces", "Recorded piece count", cells[3], "decimal"),
+                    ("kilograms", "Recorded weight (kg)", cells[4], "decimal"),
+                    ("business_location", "Business location", None, "text"),
+                ]
+                label = cells[2].strip()
+            for key, field_label, value, field_kind in structured:
+                fields.append(field(key, value, kind=field_kind, label=field_label))
+                proposed[key] = proposed_value(value or "", field_kind)
         if record_index in by_record:
             block, line = by_record[record_index]
             label = line["product_label"]
