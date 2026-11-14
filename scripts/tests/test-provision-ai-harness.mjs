@@ -28,8 +28,7 @@ function fixture() {
     async sql(sql, role) {
       if (sql.includes('FROM company ')) return [{ id: 3, organization_id: 9 }]
       if (sql.includes('FROM ai_skill ') && !sql.includes("skill_key = 'report_analysis'")) return tables.surfaces
-      if (sql.includes('FROM ai_skill ')) return [{ id: 8, organization_id: 0, is_active: true }]
-      if (sql.includes('FROM ai_skill_release ')) return [{ id: 5, skill_version_id: 6 }]
+      if (sql.includes('FROM ai_skill ')) return [{ id: 8, skill_key: 'report_analysis', organization_id: 0, is_active: true }]
       if (sql.includes('FROM ai_model_profile ')) return tables.profiles.filter(row => sql.includes(`'${row.profile_key}'`))
       if (sql.includes('FROM ai_intelligence_policy ')) return tables.policies
       if (sql.includes('FROM ai_agent ')) return tables.agents
@@ -105,14 +104,21 @@ test('apply is idempotent, preserves counters and scoped settings, and verifies 
 })
 
 test('wrong company, immutable drift, disabled skill and unregistered reader fail before writes', async () => {
-  for (const kind of ['company', 'profile', 'policy', 'disabled', 'reader', 'release', 'price', 'budget']) {
+  for (const kind of ['company', 'profile', 'policy', 'disabled', 'reader', 'catalog-disabled', 'inherited-disabled', 'price', 'budget']) {
     const { client, tables, writes } = fixture()
     if (kind === 'company') { const base = client.sql; client.sql = async (...args) => args[0].includes('FROM company ') ? [{ id: 3, organization_id: 10 }] : base(...args) }
     if (kind === 'profile') tables.profiles.push({ ...profilesFor(manifest())[0], model: 'different', is_active: true })
     if (kind === 'policy') tables.policies.push({ ...policyFor(manifest()), default_review_profile: 'unreviewed@1', is_active: true })
     if (kind === 'disabled') tables.configs.push({ company_id: [0, 3], is_enabled: false, config_json: '{}' })
+    if (kind === 'inherited-disabled') tables.configs.push({ company_id: { none: [] }, is_enabled: false, config_json: '{}' })
     if (kind === 'reader') client.verifyTarget = async () => { throw new Error('reader not registered') }
-    if (kind === 'release') { const base = client.sql; client.sql = async (...args) => args[0].includes('FROM ai_skill_release ') ? [] : base(...args) }
+    if (kind === 'catalog-disabled') {
+      const base = client.sql
+      client.sql = async (...args) => args[0].includes("skill_key = 'report_analysis'") ? [
+        { id: 8, skill_key: 'report_analysis', organization_id: 0, is_active: true },
+        { id: 10, skill_key: 'report_analysis', organization_id: 9, is_active: false },
+      ] : base(...args)
+    }
     if (kind === 'price' || kind === 'budget') {
       await provision(manifest(), client, true)
       writes.length = 0

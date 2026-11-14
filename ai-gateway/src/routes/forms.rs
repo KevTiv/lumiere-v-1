@@ -9,6 +9,7 @@ use crate::{
         resolve_surface_agent,
     },
     error::{AppError, AppResult},
+    orchestrator::skill_access::ActorSkillAccess,
     orchestrator::{
         intelligence_router::run_catalogued_generation_surface,
         model_configuration::StdbModelConfigurationStore,
@@ -73,6 +74,7 @@ pub struct FormSuggestRequest {
     pub agent_id: Option<u64>,
     pub team_member_id: Option<u64>,
     pub identity_hex: String,
+    pub stdb_token: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -407,6 +409,14 @@ pub async fn post_suggest(
         ));
     }
 
+    let skill_access = ActorSkillAccess::new(
+        &state,
+        req.org_id,
+        req.company_id,
+        &req.stdb_token,
+        &req.identity_hex,
+    )?;
+    skill_access.require("form_suggestion").await?;
     let prompt = build_suggestion_prompt(&req);
 
     let agent = resolve_surface_agent(
@@ -479,6 +489,7 @@ pub async fn post_suggest(
         }),
         Some(system),
         Some(agent.max_tokens.min(FORM_SUGGEST_MAX_TOKENS)),
+        &skill_access,
     )
     .await;
     let program = match program {
@@ -518,6 +529,23 @@ pub async fn post_suggest(
             "generated form suggestions require review before release".into(),
         ));
     };
+    if let Err(error) = skill_access.require("form_suggestion").await {
+        let _ = complete_run(
+            state.stdb.as_ref(),
+            req.org_id,
+            req.company_id,
+            run.run_id,
+            "failed",
+            None,
+            None,
+            None,
+            program.trace.len() as u32,
+            total_tokens,
+            Some(error.to_string()),
+        )
+        .await;
+        return Err(error.into());
+    }
     let text = generated;
     let model_json: Value = match serde_json::from_str(clean_json_response(text)) {
         Ok(value) => value,

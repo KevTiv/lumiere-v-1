@@ -345,9 +345,9 @@ Tenants do not need to assemble individual agents and built-in skill bindings.
 ### Deployment-wide alpha AI default
 
 Platform superusers can publish the default from **AI Workbench → AI profile**.
-That flow publishes the three bundled global generation skills, registers the
-immutable model/funding template, and selects it for future enrollment. It does
-not accept provider credentials; configure those on the gateway deployment.
+That flow uses the global generation skills, registers the immutable
+model/funding template, and selects it for future enrollment. Configure provider
+credentials on the gateway deployment.
 Before publishing, the deployment must have one active `ai_spend_reader` identity
 and one distinct active `ai_spend_writer` identity registered. These must match
 the gateway's configured reader and runtime writer credentials. The template
@@ -384,6 +384,12 @@ immutable template for enrollment. Both writes verify durable state and stop
 on an unknown result instead of blindly retrying. No generation call occurs.
 Published global skill definitions are prerequisites: registration must not
 promote arbitrary tenant skills or fabricate release certification.
+
+Fresh databases register Lumière's built-in skills automatically at module
+initialization. After upgrading an existing database, use the existing platform
+operator to re-apply the active AI template with `--activate --env` or save the
+active AI profile in Workbench. Activation inserts missing built-in catalog
+entries and preserves existing IDs, company configurations, and disablements.
 
 Enrollment is handled by the server's `enroll_ai_company_defaults` path and
 company lifecycle integration. It creates scoped tenant records using the active

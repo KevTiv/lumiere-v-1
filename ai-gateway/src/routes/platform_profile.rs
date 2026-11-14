@@ -226,24 +226,7 @@ pub async fn post_platform_profile(
             "form_suggestion",
             "action_draft_generation",
         ] {
-            let call = crate::orchestrator::surface_provisioning::create_surface(0, key)
-                .map_err(setup_error)?;
-            let mut params = call.args()[1].clone();
-            params["is_system"] = json!(true);
-            writer
-                .company_operation("erp.publish_ai_platform_skill", json!({"params":params}))
-                .await
-                .map_err(setup_error)?;
-            let rows = state.stdb.query_sql(&format!("SELECT id FROM ai_skill WHERE organization_id = 0 AND skill_key = '{key}' AND is_system = true AND is_active = true LIMIT 2")).await.map_err(|_| AppError::Unavailable("Published skill readback failed".into()))?;
-            if rows.len() != 1 {
-                return Err(AppError::Unavailable("Published skill is ambiguous".into()));
-            }
-            skill_ids.push(
-                rows[0]
-                    .get("id")
-                    .and_then(Value::as_u64)
-                    .ok_or_else(|| AppError::Unavailable("Published skill ID missing".into()))?,
-            );
+            skill_ids.push(ensure_platform_generation_skill(&state, &writer, key).await?);
         }
         let params = json!({"template_key":profile.template_key,"template_version":profile.template_version,
             "generation_profile":profile.model_params(&profile.generation_profile,"generation"),
@@ -273,6 +256,50 @@ pub async fn post_platform_profile(
             .map_err(setup_error)?;
     }
     Ok(Json(read_profile(&state).await?))
+}
+
+async fn ensure_platform_generation_skill(
+    state: &AppState,
+    writer: &ApiSurfaceWriter<'_>,
+    key: &str,
+) -> AppResult<u64> {
+    let statement = format!(
+        "SELECT id, is_system, is_active FROM ai_skill \
+         WHERE organization_id = 0 AND skill_key = '{key}' LIMIT 2"
+    );
+    let read_skill = || async {
+        state
+            .stdb
+            .query_sql(&statement)
+            .await
+            .map_err(|_| AppError::Unavailable("Published skill readback failed".into()))
+    };
+    let mut rows = read_skill().await?;
+    if rows.is_empty() {
+        let call = crate::orchestrator::surface_provisioning::create_surface(0, key)
+            .map_err(setup_error)?;
+        let mut params = call.args()[1].clone();
+        params["is_system"] = json!(true);
+        writer
+            .company_operation("erp.publish_ai_platform_skill", json!({"params":params}))
+            .await
+            .map_err(setup_error)?;
+        rows = read_skill().await?;
+    }
+    let [row] = rows.as_slice() else {
+        return Err(AppError::Unavailable(
+            "Published skill is missing or ambiguous".into(),
+        ));
+    };
+    if row["isSystem"].as_bool() != Some(true) || row["isActive"].as_bool() != Some(true) {
+        return Err(AppError::Unavailable(
+            "Published skill is inactive or not a system skill".into(),
+        ));
+    }
+    row["id"]
+        .as_u64()
+        .filter(|id| *id > 0)
+        .ok_or_else(|| AppError::Unavailable("Published skill ID missing".into()))
 }
 
 #[cfg(test)]

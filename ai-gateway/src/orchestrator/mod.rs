@@ -33,6 +33,7 @@ pub mod run;
 pub mod run_lifecycle;
 mod run_review;
 pub(crate) mod security_envelope;
+pub(crate) mod skill_access;
 pub mod skill_loader;
 pub(crate) mod spend_admission;
 pub(crate) mod surface_provisioning;

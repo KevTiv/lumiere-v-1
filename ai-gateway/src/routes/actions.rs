@@ -14,6 +14,7 @@ use crate::{
         fetch_authorized_live_snapshots, filter_entity_refs_by_allowed_types, ActorCredentials,
         EntityRef, LiveSnapshot,
     },
+    orchestrator::skill_access::ActorSkillAccess,
     orchestrator::{
         intelligence::EvidenceRef,
         intelligence_router::run_catalogued_generation_surface,
@@ -347,6 +348,7 @@ async fn draft_actions_llm(
     state: &AppState,
     req: &ActionDraftRequest,
     grounding_snapshots: Option<&[LiveSnapshot]>,
+    skill_access: &ActorSkillAccess<'_>,
 ) -> Result<GeneratedDraftBatch, DraftActionsError> {
     let org_id = req
         .org_id
@@ -429,6 +431,7 @@ async fn draft_actions_llm(
         }),
         Some(system),
         Some(agent.max_tokens.min(ACTION_DRAFT_MAX_TOKENS)),
+        skill_access,
     )
     .await;
     let program = match program {
@@ -926,12 +929,28 @@ pub async fn post_draft(
     if !non_empty(&req.query) {
         return Err(AppError::BadRequest("query must not be empty".into()));
     }
-    ActorCredentials::new(req.stdb_token.clone(), req.identity_hex.clone())
-        .map_err(|error| AppError::Forbidden(error.to_string()))?;
+    let org_id = req
+        .org_id
+        .ok_or_else(|| AppError::BadRequest("org_id is required".into()))?;
+    let skill_access = ActorSkillAccess::new(
+        &state,
+        org_id,
+        req.company_id,
+        &req.stdb_token,
+        &req.identity_hex,
+    )?;
+    skill_access.require("action_draft_generation").await?;
 
     let grounding_snapshots = fetch_grounding_snapshots(&state, &req).await?;
 
-    let mut batch = match draft_actions_llm(&state, &req, grounding_snapshots.as_deref()).await {
+    let mut batch = match draft_actions_llm(
+        &state,
+        &req,
+        grounding_snapshots.as_deref(),
+        &skill_access,
+    )
+    .await
+    {
         Ok(batch) => batch,
         Err(DraftActionsError::Limit(violation)) => return Err(violation.into_app_error()),
         Err(DraftActionsError::AgentResolution(error)) => return Err(error),
@@ -1013,6 +1032,10 @@ pub async fn post_draft(
         }
     }
 
+    if let Err(error) = skill_access.require("action_draft_generation").await {
+        fail_generated_run(&state, &req, &batch, error.to_string()).await;
+        return Err(error.into());
+    }
     if let Err(error) =
         persist_generated_drafts(&state, &req, batch.run.run_id, &mut batch.drafts).await
     {

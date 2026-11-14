@@ -756,6 +756,14 @@ pub async fn run_skill_admitted(
         .zip(req.triggered_by_hex.as_ref())
         .and_then(|(token, identity)| ActorCredentials::new(token.clone(), identity.clone()).ok())
         .context("admitted runs require authenticated actor credentials")?;
+    let actor_skill_access = super::skill_access::ActorSkillAccess::new(
+        state,
+        req.org_id,
+        req.company_id,
+        &actor.stdb_token,
+        &actor.identity_hex,
+    )?;
+    actor_skill_access.require(&skill_key).await?;
     let stdb = req
         .stdb_token
         .as_ref()
@@ -932,7 +940,8 @@ pub async fn run_skill_admitted(
             run_id,
             IntelligenceRole::Decision,
             &shadow_recorder,
-        )?;
+        )?
+        .with_actor_skill_access(&actor_skill_access, &skill_key);
         let review_provider = RoutedDecisionProvider::new(
             &intelligence_router,
             state.providers.llm.as_ref(),
@@ -943,7 +952,8 @@ pub async fn run_skill_admitted(
             run_id,
             IntelligenceRole::Review,
             &NoopShadowDecisionRecorder,
-        )?;
+        )?
+        .with_actor_skill_access(&actor_skill_access, &skill_key);
         let generation_provider = RoutedGenerationProvider::new(
             &intelligence_router,
             state.providers.llm.as_ref(),
@@ -952,7 +962,8 @@ pub async fn run_skill_admitted(
             req.org_id,
             req.company_id,
             run_id,
-        );
+        )
+        .with_actor_skill_access(&actor_skill_access, &skill_key);
         let reasoning_provider = RoutedReasoningProvider::new(
             &intelligence_router,
             state.providers.llm.as_ref(),
@@ -961,7 +972,8 @@ pub async fn run_skill_admitted(
             req.org_id,
             req.company_id,
             run_id,
-        );
+        )
+        .with_actor_skill_access(&actor_skill_access, &skill_key);
 
         let decision_types = StdbDecisionTypeRegistry {
             writer: state.stdb.as_ref(),
@@ -1173,6 +1185,7 @@ pub async fn run_skill_admitted(
             // This mutation happens only after the current actor, skill,
             // bounded inputs, graph and knowledge/source dependencies have
             // all been re-authorized and matched to the immutable checkpoint.
+            actor_skill_access.require(&skill_key).await?;
             resume_run(&stdb, spend_reader, req.org_id, req.company_id, run_id).await?;
         }
         let program = match executor.run(&graph, &program_context).await {
@@ -1250,6 +1263,27 @@ pub async fn run_skill_admitted(
         // wait state or approval summary can be released to the caller.
         verify_current_execution_authority(&envelope_authority, &execution_envelope, &tool_ctx)
             .await?;
+        if let Err(error) = actor_skill_access.require(&skill_key).await {
+            let steps =
+                load_run_step_count(state.stdb.as_ref(), req.org_id, req.company_id, run_id)
+                    .await?;
+            let tokens = load_run_tokens(spend_reader, req.org_id, req.company_id, run_id).await?;
+            complete_run(
+                state.stdb.as_ref(),
+                req.org_id,
+                req.company_id,
+                run_id,
+                "failed",
+                None,
+                None,
+                None,
+                steps,
+                tokens,
+                Some(error.to_string()),
+            )
+            .await?;
+            return Err(error.into());
+        }
         let trace_step_offset =
             load_run_step_count(state.stdb.as_ref(), req.org_id, req.company_id, run_id).await?;
         let durable_step_count = persist_governed_trace(
