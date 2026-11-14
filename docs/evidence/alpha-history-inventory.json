@@ -517,7 +517,7 @@
     },
     {
       "path": "api-server/src/routes/import_reviews/tasks.rs",
-      "sha256": "4d5a44e3dfdb579dbe320e2e8a7057414b30a3117487239407ec62e91ce0138d"
+      "sha256": "26f05260c77dfb3a091d8904a844b6c33fb5213139dfb66119ea3b1a91d5699d"
     },
     {
       "path": "frontend/packages/ui/src/lib/product-surface-catalog.ts",
@@ -529,7 +529,7 @@
     },
     {
       "path": "frontend/web/lib/inventory-workspace-navigation.ts",
-      "sha256": "fb738fa00000b1a64d73b82e4fd9ca6b0c9e6a7eb304d834a7637b932a9e9a55"
+      "sha256": "5695b11969d572fbbd9c1c2e4b71f7598c8aa243032409f718be9243dd175b4d"
     },
     {
       "path": "lumiere-codegen/business-history-owner-policy.json",

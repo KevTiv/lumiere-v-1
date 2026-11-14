@@ -13,6 +13,7 @@ import type { ModuleConfig } from "@lumiere/ui/lib/module-types";
 import { entityColumnLayouts as layout } from "@lumiere/ui/lib/entity-column-layouts";
 
 import { WAREHOUSE_TAB_IDS } from '../../../lib/inventory-workspace-navigation';
+import { moduleBackfillTabs } from '../../../lib/module-backfill-navigation';
 export { WAREHOUSE_TAB_IDS } from '../../../lib/inventory-workspace-navigation';
 
 const CREATE_PERMISSIONS: Readonly<Record<string, EntitySurfacePermission>> = {
@@ -333,7 +334,7 @@ export function warehouseWorkspace(
   const groups = [
     { id: "stock", label: t("modules.tabGroups.stock"), tabIds: ["stock", "lots", "serials"] },
     { id: "movements", label: t("modules.tabGroups.movements"), tabIds: ["transfers", "stock-moves"] },
-    { id: "counts", label: t("inventory.warehouseWorkspace.counts", { defaultValue: "Counts" }), tabIds: ["adjustments", "cycle-counts", "cycle-wizard"] },
+    { id: "counts", label: t("inventory.warehouseWorkspace.counts", { defaultValue: "Counts" }), tabIds: ["adjustments", "cycle-counts", moduleBackfillTabs.warehouse, "cycle-wizard"] },
     { id: "setup", label: t("modules.tabGroups.setup"), tabIds: ["warehouses", "locations", "replenishment"] },
   ].map((group) => ({ ...group, tabIds: group.tabIds.filter((id) => tabs.some((tab) => tab.id === id)) }))
     .filter((group) => group.tabIds.length > 0);

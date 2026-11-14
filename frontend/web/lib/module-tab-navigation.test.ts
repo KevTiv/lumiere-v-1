@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { moduleBackfillHref } from "./module-backfill-navigation"
 import { moduleTabDestination } from "./module-tab-navigation"
 
 const base = { pathname: "/accounting", defaultTab: "dashboard", validTabs: ["dashboard", "invoices", "bills"] }
@@ -25,4 +26,19 @@ test("changing tabs leaves the owner queue on the previous history entry", () =>
   const query = "tab=invoices&ownerQueue=overdue-invoices&company=7"
   assert.equal(moduleTabDestination({ ...base, query, tab: "bills" }), "/accounting?tab=bills&company=7")
   assert.equal(moduleTabDestination({ ...base, query, tab: "invoices" }), null)
+})
+
+test("import results open their owning list and keep the task filter on that tab", () => {
+  const task = "a".repeat(32)
+  for (const [module, tab, defaultTab] of [
+    ["sales", "customer-sales", "orders"],
+    ["warehouse", "recorded-counts", "stock"],
+  ] as const) {
+    const href = moduleBackfillHref(module, { id: task, companyId: 7 })
+    assert.equal(href, `/${module}?tab=${tab}&backfillTask=${task}&backfillCompany=7`)
+    const { pathname, search } = new URL(href, "https://example.test")
+    assert.equal(moduleTabDestination({
+      pathname, query: search, tab: defaultTab, defaultTab, validTabs: [tab, defaultTab],
+    }), `/${module}`)
+  }
 })

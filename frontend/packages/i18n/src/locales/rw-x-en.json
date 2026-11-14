@@ -1,8 +1,4 @@
 {
-  "moduleCsvHistory": {
-    "salesDescription": "Ibicuruzwa byagurishijwe byemejwe muri file za CSV. Report z’amaduka n’iz’ibihe zishobora kubariramo amakuru amwe.",
-    "description": "Amakuru yemejwe yavuye muri file za CSV za sosiyete."
-  },
   "moduleInsights": {
     "workspaces": {
       "lines": "Imirongo ya order",

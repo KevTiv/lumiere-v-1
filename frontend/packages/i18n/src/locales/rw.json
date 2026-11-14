@@ -1,17 +1,27 @@
 {
-  "moduleCsvHistory": {
-    "title": "Amateka ya CSV",
-    "salesDescription": "Ibicuruzwa byagurishijwe byemejwe muri dosiye za CSV. Raporo z’amaduka n’iz’ibihe zishobora kubariramo amakuru amwe.",
-    "description": "Amakuru yemejwe yavuye muri dosiye za CSV za sosiyete.",
-    "search": "Shakisha mu mateka ya CSV",
-    "productCustomer": "Igicuruzwa cyangwa umukiriya",
-    "location": "Aho biherereye",
+  "moduleRecords": {
+    "sales": "Incamake y’ibyagurishijwe ku bakiriya",
+    "warehouse": "Ibarura ryanditswe",
+    "period": "Igihe cy’igurisha",
+    "countDate": "Itariki y’ibarura",
+    "customer": "Umukiriya",
+    "product": "Igicuruzwa",
     "quantity": "Ingano",
     "unitPrice": "Igiciro kuri kimwe",
-    "amount": "Amafaranga yanditswe",
+    "reportedTotal": "Igiteranyo cyatangajwe",
+    "paymentComment": "Icyitonderwa ku bwishyu",
+    "pieces": "Umubare w’ibintu",
+    "kilograms": "Ibiro",
+    "location": "Ahantu",
+    "source": "Inkomoko",
     "sourceRow": "{{file}} · umurongo {{row}}",
-    "showDataset": "Erekana imirongo yose y’aya makuru",
-    "openReview": "Fungura isuzuma ry’amakuru y’umwimerere"
+    "showAll": "Erekana inyandiko zose",
+    "loadMore": "Erekana izindi",
+    "emptySales": "Nta ncamake y’ibyagurishijwe ku bakiriya yabitswe.",
+    "emptyCounts": "Nta barura ryabitswe.",
+    "emptyFiltered": "Nta nyandiko zihuye n’amatariki cyangwa ibyinjijwe byatoranyijwe.",
+    "otherCompany": "Hitamo sosiyete yakoreshejwe muri iri yinjiza kugira ngo urebe inyandiko zayo.",
+    "loadError": "Ntibishobotse kwerekana inyandiko."
   },
   "aiHarness": {
     "platformProfile": {
