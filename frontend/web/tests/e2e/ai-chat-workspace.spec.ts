@@ -20,7 +20,7 @@ test.describe("AI chat workspace", { tag: ["@p0", "@ai-workspace"] }, () => {
       await chooseSelectOptionByTriggerValue(
         page,
         panel.getByRole("combobox", { name: "Assistant context" }),
-        "module:inventory",
+        "module:warehouse",
       )
       if (width === 1440) {
         await panel.getByRole("button", { name: "Open full workspace" }).click()
@@ -28,7 +28,7 @@ test.describe("AI chat workspace", { tag: ["@p0", "@ai-workspace"] }, () => {
       await expect(panel).toHaveAttribute("data-mode", "full")
       await expect(input).toHaveValue(question)
       if (width === 1440) await expect(input).toBeFocused()
-      await expect(panel.getByRole("combobox", { name: "Assistant context" })).toContainText("Inventory")
+      await expect(panel.getByRole("combobox", { name: "Assistant context" })).toContainText("Warehouse")
       const bounds = await panel.boundingBox()
       expect(bounds).not.toBeNull()
       expect(bounds!.x).toBeGreaterThanOrEqual(0)
