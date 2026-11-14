@@ -29,6 +29,38 @@ test('exact row selection keeps one report selected across repeated and changed 
   await expect(page.getByTestId('submitted-reports')).toHaveText('report-0');
 });
 
+for (const width of [390, 1280]) {
+  test(`table headings stay on one line with and without records at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto('/helper-regressions');
+    await expect(page.getByTestId('helper-fixture')).toHaveAttribute('data-hydrated', 'true');
+
+    const sortableLabel = 'International expense report reference';
+    const plainLabel = 'Customer reference for reimbursement';
+    const sortableHeader = page.getByRole('columnheader', { name: sortableLabel });
+    const plainHeader = page.getByRole('columnheader', { name: plainLabel });
+    const sort = sortableHeader.getByRole('button', { name: sortableLabel });
+
+    for (const label of [sortableLabel, plainLabel]) {
+      const text = page.getByTitle(label);
+      await expect(text).toHaveCSS('text-overflow', 'ellipsis');
+      await expect(text).toHaveCSS('white-space', 'nowrap');
+      expect(await text.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+    }
+    await expect(sort.locator('svg')).toBeVisible();
+    await sort.focus();
+    await sort.press('Enter');
+    await expect(sortableHeader).toHaveAttribute('aria-sort', 'ascending');
+
+    await page.getByRole('textbox', { name: 'Search records' }).fill('no matching report');
+    await expect(page.getByTestId('entity-empty-no-results')).toBeVisible();
+    await expect(sortableHeader).toHaveCSS('white-space', 'nowrap');
+    await expect(plainHeader).toHaveCSS('white-space', 'nowrap');
+    await expect(page.getByRole('region', { name: 'Records' })).toHaveAttribute('tabindex', '0');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  });
+}
+
 test('confirmed discard opens a fresh form when the same dialog is reopened', async ({ page }) => {
   await page.goto('/helper-regressions');
   await expect(page.getByTestId('helper-fixture')).toHaveAttribute('data-hydrated', 'true');

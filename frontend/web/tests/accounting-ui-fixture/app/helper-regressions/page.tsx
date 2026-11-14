@@ -48,7 +48,20 @@ function Fixture() {
     <output data-testid="submitted-reports">{submittedReports}</output>
     <section role="tabpanel" aria-label="Expense reports">
       <EntityTable config={{ mode: 'table', rowKey: 'id', rowSelectionToggleOnClick: false,
-        columns: [{ key: 'name', label: 'Report', layout: { min: 10, max: 10, wrap: 1 } }],
+        searchable: true,
+        columns: [
+          {
+            key: 'name',
+            label: 'International expense report reference',
+            sortable: true,
+            layout: { min: 10, max: 10, wrap: 1 },
+          },
+          {
+            key: 'customerRef',
+            label: 'Customer reference for reimbursement',
+            layout: { min: 7, max: 7, wrap: 1 },
+          },
+        ],
         actions: [{ id: 'submit-sheets', label: 'Submit reports', requiresSelection: true, selection: 'multiple', onClick: (rows) => setSubmittedReports(rows.map((row) => row.id).join(',')) }],
       }} data={[
         { id: 'report-1', name: 'Synthetic expense report' },
