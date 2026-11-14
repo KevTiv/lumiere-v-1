@@ -752,9 +752,9 @@ pub fn publish_workflow_version(
     validate_workflow_graph(&version.snapshot_fields, &nodes, &edges)
         .map_err(|errors| format!("workflow graph is invalid: {}", errors.join("; ")))?;
     let content_hash = canonical_definition_hash(&workflow, &version, &nodes, &edges)?;
-    // A harness-generated draft publishes only with complete, current
-    // provenance; a failed binding returns Err and rolls the publication back.
-    enforce_provenance_on_publish(ctx, &version, &nodes)?;
+    // A harness-generated draft needs current provenance and a complete
+    // simulation of this graph before the reducer publishes it.
+    enforce_provenance_on_publish(ctx, &version, &nodes, &content_hash)?;
 
     ctx.db.workflow_version().id().update(WorkflowVersion {
         status: WorkflowVersionStatus::Published,

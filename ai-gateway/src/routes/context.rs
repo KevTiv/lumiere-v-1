@@ -189,6 +189,17 @@ pub(crate) async fn admitted_query_vector(
         unit: MeteredUnit::Tokens,
         allowance: u32::try_from(query.len() + 128)?,
     };
+    if let Some(key) = generation_skill_key {
+        crate::orchestrator::skill_access::ActorSkillAccess::new(
+            state,
+            org,
+            company,
+            &actor.stdb_token,
+            &actor.identity_hex,
+        )?
+        .require(key)
+        .await?;
+    }
     execute_query_embedding(
         state.stdb.as_ref(),
         reader,

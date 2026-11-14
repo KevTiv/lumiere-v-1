@@ -18,6 +18,7 @@ export type AiSkillVersionRow = {
   skillKey?: string
   skill_key?: string
   version?: string
+  executor?: string
   risk?: string
   sourceHash?: string
   source_hash?: string
@@ -54,6 +55,7 @@ export type AiSkillFixtureRow = {
   input_json?: string
   expectedOutputJson?: string
   expected_output_json?: string
+  metadata?: string
 }
 
 export type AiSkillTestRunRow = {
@@ -225,13 +227,19 @@ export function useAiSkillTestRuns(organizationId: bigint, enabled = true) {
   })
 }
 
-export function useAiSkillCertificationRequests(organizationId: bigint, enabled = true) {
+export function useAiSkillCertificationRequests(
+  organizationId: bigint,
+  enabled = true,
+  skillVersionId: number | null = null,
+) {
   return useQuery({
-    queryKey: registryQueryKey(organizationId, "certifications"),
+    queryKey: [...registryQueryKey(organizationId, "certifications"), skillVersionId],
     enabled: enabled && organizationId > 0n,
     queryFn: async () => {
       const rows = await fetchQueryList(
-        "/api/ai/skills/certifications",
+        skillVersionId == null
+          ? "/api/ai/skills/certifications"
+          : `/api/ai/skills/certifications?skillVersionId=${skillVersionId}`,
         "Failed to fetch AI skill certifications",
       )
       return rows as AiSkillCertificationRequestRow[]
@@ -383,6 +391,22 @@ export function useRequestAiSkillCertification(organizationId: number) {
       if (!response.ok) throw new Error(await parseCallError(response))
     },
     onSuccess: () => invalidateRegistry(qc, organizationId),
+  })
+}
+
+export function useRunPublishedAiSkill() {
+  return useMutation({
+    mutationFn: async (args: { skillId: number; companyId: number; input: unknown }) => {
+      const { skillId, ...body } = args
+      const response = await apiFetch(`/api/ai/skills/published/${skillId}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      if (!response.ok) throw new Error(await parseCallError(response))
+      const result: { data: { skillVersionId: number; output: unknown } } = await response.json()
+      return result.data
+    },
   })
 }
 

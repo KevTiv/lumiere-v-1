@@ -7,6 +7,7 @@
 ///          PolicySnapshot is a client projection rebuilt on policy mutations.
 ///          UserRoleAssignment links identities to roles within an organization.
 use crate::core::business_changes::write_business_audit;
+use lumiere_policy_core::ai_skills::{is_builtin_skill, USER_SKILL_PERMISSION_PREFIX};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::users::{find_user_profile_for_organization, user_organization};
@@ -1415,6 +1416,47 @@ pub fn revoke_field_permission(
     Ok(())
 }
 
+fn require_skill_access_administrator(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<(), String> {
+    let caller = ctx.sender();
+    let roles = effective_roles(ctx, organization_id, caller)?;
+    if !crate::core::access_lifecycle::member_is_admin(ctx, organization_id, caller, &roles)
+        || find_user_profile_for_organization(ctx, caller, organization_id)
+            .is_none_or(|profile| !is_interactive_member_profile(&profile))
+    {
+        return Err("Organization administrator required to manage skill access".into());
+    }
+    check_permission(ctx, organization_id, "org_permission", "create")?;
+    check_permission(ctx, organization_id, "org_permission", "delete")
+}
+
+fn is_interactive_member_profile(profile: &crate::core::users::UserProfile) -> bool {
+    profile.is_active
+        && !profile.metadata.as_deref().is_some_and(|metadata| {
+            metadata.contains(lumiere_policy_core::PERSISTENT_PLATFORM_OPERATOR_METADATA_PREFIX)
+        })
+}
+
+fn skill_access_denial_target(
+    params: &GrantOrgPermissionParams,
+) -> Result<Option<Identity>, String> {
+    let Some(skill_key) = params.resource.strip_prefix(USER_SKILL_PERMISSION_PREFIX) else {
+        return Ok(None);
+    };
+    match params.subject {
+        PermissionSubject::User(identity)
+            if is_builtin_skill(skill_key)
+                && params.action == PermissionAction::All
+                && params.effect == PermissionEffect::Deny =>
+        {
+            Ok(Some(identity))
+        }
+        _ => Err("Built-in skill access supports only per-user revocations".into()),
+    }
+}
+
 #[spacetimedb::reducer]
 pub fn grant_permission(
     ctx: &ReducerContext,
@@ -1426,6 +1468,39 @@ pub fn grant_permission(
 
     if params.resource.is_empty() {
         return Err("resource cannot be empty".to_string());
+    }
+
+    let skill_access_user = skill_access_denial_target(&params)?;
+    if let Some(target) = skill_access_user {
+        require_skill_access_administrator(ctx, organization_id)?;
+        let active_memberships = ctx
+            .db
+            .user_organization()
+            .user_org_by_user()
+            .filter(&target)
+            .filter(|row| row.organization_id == organization_id && row.is_active)
+            .take(2)
+            .count();
+        if active_memberships != 1
+            || find_user_profile_for_organization(ctx, target, organization_id)
+                .is_none_or(|profile| !is_interactive_member_profile(&profile))
+        {
+            return Err("Skill access target must be an active organization user".into());
+        }
+        if ctx
+            .db
+            .org_permission()
+            .perm_by_org()
+            .filter(&organization_id)
+            .any(|row| {
+                row.resource == params.resource
+                    && row.subject == params.subject
+                    && row.action == params.action
+                    && row.effect == params.effect
+            })
+        {
+            return Ok(());
+        }
     }
 
     match params.subject {
@@ -1487,6 +1562,14 @@ pub fn grant_permission(
         return Err("Cannot remove the last organization administrator".into());
     }
 
+    let mut new_values = serde_json::json!({
+        "resource": params.resource,
+        "action": format!("{:?}", params.action),
+        "effect": format!("{:?}", params.effect),
+    });
+    if let Some(identity) = skill_access_user {
+        new_values["skill_access_user"] = identity.to_hex().to_string().into();
+    }
     write_business_audit(
         ctx,
         organization_id,
@@ -1497,14 +1580,7 @@ pub fn grant_permission(
             record_id: row.id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(
-                serde_json::json!({
-                    "resource": params.resource,
-                    "action": format!("{:?}", params.action),
-                    "effect": format!("{:?}", params.effect),
-                })
-                .to_string(),
-            ),
+            new_values: Some(new_values.to_string()),
             changed_fields: vec![
                 "resource".to_string(),
                 "action".to_string(),
@@ -1539,14 +1615,19 @@ pub fn revoke_permission(
     }
 
     let subject = row.subject.clone();
-    let old_values = serde_json::json!({
+    let mut old_values = serde_json::json!({
         "resource": row.resource,
         "action": format!("{:?}", row.action),
         "effect": format!("{:?}", row.effect),
-    })
-    .to_string();
+    });
 
     ensure_delegated_admin_may_grant_permission(ctx, organization_id)?;
+    if row.resource.starts_with(USER_SKILL_PERMISSION_PREFIX) {
+        require_skill_access_administrator(ctx, organization_id)?;
+        if let PermissionSubject::User(identity) = &subject {
+            old_values["skill_access_user"] = identity.to_hex().to_string().into();
+        }
+    }
     let had_admin = organization_has_admin(ctx, organization_id);
     ctx.db.org_permission().id().delete(&permission_id);
 
@@ -1563,7 +1644,7 @@ pub fn revoke_permission(
             table_name: "org_permission",
             record_id: permission_id,
             action: "DELETE",
-            old_values: Some(old_values),
+            old_values: Some(old_values.to_string()),
             new_values: None,
             changed_fields: vec![],
             metadata: None,

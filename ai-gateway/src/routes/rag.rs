@@ -23,6 +23,7 @@ use crate::{
         format_live_context_block, resolve_snapshot_candidates, ActorCredentials, LiveSnapshot,
         SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
+    orchestrator::skill_access::ActorSkillAccess,
     orchestrator::{
         intelligence::EvidenceRef,
         intelligence_router::{
@@ -274,6 +275,7 @@ struct RoutedRagAdmission<'a> {
     transport: &'a dyn crate::providers::llm::LlmCompletion,
     /// Reads the durable evidence tables to find an exact human review.
     reader: &'a stdb_client::StdbClient,
+    skill_access: &'a ActorSkillAccess<'a>,
 }
 
 #[async_trait]
@@ -298,6 +300,7 @@ impl RagAnswerAdmission for RoutedRagAdmission<'_> {
             evidence,
             passages,
             Some(&reviewed_claims),
+            self.skill_access,
         )
         .await
     }
@@ -702,6 +705,15 @@ pub async fn post_rag(
         ));
     }
 
+    let skill_access = ActorSkillAccess::new(
+        &state,
+        org_id,
+        req.company_id,
+        &actor.stdb_token,
+        &actor.identity_hex,
+    )?;
+    skill_access.require("rag_generation").await?;
+
     let conversation = conversation::retrieve(
         &state,
         &actor,
@@ -850,6 +862,11 @@ pub async fn post_rag(
         )
     };
     if let Some(Err(error)) = &query_vector {
+        if let Some(access_error) =
+            error.downcast_ref::<crate::orchestrator::skill_access::SkillAccessError>()
+        {
+            return Err((*access_error).into());
+        }
         if error.is::<crate::error::SkillUnavailable>() {
             // Stop the chat turn when the skill has been disabled.
             return Err(AppError::SkillUnavailable(crate::error::SkillUnavailable));
@@ -1142,9 +1159,10 @@ pub async fn post_rag(
             id: selection.digest.clone(),
         });
     }
-    let spend_reader = state.spend_read_stdb.as_deref().ok_or_else(|| {
-        AppError::Internal("spend_read_stdb is required for routed generation".into())
-    })?;
+    let spend_reader = state
+        .spend_read_stdb
+        .as_deref()
+        .ok_or(AppError::GenerationAdmissionUnavailable)?;
     let run_inputs = json!({
         "surface": "rag_generation",
         "query": req.query.clone(),
@@ -1279,6 +1297,7 @@ pub async fn post_rag(
         json!({"surface":"rag_generation"}),
         Some(system_prompt),
         Some(agent.max_tokens),
+        &skill_access,
     )
     .await;
     let program = match program {
@@ -1317,6 +1336,7 @@ pub async fn post_rag(
         agent: &agent,
         transport: state.providers.llm.as_ref(),
         reader: spend_reader,
+        skill_access: &skill_access,
     };
     let provenance_sink = StdbRagProvenance {
         writer: state.stdb.as_ref(),
@@ -1407,6 +1427,24 @@ pub async fn post_rag(
         if !conversation::recheck_scope(&state, &actor, req.company_id, key).await {
             release.withhold("the earlier conversation is no longer available");
         }
+    }
+
+    if let Err(error) = skill_access.require("rag_generation").await {
+        let _ = complete_run(
+            state.stdb.as_ref(),
+            org_id,
+            req.company_id,
+            run.run_id,
+            "failed",
+            None,
+            None,
+            None,
+            program.trace.len() as u32,
+            total_tokens,
+            Some(error.to_string()),
+        )
+        .await;
+        return Err(error.into());
     }
 
     // The durable run completes only after admission and provenance

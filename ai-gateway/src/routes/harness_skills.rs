@@ -36,6 +36,7 @@ use crate::{
         ActorCredentials,
     },
     orchestrator::governed_bootstrap::{bootstrap_governed_intelligence, GovernedBootstrapResult},
+    orchestrator::skill_access::ActorSkillAccess,
     state::AppState,
 };
 
@@ -214,7 +215,16 @@ pub async fn post_import_mapping(
     Json(req): Json<GatewayImportMappingRequest>,
 ) -> AppResult<Json<ImportMappingResult>> {
     validate_scope(req.org_id, req.company_id, &req.stdb_token)?;
-    let identity_hex = identity_or(req.identity_hex, "import-mapping");
+    let identity_hex = req.identity_hex.unwrap_or_default();
+    ActorSkillAccess::new(
+        &state,
+        req.org_id,
+        req.company_id,
+        &req.stdb_token,
+        &identity_hex,
+    )?
+    .require(IMPORT_MAPPING_SKILL_KEY)
+    .await?;
     let policy = policy_for(
         &state,
         req.org_id,
@@ -263,7 +273,16 @@ pub async fn post_insights_scan(
     Json(req): Json<GatewayInsightsScanRequest>,
 ) -> AppResult<Json<InsightsScanHarnessResult>> {
     validate_scope(req.org_id, req.company_id, &req.stdb_token)?;
-    let identity_hex = identity_or(req.identity_hex, "insights-scan");
+    let identity_hex = req.identity_hex.unwrap_or_default();
+    ActorSkillAccess::new(
+        &state,
+        req.org_id,
+        req.company_id,
+        &req.stdb_token,
+        &identity_hex,
+    )?
+    .require(INSIGHTS_SCAN_SKILL_KEY)
+    .await?;
     let policy = policy_for(
         &state,
         req.org_id,
@@ -313,6 +332,15 @@ pub async fn post_daily_briefing(
     validate_scope(req.org_id, req.company_id, &req.stdb_token)?;
     let actor = ActorCredentials::new(req.stdb_token.clone(), req.identity_hex)
         .map_err(|error| AppError::Forbidden(error.to_string()))?;
+    ActorSkillAccess::new(
+        &state,
+        req.org_id,
+        req.company_id,
+        &actor.stdb_token,
+        &actor.identity_hex,
+    )?
+    .require(DAILY_BRIEFING_SKILL_KEY)
+    .await?;
     let policy = policy_for(
         &state,
         req.org_id,
@@ -448,16 +476,11 @@ async fn run_llm_route(
     skill_key: &str,
 ) -> AppResult<Json<GovernedLlmSkillResult>> {
     validate_scope(req.org_id, req.company_id, &req.stdb_token)?;
-    let identity_hex = identity_or(req.identity_hex, &skill_key.replace('_', "-"));
+    let identity_hex = req.identity_hex.unwrap_or_default();
     run_llm_with_context(
         state,
         skill_key,
-        TrustedActorContext {
-            organization_id: req.org_id,
-            company_id: req.company_id,
-            identity: identity_hex,
-            token: req.stdb_token,
-        },
+        TrustedActorContext::new(&identity_hex, &req.stdb_token, req.org_id, req.company_id)?,
         GovernedLlmSkillInput {
             inputs: req.inputs,
             agent_id: req.agent_id,
@@ -497,7 +520,7 @@ async fn run_llm_with_context(
         policy,
     )
     .await
-    .map_err(AppError::Internal)?;
+    .map_err(AppError::from_generation)?;
     Ok(Json(result))
 }
 
@@ -517,10 +540,6 @@ async fn policy_for(
         PolicyEngine::new(SkillRegistry::exact(manifest), ResourceRegistry::built_in())
             .with_org_privacy(org_privacy_policy),
     )
-}
-
-fn identity_or(identity_hex: Option<String>, fallback: &str) -> String {
-    identity_hex.unwrap_or_else(|| fallback.to_string())
 }
 
 fn validate_scope(org_id: u64, company_id: u64, stdb_token: &str) -> AppResult<()> {

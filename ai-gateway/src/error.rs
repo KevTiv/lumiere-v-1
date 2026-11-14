@@ -50,6 +50,9 @@ pub enum AppError {
     #[error("Unavailable: {0}")]
     Unavailable(String),
 
+    #[error("AI generation is currently unavailable for this company.")]
+    GenerationAdmissionUnavailable,
+
     /// Static guidance only: provider failures must never enter the public body.
     #[error("AI retrieval is unavailable and no authorized grounding was found. A platform administrator needs to check this company's AI service. You can instead open a permitted record or provide authorized live context before asking again.")]
     RetrievalUnavailable,
@@ -67,6 +70,11 @@ pub enum AppError {
 impl AppError {
     /// Preserve skill availability failures during execution.
     pub fn from_generation(error: anyhow::Error) -> Self {
+        if let Some(access_error) =
+            error.downcast_ref::<crate::orchestrator::skill_access::SkillAccessError>()
+        {
+            return (*access_error).into();
+        }
         if error.is::<SkillUnavailable>() {
             Self::from_agent_resolution(error)
         } else {
@@ -103,6 +111,9 @@ impl IntoResponse for AppError {
             AppError::Embedding(m) => (StatusCode::BAD_GATEWAY, m.clone()),
             AppError::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m.clone()),
             AppError::Unavailable(m) => (StatusCode::SERVICE_UNAVAILABLE, m.clone()),
+            AppError::GenerationAdmissionUnavailable => {
+                (StatusCode::SERVICE_UNAVAILABLE, self.to_string())
+            }
             AppError::RetrievalUnavailable => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
             AppError::SkillUnavailable(_) => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
             AppError::DefaultAgentNotProvisioned(error) => {
@@ -117,6 +128,9 @@ impl IntoResponse for AppError {
         let mut body = json!({ "error": message });
         if matches!(&self, Self::ChatInputTooLarge) {
             body["code"] = json!("ai_chat_input_too_large");
+        }
+        if matches!(&self, Self::GenerationAdmissionUnavailable) {
+            body["code"] = json!("ai_generation_admission_unavailable");
         }
         if matches!(&self, Self::SkillUnavailable(_)) {
             body["code"] = json!("ai_skill_unavailable");

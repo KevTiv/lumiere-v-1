@@ -250,6 +250,8 @@ pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
 /// Use this to seed system roles, default currencies, etc.
 #[spacetimedb::reducer(init)]
 pub fn init(ctx: &ReducerContext) {
+    crate::ai::platform_defaults::ensure_builtin_skill_catalog(ctx)
+        .expect("compiled AI skill catalog must be valid");
     if let Err(error) = apply_pending_global_migrations(ctx) {
         log::warn!("Global migrations skipped during init: {error}");
     }
