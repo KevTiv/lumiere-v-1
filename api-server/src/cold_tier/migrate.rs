@@ -425,6 +425,13 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: include_str!("assistant_widget_receipts_expand.sql"),
     },
+    Migration {
+        version: 45,
+        name: "module_backfill_records",
+        change_set: 34,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("module_backfill_expand.sql"),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

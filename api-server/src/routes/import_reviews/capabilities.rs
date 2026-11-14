@@ -7,6 +7,7 @@ use serde::Serialize;
 pub(super) enum Readiness {
     TaskExecution,
     NativePreview,
+    ReviewedRecords,
     EvidenceOnly,
 }
 
@@ -44,6 +45,16 @@ pub(super) fn catalog() -> Vec<Capability> {
         native("products", "products", "Product master records", &["product"], &["name", "category", "unit", "reviewed prices"], "/products"),
         native("contacts", "crm", "Customer and supplier contacts", &["contact"], &["name", "customer or supplier role"], "/crm?tab=contacts"),
         native("warehouse_locations", "warehouse", "Warehouse locations", &["stock_location"], &["name", "location type", "parent location"], "/warehouse?tab=locations"),
+        Capability {
+            key: "customer_sales_backfill",
+            module: "sales",
+            label: "Customer sales summaries",
+            target_entities: &["source_observation"],
+            required_facts: &["customer match", "product or summary scope", "report period", "quantity, unit price, and total"],
+            readiness: Readiness::ReviewedRecords,
+            blocking_reason: None,
+            destination: "/sales#backfilled-records",
+        },
         held("sales_history", "sales", "Historical sales", &["sale_order", "sale_order_line"], "Resolve customer, product, units, historical prices, tax and document identity before preparing orders.", "/sales"),
         held("crm_history", "crm", "CRM history", &["crm_lead"], "CRM CSV import remains subject to its existing feature gate and permissions; a saved-task execution adapter is not available.", "/crm"),
         held("purchasing_history", "purchasing", "Historical purchases", &["purchase_order", "purchase_order_line"], "Resolve supplier, product, units, historical prices, tax and document identity before preparing purchases.", "/purchasing"),
@@ -52,6 +63,16 @@ pub(super) fn catalog() -> Vec<Capability> {
         held("employee_expenses", "expenses", "Employee expense claims", &["expense"], "Historical expense journals are available in Accounting; employee claims require employee, policy and settlement decisions.", "/expenses"),
         held("opening_balances", "accounting", "Opening balances", &["account_move", "account_move_line"], "Confirm the cutover date, account and currency references, and balancing entries. The saved expense workflow cannot prepare opening balances.", "/accounting?tab=journal-entries"),
         held("historical_payments", "accounting", "Historical payments", &["account_payment"], "Use Accounting’s payment workflows with confirmed settlement, journal and document references. The saved task keeps source evidence for payments.", "/accounting?tab=payments"),
+        Capability {
+            key: "inventory_count_backfill",
+            module: "warehouse",
+            label: "Dated inventory counts",
+            target_entities: &["source_observation"],
+            required_facts: &["count date", "product label", "piece count", "weight in kilograms"],
+            readiness: Readiness::ReviewedRecords,
+            blocking_reason: None,
+            destination: "/warehouse#backfilled-records",
+        },
         held("stock_counts", "warehouse", "Stock counts", &["stock_cycle_count"], "Confirm a count date, item, location, unit and quantity in Warehouse. Historical counts stay available as dated evidence.", "/warehouse?tab=cycle-counts"),
         held("stock_history", "warehouse", "Historical stock movements", &["stock_move"], "Resolve item identity, dated movement direction, locations and units; an old stock report must not become current stock.", "/warehouse"),
         held("fleet_history", "fleet", "Fleet history", &["fleet_vehicle"], "Resolve vehicle and service identities, dates and costs before preparing fleet records.", "/fleet"),

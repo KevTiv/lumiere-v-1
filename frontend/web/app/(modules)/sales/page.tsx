@@ -1,6 +1,7 @@
 import { getStdbSession } from "@/lib/api-session"
 import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { SalesClient } from "./sales-client"
+import { ModuleBackfillRecords } from "../../../components/module-backfill-records"
 
 const SSR_RESOURCES = [
   "sale-orders",
@@ -47,24 +48,27 @@ export default async function SalesPage() {
   ] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
-    <SalesClient
-      initialOrders={orders}
-      initialOrderLines={orderLines}
-      initialPricelists={pricelists}
-      initialPricelistItems={pricelistItems}
-      initialDeliveries={deliveries}
-      initialDeliveryCarriers={deliveryCarriers}
-      initialDeliveryPriceRules={deliveryPriceRules}
-      initialShippingMethods={shippingMethods}
-      initialPosPaymentMethods={posPaymentMethods}
-      initialLoyaltyPrograms={loyaltyPrograms}
-      initialLoyaltyCards={loyaltyCards}
-      initialContacts={contacts}
-      initialWarehouses={warehouses}
-      initialStockPickings={stockPickings}
-      initialReturnOrders={returnOrders}
-      initialReturnOrderLines={returnOrderLines}
-      organizationId={session.organizationId}
-    />
+    <>
+      <SalesClient
+        initialOrders={orders}
+        initialOrderLines={orderLines}
+        initialPricelists={pricelists}
+        initialPricelistItems={pricelistItems}
+        initialDeliveries={deliveries}
+        initialDeliveryCarriers={deliveryCarriers}
+        initialDeliveryPriceRules={deliveryPriceRules}
+        initialShippingMethods={shippingMethods}
+        initialPosPaymentMethods={posPaymentMethods}
+        initialLoyaltyPrograms={loyaltyPrograms}
+        initialLoyaltyCards={loyaltyCards}
+        initialContacts={contacts}
+        initialWarehouses={warehouses}
+        initialStockPickings={stockPickings}
+        initialReturnOrders={returnOrders}
+        initialReturnOrderLines={returnOrderLines}
+        organizationId={session.organizationId}
+      />
+      <ModuleBackfillRecords organizationId={session.organizationId} module="sales" />
+    </>
   )
 }

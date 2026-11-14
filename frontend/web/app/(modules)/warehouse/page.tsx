@@ -1,6 +1,7 @@
 import { getStdbSession } from "@/lib/api-session";
 import { serverPrefetchQueryLists } from "@/lib/server-query";
 import { InventoryClient } from "../inventory/inventory-client";
+import { ModuleBackfillRecords } from "../../../components/module-backfill-records";
 import { ModuleCsvHistoryDisclosure } from "../../../components/module-csv-history";
 
 const WAREHOUSE_RESOURCES = [
@@ -35,6 +36,7 @@ export default async function WarehousePage() {
         initialReplenishmentRules={replenishmentRules}
         initialStockProductionSerials={serials}
       />
+      <ModuleBackfillRecords organizationId={session.organizationId} module="warehouse" />
     </>
   );
 }
