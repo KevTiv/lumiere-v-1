@@ -37,6 +37,7 @@ MODULES = {
     "reports": {"owner": "COV-20", "domains": ["analytics"]},
     "subscriptions": {"owner": "COV-12", "domains": ["subscriptions"]},
     "expenses": {"owner": "COV-11", "domains": ["expenses"]},
+    "inventory": {"owner": "COV-06", "domains": ["inventory"]},
     "products": {"owner": "COV-06", "files": ["inventory/product.rs", "inventory/product_category.rs"]},
     "warehouse": {"owner": "COV-06", "files": [
         "inventory/stock.rs", "inventory/warehouse.rs", "inventory/tracking.rs",
@@ -70,7 +71,7 @@ IMPORT_FILES = {
     "analytics_imports.rs": ["reports"], "subscription_imports.rs": ["subscriptions"],
     "expenses_imports.rs": ["expenses"], "document_imports.rs": ["documents"],
     "core_imports.rs": ["settings", "products"],
-    "inventory_imports.rs": ["products", "warehouse"],
+    "inventory_imports.rs": ["inventory", "products", "warehouse"],
     "import_tracker.rs": ["settings"], "import_mapping_templates.rs": ["settings"],
 }
 LINKED_COMMUNICATIONS = {"core/messaging.rs", "core/operational_messaging.rs"}
@@ -503,7 +504,7 @@ def build_inventory(root: Path) -> dict[str, Any]:
         "status": "source-coverage-register-not-runtime-acceptance",
         "scope": {
             "profile": "finance-alpha", "surfaces": visible,
-            "standalone_hidden": ["inventory", "messages", "journal", "notebook", "pos", "manufacturing",
+            "standalone_hidden": ["messages", "journal", "notebook", "pos", "manufacturing",
                                   "helpdesk", "hr", "projects", "proposals", "distributor", "iot"],
             "linked_hidden_records_retain_existing_authority": True,
             "bounded_inventory_tabs_source": BOUNDED_TABS,

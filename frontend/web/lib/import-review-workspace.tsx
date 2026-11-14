@@ -690,7 +690,7 @@ function ReviewWorkspace({
             </p>
           ) : null}
           {allowImport ? (
-            <ModuleBackfillAction detail={detail.data} companyId={companyId}
+            <ModuleBackfillAction detail={detail.data} taskId={historySource?.taskId} companyId={companyId}
               organizationId={organizationId} actor={actor} disabled={unavailable || !!selected || !!continuationBlock} />
           ) : null}
           <ImportReviewDecisionSummary

@@ -1,17 +1,27 @@
 {
-  "moduleCsvHistory": {
-    "title": "Historia ya CSV",
-    "salesDescription": "Mauzo yaliyothibitishwa katika faili za CSV. Muhtasari wa maduka na vipindi unaweza kujumuisha mauzo yale yale.",
-    "description": "Rekodi za chanzo zilizothibitishwa kutoka kwenye faili za CSV za kampuni.",
-    "search": "Tafuta katika historia ya CSV",
-    "productCustomer": "Bidhaa au mteja",
-    "location": "Mahali",
+  "moduleRecords": {
+    "sales": "Muhtasari wa mauzo kwa wateja",
+    "warehouse": "Hesabu zilizorekodiwa",
+    "period": "Kipindi cha mauzo",
+    "countDate": "Tarehe ya kuhesabu",
+    "customer": "Mteja",
+    "product": "Bidhaa",
     "quantity": "Kiasi",
     "unitPrice": "Bei kwa kipimo",
-    "amount": "Kiasi kilichorekodiwa",
+    "reportedTotal": "Jumla iliyoripotiwa",
+    "paymentComment": "Dokezo la malipo",
+    "pieces": "Idadi ya vipande",
+    "kilograms": "Kilogramu",
+    "location": "Mahali",
+    "source": "Chanzo",
     "sourceRow": "{{file}} · safu mlalo {{row}}",
-    "showDataset": "Onyesha safu mlalo zote katika mkusanyiko huu",
-    "openReview": "Fungua ukaguzi wa vyanzo"
+    "showAll": "Onyesha rekodi zote",
+    "loadMore": "Pakia zaidi",
+    "emptySales": "Hakuna muhtasari wa mauzo kwa wateja uliohifadhiwa.",
+    "emptyCounts": "Hakuna hesabu iliyohifadhiwa.",
+    "emptyFiltered": "Hakuna rekodi zinazolingana na tarehe au uingizaji uliochaguliwa.",
+    "otherCompany": "Chagua kampuni iliyotumika kuingiza data hii ili kuona rekodi zake.",
+    "loadError": "Imeshindwa kupakia rekodi."
   },
   "aiHarness": {
     "platformProfile": {

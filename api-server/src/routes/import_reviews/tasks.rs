@@ -111,7 +111,7 @@ struct Preparation {
     preparation_receipt: Option<Value>,
 }
 
-fn valid_request_id(value: &str) -> bool {
+pub(super) fn valid_request_id(value: &str) -> bool {
     value.len() == 32
         && value
             .bytes()

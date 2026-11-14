@@ -1,7 +1,6 @@
 import { getStdbSession } from "@/lib/api-session"
 import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { AccountingClient } from "./accounting-client"
-import { ModuleCsvHistoryDisclosure } from "../../../components/module-csv-history"
 
 const SSR_RESOURCES = [
   // Generated company-scoped reads load after active-company resolution in the browser.
@@ -19,13 +18,10 @@ export default async function AccountingPage() {
     await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
-    <>
-      <ModuleCsvHistoryDisclosure organizationId={session.organizationId} view="accounting" />
-      <AccountingClient
-        initialFiscalYears={fiscalYears}
-        initialAccountPeriods={accountPeriods}
-        organizationId={session.organizationId}
-      />
-    </>
+    <AccountingClient
+      initialFiscalYears={fiscalYears}
+      initialAccountPeriods={accountPeriods}
+      organizationId={session.organizationId}
+    />
   )
 }

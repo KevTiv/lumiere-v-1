@@ -160,7 +160,7 @@ function dateFromStored(raw: unknown): Date {
 
 const HISTORY_MODULES = [
   "accounting", "expenses", "reports", "sales", "crm", "purchasing", "subscriptions",
-  "products", "warehouse", "fleet", "overview", "tasks", "approvals", "documents", "calendar", "settings", "ai-assistant",
+  "products", "warehouse", "inventory", "fleet", "overview", "tasks", "approvals", "documents", "calendar", "settings", "ai-assistant",
 ] as const
 
 function historyModuleLabel(module: string) {

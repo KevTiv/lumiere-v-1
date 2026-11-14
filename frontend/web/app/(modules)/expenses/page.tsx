@@ -1,7 +1,6 @@
 import { getStdbSession } from "@/lib/api-session"
 import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { ExpensesClient } from "./expenses-client"
-import { ModuleCsvHistoryDisclosure } from "../../../components/module-csv-history"
 
 const SSR_RESOURCES = ["expenses", "expense-sheets", "pricelists", "employees"] as const
 
@@ -17,15 +16,12 @@ export default async function ExpensesPage() {
   )
 
   return (
-    <>
-      <ModuleCsvHistoryDisclosure organizationId={session.organizationId} view="expenses" />
-      <ExpensesClient
-        initialExpenses={expenses}
-        initialSheets={sheets}
-        initialPricelists={pricelists}
-        initialEmployees={employees}
-        organizationId={session.organizationId}
-      />
-    </>
+    <ExpensesClient
+      initialExpenses={expenses}
+      initialSheets={sheets}
+      initialPricelists={pricelists}
+      initialEmployees={employees}
+      organizationId={session.organizationId}
+    />
   )
 }

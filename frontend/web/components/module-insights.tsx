@@ -148,7 +148,6 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }
         {model.previousBounds?.startMs != null && model.previousBounds.endMs != null && <> · {t("moduleInsights.comparedWith")} {date(model.previousBounds.startMs)} – {date(model.previousBounds.endMs - 1)}</>}
         {` · ${model.timeZone}`}
       </p>
-      <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.historySource", { defaultValue: "These figures use the module records available to you. Inspect imported source history to see its complete date coverage and review status." })} <Link className="underline underline-offset-2" href="/settings?section=imports#available-history">{t("moduleInsights.availableHistory", { defaultValue: "Available history" })}</Link></p>
       <p className="text-xs leading-5 text-muted-foreground">{label("basis")}</p>
     </section>
     <ModulePageComposition moduleId={input.module} pageId="dashboard" title={label("title")} sections={compositionSections}

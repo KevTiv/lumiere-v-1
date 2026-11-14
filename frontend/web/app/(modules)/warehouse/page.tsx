@@ -1,8 +1,6 @@
 import { getStdbSession } from "@/lib/api-session";
 import { serverPrefetchQueryLists } from "@/lib/server-query";
 import { InventoryClient } from "../inventory/inventory-client";
-import { ModuleBackfillRecords } from "../../../components/module-backfill-records";
-import { ModuleCsvHistoryDisclosure } from "../../../components/module-csv-history";
 
 const WAREHOUSE_RESOURCES = [
   "products", "stock-quants", "stock-pickings", "warehouses",
@@ -19,24 +17,20 @@ export default async function WarehousePage() {
     await serverPrefetchQueryLists(session, WAREHOUSE_RESOURCES);
 
   return (
-    <>
-      <ModuleCsvHistoryDisclosure organizationId={session.organizationId} view="warehouse" />
-      <InventoryClient
-        workspace="warehouse"
-        organizationId={session.organizationId}
-        initialProducts={products}
-        initialStockQuants={stockQuants}
-        initialTransfers={transfers}
-        initialWarehouses={warehouses}
-        initialAdjustments={adjustments}
-        initialUoms={uoms}
-        initialStockLocations={locations}
-        initialStockCycleCounts={cycleCounts}
-        initialStockMoves={stockMoves}
-        initialReplenishmentRules={replenishmentRules}
-        initialStockProductionSerials={serials}
-      />
-      <ModuleBackfillRecords organizationId={session.organizationId} module="warehouse" />
-    </>
+    <InventoryClient
+      workspace="warehouse"
+      organizationId={session.organizationId}
+      initialProducts={products}
+      initialStockQuants={stockQuants}
+      initialTransfers={transfers}
+      initialWarehouses={warehouses}
+      initialAdjustments={adjustments}
+      initialUoms={uoms}
+      initialStockLocations={locations}
+      initialStockCycleCounts={cycleCounts}
+      initialStockMoves={stockMoves}
+      initialReplenishmentRules={replenishmentRules}
+      initialStockProductionSerials={serials}
+    />
   );
 }

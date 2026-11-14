@@ -34,11 +34,11 @@ describe("Settings custom-field target discovery", () => {
       render(<WorkspaceProfileProvider value={profile}><UserCustomFields /></WorkspaceProfileProvider>)
       await waitFor(() => expect(screen.getByRole("combobox").hasAttribute("disabled")).toBe(false))
       fireEvent.click(screen.getByRole("combobox"))
-      await waitFor(() => expect(screen.getAllByRole("option").length).toBe(profile === "finance-alpha" ? 1 : 3))
+      await waitFor(() => expect(screen.getAllByRole("option").length).toBe(profile === "finance-alpha" ? 2 : 3))
       expect(screen.getByRole("option", { name: "Finance invoice (accounting/invoice)" })).toBeTruthy()
       expect(screen.queryByRole("option", { name: /Other tenant|Inactive invoice/ })).toBeNull()
       expect(Boolean(screen.queryByRole("option", { name: "HR employee (hr/employee)" }))).toBe(profile === "full")
-      expect(Boolean(screen.queryByRole("option", { name: "Stock product (inventory/product)" }))).toBe(profile === "full")
+      expect(screen.getByRole("option", { name: "Stock product (inventory/product)" })).toBeTruthy()
     })
   }
 })

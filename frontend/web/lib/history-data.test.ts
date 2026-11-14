@@ -11,7 +11,6 @@ import {
   shiftHistoryDate,
   type HistoryFilters,
 } from "./history-data"
-import { csvMoney, csvQuantity } from "./module-csv-history"
 import { sourceHistoryCoverage, sourceHistoryRows } from "./history-data.fixtures"
 
 const scope = { organizationId: 42, companyId: 7, actorIdentity: "operator-one" }
@@ -159,20 +158,4 @@ test("module, search, and exact source row filters are retained without numeric 
   assert.equal(query.get("search"), "Kicukiro")
   assert.equal(query.get("cursor"), "next")
   assert.notDeepEqual(historyQueryKey("rows", scope, scoped), historyQueryKey("rows", scope, { ...scoped, view: "warehouse" }))
-})
-
-test("confirmed sales retain exact amounts and units stated by the source", () => {
-  const [base] = parseHistoryRows(sourceHistoryRows(), scope).data
-  const row = {
-    ...base!,
-    values: { quantity: "9.555000", amount: "36309.0000" },
-    fields: [
-      { key: "quantity", label: "Recorded sold quantity (kg)", sourceValue: "9.555000" },
-      { key: "amount", label: "Recorded sales amount (RWF)", sourceValue: "36309.0000" },
-    ],
-  }
-  assert.equal(csvQuantity(row, ["quantity"]), "9.555000 kg")
-  assert.equal(csvMoney(row, ["amount"]), "36309.0000 RWF")
-  assert.equal(csvMoney({ ...row, fields: [] }, ["amount"]), "36309.0000")
-  assert.equal(csvMoney({ ...row, state: "needs_review" }, ["amount"]), undefined)
 })

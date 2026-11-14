@@ -12,7 +12,7 @@
 
 ## 1. Product decision
 
-The alpha workspace adds **Products** at `/products`, **Warehouse** at `/warehouse`, and **Fleet** at `/fleet` alongside the existing Finance modules. Products and Warehouse are bounded workspaces using the existing Inventory operation owners. The broad legacy Inventory workspace remains available in the full profile and through its existing Finance handoff routes in alpha. `/map` remains a hidden geospatial showcase.
+The alpha workspace adds **Products** at `/products`, **Warehouse** at `/warehouse`, and **Fleet** at `/fleet` alongside the existing Finance modules. Products and Warehouse are bounded workspaces using the existing Inventory operation owners. The October 31 rollout kept Inventory available through Finance handoffs in alpha. The November 14 decision restores `/inventory` alongside those focused workspaces. `/map` remains a hidden geospatial showcase.
 
 This is an explicit alpha scope decision. It does not award U4/U5, promote the broader Inventory/Fleet evidence matrix, or claim deployment. The server's current organization, company, role and field permissions remain authoritative.
 
@@ -22,17 +22,17 @@ This is an explicit alpha scope decision. It does not award U4/U5, promote the b
 | Warehouse | Stock by product/location, lots and serials, transfers and stock moves, inventory adjustments, cycle counts, locations/warehouse setup and replenishment rules/scheduling. | No 3D/map, quality, waves/packages, warehouse tasks, routing, barcode or full WMS certification. Immediate replenishment execution is withheld from this bounded toolbar until its native `execute` permission can be represented faithfully. |
 | Fleet | Existing tenant-owned vehicle register/details, driver assignment, garage interventions/maintenance with real service-cost posting, inspection/cost history and manual odometer editing. Broader vehicle retirement and lifecycle acceptance remain open. | No rental/booking flow, automatic GPS mileage, telematics worker, dispatch optimization, fuel accounting/TCO claim, asset-disposal integration or new Kanban assignment adapter. |
 
-The full workspace exposes Products and Warehouse for their focused catalog and stock-operation jobs, and retains Inventory for the broader legacy workspace. These three entries use `module:inventory`; separate menu entries do not create a new permission or duplicate product or stock records.
+Both profiles expose Products and Warehouse for catalog and stock operations and Inventory for the broader workspace. These three entries use `module:inventory`; separate menu entries do not create a new permission or duplicate product or stock records.
 
 ## 2. Admission and discovery owners
 
-`frontend/packages/ui/src/lib/product-surface-catalog.ts` remains the single product-surface authority. Products, Warehouse and Fleet keep `firstOrgExposure: "review"` and receive a separate `boundedAlpha` decision with a scope and this document's path. `isFirstOrgSurfaceAdmitted` retains strict lifecycle admission. `isFirstOrgNavigationAdmitted` combines that admission with the explicitly selected bounded alpha workspaces; `isFirstOrgRouteAdmitted` uses the same decision plus the existing Finance support-route list.
+`frontend/packages/ui/src/lib/product-surface-catalog.ts` remains the single product-surface authority. Products, Warehouse, Inventory and Fleet keep `firstOrgExposure: "review"` and receive a separate `boundedAlpha` decision with a scope and this document's path. `isFirstOrgSurfaceAdmitted` retains strict lifecycle admission. `isFirstOrgNavigationAdmitted` combines that admission with the explicitly selected bounded alpha workspaces; `isFirstOrgRouteAdmitted` uses the same decision plus the existing Finance support-route list.
 
-`workspace-profile.ts` includes Products, Warehouse and Fleet in `finance-alpha` discovery. `navigation-catalog.ts` supplies both sidebar and command-palette links. The profile name is retained for compatibility. Inventory remains outside alpha global navigation; unknown, unrelated review, AI, internal and showcase routes receive no new admission. No role, backend allowlist or generated contract changes are needed for this decision.
+`workspace-profile.ts` includes Products, Warehouse, Inventory and Fleet in `finance-alpha` discovery. `navigation-catalog.ts` supplies both sidebar and command-palette links. The profile name is retained for compatibility. The sidebar, command palette and Assistant context show Inventory. No role, backend allowlist or generated contract changes are needed for this decision.
 
-The product-surface census covers `/products` and `/warehouse` as separate bounded routes owned by COV-06. COV-06's broader Inventory/WMS and COV-15's broader Fleet lifecycle remain at their recorded evidence levels. `scripts/validate-cov00d-evidence-matrix.py` must continue to pass without changing their D/A/O/E scores or `launch_admission` merely to expose these alpha workspaces.
+The product-surface census covers `/products`, `/warehouse`, and `/inventory` as separate routes owned by COV-06. COV-06's broader Inventory/WMS and COV-15's broader Fleet lifecycle remain at their recorded evidence levels. `scripts/validate-cov00d-evidence-matrix.py` must continue to pass without changing their D/A/O/E scores or `launch_admission` merely to expose these alpha workspaces.
 
-The profile permits the bounded module IDs in Settings where a form module is registered. Fleet currently uses static forms, and Product/Warehouse forms retain their existing Inventory owners; this decision does not register new Settings form modules or expose the whole Inventory form/import catalog. Existing Product imports remain available under the established Finance import policy. In-module Warehouse import tools retain their native owners and permission gates.
+Settings lists the registered Inventory forms, including the forms used by Products and Warehouse. Fleet uses static forms. Existing Product imports remain available under the established Finance import policy. In-module Warehouse import tools retain their native owners and permission gates.
 
 ## 3. Source findings and implementation
 

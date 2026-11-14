@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next"
+import { moduleBackfillTabs } from "./module-backfill-navigation"
 import type { ModuleWorkspaceNav } from "@lumiere/ui/lib/module-types"
 
 export type BusinessWorkspaceModule = "sales" | "crm" | "purchasing" | "reports" | "expenses" | "documents" | "calendar" | "messages"
@@ -10,7 +11,7 @@ const definitions: Record<BusinessWorkspaceModule, { workspaces: readonly Group[
   sales: {
     workspaces: [
       ["overview", ["dashboard", "ops"]],
-      ["orders", ["orders", "order-lines", "csv-history", "returns", "invoices"]],
+      ["orders", ["orders", "order-lines", moduleBackfillTabs.sales, "returns", "invoices"]],
       ["fulfillment", ["deliveries", "fulfillment"]],
       ["pricing", ["pricelists", "pricelist-items", "loyalty-programs", "loyalty-cards"]],
     ],

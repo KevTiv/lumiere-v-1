@@ -1,5 +1,8 @@
 'use client';
 
+import { ModuleBackfillRecords, useCanReadModuleBackfill } from '../../../components/module-backfill-records';
+import { moduleBackfillTabs } from '@/lib/module-backfill-navigation';
+
 import { isInventoryWorkspaceReadEnabled } from '@lumiere/stdb/subscriptions';
 import { useStockMoveTabActions } from './stock-move-tab-actions';
 import { useInventoryCountTabActions } from './inventory-count-tab-actions';
@@ -497,6 +500,7 @@ function InventoryClientLoaded({
   organizationId,
 }: InventoryClientLoadedProps) {
   useInventoryModuleSubscription(workspace);
+  const canReadBackfill = useCanReadModuleBackfill(organizationId);
   const readEnabled = (resource: string) => isInventoryWorkspaceReadEnabled(workspace, resource);
   const { t } = useTranslation();
   const { checkPermission, permissionsReady, currentUser } = useRBAC();
@@ -549,14 +553,14 @@ function InventoryClientLoaded({
   // Sync the active tab with `?tab=` so record links (e.g. a receipt's
   // `/inventory?tab=transfers&filter=id:…`) land on the right tab.
   const inventoryTabIds = useMemo(
-    () => workspace === 'products' ? [...PRODUCT_CATALOG_TAB_IDS] : workspace === 'warehouse' ? [...WAREHOUSE_TAB_IDS] : [
+    () => workspace === 'products' ? [...PRODUCT_CATALOG_TAB_IDS] : workspace === 'warehouse' ? WAREHOUSE_TAB_IDS.filter((tab) => canReadBackfill || tab !== moduleBackfillTabs.warehouse) : [
       ...inventoryModuleConfig(t).tabs.map((tab) => tab.id),
       'cycle-wizard',
       'location-tree',
       'quality-alerts',
       '3d-view',
     ],
-    [t, workspace],
+    [canReadBackfill, t, workspace],
   );
   const { activeTab, setActiveTab } = useModuleTab(
     workspace === 'products' ? 'products' : workspace === 'warehouse' ? 'stock' : 'dashboard',
@@ -3320,6 +3324,12 @@ function InventoryClientLoaded({
           if (tab.id === 'warehouse-tasks') return withTransferActions(tab);
           return tab;
         }),
+        ...(workspace === 'warehouse' && canReadBackfill ? [{
+          id: moduleBackfillTabs.warehouse,
+          label: t('moduleRecords.warehouse'),
+          type: 'custom' as const,
+          customContent: <ModuleBackfillRecords organizationId={organizationId} module="warehouse" />,
+        }] : []),
         cycleCountWizardTab,
         locationHierarchyTab,
         qualityAlertsTab,
@@ -3331,6 +3341,8 @@ function InventoryClientLoaded({
     return configured;
   }, [
     workspace,
+    canReadBackfill,
+    organizationId,
     setup.status,
     stockMoveTabActions,
     inventoryCountTabActions,

@@ -4,8 +4,7 @@ export type WorkspaceProfile = "full" | "finance-alpha"
 const FINANCE_MODULES = new Set([
   "accounting", "sales", "crm", "purchasing", "reports", "subscriptions", "expenses",
 ])
-// Bounded workspaces alongside Finance; the broad legacy Inventory route stays link-only.
-const ALPHA_MODULES = new Set(["products", "warehouse", "fleet"])
+const ALPHA_MODULES = new Set(["products", "warehouse", "inventory", "fleet"])
 const FINANCE_SUPPORT = new Set([
   "overview", "tasks", "approvals", "documents", "calendar", "settings",
   "ai-assistant",
