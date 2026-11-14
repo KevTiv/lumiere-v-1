@@ -16,6 +16,8 @@ use crate::core::organization::require_company_in_organization;
 use crate::core::permissions::caller_delegated_company_scope;
 use crate::core::users::find_user_profile_for_identity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use lumiere_policy_core::ai_skills::BUILTIN_SKILL_KEYS;
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
@@ -174,6 +176,7 @@ pub fn set_ai_platform_default(
             .find(id)
             .ok_or("AI template not found")?;
         validate_template_catalog(ctx, &template)?;
+        ensure_builtin_skill_catalog(ctx)?;
     }
     if ctx
         .db
@@ -196,6 +199,71 @@ pub fn set_ai_platform_default(
         ctx.db.ai_platform_default().insert(row);
     }
     audit(ctx, 0, 1, "ai_platform_default", "UPDATE");
+    Ok(())
+}
+
+#[derive(Deserialize)]
+struct BuiltinSkill {
+    skill_key: String,
+    name: String,
+    description: String,
+    category: String,
+    prompt_template: String,
+    required_tools: Vec<String>,
+    optional_tools: Vec<String>,
+    default_max_steps: u32,
+    default_max_tool_calls: u32,
+    dataset_specs: Option<String>,
+    allowed_action_drafts: Vec<String>,
+    metadata: serde_json::Value,
+}
+
+pub(crate) fn ensure_builtin_skill_catalog(ctx: &ReducerContext) -> Result<(), String> {
+    let skills: Vec<BuiltinSkill> =
+        serde_json::from_str(include_str!("../../assets/ai-builtin-skills.json"))
+            .map_err(|error| format!("invalid compiled AI skill catalog: {error}"))?;
+    if !skills
+        .iter()
+        .map(|skill| skill.skill_key.as_str())
+        .eq(BUILTIN_SKILL_KEYS.iter().copied())
+    {
+        return Err("compiled AI skill catalog does not match its policy keys".into());
+    }
+    for skill in skills {
+        if ctx
+            .db
+            .ai_skill()
+            .ai_skill_by_org_key()
+            .filter((&0u64, &skill.skill_key))
+            .next()
+            .is_some()
+        {
+            continue;
+        }
+        let row = ctx.db.ai_skill().insert(AiSkill {
+            id: 0,
+            organization_id: 0,
+            skill_key: skill.skill_key,
+            name: skill.name,
+            description: Some(skill.description),
+            category: skill.category,
+            prompt_template: skill.prompt_template,
+            required_tools: skill.required_tools,
+            optional_tools: skill.optional_tools,
+            default_max_steps: skill.default_max_steps,
+            default_max_tool_calls: skill.default_max_tool_calls,
+            output_schema: None,
+            config_schema: None,
+            dataset_specs: skill.dataset_specs,
+            allowed_action_drafts: skill.allowed_action_drafts,
+            is_active: true,
+            is_system: true,
+            create_date: ctx.timestamp,
+            write_date: ctx.timestamp,
+            metadata: Some(skill.metadata.to_string()),
+        });
+        audit(ctx, 0, row.id, "ai_skill", "CREATE");
+    }
     Ok(())
 }
 

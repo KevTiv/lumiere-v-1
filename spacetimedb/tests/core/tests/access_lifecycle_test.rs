@@ -3,10 +3,10 @@ use crate::core::auth::{
     accept_user_invite, create_user_invite, user_credential, user_invite_acceptance,
 };
 use crate::core::permissions::{
-    assign_role, build_policy_snapshot_row, create_role, effective_roles, grant_permission, role,
-    update_role, user_role_assignment, AssignRoleParams, CreateRoleParams,
-    GrantOrgPermissionParams, PermissionAction, PermissionEffect, PermissionSubject,
-    UpdateRoleParams,
+    assign_role, build_policy_snapshot_row, create_role, effective_roles, grant_permission,
+    org_permission, policy_snapshot, revoke_permission, role, update_role, user_role_assignment,
+    AssignRoleParams, CreateRoleParams, GrantOrgPermissionParams, PermissionAction,
+    PermissionEffect, PermissionSubject, UpdateRoleParams,
 };
 use crate::core::users::{
     add_user_to_organization, remove_user_from_organization, user_organization,
@@ -294,6 +294,58 @@ pub fn test_effective_access_and_atomic_updates(ctx: &ReducerContext) -> Result<
         return Err("Read wildcard ignored an all-actions resource deny".into());
     }
 
+    Ok(())
+}
+
+pub fn test_builtin_skill_access_denial(ctx: &ReducerContext) -> Result<(), String> {
+    let org = OrgFixture::seed_minimal(ctx)?.organization_id;
+    let user = ctx.sender();
+    let resource = "ai_skill.rag_generation";
+    let mut params = GrantOrgPermissionParams {
+        resource: resource.into(),
+        subject: PermissionSubject::User(user),
+        action: PermissionAction::All,
+        effect: PermissionEffect::Allow,
+    };
+    if grant_permission(ctx, org, params.clone()).is_ok() {
+        return Err("A built-in skill accepted an explicit allow".into());
+    }
+    params.effect = PermissionEffect::Deny;
+    params.subject = PermissionSubject::User(Identity::from_byte_array([0x93; 32]));
+    if grant_permission(ctx, org, params.clone()).is_ok() {
+        return Err("A built-in skill accepted a nonmember target".into());
+    }
+    params.subject = PermissionSubject::User(user);
+    grant_permission(ctx, org, params.clone())?;
+    grant_permission(ctx, org, params)?;
+    let denials: Vec<_> = ctx
+        .db
+        .org_permission()
+        .perm_by_org()
+        .filter(&org)
+        .filter(|row| row.resource == resource)
+        .collect();
+    let [denial] = denials.as_slice() else {
+        return Err("Repeated built-in skill revocation created duplicate entries".into());
+    };
+    let snapshot_has_denial = || {
+        ctx.db
+            .policy_snapshot()
+            .policy_snapshot_by_user()
+            .filter((&org, &user))
+            .any(|snapshot| {
+                snapshot.org_permission_grants.iter().any(|grant| {
+                    grant.resource == resource && grant.action == "*" && grant.effect == "deny"
+                })
+            })
+    };
+    if !snapshot_has_denial() {
+        return Err("Revocation did not update the target's skill policy snapshot".into());
+    }
+    revoke_permission(ctx, org, denial.id)?;
+    if snapshot_has_denial() {
+        return Err("Restore did not clear the target's skill policy snapshot".into());
+    }
     Ok(())
 }
 

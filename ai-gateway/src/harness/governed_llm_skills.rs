@@ -242,13 +242,13 @@ pub async fn run_governed_llm_skill(
     input: GovernedLlmSkillInput,
     company_id: u64,
     policy: PolicyEngine,
-) -> Result<GovernedLlmSkillResult, String> {
+) -> anyhow::Result<GovernedLlmSkillResult> {
     let SkillEndpoints {
         resource,
         output_type,
-    } = endpoints(skill_key)?;
+    } = endpoints(skill_key).map_err(anyhow::Error::msg)?;
     let input_value = serde_json::to_value(&input).unwrap_or_default();
-    validate_llm_input(&input_value)?;
+    validate_llm_input(&input_value).map_err(anyhow::Error::msg)?;
 
     let outcome = execute_named_read(
         &policy,
@@ -303,8 +303,7 @@ pub async fn run_governed_llm_skill(
             resume_run_id: input.resume_run_id,
         },
     )
-    .await
-    .map_err(|error| error.to_string())?;
+    .await?;
 
     // Admission/transport success does not mean the reviewed run completed.
     // Keep waiting, failed and unknown states distinct in durable audit output.

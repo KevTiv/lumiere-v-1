@@ -16,6 +16,7 @@ use crate::{
         },
         skill_registry::SkillRegistry,
     },
+    orchestrator::skill_access::ActorSkillAccess,
     state::AppState,
 };
 
@@ -56,9 +57,16 @@ pub async fn post_compose(
         .as_deref()
         .ok_or_else(|| AppError::Internal("api-server URL is not configured".into()))?;
 
-    let identity_hex = req
-        .identity_hex
-        .unwrap_or_else(|| "report-composer".to_string());
+    let identity_hex = req.identity_hex.unwrap_or_default();
+    ActorSkillAccess::new(
+        &state,
+        req.org_id,
+        req.company_id,
+        &req.stdb_token,
+        &identity_hex,
+    )?
+    .require(REPORT_COMPOSER_SKILL_KEY)
+    .await?;
     let manifest = load_builtin_execution_manifest(
         &state.stdb,
         req.org_id,

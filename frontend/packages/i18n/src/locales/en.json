@@ -18279,6 +18279,31 @@
     "resetDescription": "Return this cancelled document to draft for editing? Only documents that have never been posted can be reset."
   },
   "aiSkills": {
+    "userAccess": {
+      "title": "User access",
+      "description": "Manage individual access to built-in skills across this organization.",
+      "catalogError": "Built-in skills could not be loaded.",
+      "loadingSkills": "Loading built-in skills…",
+      "noSkills": "No built-in skills are available.",
+      "skill": "Built-in skill",
+      "chooseSkill": "Choose a skill",
+      "searchSkills": "Search skills",
+      "person": "Organization member",
+      "choosePerson": "Choose a member",
+      "searchPeople": "Search members",
+      "noPeople": "No active members are available.",
+      "peopleDenied": "Organization directory access is required.",
+      "peopleError": "The member directory could not be loaded.",
+      "accessError": "The member’s skill access could not be verified.",
+      "saving": "Saving access…",
+      "revoked": "Access revoked for this member.",
+      "revokedLabel": "Revoked",
+      "defaultAccess": "This member inherits the organization’s default access.",
+      "loadingAccess": "Checking access…",
+      "restore": "Restore default access",
+      "revoke": "Revoke access",
+      "saveError": "The change could not be confirmed. Check the current access before trying again."
+    },
     "actions": {
       "assignSkill": "Assign skill",
       "cancel": "Cancel",
@@ -18388,6 +18413,28 @@
       }
     },
     "registry": {
+      "draftTest": {
+        "title": "Test draft",
+        "examples": "Test examples",
+        "exampleHelp": "Use sample data. Every saved example must pass before this skill version can be published.",
+        "name": "Example name",
+        "input": "Sample input JSON",
+        "expected": "Expected output JSON",
+        "saveExample": "Save example",
+        "loadError": "Could not load test examples or results.",
+        "companyRequired": "Select a company to run draft tests.",
+        "results": "Draft test results",
+        "pass": "Passed",
+        "badInput": "Input could not be evaluated",
+        "mismatch": "Output differed from expected",
+        "pending": "Awaiting test",
+        "runAll": "Run all examples",
+        "runPublished": "Run published skill",
+        "runInput": "Input JSON",
+        "run": "Run skill",
+        "starter": "Use JSON projection template",
+        "required": "Every saved example must pass before activation. Close this dialog to run the draft tests."
+      },
       "validation": {
         "advanced": "Advanced manifest",
         "reviewActivate": "Review and activate",

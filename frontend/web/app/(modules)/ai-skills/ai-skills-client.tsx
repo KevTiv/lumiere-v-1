@@ -25,6 +25,7 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 
 import { SkillRegistryPanel } from "./skill-registry-panel"
+import { SkillUserAccessPanel } from "./skill-user-access-panel"
 
 export { AI_SKILLS_UI_REDUCERS } from "@/lib/ai-skills-ui-reducers"
 
@@ -228,6 +229,13 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
     && checkPermission("ai_skill", "create").allowed
     && checkPermission("ai_skill", "write").allowed
     && checkPermission("ai_agent", "write").allowed
+  const canManageSkillAccess = permissionsReady === true
+    && checkPermission("role", "write").allowed
+    && checkPermission("user_organization", "write").allowed
+    && checkPermission("user_role_assignment", "create").allowed
+    && checkPermission("user_role_assignment", "delete").allowed
+    && checkPermission("org_permission", "create").allowed
+    && checkPermission("org_permission", "delete").allowed
   const createSkill = useCreateAiSkill(organizationId)
   const setSkillActive = useSetAiSkillActive(organizationId)
   const upsertConfig = useUpsertAiSkillConfig()
@@ -468,6 +476,10 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           </div>
         ))}
       </div>
+
+      {canManageSkillAccess ? (
+        <SkillUserAccessPanel key={organizationId} organizationId={organizationId} skills={sortedSkills} />
+      ) : null}
 
       <SkillRegistryPanel
         organizationId={orgId}

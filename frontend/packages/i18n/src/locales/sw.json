@@ -41,6 +41,31 @@
     }
   },
   "aiSkills": {
+    "userAccess": {
+      "title": "Ufikiaji wa watumiaji",
+      "description": "Dhibiti ufikiaji wa kila mwanachama kwa ujuzi uliojengewa ndani wa shirika hili.",
+      "catalogError": "Imeshindwa kupakia ujuzi uliojengewa ndani.",
+      "loadingSkills": "Inapakia ujuzi uliojengewa ndani…",
+      "noSkills": "Hakuna ujuzi uliojengewa ndani unaopatikana.",
+      "skill": "Ujuzi uliojengewa ndani",
+      "chooseSkill": "Chagua ujuzi",
+      "searchSkills": "Tafuta ujuzi",
+      "person": "Mwanachama wa shirika",
+      "choosePerson": "Chagua mwanachama",
+      "searchPeople": "Tafuta wanachama",
+      "noPeople": "Hakuna wanachama wanaotumika wanaopatikana.",
+      "peopleDenied": "Unahitaji ufikiaji wa orodha ya wanachama wa shirika.",
+      "peopleError": "Imeshindwa kupakia orodha ya wanachama.",
+      "accessError": "Imeshindwa kuthibitisha ufikiaji wa mwanachama kwa ujuzi huu.",
+      "saving": "Inahifadhi ufikiaji…",
+      "revoked": "Ufikiaji wa mwanachama huyu umebatilishwa.",
+      "revokedLabel": "Umebatilishwa",
+      "defaultAccess": "Mwanachama huyu anatumia ufikiaji chaguomsingi wa shirika.",
+      "loadingAccess": "Inakagua ufikiaji…",
+      "restore": "Rejesha ufikiaji chaguomsingi",
+      "revoke": "Batilisha ufikiaji",
+      "saveError": "Mabadiliko hayakuweza kuthibitishwa. Kagua ufikiaji wa sasa kabla ya kujaribu tena."
+    },
     "setup": {
       "title": "Maandalizi ya vipengele vya AI",
       "action": "Sanidi vipengele vya AI",
