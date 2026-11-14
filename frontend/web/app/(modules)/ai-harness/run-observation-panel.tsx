@@ -17,10 +17,14 @@ export type ObservationState =
   | { status: "unavailable"; message: string }
   | { status: "success"; data: RunObservationView }
 
+type SavedObservation =
+  | Extract<ObservationState, { status: "loading" | "success" }>
+  | { status: "unavailable"; error: "transcriptUnauthorized" | "transcriptNotFound" | "transcriptUnavailable" | "transcriptIncomplete" }
+
 /** Read one saved run without lifecycle authority or another provider request. */
 export function SavedRunObservation({ companyId, runId }: { companyId: number; runId: number }) {
   const { t } = useTranslation()
-  const [observation, setObservation] = useState<ObservationState>({ status: "loading" })
+  const [observation, setObservation] = useState<SavedObservation>({ status: "loading" })
   useEffect(() => {
     const controller = new AbortController()
     setObservation({ status: "loading" })
@@ -38,22 +42,24 @@ export function SavedRunObservation({ companyId, runId }: { companyId: number; r
           const key = response.status === 401 || response.status === 403
             ? "transcriptUnauthorized"
             : response.status === 404 ? "transcriptNotFound" : "transcriptUnavailable"
-          setObservation({ status: "unavailable", message: t(`aiHarness.runLifecycle.errors.${key}`) })
+          setObservation({ status: "unavailable", error: key })
           return
         }
         const mapped = mapRunObservation(payload)
         setObservation(mapped && mapped.runId === runId
           ? { status: "success", data: mapped }
-          : { status: "unavailable", message: t("aiHarness.runLifecycle.errors.transcriptIncomplete") })
+          : { status: "unavailable", error: "transcriptIncomplete" })
       } catch {
         if (!controller.signal.aborted) {
-          setObservation({ status: "unavailable", message: t("aiHarness.runLifecycle.errors.transcriptUnavailable") })
+          setObservation({ status: "unavailable", error: "transcriptUnavailable" })
         }
       }
     })()
     return () => controller.abort()
-  }, [companyId, runId, t])
-  return <RunObservation observation={observation} />
+  }, [companyId, runId])
+  return <RunObservation observation={observation.status === "unavailable"
+    ? { status: "unavailable", message: t(`aiHarness.runLifecycle.errors.${observation.error}`) }
+    : observation} />
 }
 
 export function RunObservation({ observation }: { observation: ObservationState }) {

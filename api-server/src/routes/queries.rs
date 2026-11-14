@@ -116,7 +116,7 @@ fn owner_read_module(resource: &str) -> Option<&'static str> {
     }
 }
 
-fn require_owner_read_permission(
+pub(super) fn require_owner_read_permission(
     resource: &str,
     context: &TrustedOperationContext,
 ) -> Result<(), ApiError> {
