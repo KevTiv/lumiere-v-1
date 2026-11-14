@@ -170,7 +170,7 @@ fn web_requests_decode_as_gateway_dtos() {
 
 #[test]
 #[ignore = "requires Node; run by the AI gateway wire contract CI step"]
-fn web_manifest_accepts_current_gateway_discovery() {
+fn web_route_forwards_current_gateway_discovery() {
     let bindings = [
         "rag_generation",
         "form_suggestion",
