@@ -157,8 +157,18 @@ describe("module insight composition integration", () => {
       )
       expect(screen.queryByTestId(`${module}-insights-currentCount`)).toBeNull()
       expect(
-        screen.getByRole("link", { name: "Available history" }),
-      ).toBeTruthy()
+        screen.queryByRole("link", { name: "Available history" }),
+      ).toBeNull()
+      const recordsLink = screen.getByRole("link", {
+        name: `moduleInsights.modules.${module}.browse`,
+      })
+      const recordsUrl = new URL(
+        recordsLink.getAttribute("href")!,
+        "https://example.test",
+      )
+      expect(recordsUrl.pathname).toBe(`/${module}`)
+      expect(recordsUrl.searchParams.get("period")).toBe("all")
+      expect(recordsUrl.searchParams.getAll("filter")).toContain("companyId:1")
       expect(screen.getByLabelText("moduleInsights.period")).toBeTruthy()
       if (module !== "reports")
         expect(screen.getByLabelText("moduleInsights.currency")).toBeTruthy()
