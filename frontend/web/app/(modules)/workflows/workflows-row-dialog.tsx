@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import type { TFunction } from "i18next"
+import type { JsonObject } from "@lumiere/api-client/json-object"
 import {
   Button,
   Dialog,
@@ -70,7 +71,7 @@ function num(row: Record<string, unknown>, ...keys: string[]): number {
   return 0
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isJsonObject(value: unknown): value is JsonObject {
   return !!value && typeof value === "object" && !Array.isArray(value)
 }
 
@@ -82,9 +83,9 @@ function parseSampleFields(json: string): WorkflowSimulationInput["sampleFields"
   } catch {
     throw new Error("Sample fields must be valid JSON.")
   }
-  if (!isRecord(fields)) throw new Error("Enter sample fields as a JSON object.")
+  if (!isJsonObject(fields)) throw new Error("Enter sample fields as a JSON object.")
   return Object.entries(fields).map(([fieldKey, value]) => {
-    if (!isRecord(value) || Object.keys(value).length !== 1) {
+    if (!isJsonObject(value) || Object.keys(value).length !== 1) {
       throw new Error(`Choose a value type for '${fieldKey}', such as {"integer":100}.`)
     }
     return { fieldKey, value }

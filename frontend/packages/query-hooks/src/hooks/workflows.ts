@@ -7,6 +7,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import type { JsonObject } from "@lumiere/api-client/json-object"
 import { responseErrorMessage } from "@lumiere/api-client/response-error"
 
 import {
@@ -400,7 +401,7 @@ export function useCancelWorkflow(organizationId: bigint) {
 export type WorkflowSimulationInput = {
   workflowVersionId: bigint | number | string
   params: SimulateWorkflowParams
-  sampleFields?: { fieldKey: string; value: Record<string, unknown> }[]
+  sampleFields?: { fieldKey: string; value: JsonObject }[]
 }
 
 export function useSimulateWorkflow(organizationId: bigint) {
