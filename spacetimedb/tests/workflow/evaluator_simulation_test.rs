@@ -147,7 +147,7 @@ fn test_trace_is_byte_identical(ctx: &ReducerContext) -> Result<(), String> {
         &nodes,
         &edges,
         &condition_snapshot,
-        None,
+        &[],
     )?;
     nodes.reverse();
     edges.reverse();
@@ -157,7 +157,7 @@ fn test_trace_is_byte_identical(ctx: &ReducerContext) -> Result<(), String> {
         &nodes,
         &edges,
         &condition_snapshot,
-        None,
+        &[],
     )?;
     if canonical_simulation_trace_bytes(&first)? != canonical_simulation_trace_bytes(&second)? {
         return Err("identical snapshot produced different canonical traces".to_string());

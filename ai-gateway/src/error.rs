@@ -67,6 +67,11 @@ pub enum AppError {
 impl AppError {
     /// Preserve skill availability failures during execution.
     pub fn from_generation(error: anyhow::Error) -> Self {
+        if let Some(access_error) =
+            error.downcast_ref::<crate::orchestrator::skill_access::SkillAccessError>()
+        {
+            return (*access_error).into();
+        }
         if error.is::<SkillUnavailable>() {
             Self::from_agent_resolution(error)
         } else {

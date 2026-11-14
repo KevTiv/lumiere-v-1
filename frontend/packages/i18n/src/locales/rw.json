@@ -41,6 +41,31 @@
     }
   },
   "aiSkills": {
+    "userAccess": {
+      "title": "Uburenganzira bw’abakoresha",
+      "description": "Genzura uburenganzira bwa buri munyamuryango bwo gukoresha ubushobozi bwubatswe muri uyu muryango.",
+      "catalogError": "Ubushobozi bwubatswe ntibwashoboye kuboneka.",
+      "loadingSkills": "Turimo gushaka ubushobozi bwubatswe…",
+      "noSkills": "Nta bushobozi bwubatswe buboneka.",
+      "skill": "Ubushobozi bwubatswe",
+      "chooseSkill": "Hitamo ubushobozi",
+      "searchSkills": "Shakisha ubushobozi",
+      "person": "Umunyamuryango",
+      "choosePerson": "Hitamo umunyamuryango",
+      "searchPeople": "Shakisha abanyamuryango",
+      "noPeople": "Nta munyamuryango ukora uboneka.",
+      "peopleDenied": "Ukeneye uburenganzira bwo kureba urutonde rw’abanyamuryango.",
+      "peopleError": "Urutonde rw’abanyamuryango ntirwashoboye kuboneka.",
+      "accessError": "Ntitwashoboye kugenzura uburenganzira bw’uyu munyamuryango.",
+      "saving": "Turimo kubika uburenganzira…",
+      "revoked": "Uburenganzira bw’uyu munyamuryango bwakuweho.",
+      "revokedLabel": "Byakuweho",
+      "defaultAccess": "Uyu munyamuryango afite uburenganzira busanzwe bw’umuryango.",
+      "loadingAccess": "Turimo kugenzura uburenganzira…",
+      "restore": "Subizaho uburenganzira busanzwe",
+      "revoke": "Kuraho uburenganzira",
+      "saveError": "Ntitwashoboye kwemeza impinduka. Banza urebe uburenganzira buriho mbere yo kongera kugerageza."
+    },
     "setup": {
       "title": "Gutegura ibikorwa bya AI",
       "action": "Tegura ibikorwa bya AI",

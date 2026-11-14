@@ -3,6 +3,7 @@
 use super::company_scope::company_ids_for_organization;
 use super::row_values::sort_rows_by_id_desc;
 use crate::error::ApiError;
+use lumiere_policy_core::skill_projection::{SkillProjection, EXECUTOR};
 use serde_json::Value;
 use std::collections::HashSet;
 use stdb_auth::resolve_http_sql_columns;
@@ -51,11 +52,24 @@ pub(crate) async fn read_ai_skill_versions(
     organization_id: u64,
 ) -> Result<Vec<Value>, ApiError> {
     let sql = format!(
-                "SELECT id, organization_id, skill_id, skill_key, version, manifest_schema_version, source_hash, risk, max_steps, max_tool_calls, permissions, resources, output_types, reviewed_at, review_notes, created_at, metadata FROM ai_skill_version WHERE organization_id = {organization_id}"
+                "SELECT id, organization_id, skill_id, skill_key, version, manifest_schema_version, manifest_json, source_hash, risk, max_steps, max_tool_calls, permissions, resources, output_types, reviewed_at, review_notes, created_at, metadata FROM ai_skill_version WHERE organization_id = {organization_id}"
             );
     let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
+    for row in rows.iter_mut().filter_map(Value::as_object_mut) {
+        let manifest = row
+            .remove("manifestJson")
+            .or_else(|| row.remove("manifest_json"));
+        let projection = manifest
+            .and_then(|raw| serde_json::from_str::<Value>(raw.as_str()?).ok())
+            .is_some_and(|manifest| {
+                matches!(SkillProjection::from_manifest(&manifest), Ok(Some(_)))
+            });
+        if projection {
+            row.insert("executor".into(), Value::String(EXECUTOR.into()));
+        }
+    }
     sort_rows_by_id_desc(&mut rows);
-    return Ok(rows);
+    Ok(rows)
 }
 
 pub(crate) async fn read_ai_skill_releases(

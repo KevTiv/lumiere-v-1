@@ -1,7 +1,9 @@
 //! Provider-independent permission evaluation shared by API reads and reducers.
 
 pub mod additional_tenant;
+pub mod ai_skills;
 pub mod expense_allocations;
+pub mod skill_projection;
 
 /// Reserved non-interactive operator namespace, including future versions.
 pub const PERSISTENT_PLATFORM_OPERATOR_METADATA_PREFIX: &str = "persistent_platform_operator_";

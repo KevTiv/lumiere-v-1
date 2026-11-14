@@ -29,6 +29,13 @@ CONTRACTS = {
 }
 DETERMINISTIC = {'daily_briefing', 'insights_scan', 'import_mapping'}
 INTERNAL = {'rag_generation', 'form_suggestion', 'action_draft_generation'}
+NATIVE_SKILLS = (
+    ('create_sale_order_draft', 'Sales Order Draft', 'Prepare a governed sales order draft for review.', 'sales'),
+    ('credit_hold_summary', 'Credit Hold Summary', 'Summarize current customer credit holds from authorized records.', 'sales'),
+    ('delivery_run_summary', 'Delivery Run Summary', 'Summarize delivery run status from authorized records.', 'inventory'),
+    ('low_stock', 'Low Stock Scan', 'Find products at or below their reorder threshold.', 'inventory'),
+    ('report_composer', 'Report Composer', 'Compose a summary from authorized report previews.', 'reporting'),
+)
 
 
 def sha(data):
@@ -107,10 +114,28 @@ def contract_fields(source, symbol):
 def generate():
     routes = dict(re.findall(r'\(\s*"([a-z_]+)",\s*"([^"]+)"\s*,?\s*\)', (ROOT/'ai-gateway/src/harness/legacy_fence.rs').read_text()))
     skills, assets = [], set()
+    platform_skills = []
     for path in sorted((ROOT/'erp-skills').glob('*/SKILL.md')):
         fields, _ = read_skill(path)
         key = fields['skill_key']
         compiled = compile_prompt(path)
+        if len(compiled['text'].encode()) > 32_000:
+            raise ValueError(f'platform catalog prompt is too large: {key}')
+        platform_skills.append({
+            'skill_key': key,
+            'name': fields['name'],
+            'description': fields['description'],
+            'category': fields['category'],
+            'prompt_template': compiled['text'],
+            'required_tools': fields.get('required_tools', []),
+            'optional_tools': fields.get('optional_tools', []),
+            'default_max_steps': int(fields['default_max_steps']),
+            'default_max_tool_calls': int(fields['default_max_tool_calls']),
+            'dataset_specs': fields.get('dataset_specs'),
+            'allowed_action_drafts': fields.get('allowed_action_drafts', []),
+            'metadata': {'source': 'bundled_md', 'path': path.relative_to(ROOT).as_posix(),
+                         **{key: value for key, value in compiled.items() if key != 'text'}},
+        })
         source, symbol = CONTRACTS.get(key, (ROOT/'ai-gateway/src/harness/governed_llm_skills.rs', 'GovernedLlmSkillInput'))
         for dep in compiled['dependencies']:
             assets.add((path.parent / dep['path']).relative_to(ROOT).as_posix())
@@ -180,7 +205,26 @@ actual provider evidence; local replay only establishes its stated assertions.
     else:
         old = '        include_bytes!("../../../erp-skills/report_analysis/SKILL.md"),'
         text = text.replace(old, block)
-    return {ROOT/'erp-skills/catalog.json': json.dumps(catalog, indent=2)+'\n', ROOT/'erp-skills/README.md':readme, cert:text}
+    for key, name, description, category in NATIVE_SKILLS:
+        platform_skills.append({
+            'skill_key': key, 'name': name, 'description': description,
+            'category': category, 'prompt_template': description,
+            'required_tools': [], 'optional_tools': [], 'default_max_steps': 1,
+            'default_max_tool_calls': 1, 'dataset_specs': None,
+            'allowed_action_drafts': [], 'metadata': {'source': 'gateway_builtin'},
+        })
+    platform_skills.sort(key=lambda skill: skill['skill_key'])
+    classifier = ROOT/'crates/policy-core/src/ai_skills.rs'
+    classifier_keys = re.findall(
+        r'^\s+"([a-z_]+)",$', classifier.read_text().split('];', 1)[0], re.M)
+    if [skill['skill_key'] for skill in platform_skills] != classifier_keys:
+        raise ValueError('platform catalog must match the built-in policy keys')
+    return {
+        ROOT/'erp-skills/catalog.json': json.dumps(catalog, indent=2)+'\n',
+        ROOT/'erp-skills/README.md': readme,
+        ROOT/'spacetimedb/assets/ai-builtin-skills.json': json.dumps(platform_skills, indent=2)+'\n',
+        cert: text,
+    }
 
 
 def main():
