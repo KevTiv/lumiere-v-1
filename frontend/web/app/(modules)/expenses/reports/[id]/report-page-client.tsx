@@ -1,4 +1,5 @@
 'use client';
+import { AskAboutRecordButton } from '../../../../../components/ask-about-record-button';
 import { CurrencyFormatProvider } from '@lumiere/ui';
 import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
 import { entityScalarText } from '@lumiere/ui/lib/entity-row-values';
@@ -223,6 +224,7 @@ function ExpenseReportPageLoaded({
         }
         actions={
           <>
+            <AskAboutRecordButton entityType="hr_expense_sheet" recordId={sheetId} label={label} activeTab={activeTab} />
             {state === 'Draft' ? (
               <Button size="sm" disabled={busy || !decision.can("submit")} data-testid="expense-report-submit" onClick={() => decision.open('submit', sheet)}>
                 {confirmTitle.submit}

@@ -38,6 +38,9 @@ for (const width of [390, 1440]) {
     await page.getByTestId("discard-changes-confirm").click()
     await expect(dialog).not.toBeVisible()
     await expect(
+      page.getByTestId("assistant-native-action").getByRole("status"),
+    ).toHaveText("Form opened")
+    await expect(
       page.getByRole("link", { name: "Canonical order 42", exact: true }),
     ).toHaveAttribute("href", "/sales?tab=orders&filter=id%3A42")
     await expect(

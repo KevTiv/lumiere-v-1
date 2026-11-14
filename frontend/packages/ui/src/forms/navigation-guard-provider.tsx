@@ -45,14 +45,14 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
     afterSave.current = []
     ready.forEach((resume) => resume())
   }, [])
-  const run = useCallback((action: () => void, deferWhileSaving = false) => {
+  const run = useCallback((action: () => void, deferWhileSaving = false, onDeclined?: () => void) => {
     if (bypass.current || !hasEdits()) { action(); return }
     if (deferWhileSaving && isSaving()) {
-      afterSave.current.push(() => run(action))
+      afterSave.current.push(() => run(action, false, onDeclined))
       return
     }
     void allow().then((accepted) => {
-      if (!accepted) return
+      if (!accepted) { onDeclined?.(); return }
       bypass.current = true
       try { action() } finally { bypass.current = false }
     })
@@ -60,7 +60,7 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
   // Consumers must not re-register editors whenever translations/router callbacks change.
   const latestRun = useRef(run)
   latestRun.current = run
-  const proceed = useCallback((action: () => void) => latestRun.current(action), [])
+  const proceed = useCallback((action: () => void, onDeclined?: () => void) => latestRun.current(action, false, onDeclined), [])
   const value = useMemo(() => ({
     proceed,
     register: (read: () => NavigationEditorState) => {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback, useId, type SetStateAction } from "react"
+import { Fragment, useState, useRef, useEffect, useCallback, useId, type SetStateAction } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -35,11 +35,16 @@ import {
   SlidersHorizontal,
   Search,
   History,
+  ArrowDown,
+  Building2,
+  ChevronRight,
+  Paperclip,
+  Square,
 } from "lucide-react"
 import type { ChatMessage, AtCommand, AIChatConfig, ChatMessageSourceRef, ChatContext, ChatAction, ChatActionDraftPayload, ChatSkill } from "@/lib/ai-chat-types"
 import { defaultAtCommands } from "@/lib/ai-chat-types"
 import { AiActionDraftCard } from "./ai-action-draft-card"
-import { AiNativeActionCard } from "./ai-native-action-card"
+import { AiNativeActionCard, type NativeActionPresentation } from "./ai-native-action-card"
 import { Dialog, DialogContent, DialogTitle } from "../components/dialog"
 import { FileIdentity } from "../components/file-identity"
 import { FileUploadField } from "../components/file-upload-field"
@@ -57,16 +62,52 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGr
 import { ActionSkillList } from "./action-skill-list"
 import { matchingChatSkills, slashSkillToken } from "../lib/chat-skill-search"
 import { WorkspaceToolSurface } from "../pages/workspace-tool-surface"
+import { ChatAnswerMarkdown } from "./chat-answer-markdown"
 
 interface ChatReply {
   content: string
+  stopped?: boolean
   recoveryPath?: ChatMessage["recoveryPath"]
   runId?: number
   sources?: ChatMessageSourceRef[]
   actions?: ChatAction[]
   guides?: GuideReference[]
   importTasks?: ChatImportTaskStatus[]
+  importTaskIds?: string[]
   earlierContextUnavailable?: boolean
+}
+
+type LocalChatMessage = ChatMessage & { stopped?: boolean }
+
+export type ChatTurnProjection = {
+  id: string
+  userText: string
+  content: string
+  timestamp: Date
+} & ({ settled: false } | { settled: true; reply: ChatReply } | { settled: true; error: string })
+
+function projectedMessages(turn: ChatTurnProjection, companyId?: number): LocalChatMessage[] {
+  const { id, userText, timestamp } = turn
+  const reply = turn.settled && "reply" in turn ? turn.reply : undefined
+  const final = reply && !reply.stopped ? reply : undefined
+  const error = turn.settled && "error" in turn ? turn.error : undefined
+  return [
+    { id: `${id}:user`, role: "user", content: userText, timestamp, metadata: { turnId: id } },
+    {
+      id: `${id}:assistant`,
+      role: "assistant",
+      content: error ?? final?.content ?? turn.content,
+      timestamp,
+      sources: final?.sources,
+      actions: final?.actions,
+      guides: final?.guides,
+      recoveryPath: final?.recoveryPath,
+      importTasks: final?.importTasks,
+      importTaskIds: final?.importTaskIds,
+      stopped: reply?.stopped,
+      metadata: { companyId, turnId: id, runId: final?.runId },
+    },
+  ]
 }
 
 export type AIChatHistory = {
@@ -99,6 +140,7 @@ interface AIChatPanelProps {
   contextOptions?: readonly { value: string; label: string; group: string }[]
   selectedContext?: string
   onContextChange?: (value: string) => void
+  onClearSelection?: () => void
   /** An explicit selection is checked again for company and model policy by the gateway. */
   agentOptions?: readonly { value: string; label: string }[]
   selectedAgent?: string
@@ -110,6 +152,9 @@ interface AIChatPanelProps {
   conversationKey?: string
   draft?: { value: string; onChange: (value: SetStateAction<string>) => void }
   sendPending?: boolean
+  turnProjection?: ChatTurnProjection
+  onStopReply?: () => void
+  turnProgress?: "answering" | "preparing_draft" | "saving_reply"
   renderMessageActions?: (message: ChatMessage) => React.ReactNode
   renderCitation?: (source: ChatMessageSourceRef) => React.ReactNode
   composerContext?: React.ReactNode
@@ -126,8 +171,11 @@ interface AIChatPanelProps {
   onImportFiles?: (files: File[]) => Promise<void>
   /** Server-backed task cards are owned by the host, separately from text replies. */
   importTaskContent?: React.ReactNode
+  renderImportTask?: (taskId: string) => React.ReactNode
   importCompanyLabel?: string
   importFileNames?: readonly string[]
+  importFocusedFileNames?: readonly string[]
+  onClearImportFocus?: () => void
   showWorkbench?: boolean
   /** The host can include actor and organization when the panel is not remounted on scope changes. */
   importScopeKey?: string
@@ -207,6 +255,7 @@ function AIChatConversation({
   contextOptions,
   selectedContext,
   onContextChange,
+  onClearSelection,
   agentOptions,
   selectedAgent,
   onAgentChange,
@@ -217,6 +266,9 @@ function AIChatConversation({
   conversationKey,
   draft,
   sendPending,
+  turnProjection,
+  onStopReply,
+  turnProgress,
   renderMessageActions,
   renderCitation,
   composerContext,
@@ -227,8 +279,11 @@ function AIChatConversation({
   onSendMessage,
   onImportFiles,
   importTaskContent,
+  renderImportTask,
   importCompanyLabel,
   importFileNames,
+  importFocusedFileNames,
+  onClearImportFocus,
   showWorkbench,
   importScopeKey,
   onStreamMessage,
@@ -236,15 +291,28 @@ function AIChatConversation({
   const { t } = useTranslation()
   const docked = requestedDocked && !modal
   const managedPlacement = workspaceHost !== undefined && !modal
-  const [localMessages, setMessages] = useState<ChatMessage[]>([])
+  const [localMessages, setMessages] = useState<LocalChatMessage[]>([])
+  const [nativePresentation, setNativePresentation] = useState(() => new Map<string, NativeActionPresentation>())
   const [localInput, setLocalInput] = useState("")
   const input = draft?.value ?? localInput
   const setInput = draft?.onChange ?? setLocalInput
   const readOnly = history?.archived || history?.unavailable
-  const persistedIds = new Set(initialMessages?.map(message => message.metadata?.turnId && `${message.metadata.turnId}:${message.role}`).filter(Boolean))
-  const messages = history?.unavailable ? [] : [...(initialMessages ?? []), ...localMessages.filter(message =>
-    !message.metadata?.turnId || !persistedIds.has(`${message.metadata.turnId}:${message.role}`),
-  )]
+  const messages: LocalChatMessage[] = []
+  const knownTurns = new Set<string>()
+  if (!history?.unavailable) {
+    const addMessage = (message: LocalChatMessage) => {
+      const turnId = message.metadata?.turnId
+      if (turnId) {
+        const key = `${turnId}:${message.role}`
+        if (knownTurns.has(key)) return
+        knownTurns.add(key)
+      }
+      messages.push(message)
+    }
+    initialMessages?.forEach(addMessage)
+    localMessages.forEach(addMessage)
+    if (turnProjection) projectedMessages(turnProjection, context?.companyId).forEach(addMessage)
+  }
   const [earlierContextUnavailable, setEarlierContextUnavailable] = useState(false)
   const [openTools, setOpenTools] = useState<"files" | "skills" | null>(null)
   const [contextVisible, setContextVisible] = useState(true)
@@ -257,6 +325,9 @@ function AIChatConversation({
   const [activeSkillId, setActiveSkillId] = useState("draft")
   const pendingCaret = useRef<number | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [streamingTurnId, setStreamingTurnId] = useState<string | null>(null)
+  const [stopping, setStopping] = useState(false)
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [guideError, setGuideError] = useState<string | null>(null)
   const fileImportEnabled = config?.enableFileUpload === true && onImportFiles != null && !readOnly
@@ -343,7 +414,11 @@ function AIChatConversation({
   const activeContext = contextOptions?.find(option => option.value === selectedContext) ?? contextOptions?.[0]
   const moduleLabel = activeContext?.value === "current"
     ? context?.activeView ?? activeContext.label
-    : activeContext?.label
+    : activeContext?.label ?? context?.activeView ?? context?.module
+  const activeViewLabel = context?.activeTab?.replaceAll(/[-_]/g, " ")
+  const focusedFileNames = importFocusedFileNames?.length ? importFocusedFileNames : undefined
+  const pending = isLoading || Boolean(sendPending || turnProjection?.settled === false)
+  const canStopReply = pending && Boolean(onStopReply)
   const showContext = !docked && !modal && !history?.open && contextVisible
   const matchingSkills = slash ? matchingChatSkills(skills, slash.query) : skills
   const focusedSkillId = matchingSkills.some(skill => skill.id === activeSkillId) ? activeSkillId : matchingSkills[0]?.id
@@ -442,7 +517,11 @@ function AIChatConversation({
     const viewport = scrollRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')
     if (!viewport) return
     const id = history?.anchorMessageId
-    const anchor = id ? viewport.querySelector<HTMLElement>(`[data-chat-message-id="${id}"]`) : null
+    const anchor = id
+      ? Array.from(viewport.querySelectorAll<HTMLElement>("[data-chat-message-id]")).find(
+        message => message.dataset.chatMessageId === id,
+      )
+      : null
     if (anchor && lastAnchor.current !== id) {
       lastAnchor.current = id ?? null
       anchor.scrollIntoView({ block: "center" })
@@ -451,16 +530,26 @@ function AIChatConversation({
       const { height, top } = scrollSnapshot.current
       viewport.scrollTop = top + viewport.scrollHeight - height
       scrollSnapshot.current = null
-    } else if (atBottom.current) {
-      viewport.scrollTop = viewport.scrollHeight
+    } else {
+      if (atBottom.current) viewport.scrollTop = viewport.scrollHeight
     }
-  }, [open, historyOpen, history?.anchorMessageId, initialMessages, localMessages])
+  }, [open, historyOpen, history?.anchorMessageId, initialMessages, localMessages, turnProjection])
 
   const loadOlder = async () => {
     const viewport = scrollRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')
     if (viewport) scrollSnapshot.current = { height: viewport.scrollHeight, top: viewport.scrollTop }
     try { await history?.onLoadOlder?.() }
     catch { scrollSnapshot.current = null }
+  }
+
+  const jumpToLatest = () => {
+    const viewport = scrollRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')
+    if (!viewport) return
+    scrollSnapshot.current = null
+    atBottom.current = true
+    viewport.scrollTop = viewport.scrollHeight
+    setShowJumpToLatest(false)
+    inputRef.current?.focus({ preventScroll: true })
   }
 
   // The shell surface handles focus on open and preserves it during responsive changes.
@@ -559,16 +648,19 @@ function AIChatConversation({
     setSendError(null)
     setEarlierContextUnavailable(false)
     atBottom.current = true
+    setShowJumpToLatest(false)
     setInput("")
     setIsLoading(true)
 
     const t0 = typeof performance !== "undefined" ? performance.now() : Date.now()
 
+    let streamFrame: number | undefined
     try {
       let assistantMessage: ChatMessage
 
       if (onStreamMessage) {
         const assistantId = `${turnId}:assistant`
+        setStreamingTurnId(turnId)
         let streamedContent = ""
         let streamedSources: ChatMessageSourceRef[] = []
         let streamedActions: ChatAction[] = []
@@ -588,44 +680,39 @@ function AIChatConversation({
           onDelta: (delta) => {
             if (!active.current) return
             streamedContent += delta
-            setMessages((prev) =>
-              prev.map((message) =>
-                message.id === assistantId
-                  ? { ...message, content: streamedContent }
-                  : message,
-              ),
-            )
+            if (streamFrame !== undefined) return
+            streamFrame = requestAnimationFrame(() => {
+              streamFrame = undefined
+              if (!active.current) return
+              const content = streamedContent
+              setMessages((prev) => prev.map((message) =>
+                message.id === assistantId ? { ...message, content } : message,
+              ))
+            })
           },
           onSources: (sources) => {
-            if (!active.current) return
             streamedSources = sources
-            setMessages((prev) =>
-              prev.map((message) =>
-                message.id === assistantId
-                  ? { ...message, sources: sources.length > 0 ? sources : undefined }
-                  : message,
-              ),
-            )
           },
           onActions: (actions) => {
-            if (!active.current) return
             streamedActions = actions
-            setMessages((prev) =>
-              prev.map((message) =>
-                message.id === assistantId
-                  ? { ...message, actions: actions.length > 0 ? actions : undefined }
-                  : message,
-              ),
-            )
           },
         })
+        if (reply.stopped) {
+          if (active.current || draft) setInput((current) => current === "" ? submittedInput : current)
+          if (active.current) {
+            setMessages((prev) => prev.map((message) =>
+              message.id === assistantId ? { ...message, content: streamedContent, stopped: true } : message,
+            ))
+          }
+          return
+        }
         if (!active.current) return
         setEarlierContextUnavailable(Boolean(reply.earlierContextUnavailable))
         const t1 = typeof performance !== "undefined" ? performance.now() : Date.now()
         assistantMessage = {
           id: assistantId,
           role: "assistant",
-          content: reply.content || streamedContent,
+          content: reply.content,
           timestamp: new Date(),
           sources:
             reply.sources && reply.sources.length > 0
@@ -642,6 +729,7 @@ function AIChatConversation({
           guides: reply.guides,
           recoveryPath: reply.recoveryPath,
           importTasks: reply.importTasks,
+          importTaskIds: reply.importTaskIds,
           metadata: {
             duration: Math.round(t1 - t0),
             turnId,
@@ -670,6 +758,7 @@ function AIChatConversation({
           guides: reply.guides,
           recoveryPath: reply.recoveryPath,
           importTasks: reply.importTasks,
+          importTaskIds: reply.importTaskIds,
           metadata: {
             duration: Math.round(t1 - t0),
             turnId,
@@ -698,9 +787,15 @@ function AIChatConversation({
         role: "assistant",
         content: msg,
         timestamp: new Date(),
+        metadata: { turnId },
       }])
     } finally {
-      if (active.current) setIsLoading(false)
+      if (streamFrame !== undefined) cancelAnimationFrame(streamFrame)
+      if (active.current) {
+        setIsLoading(false)
+        setStreamingTurnId(null)
+        setStopping(false)
+      }
     }
   }
 
@@ -810,7 +905,8 @@ function AIChatConversation({
     <>
       <section className="space-y-2 border-b px-4 py-3">
         <h4 className="text-xs font-medium text-muted-foreground">{t("aiChat.workspace.modules")}</h4>
-        <p className="text-sm font-medium [overflow-wrap:anywhere]">{moduleLabel ?? context?.activeView ?? t("aiChat.workspace.noModule", { defaultValue: "No active module" })}</p>
+        <p className="text-sm font-medium capitalize [overflow-wrap:anywhere]">{moduleLabel ?? t("aiChat.workspace.noModule", { defaultValue: "No active module" })}</p>
+        {importCompanyLabel ? <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{importCompanyLabel}</p> : null}
         {selectionSummary ? <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{selectionSummary}</p> : null}
       </section>
       {config?.enableFileUpload ? (
@@ -940,13 +1036,14 @@ function AIChatConversation({
           const target = event.target
           if (target instanceof HTMLElement && target.dataset.slot === "scroll-area-viewport") {
             atBottom.current = target.scrollHeight - target.scrollTop - target.clientHeight < 80
+            setShowJumpToLatest(!atBottom.current)
           }
         }}>
-          <div className="mx-auto w-full max-w-[820px] px-4 py-6">
-          {sendError ? <p role="alert" className="break-words text-sm text-destructive">{t("aiChat.requestFailed", { defaultValue: "The assistant request failed. Review the error and your message before sending again." })}</p> : null}
+          <div className="mx-auto w-full max-w-[768px] px-4 py-6 sm:px-6">
+          {sendError || (turnProjection?.settled && "error" in turnProjection) ? <p role="alert" className="break-words text-sm text-destructive">{t("aiChat.requestFailed", { defaultValue: "The assistant request failed. Review the error and your message before sending again." })}</p> : null}
           {guideError ? <p role="alert" className="mb-4 break-words text-sm text-destructive">{guideError}</p> : null}
           {historySaveFailed ? <p role="alert" className="mb-4 break-words rounded-md border p-3 text-sm">{t("aiChat.historySaveFailed", { defaultValue: "Conversation history may not be available after leaving this page. Your answer is still here. Copy anything you need to keep. This warning does not describe whether a business action completed." })}</p> : null}
-          {earlierContextUnavailable ? <p role="status" className="mb-4 text-sm text-muted-foreground">{t("aiChat.history.earlierUnavailable", { defaultValue: "Earlier context is temporarily unavailable." })}</p> : null}
+          {earlierContextUnavailable || (turnProjection?.settled && "reply" in turnProjection && turnProjection.reply.earlierContextUnavailable) ? <p role="status" className="mb-4 text-sm text-muted-foreground">{t("aiChat.history.earlierUnavailable", { defaultValue: "Earlier context is temporarily unavailable." })}</p> : null}
           {history?.loading ? <p role="status" className="mb-4 text-sm text-muted-foreground">{t("aiChat.history.loadingThread", { defaultValue: "Loading conversation…" })}</p> : null}
           {history?.error || history?.unavailable ? (
             <div role="alert" className="mb-4 space-y-2">
@@ -973,7 +1070,7 @@ function AIChatConversation({
             </div>
           ) : null}
           {!history?.unavailable && importTaskContent ? <div className="mb-6 space-y-3" data-testid="erp-ai-chat-import-tasks">{importTaskContent}</div> : null}
-            {messages.length === 0 ? (
+          {messages.length === 0 && !pending ? (
               history?.loading || history?.error || readOnly ? null : <div className={cn("flex flex-col justify-center", docked ? "py-8" : "min-h-[48vh] py-12")}>
                 <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                   <span className="inline-block size-1.5 rounded-full bg-primary" aria-hidden="true" />
@@ -1011,7 +1108,12 @@ function AIChatConversation({
               </div>
             ) : (
               <div className="space-y-6 pb-2">
-                {messages.map((message) => (
+                {messages.map((message) => {
+                  const inFlightId = streamingTurnId ?? (turnProjection?.settled === false ? turnProjection.id : null)
+                  const streaming = message.role === "assistant" && inFlightId !== null
+                    && message.id === `${inFlightId}:assistant`
+                  const provisional = streaming || message.stopped === true
+                  return (
                   <div
                     key={message.id}
                     data-chat-message-id={message.id}
@@ -1025,28 +1127,43 @@ function AIChatConversation({
                     
                     <div className={cn(
                       "flex min-w-0 flex-col gap-2",
-                      message.role === "user" ? "items-end max-w-[90%]" : "items-start w-full"
+                        message.role === "user" ? "items-end max-w-[90%]" : "items-start w-full"
                     )}>
                       <div className={cn(
                         "max-w-full min-w-0 break-words text-sm leading-6",
                         message.role === "user"
                           ? "rounded-2xl rounded-br-md border border-border/50 bg-card px-4 py-2.5 text-foreground"
-                          : "text-foreground"
+                          : "w-full max-w-[72ch] text-foreground"
                       )}>
-                        {message.content ? <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.content}</p> : null}
+                        {message.content ? (
+                          message.role === "assistant" && !provisional
+                            ? <ChatAnswerMarkdown content={message.content} />
+                            : <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.content}</p>
+                        ) : null}
+                        {message.stopped ? (
+                          <p role="status" className="mt-2 text-xs font-medium text-muted-foreground">
+                            {message.content
+                              ? t("aiChat.progress.partial", { defaultValue: "Reply stopped. Partial reply only." })
+                              : t("aiChat.progress.stopped", { defaultValue: "Reply stopped." })}
+                          </p>
+                        ) : null}
                         {message.metadata?.historyTruncated ? (
                           <p className="text-sm text-muted-foreground">{t("aiChat.history.messageTruncated", {
                             defaultValue: "Part of this saved message exceeds the history display limit.",
                           })}</p>
                         ) : null}
                       </div>
-                      {message.role === "assistant" && message.recoveryPath === "/ai-skills" && (
+                      {message.role === "assistant" && !provisional && message.recoveryPath === "/ai-skills" && (
                         <a className="text-sm font-medium text-primary underline underline-offset-4" href={message.recoveryPath}>
                           {t("aiSkills.title")}
                         </a>
                       )}
-                      {message.role === "assistant" ? message.importTasks?.map(status => <ImportTaskStatusCard key={status.taskId} status={status} companyId={context?.companyId} />) : null}
-                      {message.role === "assistant" && config?.onOpenGuide ? <>
+                      {message.role === "assistant" && !provisional ? (
+                        message.importTaskIds?.length && renderImportTask
+                          ? message.importTaskIds.map(taskId => <Fragment key={taskId}>{renderImportTask(taskId)}</Fragment>)
+                          : message.importTasks?.map(status => <ImportTaskStatusCard key={status.taskId} status={status} companyId={context?.companyId} />)
+                      ) : null}
+                      {message.role === "assistant" && !provisional && config?.onOpenGuide ? <>
                         {message.guides?.map((reference) => <AssistantGuideCard key={`${reference.guideId}:${reference.revision}`} title={reference.title ?? t("aiChat.guide.savedGuide", { defaultValue: "Saved ERP guide" })} module={reference.module} revision={reference.revision} onOpen={() => void handleOpenGuide({ messageId: message.id, reference })} />)}
                         {!isLoading && message.content.trim().length >= 240 && context?.companyId ? <AssistantGuideCard title={message.content.split("\n").find((line) => line.trim())?.replace(/^#{1,6}\s*/, "").replace(/\*\*/g, "").slice(0, 100) ?? t("aiChat.guide.newGuide", { defaultValue: "ERP guidance" })} module={context.module ?? context.activeView} onOpen={() => void handleOpenGuide({ messageId: message.id, draft: {
                           draftKey: `message:${message.id}`,
@@ -1061,10 +1178,13 @@ function AIChatConversation({
                           runId: message.metadata?.runId != null ? String(message.metadata.runId) : undefined,
                         } })} /> : null}
                       </> : null}
-                      {message.role === "assistant" && message.sources != null && message.sources.length > 0 && (
-                        <div className="mt-2 w-full max-w-full rounded-lg border border-border bg-card p-3 text-xs leading-5 text-muted-foreground">
-                          <div className="font-medium text-foreground/80 mb-0.5">{t("aiChat.sources")}</div>
-                          <ul className="space-y-0.5 list-disc list-inside">
+                      {message.role === "assistant" && !provisional && message.sources != null && message.sources.length > 0 && (
+                        <details className="group w-full max-w-full text-xs leading-5 text-muted-foreground">
+                          <summary className="inline-flex min-h-9 cursor-pointer list-none items-center gap-1.5 rounded-md px-1 font-medium text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+                            <ChevronRight aria-hidden="true" className="size-3.5 transition-transform group-open:rotate-90" />
+                            {t("aiChat.sources")} <span className="text-muted-foreground">{message.sources.length}</span>
+                          </summary>
+                          <ul className="space-y-2 rounded-lg border border-border bg-card p-3">
                             {(message.sources as ChatMessageSourceRef[]).map((src, i) => {
                               const scope = src.entity_type ?? src.source_kind ?? "ref"
                               const idLabel =
@@ -1089,7 +1209,7 @@ function AIChatConversation({
                               const canCite = config?.onCiteSource != null && src.kind === "passage" && src.passage_id != null
                               const status = citeStatus[sourceKey]
                               return (
-                                <li key={sourceKey} className="break-all">
+                                <li key={sourceKey} className="[overflow-wrap:anywhere]">
                                   <span
                                     className={cn(
                                       "mr-1 inline-flex rounded px-1 py-px text-[11px] font-medium uppercase tracking-wide",
@@ -1154,12 +1274,12 @@ function AIChatConversation({
                               )
                             })}
                           </ul>
-                        </div>
+                        </details>
                       )}
-                      {message.role === "assistant" && message.actions != null && message.actions.length > 0 && (
+                      {message.role === "assistant" && !provisional && message.actions != null && message.actions.length > 0 && (
                         <div className="mt-2 w-full min-w-0 space-y-3">
-                          {message.actions.map((action) =>
-                            action.type === "draft" && action.draft ? (
+                          {message.actions.map((action) => {
+                            if (action.type === "draft" && action.draft) return (
                               <AiActionDraftCard
                                 key={action.id}
                                 draft={action.draft}
@@ -1175,20 +1295,41 @@ function AIChatConversation({
                                 }
                                 onRefresh={config?.onRefreshActionDraft ? handleRefreshDraft : undefined}
                               />
-                            ) : action.type === "native" && action.nativeAction ? (
-                              <AiNativeActionCard key={action.id} action={action.nativeAction} label={action.label} onOpen={config?.onNativeAction ? (nativeAction) => config.onNativeAction?.(nativeAction, message.id) : undefined} />
-                            ) : null,
-                          )}
+                            )
+                            if (action.type !== "native" || !action.nativeAction) return null
+                            const key = JSON.stringify([message.metadata?.turnId ?? message.id, action.id, action.nativeAction])
+                            return (
+                              <AiNativeActionCard
+                                key={key}
+                                action={action.nativeAction}
+                                label={action.label}
+                                onOpen={config?.onNativeAction ? (nativeAction) => config.onNativeAction?.(nativeAction, message.id) : undefined}
+                                presentation={{
+                                  state: nativePresentation.get(key),
+                                  onChange: state => setNativePresentation(previous => {
+                                    const next = new Map(previous)
+                                    next.delete(key)
+                                    if (state) next.set(key, state)
+                                    const oldest = next.keys().next().value
+                                    if (next.size > 50 && oldest !== undefined) next.delete(oldest)
+                                    return next
+                                  }),
+                                }}
+                              />
+                            )
+                          })}
                         </div>
                       )}
-                      <div className="flex flex-wrap items-center gap-3 pt-1">
+                      {!provisional ? <div className="flex flex-wrap items-center gap-3 pt-1">
                         <span className="text-[11px] text-muted-foreground">
                           {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </span>
-                        {message.role === "assistant" && (
+                        {message.role === "assistant" && message.content && (
                           <button
-                            onClick={() => handleCopy(message.content, message.id)}
-                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            type="button"
+                            onClick={() => void handleCopy(message.content, message.id)}
+                            className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring transition-colors pointer-coarse:size-11"
+                            aria-label="Copy answer"
                             title="Copy answer"
                           >
                             {copiedId === message.id ? (
@@ -1198,11 +1339,11 @@ function AIChatConversation({
                             )}
                           </button>
                         )}
-                        {message.role === "assistant" && !readOnly && (
+                        {message.role === "assistant" && message.content && !readOnly && (
                           <button
                             type="button"
                             onClick={() => handleUseAnswerInForm(message.content)}
-                            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                            className="inline-flex min-h-8 items-center rounded-md px-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring transition-colors pointer-coarse:min-h-11"
                           >
                             Use in form
                           </button>
@@ -1210,7 +1351,7 @@ function AIChatConversation({
                         {message.role === "assistant" && message.metadata?.runId != null ? (
                           <a
                             href={`/ai-harness?runId=${message.metadata.runId}${message.metadata.companyId ? `&companyId=${message.metadata.companyId}` : ""}`}
-                            className="text-[11px] text-primary hover:underline"
+                            className="inline-flex min-h-8 items-center text-xs text-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-ring pointer-coarse:min-h-11"
                           >
                             Inspect run
                           </a>
@@ -1221,20 +1362,25 @@ function AIChatConversation({
                             {message.metadata.tokens}t
                           </span>
                         ) : null}
-                      </div>
+                      </div> : null}
                     </div>
                   </div>
-                ))}
-                {(isLoading || sendPending) && (
-                  <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground" role="status">
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                    {t("aiChat.thinking")}
-                  </div>
+                )})}
+                {pending && (
+                  <ChatReplyProgress progress={turnProgress} stopping={stopping} />
                 )}
               </div>
             )}
           </div>
         </ScrollArea>
+        {showJumpToLatest && !historyOpen ? (
+          <div className="relative -mt-10 mb-1 flex h-9 shrink-0 justify-center">
+            <Button type="button" variant="outline" size="sm" className="pointer-events-auto gap-1.5 bg-background" onClick={jumpToLatest}>
+              <ArrowDown className="size-3.5" aria-hidden="true" />
+              {t("aiChat.progress.jumpToLatest", { defaultValue: "Jump to latest" })}
+            </Button>
+          </div>
+        ) : null}
         {readOnly ? (
           history?.archived ? <p className="shrink-0 border-t px-4 py-3 text-sm text-muted-foreground">{t("aiChat.history.restoreToContinue", { defaultValue: "Restore this conversation to continue." })}</p> : null
         ) : <div className="relative shrink-0 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
@@ -1289,7 +1435,7 @@ function AIChatConversation({
               </div>
             </div>
           )}
-        <div className="mx-auto w-full max-w-[820px] px-4">
+        <div className="mx-auto w-full max-w-[768px] px-4 sm:px-6">
           <div id={skillsId} hidden={!showSkills} className="max-h-[30dvh] overflow-y-auto">
             <ActionSkillList className="mb-3" items={skills.map(skill => ({ ...skill, icon: iconMap[skill.icon ?? ""] ?? <Sparkles className="size-4" /> }))}
               selectedIds={selectedSkillIds} activeId={focusedSkillId} matchingIds={slash ? matchingSkills.map(skill => skill.id) : undefined}
@@ -1318,9 +1464,42 @@ function AIChatConversation({
           ) : null}
           {fileImportError ? <p role="alert" className="mx-auto mb-2 max-w-[790px] break-words text-sm text-destructive">{fileImportError}</p> : null}
           {fileImportBusy ? <p role="status" className="mx-auto mb-2 flex max-w-[790px] items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" aria-hidden="true" />{t("aiChat.import.savingAttachments", { defaultValue: "Saving attachments…" })}</p> : null}
-          {config?.enableFileUpload && importCompanyLabel ? <p className="mx-auto mb-2 max-w-[790px] truncate text-xs text-muted-foreground" title={importCompanyLabel}>{t("aiChat.import.destination", { defaultValue: "Import into {{company}}", company: importCompanyLabel })}</p> : null}
           {composerContext}
-          <div className="mx-auto w-full max-w-[790px] rounded-2xl border border-border/50 bg-muted/60 p-2 transition-colors focus-within:border-ring">
+          <div className="w-full rounded-2xl border border-border bg-muted/40 p-2 transition-colors focus-within:border-ring">
+            {moduleLabel || importCompanyLabel || selectionSummary || focusedFileNames ? (
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 px-2 pt-1 text-xs text-muted-foreground"
+                data-testid="assistant-composer-scope">
+                {importCompanyLabel ? (
+                  <span className="inline-flex min-w-0 max-w-full items-center gap-1.5" title={importCompanyLabel}>
+                    <Building2 className="size-3.5 shrink-0" aria-hidden="true" />
+                    <span className="truncate font-medium text-foreground">{importCompanyLabel}</span>
+                  </span>
+                ) : null}
+                {moduleLabel ? (
+                  <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
+                    <Layers3 className="size-3.5 shrink-0" aria-hidden="true" />
+                    <span className="truncate capitalize">{moduleLabel}{activeViewLabel ? ` · ${activeViewLabel}` : ""}</span>
+                  </span>
+                ) : null}
+                {selectionSummary ? (
+                  <ChatScopeChip
+                    label={selectionSummary}
+                    icon={<CheckSquare className="size-3 shrink-0" aria-hidden="true" />}
+                    clearLabel={t("aiChat.workspace.clearSelection", { defaultValue: "Remove selected record from chat" })}
+                    onClear={onClearSelection && (() => { onClearSelection(); inputRef.current?.focus() })}
+                  />
+                ) : null}
+                {focusedFileNames ? (
+                  <ChatScopeChip
+                    label={focusedFileNames.length === 1 ? focusedFileNames[0]! : t("aiChat.workspace.focusedFiles", { defaultValue: "{{count}} files in this message", count: focusedFileNames.length })}
+                    title={focusedFileNames.join(", ")}
+                    icon={<Paperclip className="size-3 shrink-0" aria-hidden="true" />}
+                    clearLabel={t("aiChat.workspace.clearFiles", { defaultValue: "Remove files from this message" })}
+                    onClear={onClearImportFocus && (() => { onClearImportFocus(); inputRef.current?.focus() })}
+                  />
+                ) : null}
+              </div>
+            ) : null}
             <Textarea
               variant="plain"
               ref={inputRef}
@@ -1332,31 +1511,38 @@ function AIChatConversation({
               placeholder={config?.placeholder || t("aiChat.placeholder")}
               rows={2}
               aria-label="Message Lumière assistant"
-              className="block field-sizing-fixed min-h-[58px] max-h-[180px] w-full resize-none rounded-none border-0 bg-transparent px-3 pt-2 text-sm leading-6 text-foreground shadow-none placeholder:text-muted-foreground focus:outline-none focus-visible:ring-0 dark:bg-transparent"
+              className="block field-sizing-content min-h-[50px] max-h-[180px] w-full resize-none rounded-none border-0 bg-transparent px-2 pt-2 text-sm leading-6 text-foreground shadow-none placeholder:text-muted-foreground focus:outline-none focus-visible:ring-0 dark:bg-transparent"
             />
-            <div className="flex min-h-10 flex-wrap items-center justify-between gap-2 pl-2">
-              <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span><kbd className="rounded bg-muted px-1 py-0.5">/</kbd> {t("aiChat.deck.skills")} · <kbd className="rounded bg-muted px-1 py-0.5">@</kbd> {t("aiChat.hints.cmds")}</span>
-                {selectionSummary ? (
-                  <Badge variant="outline" className="max-w-[180px] truncate text-[10px]" title={t("aiChat.selectionContext")}>
-                    <CheckSquare className="mr-1 size-3 shrink-0" aria-hidden="true" />
-                    <span className="truncate">{selectionSummary}</span>
-                  </Badge>
-                ) : null}
-              </div>
-              <Button
-                size="icon"
-                data-testid="erp-ai-chat-send"
-                onClick={handleSend}
-                disabled={(!input.trim() && selectedSkills.length === 0) || isLoading || sendPending || history?.loading || slash !== null}
-                className="size-9 shrink-0 rounded-xl"
-                aria-label="Send message"
-              >
-                {isLoading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-              </Button>
+            <div className="flex min-h-10 items-center justify-between gap-2 ps-2">
+              <span className="min-w-0 text-xs text-muted-foreground">
+                <kbd className="rounded bg-muted px-1 py-0.5">/</kbd> {t("aiChat.deck.skills")} · <kbd className="rounded bg-muted px-1 py-0.5">@</kbd> {t("aiChat.hints.cmds")}
+              </span>
+              {canStopReply || stopping ? (
+                <Button type="button" size="icon" variant="outline"
+                  data-testid="erp-ai-chat-stop"
+                  className="size-9 shrink-0 rounded-xl pointer-coarse:size-11"
+                  disabled={stopping}
+                  aria-label={t("aiChat.progress.stop", { defaultValue: "Stop reply" })}
+                  title={t("aiChat.progress.stop", { defaultValue: "Stop reply" })}
+                  onClick={() => { setStopping(true); onStopReply?.(); inputRef.current?.focus() }}>
+                  <Square className="size-3.5 fill-current" aria-hidden="true" />
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="icon"
+                  data-testid="erp-ai-chat-send"
+                  onClick={handleSend}
+                  disabled={(!input.trim() && selectedSkills.length === 0) || pending || history?.loading || slash !== null}
+                  className="size-9 shrink-0 rounded-xl pointer-coarse:size-11"
+                  aria-label="Send message"
+                >
+                  {pending ? <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" /> : <Send className="size-4" aria-hidden="true" />}
+                </Button>
+              )}
             </div>
           </div>
-          <div className="mx-2 flex max-w-[790px] flex-wrap items-center gap-1 rounded-b-xl bg-muted/60 px-2 py-1">
+          <div className="flex flex-wrap items-center gap-1 py-1">
           {agentOptions && agentOptions.length > 0 && onAgentChange ? (
             <div className="flex min-w-0 items-center gap-1">
               <User className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -1432,9 +1618,6 @@ function AIChatConversation({
             </Button>
           {config?.guideLibraryHref && safeGuideHref(config.guideLibraryHref) ? <a href={safeGuideHref(config.guideLibraryHref)} className="flex min-h-8 items-center gap-2 text-xs text-primary hover:underline"><BookOpen className="size-3.5" aria-hidden="true" />{t("aiChat.guide.library", { defaultValue: "Saved guides" })}</a> : null}
           </div>
-          <p className="mx-auto mt-2 max-w-[790px] text-center text-[11px] text-muted-foreground">
-            Suggested actions require review. Lumière checks your current permissions.
-          </p>
         </div>
         </div>}
       </div>
@@ -1470,4 +1653,43 @@ function ChatFileNames({ names }: { names?: readonly string[] }) {
       {names.map((name, index) => <li className="min-w-0" key={index}><FileIdentity fileName={name} /></li>)}
     </ul>
   ) : <p className="text-xs text-muted-foreground">{t("aiChat.workspace.noFiles")}</p>
+}
+
+function ChatReplyProgress({ progress, stopping }: { progress: AIChatPanelProps["turnProgress"]; stopping: boolean }) {
+  const { t } = useTranslation()
+  const labels = {
+    sending: t("aiChat.progress.sending", { defaultValue: "Sending message…" }),
+    answering: t("aiChat.progress.answering", { defaultValue: "Writing reply…" }),
+    preparing_draft: t("aiChat.progress.preparingDraft", { defaultValue: "Preparing a draft for review…" }),
+    saving_reply: t("aiChat.progress.savingReply", { defaultValue: "Saving reply to history…" }),
+    stopping: t("aiChat.progress.stopping", { defaultValue: "Stopping reply…" }),
+  }
+  return (
+    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground" role="status">
+      <Loader2 className="size-3.5 motion-safe:animate-spin" aria-hidden="true" />
+      {labels[stopping ? "stopping" : progress ?? "sending"]}
+    </div>
+  )
+}
+
+function ChatScopeChip({ label, title = label, icon, clearLabel, onClear }: {
+  label: string
+  title?: string
+  icon: React.ReactNode
+  clearLabel: string
+  onClear?: () => void
+}) {
+  return (
+    <Badge variant="outline" className="h-auto min-w-0 max-w-full gap-1 truncate px-1.5 py-0 text-xs" title={title}>
+      {icon}
+      <span className="truncate">{label}</span>
+      {onClear ? (
+        <button type="button"
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring pointer-coarse:size-9"
+          aria-label={clearLabel} onClick={onClear}>
+          <X className="size-3.5" aria-hidden="true" />
+        </button>
+      ) : null}
+    </Badge>
+  )
 }

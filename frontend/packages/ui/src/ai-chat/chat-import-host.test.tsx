@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest"
 import type { ReactNode } from "react"
@@ -24,6 +25,14 @@ function Harness({ companyId = 3 }: { companyId?: number }) {
   controls.latest = imports
   return <>{imports.content}<button disabled={!imports.onImportFiles} onClick={() => void imports.onImportFiles?.([])}>Submit files</button></>
 }
+function renderHost() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  )
+  return render(<Harness />, { wrapper })
+}
+
 function task(id = "a", status: ChatImportTask["status"] = "needs_review"): ChatImportTask {
   return { requestId: id.repeat(32), companyId: "3", conversationKey: "conversation", status, createdAt: "2026-11-01T12:00:00Z", warnings: [], error: null,
     decision: { id: `${id.repeat(32)}:purpose`, revision: 2, status: "approved", question: "What should I do with these files?", options: [{ id: "prepare_import", label: "Prepare an import" }, { id: "inspect_only", label: "Inspect only" }], allowOther: true, selectedOptionId: "prepare_import", otherText: null, decisionId: "d".repeat(32) }, decisionReceipt: null, decisionHistory: [],
@@ -60,7 +69,7 @@ afterEach(cleanup)
 it("ignores a delayed A submission after an A→B→A roundtrip and newer access denial", async () => {
   const waiting = deferred<ChatImportTask>()
   controls.submit.mockReturnValue(waiting.promise)
-  const view = render(<Harness />)
+  const view = renderHost()
   await waitFor(() => expect(controls.latest?.onImportFiles).toBeTypeOf("function"))
   let completion!: Promise<void>
   act(() => { completion = controls.latest!.onImportFiles!([]) })
@@ -79,7 +88,7 @@ it("ignores a delayed A submission after an A→B→A roundtrip and newer access
 it("an old submission's finally cannot clear the newer A operation's busy state", async () => {
   const old = deferred<ChatImportTask>(), current = deferred<ChatImportTask>()
   controls.submit.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise)
-  const view = render(<Harness />)
+  const view = renderHost()
   await waitFor(() => expect(controls.latest?.onImportFiles).toBeTypeOf("function"))
   let oldCompletion!: Promise<void>, newCompletion!: Promise<void>
   act(() => { oldCompletion = controls.latest!.onImportFiles!([]) })
@@ -93,14 +102,14 @@ it("an old submission's finally cannot clear the newer A operation's busy state"
   expect(screen.getByRole("status").textContent).toContain("Saving files")
   await act(async () => { current.resolve(task("b")); await newCompletion })
   expect(screen.getByRole("link", { name: "Download b.csv" })).toBeTruthy()
-  expect(screen.queryByRole("status")).toBeNull()
+  expect(screen.queryByText("Saving files", { exact: false })).toBeNull()
 })
 
 it("ignores a delayed resume after returning to A with access denied", async () => {
   const waiting = deferred<Response>()
   controls.list.mockResolvedValueOnce([task("a", "saved")]).mockResolvedValue([])
   controls.fetch.mockReturnValue(waiting.promise)
-  const view = render(<Harness />)
+  const view = renderHost()
   fireEvent.click(await screen.findByRole("button", { name: "Resume preparation" }))
   view.rerender(<Harness companyId={4} />)
   await waitFor(() => expect(controls.latest?.onImportFiles).toBeTypeOf("function"))
@@ -115,8 +124,11 @@ it("ignores a delayed resume after returning to A with access denied", async () 
 
 it("restores an unselected saved question and waits for explicit approval before processing", async () => {
   controls.list.mockResolvedValue([pendingTask()])
-  controls.fetch.mockImplementation(async (_url, init) => new Response(JSON.stringify(acknowledged(JSON.parse(String(init.body))))))
-  render(<Harness />)
+  controls.fetch.mockImplementation(async (_url, init) => {
+    if (init?.method !== "POST") return new Response(null, { status: 404 })
+    return new Response(JSON.stringify(acknowledged(JSON.parse(String(init.body)))))
+  })
+  renderHost()
   await screen.findByRole("radiogroup", { name: "What should I do with these files?" })
   expect(screen.getByRole("button", { name: "Submit answer" })).toHaveProperty("disabled", true)
   for (const radio of screen.getAllByRole("radio")) expect(radio.getAttribute("aria-checked")).toBe("false")
@@ -125,8 +137,9 @@ it("restores an unselected saved question and waits for explicit approval before
   expect(controls.fetch).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole("button", { name: "Approve preparation" }))
   await screen.findByText("You approved import preparation. Creating business records still requires a separate review and confirmation.")
-  expect(controls.fetch).toHaveBeenCalledOnce()
-  const [url, init] = controls.fetch.mock.calls[0]
+  const writes = controls.fetch.mock.calls.filter(([, init]) => init?.method === "POST")
+  expect(writes).toHaveLength(1)
+  const [url, init] = writes[0]!
   expect(url).toBe(`/api/import-tasks/${"a".repeat(32)}/decision`)
   expect(JSON.parse(init.body)).toMatchObject({ expectedRevision: 1, optionId: "prepare_import", companyId: 3 })
   expect(screen.queryByRole("radiogroup")).toBeNull()
@@ -135,7 +148,7 @@ it("restores an unselected saved question and waits for explicit approval before
 it("Other saves instructions and renders a new unselected question without starting preparation", async () => {
   controls.list.mockResolvedValue([pendingTask()])
   controls.fetch.mockImplementation(async (_url, init) => new Response(JSON.stringify(acknowledged(JSON.parse(String(init.body))))))
-  render(<Harness />)
+  renderHost()
   fireEvent.click(await screen.findByRole("radio", { name: "Other" }))
   fireEvent.change(screen.getByRole("textbox", { name: "Tell us what you want to do" }), { target: { value: "Keep these as historical evidence only." } })
   expect(controls.fetch).not.toHaveBeenCalled()
@@ -157,7 +170,7 @@ it("refresh recovers a lost decision receipt without automatically approving aga
     if (init?.method === "POST") { posts++; approved = acknowledged(JSON.parse(String(init.body))); throw new Error("lost approval reply") }
     return new Response(null, { status: 404 })
   })
-  const view = render(<Harness />)
+  const view = renderHost()
   fireEvent.click(await screen.findByRole("radio", { name: "Prepare an import" }))
   fireEvent.click(screen.getByRole("button", { name: "Approve preparation" }))
   await screen.findByText(/The decision result is uncertain/)
@@ -167,7 +180,7 @@ it("refresh recovers a lost decision receipt without automatically approving aga
     expect(url).toContain(`decisionId=${approved!.decision.decisionId}`)
     return new Response(JSON.stringify(approved))
   })
-  render(<Harness />)
+  renderHost()
   await screen.findByText("You approved import preparation. Creating business records still requires a separate review and confirmation.")
   expect(posts).toBe(1)
   expect(screen.queryByRole("radiogroup")).toBeNull()
@@ -178,7 +191,7 @@ it("a delayed approval cannot republish a task after a scope roundtrip and revok
   const waiting = deferred<Response>()
   let approved!: ChatImportTask
   controls.fetch.mockImplementation((_url, init) => { approved = acknowledged(JSON.parse(String(init.body))); return waiting.promise })
-  const view = render(<Harness />)
+  const view = renderHost()
   fireEvent.click(await screen.findByRole("radio", { name: "Inspect only" }))
   fireEvent.click(screen.getByRole("button", { name: "Approve inspection" }))
   view.rerender(<Harness companyId={4} />)
@@ -201,7 +214,7 @@ it("shows the exact saved answer and instructions before an explicit approval re
   controls.fetch.mockImplementation(async (_url, init) => init?.method === "POST"
     ? new Response(JSON.stringify(acknowledged(JSON.parse(String(init.body)))))
     : new Response(null, { status: 404 }))
-  render(<Harness />)
+  renderHost()
   await screen.findByText("Saved answer: Other")
   expect(screen.getByText(savedAnswer.otherText)).toBeTruthy()
   expect(screen.queryByRole("radiogroup")).toBeNull()

@@ -147,6 +147,11 @@ test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unaut
       }
       expect(await fetchOrderPickings(page, orderId, companyId)).toEqual([])
 
+      const exactApprovalHref = `/approvals?taskId=${taskId}&taskCompany=${companyId}`
+      await page.goto(exactApprovalHref)
+      await expect(page.getByTestId(`approval-card-${taskId}`)).toBeVisible({ timeout: 30_000 })
+      await expect(page.getByTestId("module-view-approvals").locator('[data-testid^="approval-card-"]')).toHaveCount(1)
+
       await gotoApprovals(page)
       await expect(page.getByTestId(`approval-card-${taskId}`)).toBeVisible({
         timeout: 30_000,
@@ -166,6 +171,9 @@ test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unaut
 
       await expect.poll(() => fetchOrderPickings(page, orderId, companyId), { timeout: 30_000 }).toHaveLength(1)
       expect(await exactActiveApprovalTaskIds(page, orderId, companyId)).toEqual([])
+      await page.goto(exactApprovalHref)
+      await expect(page.getByTestId(`approval-card-${taskId}`)).toContainText("Approved", { timeout: 30_000 })
+      await expect(page.getByTestId(`approval-approve-${taskId}`)).toHaveCount(0)
       const stale = await confirmRequest(requester, companyId, orderId)
       expect(stale.status()).toBe(422)
       expect(await fetchOrderPickings(page, orderId, companyId)).toHaveLength(1)

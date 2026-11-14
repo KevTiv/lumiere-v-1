@@ -514,7 +514,7 @@ async function main() {
     })
     assert.ok(
       ["ai_default_agent_not_provisioned", "ai_surface_skill_not_provisioned"].includes(result.value?.code),
-      "The isolated Gateway must reach its model setup boundary after building context",
+      `The isolated Gateway must reach its model setup boundary after building context. ${path} returned ${result.status} (${result.value?.code ?? "no error code"}).`,
     )
     const checkpoint = (await getContext(env, admin, companyId, sessionKey)).value
     assert.ok(checkpoint.revision >= previousRevision + 2, "Both the Gateway path and the direct probe must advance the checkpoint")

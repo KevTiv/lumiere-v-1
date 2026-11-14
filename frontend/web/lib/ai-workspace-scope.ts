@@ -1,4 +1,5 @@
 import type { AiEntitySelection } from "@lumiere/query-hooks/ai-ui-context"
+import { isWorkspaceSurfaceVisible, type WorkspaceProfile } from "@lumiere/ui/lib/workspace-profile"
 
 /** Scope changes are presentation/retrieval hints, never permission grants. */
 export interface AiWorkspaceScopeOption {
@@ -24,13 +25,28 @@ export const AI_WORKSPACE_SCOPES: readonly AiWorkspaceScopeOption[] = [
   { value: "module:expenses", label: "Expenses", group: "Modules", pathname: "/expenses" },
   { value: "module:subscriptions", label: "Subscriptions", group: "Modules", pathname: "/subscriptions" },
   { value: "module:reports", label: "Reports", group: "Modules", pathname: "/reports", commands: ["reports"] },
+  { value: "module:products", label: "Products", group: "Modules", pathname: "/products", commands: ["inventory"] },
+  { value: "module:warehouse", label: "Warehouse", group: "Modules", pathname: "/warehouse", commands: ["inventory"] },
+  { value: "module:fleet", label: "Fleet", group: "Modules", pathname: "/fleet" },
+  { value: "module:overview", label: "Overview", group: "Modules", pathname: "/overview" },
+  { value: "module:tasks", label: "My work", group: "Modules", pathname: "/tasks" },
+  { value: "module:approvals", label: "Approvals", group: "Modules", pathname: "/approvals" },
   { value: "module:documents", label: "Documents", group: "Modules", pathname: "/documents", commands: ["docs"] },
+  { value: "module:calendar", label: "Calendar", group: "Modules", pathname: "/calendar" },
+  { value: "module:settings", label: "Settings", group: "Modules", pathname: "/settings" },
 ]
+
+export function aiWorkspaceScopesForProfile(profile: WorkspaceProfile): readonly AiWorkspaceScopeOption[] {
+  return AI_WORKSPACE_SCOPES.filter((option) =>
+    option.group !== "Modules" || isWorkspaceSurfaceVisible(profile, option.value.slice("module:".length)),
+  )
+}
 
 export function resolveAiWorkspaceScope(
   selected: string,
   currentPathname: string,
   selection: AiEntitySelection | null,
+  options: readonly AiWorkspaceScopeOption[] = AI_WORKSPACE_SCOPES,
 ): {
   label: string
   pathname: string
@@ -38,7 +54,7 @@ export function resolveAiWorkspaceScope(
   selection: AiEntitySelection | null
   usesCurrentPage: boolean
 } {
-  const option = AI_WORKSPACE_SCOPES.find((scope) => scope.value === selected) ?? AI_WORKSPACE_SCOPES[0]!
+  const option = options.find((scope) => scope.value === selected) ?? AI_WORKSPACE_SCOPES[0]!
   const usesCurrentPage = option.value === "current"
   return {
     label: option.label,

@@ -2,20 +2,46 @@
 
 import { useEffect, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { accountMoveBatchHref } from "@lumiere/erp-shared/record-links"
+import { Button, buttonVariants } from "../components/button"
+import { useCurrencyFormat } from "../lib/currency-context"
+import { AssistantActionCard } from "./assistant-action-card"
 import {
   importTaskStatusIsCurrent,
   IMPORT_TASK_STATUS_MAX_AGE_MS,
+  type ChatImportPostingStatus,
   type ChatImportTaskStatus,
 } from "../lib/import-task-status"
+
+function formatAmount(amount: string, locale?: string) {
+  const [integer, decimals] = amount.split(".")
+  const formatted = Intl.NumberFormat(locale, {
+    maximumFractionDigits: 0,
+  }).format(BigInt(integer!))
+  const separator =
+    Intl.NumberFormat(locale)
+      .formatToParts(1.1)
+      .find((part) => part.type === "decimal")?.value ?? "."
+  return formatted + (decimals ? separator + decimals : "")
+}
 
 export function ImportTaskStatusCard({
   status,
   companyId,
+  postingStatuses = [],
+  checking = false,
+  onOpen,
+  onRefresh,
 }: {
   status: ChatImportTaskStatus
   companyId?: number
+  postingStatuses?: ChatImportPostingStatus[]
+  checking?: boolean
+  onOpen?: (view: "sources" | "decisions" | "preview" | "results") => void
+  onRefresh?: () => void
 }) {
   const { t } = useTranslation()
+  const { codeFor, locale } = useCurrencyFormat()
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
     setNow(Date.now())
@@ -26,9 +52,68 @@ export function ImportTaskStatusCard({
     return () => clearTimeout(timer)
   }, [status.readAt])
   if (!importTaskStatusIsCurrent(status, companyId, now)) return null
-  const href = `/settings?section=imports&importTask=${status.taskId}&importCompany=${status.companyId}&importView=results#import-task`
   const nativeResults = status.nativeResults ?? []
   const shownNativeResults = nativeResults.slice(0, 3)
+  const verifiedProposals = status.proposals.filter(
+    (proposal) => proposal.verifiedResult,
+  )
+  const proposalSummary =
+    verifiedProposals.length === 1 ? verifiedProposals[0] : undefined
+  const result = proposalSummary?.verifiedResult
+  const recordIds = [
+    ...new Set(
+      verifiedProposals.flatMap(
+        (proposal) =>
+          proposal.verifiedResult?.records?.map((record) => record.id) ?? [],
+      ),
+    ),
+  ]
+  const hasBatchLink = recordIds.length > 0 && recordIds.length <= 200
+  const hasResults = status.proposals.length > 0 || nativeResults.length > 0
+  const view = hasResults
+    ? "results"
+    : status.preparationStatus === "needs_review"
+      ? "decisions"
+      : "sources"
+  const href = `/settings?section=imports&importTask=${status.taskId}&importCompany=${status.companyId}&importView=${view}#import-task`
+  const taskActionLabel =
+    hasResults || status.preparationStatus !== "needs_review"
+      ? t("settings.importTask.openTask", { defaultValue: "Open saved task" })
+      : t("settings.importTask.openSourceReview", {
+          defaultValue: "Review source rows",
+        })
+  const taskAction = onOpen ? (
+    <Button
+      size="sm"
+      variant="outline"
+      type="button"
+      onClick={() => onOpen(view)}
+    >
+      {taskActionLabel}
+    </Button>
+  ) : (
+    <a
+      href={href}
+      className={buttonVariants({ size: "sm", variant: "outline" })}
+    >
+      {taskActionLabel}
+    </a>
+  )
+  const current = postingStatuses.find(
+    (posting) => posting.proposalId === proposalSummary?.id,
+  )
+  const blocked = status.proposals.some((item) => item.status === "blocked")
+  const partial =
+    verifiedProposals.length > 0 &&
+    (status.sourceRows.held > 0 ||
+      status.sourceRows.excluded > 0 ||
+      Boolean(proposalSummary?.heldRecords))
+  const allPosted = Boolean(
+    current &&
+    current.postedCount === current.recordCount &&
+    current.recordCount,
+  )
+  const currency = result && codeFor(result.currencyId)
   const nativeEntities = {
     product: t("settings.importTask.nativeEntity.product", {
       defaultValue: "Products",
@@ -74,14 +159,102 @@ export function ImportTaskStatusCard({
       defaultValue: "Preparation needs attention",
     }),
   }
+  const nativeResult = nativeResults.length === 1 ? nativeResults[0] : undefined
+  const nativeLabel = nativeResult?.receipt
+    ? nativeStates[nativeResult.receipt.status]
+    : t("settings.importTask.cardNativePending", {
+        defaultValue: "Awaiting job receipt",
+      })
+  const title = result
+    ? allPosted
+      ? t("settings.importTask.cardPostedTitle", {
+          defaultValue: "{{count}} journal entries posted",
+          count: result.recordCount,
+        })
+      : t("settings.importTask.cardDraftTitle", {
+          defaultValue: "{{count}} journal drafts saved",
+          count: result.recordCount,
+        })
+    : verifiedProposals.length > 0
+      ? t("settings.importTask.cardAccountingTitle", {
+          defaultValue: "Accounting drafts",
+        })
+      : nativeResults.length === 1 && nativeResult
+        ? t("settings.importTask.cardNativeResultTitle", {
+            defaultValue: "{{entity}} import · {{state}}",
+            entity: nativeEntities[nativeResult.entity],
+            state: nativeLabel,
+          })
+        : nativeResults.length > 0
+          ? t("settings.importTask.cardNativeTitle", {
+              defaultValue: "Native import job receipts",
+            })
+          : stateLabels[status.preparationStatus]
+  const summary =
+    result && currency
+      ? t("settings.importTask.cardDraftTotals", {
+          defaultValue: "{{currency}} {{amount}} · {{lines}} balanced lines",
+          currency,
+          amount: formatAmount(result.totalDebit, locale),
+          lines: result.lineCount,
+        })
+      : undefined
+  const executing = status.proposals.some(
+    (proposal) => proposal.status === "executing",
+  )
   return (
-    <section
-      className="w-full min-w-0 space-y-2 rounded-lg border bg-muted/20 p-3 text-sm"
-      aria-label={t("settings.importTask.cardTitle", {
+    <AssistantActionCard
+      title={title}
+      busy={checking}
+      ariaLabel={t("settings.importTask.cardTitle", {
         defaultValue: "Saved import status",
       })}
+      description={
+        status.fileNames?.length || summary ? (
+          <div className="space-y-1">
+            {status.fileNames?.length ? (
+              <p>{status.fileNames.join(", ")}</p>
+            ) : null}
+            {summary ? <p className="tabular-nums">{summary}</p> : null}
+          </div>
+        ) : undefined
+      }
+      status={
+        blocked || executing
+          ? {
+              label: blocked
+                ? t("settings.importTask.cardNeedsOutcome", {
+                    defaultValue: "Needs attention",
+                  })
+                : t("settings.importTask.cardExecutionStarted", {
+                    defaultValue: "Execution started",
+                  }),
+              tone: "warning",
+            }
+          : partial
+            ? {
+                label: t("settings.importTask.cardPartiallySaved", {
+                  defaultValue: "Partially saved",
+                }),
+                tone: "warning",
+              }
+            : undefined
+      }
+      primaryAction={
+        hasBatchLink && companyId ? (
+          <a
+            href={accountMoveBatchHref(recordIds, companyId)}
+            className={buttonVariants({ size: "sm" })}
+          >
+            {t("settings.importTask.cardOpenEntries", {
+              defaultValue: "View journal entries",
+            })}
+          </a>
+        ) : (
+          taskAction
+        )
+      }
     >
-      <h3 className="font-medium">{stateLabels[status.preparationStatus]}</h3>
       <p>
         {t("settings.importTask.cardSourceCounts", {
           defaultValue:
@@ -89,21 +262,16 @@ export function ImportTaskStatusCard({
           ...status.sourceRows,
         })}
       </p>
-      <p className="text-xs text-muted-foreground">
-        {t("settings.importTask.cardReceiptBoundary", {
-          defaultValue:
-            "Source confirmation does not create ERP records. Accounting draft readback and native job receipts are shown separately.",
-        })}
-      </p>
-      {!!status.proposals.length && (
-        <h4 className="font-medium">
-          {t("settings.importTask.cardAccountingTitle", {
-            defaultValue: "Accounting drafts",
+      {!result ? (
+        <p className="text-xs text-muted-foreground">
+          {t("settings.importTask.cardReceiptBoundary", {
+            defaultValue:
+              "Source confirmation does not create ERP records. Accounting draft readback and native job receipts are shown separately.",
           })}
-        </h4>
-      )}
+        </p>
+      ) : null}
       {status.proposals.map((proposal) => (
-        <div key={proposal.id} className="rounded-md border bg-background p-2">
+        <div key={proposal.id} className="space-y-1 border-t pt-2 text-sm">
           {proposal.verifiedResult ? (
             <>
               <p className="font-medium">
@@ -123,12 +291,66 @@ export function ImportTaskStatusCard({
                   currency: proposal.verifiedResult.currencyId,
                 })}
               </p>
-              <p className="text-xs text-muted-foreground">
-                {t("settings.importTask.cardUnposted", {
-                  defaultValue:
-                    "Created as unposted drafts. Open Accounting to check their current posting state.",
-                })}
-              </p>
+              {!postingStatuses.some(
+                (posting) => posting.proposalId === proposal.id,
+              ) ? (
+                <p className="text-xs text-muted-foreground">
+                  {t("settings.importTask.cardUnposted", {
+                    defaultValue:
+                      "Created as unposted drafts. Open Accounting to check their current posting state.",
+                  })}
+                </p>
+              ) : null}
+              {postingStatuses
+                .filter((posting) => posting.proposalId === proposal.id)
+                .map((posting) => (
+                  <p
+                    key={posting.proposalId}
+                    className="text-sm text-muted-foreground"
+                  >
+                    {t("settings.importTask.cardCurrentPosting", {
+                      defaultValue:
+                        "Current state · {{postedCount}} posted · {{draftCount}} draft · {{otherCount}} other · {{unavailableCount}} unavailable",
+                      ...posting,
+                    })}
+                  </p>
+                ))}
+              {proposal.verifiedResult.records?.length && companyId ? (
+                <details>
+                  <summary className="cursor-pointer text-sm text-muted-foreground">
+                    {t("settings.importTask.cardRecordLinks", {
+                      defaultValue: "Journal entry references",
+                    })}
+                  </summary>
+                  <ul className="space-y-1 py-2">
+                    {proposal.verifiedResult.records.map((record) => (
+                      <li key={record.id}>
+                        <a
+                          href={accountMoveBatchHref([record.id], companyId)}
+                          className="text-primary underline underline-offset-4"
+                        >
+                          {record.reference}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                  {!hasBatchLink ? (
+                    <a
+                      href={accountMoveBatchHref(
+                        proposal.verifiedResult.records.map(
+                          (record) => record.id,
+                        ),
+                        companyId,
+                      )}
+                      className="text-primary underline underline-offset-4"
+                    >
+                      {t("settings.importTask.cardOpenEntries", {
+                        defaultValue: "View journal entries",
+                      })}
+                    </a>
+                  ) : null}
+                </details>
+              ) : null}
               <p className="text-xs text-muted-foreground">
                 {t("settings.importTask.cardVerifiedAt", {
                   defaultValue: "ERP readback {{timestamp}}",
@@ -154,7 +376,7 @@ export function ImportTaskStatusCard({
           )}
         </div>
       ))}
-      {!status.proposalCount ? (
+      {!status.proposalCount && !nativeResults.length ? (
         <p>
           {t("settings.importTask.cardNoAccountingProposal", {
             defaultValue: "No saved Accounting draft proposal yet.",
@@ -188,10 +410,7 @@ export function ImportTaskStatusCard({
             })}
           </p>
           {shownNativeResults.map((result) => (
-            <div
-              key={result.requestId}
-              className="space-y-1 rounded-md border bg-background p-2"
-            >
+            <div key={result.requestId} className="space-y-1 border-t pt-2">
               <p className="font-medium">{nativeEntities[result.entity]}</p>
               {result.receipt ? (
                 <>
@@ -240,12 +459,28 @@ export function ImportTaskStatusCard({
           timestamp: new Date(status.readAt).toLocaleString(),
         })}
       </p>
-      <a
-        href={href}
-        className="inline-flex min-h-8 items-center font-medium underline underline-offset-4"
-      >
-        {t("settings.importTask.openTask", { defaultValue: "Open saved task" })}
-      </a>
-    </section>
+      {hasBatchLink || onRefresh ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {hasBatchLink ? taskAction : null}
+          {onRefresh ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={checking}
+              onClick={onRefresh}
+            >
+              {checking
+                ? t("aiChat.import.checkingOutcome", {
+                    defaultValue: "Checking saved import…",
+                  })
+                : t("settings.importTask.cardCheck", {
+                    defaultValue: "Check outcome",
+                  })}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+    </AssistantActionCard>
   )
 }

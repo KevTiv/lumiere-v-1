@@ -1,6 +1,6 @@
 /** Map RAG / activity source identifiers to in-app ERP routes (metadata only). */
 
-import { moduleTabHref } from "./record-links"
+import { fleetVehicleHref, moduleTabHref, reportWorkspaceHref } from "./record-links"
 import { parseStrictU64, type ScalarId } from "./u64"
 
 export type AiSourceLinkInput = {
@@ -18,6 +18,8 @@ type ModuleTabTarget = {
   navigationModule?: string
   /** Existing dedicated record page, where the module list is not a record view. */
   recordPrefix?: string
+  /** Existing native result view with its own record-selection contract. */
+  recordHref?: (recordId: string) => string
   /** Exact-record list when the normal destination is a custom, unfiltered view. */
   recordTab?: string
 }
@@ -58,9 +60,9 @@ const SOURCE_ROUTE_MAP: Record<string, SourceRouteTarget> = {
   hr_expense: { kind: "module_tab", module: "expenses", tab: "expenses" },
   expense: { kind: "module_tab", module: "expenses", tab: "expenses" },
   hr_expense_sheet: { kind: "module_tab", module: "expenses", tab: "expense-sheets", recordPrefix: "/expenses/reports" },
-  financial_report: { kind: "module_tab", module: "reports", tab: "reports" },
+  financial_report: { kind: "module_tab", module: "reports", tab: "reports", recordHref: (id) => reportWorkspaceHref("", id) },
   subscription: { kind: "module_tab", module: "subscriptions", tab: "subscriptions", recordPrefix: "/subscriptions" },
-  fleet_vehicle: { kind: "module_tab", module: "fleet", tab: "fleet-vehicles", recordPrefix: "/fleet/vehicles" },
+  fleet_vehicle: { kind: "module_tab", module: "fleet", tab: "fleet-vehicles", recordHref: fleetVehicleHref },
   calendar_event: { kind: "module_tab", module: "calendar", tab: "calendar", recordPrefix: "/calendar/events" },
   mrp_production: { kind: "module_tab", module: "manufacturing", tab: "orders" },
   purchase_order: { kind: "module_tab", module: "purchasing", tab: "orders" },
@@ -108,6 +110,7 @@ function resolveTarget(target: SourceRouteTarget, recordId?: string): string | u
     if (!recordId) return target.prefix
     return `${target.prefix}/${encodeURIComponent(recordId)}`
   }
+  if (recordId && target.recordHref) return target.recordHref(recordId)
   if (recordId && target.recordPrefix) return `${target.recordPrefix}/${recordId}`
   return moduleTabHref(
     target.navigationModule ?? target.module,

@@ -103,6 +103,41 @@ async fn read_request(
     Ok(Json(proposal.view()))
 }
 
+async fn read_posting_status(
+    State(state): State<Arc<AppState>>,
+    OrgSession { session, .. }: OrgSession,
+    Path((task, id)): Path<(String, i64)>,
+    Query(query): Query<Scope>,
+) -> Result<Json<Value>, ApiError> {
+    let context = scope(&state, &session, query.company_id).await?;
+    let access = Some(context.field_access());
+    if ["state", "move_type", "metadata"]
+        .into_iter()
+        .any(|field| !stdb_auth::has_resource_field_read_permission(access, "account-moves", field))
+    {
+        return Err(ApiError::NotFound(
+            "verified journal entry receipt not found".into(),
+        ));
+    }
+    let scoped = storage_scope(&context, query.company_id);
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let mut client = pool.get().await.map_err(ApiError::internal)?;
+    let tx = client.transaction().await.map_err(ApiError::internal)?;
+    storage::require_task(&tx, scoped, &task, false).await?;
+    let proposal = storage::read_proposal(&tx, scoped, &task, id, false).await?;
+    tx.commit().await.map_err(ApiError::internal)?;
+    let result = proposal
+        .result
+        .as_ref()
+        .filter(|_| proposal.state == "verified")
+        .ok_or_else(|| ApiError::NotFound("verified journal entry receipt not found".into()))?;
+    let mut status =
+        native::read_posting_status(&context, scoped, &task, &proposal, result).await?;
+    status["taskId"] = json!(task);
+    status["organizationId"] = json!(scoped.organization.to_string());
+    Ok(Json(status))
+}
+
 async fn approve(
     State(state): State<Arc<AppState>>,
     OrgSession { session, .. }: OrgSession,
@@ -360,6 +395,10 @@ pub(super) fn router() -> Router<Arc<AppState>> {
         .route(
             "/import-tasks/:task/workflow/proposals/:proposal/verify",
             post(verify),
+        )
+        .route(
+            "/import-tasks/:task/workflow/proposals/:proposal/posting-status",
+            get(read_posting_status),
         )
         .layer(DefaultBodyLimit::max(500_000))
 }

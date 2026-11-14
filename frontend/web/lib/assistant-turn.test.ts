@@ -125,6 +125,53 @@ test("the admitted SSE answer, sources and run identity require a terminal done 
   for (const crlf of [false, true]) assert.deepEqual(await readAssistantStream(sse(complete, crlf), metadata), { answer: "Admitted answer", sources: ["source"], run_id: 7 })
 })
 
+test("admitted answer text reaches chat before the stream completes", async () => {
+  const encoder = new TextEncoder()
+  const { readable, writable } = new TransformStream<Uint8Array>()
+  const writer = writable.getWriter()
+  const { promise: firstDelta, resolve: deliverDelta } = Promise.withResolvers<string>()
+  const deltas: string[] = []
+  let completed = false
+  const result = readAssistantStream(
+    new Response(readable, { headers: { "content-type": "text/event-stream" } }),
+    metadata,
+    (delta) => {
+      deltas.push(delta)
+      deliverDelta(delta)
+    },
+  ).then((reply) => {
+    completed = true
+    return reply
+  })
+
+  await writer.write(encoder.encode("event: delta\ndata: Admitted \n\n"))
+  assert.equal(await firstDelta, "Admitted ")
+  assert.equal(completed, false)
+  await writer.write(encoder.encode(complete.replace("Admitted answer", "answer")))
+  await writer.close()
+
+  assert.deepEqual(await result, { answer: "Admitted answer", sources: ["source"], run_id: 7 })
+  assert.deepEqual(deltas, ["Admitted ", "answer"])
+})
+
+test("visible provisional text does not verify an interrupted stream", async () => {
+  const deltas: string[] = []
+  const incomplete = complete.replace(/event: done[\s\S]*/, "")
+  await assert.rejects(
+    readAssistantStream(sse(incomplete), metadata, (delta) => deltas.push(delta)),
+    /ended before completion/,
+  )
+  assert.deepEqual(deltas, ["Admitted answer"])
+})
+
+test("multiple deltas in one network chunk reach chat as one update", async () => {
+  const deltas: string[] = []
+  const text = "event: delta\ndata: Admitted \n\n" + complete.replace("Admitted answer", "answer")
+  const result = await readAssistantStream(sse(text), metadata, (delta) => deltas.push(delta))
+  assert.deepEqual(deltas, ["Admitted answer"])
+  assert.equal(result.answer, "Admitted answer")
+})
+
 test("truncated, failed and malformed streams never become completed answers", async () => {
   for (const text of [complete.replace(/event: done[\s\S]*/, ""), 'event: done\ndata: {}\n\n', complete.replace('event: done', 'event: error'), complete.replace('{"sources":["source"],"run_id":7}', 'not json')]) {
     await assert.rejects(readAssistantStream(sse(text), metadata))

@@ -1,5 +1,7 @@
 'use client';
 
+import { AskAboutRecordButton } from '../../../../components/ask-about-record-button';
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useErpSession } from '@lumiere/erp-session';
 import Link from 'next/link';
@@ -255,7 +257,7 @@ function DocumentPageLoaded({
   const applyLegalHold = useApplyDocumentLegalHold(orgId);
   const releaseLegalHold = useReleaseDocumentLegalHold(orgId);
   const createSignatureRequest = useCreateDocumentSignatureRequest(orgId);
-  const { checkPermission } = useRBAC();
+  const { checkPermission, permissionsReady, currentUser } = useRBAC();
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const releaseNoteRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -568,6 +570,12 @@ function DocumentPageLoaded({
         }
         actions={
           <>
+            {!isDeleted && !documentsQuery.isError && permissionsReady === true
+              && session.activeCompanyReady && session.organizationId === organizationId
+              && Boolean(session.identity) && currentUser?.id === session.identity
+              && checkPermission('document', 'read').allowed ? (
+                <AskAboutRecordButton entityType="document" recordId={documentId} label={label} activeTab={activeTab} />
+              ) : null}
             {url ? (
               <Button
                 size="sm"

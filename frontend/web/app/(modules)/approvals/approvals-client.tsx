@@ -5,6 +5,7 @@ import { usePageCompositionActionSlot } from "@lumiere/ui/pages/page-composition
 import { OperationalPageComposition } from "../../../components/operational-page-composition"
 
 import { useEffect, useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import Link from "next/link"
@@ -32,8 +33,12 @@ import {
   resolveApprovalActor,
 } from "@lumiere/query-hooks/hooks/approval-controls"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { apiFetch } from "@lumiere/query-hooks/http"
+import { parseWorkBoardPage, workActionsForActor, workBoardQueryKey, workBoardQueryPath, type WorkBoardScope, type WorkTaskRow } from "@lumiere/query-hooks/hooks/work-board-model"
+import { AskAboutRecordButton } from "../../../components/ask-about-record-button"
+import { canReadWorkflowWork } from "../../../components/work-board/work-board-permissions"
 import { CheckCircle2, ExternalLink, Hand, Loader2, Sparkles, XCircle } from "lucide-react"
-import { approvalInboxTarget, approvalTaskMatchesTarget, approvalSubjectKind } from "./approval-inbox-view"
+import { approvalInboxTarget, approvalRequestTarget, approvalTaskMatchesTarget, approvalSubjectKind } from "./approval-inbox-view"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 import { ApprovalSourceDetails } from "./approval-source-details"
 import { approvalRequestedEffect } from "./approval-source-summary"
@@ -50,18 +55,45 @@ export function ApprovalsClient({ organizationId }: { organizationId?: number })
 function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
   const { t } = useTranslation()
   const searchParams = useSearchParams()
-  const { identity } = useErpSession()
-  const { checkPermission, permissionsReady } = useRBAC()
+  const session = useErpSession()
+  const { identity } = session
+  const { checkPermission, permissionsReady, currentUser, roles, policies } = useRBAC()
   const canReviewRules = permissionsReady === true && checkPermission("module:workflows", "read").allowed
   const operatingCompanyId = useOperatingCompanyId(organizationId)
   const { target: compositionTarget, slot: compositionSlot } = usePageCompositionActionSlot()
+  const exactRequested = searchParams.has("taskId") || searchParams.has("taskCompany")
+  const exactTaskId = approvalRequestTarget(searchParams.get("taskId"), searchParams.get("taskCompany"), operatingCompanyId)
+  const exactScopeReady = permissionsReady === true && canReadWorkflowWork(checkPermission) && session.activeCompanyReady === true
+    && session.organizationId === organizationId && currentUser?.id === identity
+    && Boolean(identity) && identity !== "unknown"
+  const exactScope: WorkBoardScope = {
+    organizationId,
+    companyId: operatingCompanyId ?? 0,
+    actorIdentity: identity ?? "",
+    authorizationKey: JSON.stringify({ currentUser, roles, policies }),
+    scope: "finance",
+    view: "eligible",
+  }
+  const exactQuery = useQuery({
+    queryKey: [...workBoardQueryKey(exactScope), "approval", exactTaskId],
+    enabled: exactTaskId !== null && exactScopeReady,
+    retry: false,
+    gcTime: 0,
+    refetchOnMount: "always",
+    queryFn: async ({ signal }) => {
+      const response = await apiFetch(`${workBoardQueryPath(exactScope)}&taskId=${exactTaskId}`, { cache: "no-store", signal })
+      if (response.status === 403 || response.status === 404) return []
+      if (!response.ok) throw new Error("Approval read failed")
+      return parseWorkBoardPage(await response.json(), exactScope).data.filter((row) => String(row.id) === exactTaskId)
+    },
+  })
   const inboxQuery = useHumanTaskInbox(
     organizationId,
     operatingCompanyId,
-    operatingCompanyId != null,
+    operatingCompanyId != null && !exactRequested,
   )
-  const claimTask = useClaimHumanTask(organizationId)
-  const decideTask = useDecideHumanTask(organizationId)
+  const claimTask = useClaimHumanTask(organizationId, exactRequested ? exactScope : undefined)
+  const decideTask = useDecideHumanTask(organizationId, exactRequested ? exactScope : undefined)
   const commentTask = useCommentHumanTask(organizationId)
 
   const [actionError, setActionError] = useState<string | null>(null)
@@ -77,7 +109,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
     setCommentingId(null)
     setCommentText("")
     setActingForByTask({})
-  }, [identity, organizationId, operatingCompanyId])
+  }, [identity, organizationId, operatingCompanyId, exactTaskId])
 
   const pendingTasks = useMemo(
     () =>
@@ -92,10 +124,11 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
     () => approvalInboxTarget(searchParams.get("model"), searchParams.get("resId")),
     [searchParams],
   )
-  const recordFilterRequested = searchParams.has("model") || searchParams.has("resId")
+  const recordFilterRequested = exactRequested || searchParams.has("model") || searchParams.has("resId")
+  const exactRows = exactTaskId && exactScopeReady && exactQuery.isSuccess ? exactQuery.data : undefined
   const visibleTasks = useMemo(
-    () => target ? pendingTasks.filter((row) => approvalTaskMatchesTarget(row, target)) : recordFilterRequested ? [] : pendingTasks,
-    [pendingTasks, target, recordFilterRequested],
+    () => exactRequested ? exactRows ?? [] : target ? pendingTasks.filter((row) => approvalTaskMatchesTarget(row, target)) : recordFilterRequested ? [] : pendingTasks,
+    [exactRequested, exactRows, pendingTasks, target, recordFilterRequested],
   )
 
   const aiDraftCount = useMemo(
@@ -103,7 +136,9 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
     [visibleTasks],
   )
 
-  const busy = claimTask.isPending || decideTask.isPending || commentTask.isPending
+  const busy = claimTask.isPending || decideTask.isPending || commentTask.isPending || (exactRequested && exactQuery.isFetching)
+  const read = exactRequested ? exactQuery : inboxQuery
+  const loading = exactRequested ? exactQuery.isFetching && !exactRows : inboxQuery.isPending
 
   const runAction = async (action: () => Promise<void>) => {
     setActionError(null)
@@ -124,6 +159,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
       expectedRevision: selection.expectedTaskRevision,
       actingFor: selection.actingFor,
     })
+    if (exactRequested) void exactQuery.refetch()
   }
 
   const handleDecide = async (
@@ -144,6 +180,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
       actingFor: selection.actingFor,
       comment: comment ?? null,
     })
+    if (exactRequested) void exactQuery.refetch()
   }
 
   const handleReject = async (row: HumanTaskRow) => {
@@ -162,6 +199,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
       expectedRevision: humanTaskRevision(row),
       comment: commentText.trim(),
     })
+    if (exactRequested) void exactQuery.refetch()
     setCommentingId(null)
     setCommentText("")
   }
@@ -177,7 +215,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
         moduleId="approvals"
         title={t("approvals.review.title", { defaultValue: "Approval inbox" })}
         actionTarget={compositionTarget}
-        sections={[createPageContentSection({
+        sections={exactRequested ? [] : [createPageContentSection({
           id: "approval-inbox-counts",
           title: t("approvals.review.inboxSummary", { defaultValue: "Approval inbox summary" }),
           width: "1/2",
@@ -193,17 +231,18 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
 
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
             <span data-testid="approvals-inbox-count">
-              {operatingCompanyId == null ? t("financeReview.selectCompany", { defaultValue: "Select a company" }) : inboxQuery.isError ? t("approvals.errors.countUnavailable", { defaultValue: "Task count unavailable" }) : inboxQuery.isPending ? t("approvals.loading", { defaultValue: "Loading approval tasks…" }) : recordFilterRequested
+              {operatingCompanyId == null ? t("financeReview.selectCompany", { defaultValue: "Select a company" }) : read.isError ? t("approvals.errors.countUnavailable", { defaultValue: "Task count unavailable" }) : loading ? t("approvals.loading", { defaultValue: "Loading approval tasks…" }) : exactRequested
+                ? t("approvals.review.linkedRequest", { defaultValue: "Linked approval request" }) : recordFilterRequested
                 ? t("approvals.countFiltered", { defaultValue: "{{shown}} of {{total}} open tasks", shown: visibleTasks.length, total: pendingTasks.length })
                 : t("approvals.count", { defaultValue: "{{count}} open tasks", defaultValue_one: "{{count}} open task", count: pendingTasks.length })}
             </span>
-            {!inboxQuery.isError && !inboxQuery.isPending && aiDraftCount > 0 ? (
+            {!read.isError && !loading && aiDraftCount > 0 ? (
               <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs">
                 <Sparkles className="h-3.5 w-3.5" />
                 {aiDraftCount} AI draft{aiDraftCount === 1 ? "" : "s"}
               </span>
             ) : null}
-            {inboxQuery.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {read.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {recordFilterRequested && (
               <Link href="/approvals" className="text-primary underline-offset-4 hover:underline">
                 {t("approvals.review.clearRecordFilter", { defaultValue: "Show all requests" })}
@@ -219,19 +258,21 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
             >
               Select an operating company to load your authorized task inbox.
             </div>
-          ) : inboxQuery.isError ? (
+          ) : read.isError && (!exactRequested || exactScopeReady) ? (
             <div role="alert" className="flex flex-col gap-3 rounded-lg border bg-card p-6 text-sm" data-testid="approvals-inbox-error">
               <p>{t("approvals.errors.loadFailed", { defaultValue: "Approval tasks could not be loaded. Retry before making a decision." })}</p>
-              <Button variant="outline" className="self-start" disabled={inboxQuery.isFetching || busy} onClick={() => { void inboxQuery.refetch() }}>{t("common.retry", { defaultValue: "Retry" })}</Button>
+              <Button variant="outline" className="self-start" disabled={read.isFetching || busy} onClick={() => { void read.refetch() }}>{t("common.retry", { defaultValue: "Retry" })}</Button>
             </div>
-          ) : inboxQuery.isPending ? (
+          ) : loading ? (
             <p role="status">{t("approvals.loading", { defaultValue: "Loading approval tasks…" })}</p>
           ) : visibleTasks.length === 0 ? (
             <div
               className="rounded-lg border bg-card p-6 text-sm text-muted-foreground"
               data-testid="approvals-inbox-empty"
             >
-              {target
+              {exactRequested
+                ? t("approvals.empty.linkedRequest", { defaultValue: "This approval request is unavailable in the current company." })
+                : target
                 ? t("approvals.empty.target", { defaultValue: "No open approval task matches this record." })
                 : recordFilterRequested
                   ? t("approvals.empty.invalidTarget", { defaultValue: "This request link does not identify a valid record. Show all requests to browse the company inbox." })
@@ -246,12 +287,17 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                 const recordHref = approvalRecordHref(model, resId)
                 const isAiDraft = isAiDraftApprovalRequest(row)
                 const status = taskStatusTag(row)
+                const isPending = Number.isSafeInteger(taskId) && (status === "Open" || status === "Claimed")
                 const requireComment =
                   row.requireCommentOnReject ?? row.require_comment_on_reject ?? false
                 const requestedActor = Object.hasOwn(actingForByTask, taskId)
                   ? actingForByTask[taskId]
                   : undefined
                 const selectedActor = resolveApprovalActor(row, requestedActor)
+                const exactActions = exactRequested ? workActionsForActor(row as WorkTaskRow, selectedActor) : undefined
+                const canClaim = exactActions == null || exactActions.includes("claim")
+                const canApprove = exactActions == null || exactActions.includes("approve")
+                const canReject = exactActions == null || exactActions.includes("reject")
                 const actorOptions = approvalActorOptions(row)
                 const needsActorSelection = selectedActor == null
                 const showActorSelection = row.directlyEligible !== true || actorOptions.length > 0
@@ -271,7 +317,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                   <div
                     key={`${identity}:${operatingCompanyId}:${taskId}:${humanTaskRevision(row)}`}
                     className="space-y-4 rounded-lg border bg-card p-5"
-                    data-testid={`approval-card-${taskId}`}
+                    data-testid={`approval-card-${row.id}`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="space-y-1">
@@ -289,6 +335,8 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                           {!showActorSelection && <span>{t("approvals.review.actingAsSelf", { defaultValue: "Acting as yourself" })}</span>}
                         </p>
                       </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                      {exactRequested ? <AskAboutRecordButton entityType="workflow_human_task" recordId={String(row.id)} label={`#${row.id} · ${kindLabels[kind]}`} activeTab="dashboard" /> : null}
                       {recordHref ? (
                         <Link
                           href={recordHref}
@@ -298,6 +346,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                           <ExternalLink className="h-3.5 w-3.5" />
                         </Link>
                       ) : null}
+                      </div>
                     </div>
 
                     <ApprovalSourceDetails organizationId={organizationId} companyId={humanTaskCompanyId(row)} model={model} subjectId={String(resId)} />
@@ -305,7 +354,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       ? t("approvals.review.requestedEffect", { defaultValue: "Requested effect: {{effect}}", effect: requestedEffect })
                       : t("approvals.review.effectNotExposed", { defaultValue: "The exact requested effect is not exposed here. Review the request in its source workspace before approving; approval can execute a business action." })}</p>
 
-                    <details className="group rounded-lg border p-3">
+                    {isPending ? <details className="group rounded-lg border p-3">
                       <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-primary" data-testid={`approval-review-${taskId}`}>
                         {t("approvals.review.open", { defaultValue: "Review assignment" })}
                       </summary>
@@ -364,7 +413,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                           </Select>
                         </label>
                       ) : null}
-                      {status === "Open" ? (
+                      {status === "Open" && canClaim ? (
                         <Button
                           size="sm"
                           variant="outline"
@@ -376,7 +425,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                           Claim
                         </Button>
                       ) : null}
-                      <Button
+                      {canApprove ? <Button
                         size="sm"
                         data-testid={`approval-approve-${taskId}`}
                         onClick={() => void runAction(() => handleDecide(row, "Approve"))}
@@ -384,8 +433,8 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       >
                         <CheckCircle2 className="mr-1.5 h-4 w-4" />
                         Approve
-                      </Button>
-                      <Button
+                      </Button> : null}
+                      {canReject ? <Button
                         size="sm"
                         variant="outline"
                         data-testid={`approval-reject-${taskId}`}
@@ -398,7 +447,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       >
                         <XCircle className="mr-1.5 h-4 w-4" />
                         Reject
-                      </Button>
+                      </Button> : null}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -468,7 +517,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       </div>
                     ) : null}
                       </div>
-                    </details>
+                    </details> : null}
                   </div>
                 )
               })}

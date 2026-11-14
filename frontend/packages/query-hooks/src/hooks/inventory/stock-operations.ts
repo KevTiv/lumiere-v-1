@@ -186,22 +186,40 @@ export async function validateStockPickingWithQuantitiesCommand(
   await validateStockPickingCommand(companyId, input.pickingId, input.createBackorder);
 }
 
-export const stockPickingsQueryOptions = (organizationId: bigint) => ({
-  queryKey: ['stock-pickings', rqBigIntKey(organizationId)] as const,
-  queryFn: () =>
-    fetchQueryList('/api/query/stock-pickings', 'Failed to fetch stock pickings'),
-  staleTime: 30_000,
-});
+function inventoryListQueryOptions<Row>(
+  resource: 'stock-pickings' | 'stock-moves' | 'stock-move-lines',
+  organizationId: bigint,
+  read: (companyId?: bigint) => Promise<Row[]>,
+  companyId?: bigint,
+) {
+  const key = [resource, rqBigIntKey(organizationId)] as const;
+  return {
+    queryKey: companyId == null ? key : [...key, 'company', companyId.toString()] as const,
+    queryFn: () => read(companyId),
+    staleTime: 30_000,
+  };
+}
+
+export const stockPickingsQueryOptions = (organizationId: bigint, companyId?: bigint) =>
+  inventoryListQueryOptions(
+    'stock-pickings',
+    organizationId,
+    (id) => id == null
+      ? fetchQueryList('/api/query/stock-pickings', 'Failed to fetch stock pickings')
+      : fetchQueryList<'stock-pickings'>(`/api/query/stock-pickings?companyId=${id}`, 'Failed to fetch stock pickings'),
+    companyId,
+  );
 
 export function useStockPickings(
   organizationId: bigint,
   initialData?: StockPicking[],
   enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<StockPicking[]>({
     enabled,
-    ...stockPickingsQueryOptions(organizationId),
-    initialData: coalesceQueryInitialData(initialData),
+    ...stockPickingsQueryOptions(organizationId, companyId),
+    initialData: companyId == null ? coalesceQueryInitialData(initialData) : undefined,
   });
 }
 
@@ -232,31 +250,38 @@ export function useStockLocations(
 }
 
 
-export const stockMovesQueryOptions = (organizationId: bigint) => ({
-  queryKey: ['stock-moves', rqBigIntKey(organizationId)] as const,
-  queryFn: () =>
-    fetchQueryList('/api/query/stock-moves', 'Failed to fetch stock moves'),
-  staleTime: 30_000,
-});
+export const stockMovesQueryOptions = (organizationId: bigint, companyId?: bigint) =>
+  inventoryListQueryOptions(
+    'stock-moves',
+    organizationId,
+    (id) => id == null
+      ? fetchQueryList('/api/query/stock-moves', 'Failed to fetch stock moves')
+      : fetchQueryList<'stock-moves'>(`/api/query/stock-moves?companyId=${id}`, 'Failed to fetch stock moves'),
+    companyId,
+  );
 
 export function useStockMoves(
   organizationId: bigint,
   initialData?: StockMove[],
   enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<StockMove[]>({
     enabled,
-    ...stockMovesQueryOptions(organizationId),
-    initialData: coalesceQueryInitialData(initialData),
+    ...stockMovesQueryOptions(organizationId, companyId),
+    initialData: companyId == null ? coalesceQueryInitialData(initialData) : undefined,
   });
 }
 
 /** Read-only list served by the authorized HTTP query path (`/api/query/stock-move-lines`). */
-export function useStockMoveLines(organizationId: bigint) {
+export function useStockMoveLines(organizationId: bigint, companyId?: bigint) {
   return useQuery<QueryRows>({
-    queryKey: ['stock-move-lines', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/stock-move-lines', 'Failed to read stock move lines'),
-    staleTime: 30_000,
+    ...inventoryListQueryOptions(
+      'stock-move-lines',
+      organizationId,
+      (id) => fetchQueryList(id == null ? '/api/query/stock-move-lines' : `/api/query/stock-move-lines?companyId=${id}`, 'Failed to read stock move lines'),
+      companyId,
+    ),
   });
 }
 

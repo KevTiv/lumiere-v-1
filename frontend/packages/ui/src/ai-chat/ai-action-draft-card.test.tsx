@@ -217,6 +217,19 @@ describe("AI action draft readback", () => {
     expect(screen.queryByTestId("ai-action-draft-approve")).toBeNull()
   })
 
+  it("names the proposed effect from the supported action rather than the model summary", () => {
+    render(
+      <AiActionDraftCard draft={{ ...draft, summary: "Request from chat" }} />,
+    )
+    expect(
+      screen.getByRole("heading", { name: "Create sales order" }),
+    ).toBeTruthy()
+    expect(screen.getByRole("status").textContent).toBe("Awaiting review")
+    expect(
+      screen.queryByRole("link", { name: "Open created record" }),
+    ).toBeNull()
+  })
+
   it("cannot act after current read permission is unavailable", async () => {
     const onRefresh = vi.fn(async (): Promise<ChatActionDraftPayload> => {
       throw new Error("denied")

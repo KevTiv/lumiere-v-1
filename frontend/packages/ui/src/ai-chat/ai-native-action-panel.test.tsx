@@ -37,6 +37,12 @@ const nativeAction: AssistantAction = {
   scope: { actorId: "actor-one", organizationId: "11", companyId: "22" },
   recordId: "9007199254740993",
 }
+const formAction: AssistantAction = {
+  version: 1,
+  kind: "open_form",
+  capabilityKey: "sales.order.create",
+  scope: nativeAction.scope,
+}
 const messages: ChatMessage[] = [
   {
     id: "answer-one",
@@ -76,7 +82,10 @@ describe("native actions in the production chat panel", () => {
     expect(onNativeAction).not.toHaveBeenCalled()
     fireEvent.click(button)
     await waitFor(() =>
-      expect(onNativeAction).toHaveBeenCalledExactlyOnceWith(nativeAction, messages[0]!.id),
+      expect(onNativeAction).toHaveBeenCalledExactlyOnceWith(
+        nativeAction,
+        messages[0]!.id,
+      ),
     )
     expect(
       (screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value,
@@ -93,5 +102,60 @@ describe("native actions in the production chat panel", () => {
         })) as HTMLButtonElement
       ).disabled,
     ).toBe(true)
+  })
+
+  it("retains a native acknowledgement when the panel closes during handoff", async () => {
+    let finish!: (result: "opened") => void
+    const config = {
+      onNativeAction: () =>
+        new Promise<"opened">((resolve) => {
+          finish = resolve
+        }),
+    }
+    const formMessages: ChatMessage[] = [
+      {
+        ...messages[0]!,
+        actions: [
+          {
+            id: "form",
+            type: "native",
+            label: "Prepare order",
+            nativeAction: formAction,
+          },
+        ],
+      },
+    ]
+    const onClose = vi.fn()
+    const view = render(
+      <AIChatPanel
+        open
+        onClose={onClose}
+        initialMessages={formMessages}
+        config={config}
+      />,
+    )
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Prepare order" }),
+    )
+    view.rerender(
+      <AIChatPanel
+        open={false}
+        onClose={onClose}
+        initialMessages={formMessages}
+        config={config}
+      />,
+    )
+    finish("opened")
+    view.rerender(
+      <AIChatPanel
+        open
+        onClose={onClose}
+        initialMessages={formMessages}
+        config={config}
+      />,
+    )
+    expect(
+      await screen.findByText("aiChat.native.formOpenedStatus"),
+    ).toBeTruthy()
   })
 })

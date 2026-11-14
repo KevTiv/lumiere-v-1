@@ -308,7 +308,10 @@ test("source confirmation, approval and verified native completion remain distin
   await page.getByText("Open created journal entries", { exact: true }).click()
   await expect(
     page.getByRole("link", { name: "SOURCE-electricity", exact: true }),
-  ).toHaveAttribute("href", "/accounting/invoices/90?companyId=9001")
+  ).toHaveAttribute(
+    "href",
+    "/accounting?tab=journal-entries&importEntryCompany=9001&importEntryIds=90",
+  )
   await page.reload()
   await expect(page.getByText("Verified in ERP", { exact: true })).toBeVisible()
   expect(actions).toEqual(["prepare", "approve", "execute"])
