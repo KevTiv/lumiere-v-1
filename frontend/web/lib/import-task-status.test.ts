@@ -2,6 +2,9 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   parseImportTaskStatuses,
+  parseStoredImportTaskIds,
+  readChatImportPostingStatus,
+  readChatImportTaskStatus,
   scopedImportTaskStatuses,
 } from "./import-task-status"
 import { assistantAnswerMetadata, readAssistantStream } from "./assistant-turn"
@@ -47,6 +50,253 @@ const nativeResult = {
     errorRows: 2,
   },
 }
+
+test("older authoritative import task citations supply read selectors only", () => {
+  const taskId = status.taskId
+  const source = {
+    kind: "live" as const,
+    trust: "authoritative" as const,
+    entity_type: "import_task",
+    source_kind: "import_task",
+    entity_id: taskId,
+    source_key: taskId,
+  }
+  assert.deepEqual(parseStoredImportTaskIds(null, [source]), [taskId])
+  assert.equal(
+    parseStoredImportTaskIds(null, [{ ...source, source_kind: "note" }]),
+    undefined,
+  )
+  assert.equal(
+    parseStoredImportTaskIds(null, [{ ...source, entity_id: "bad" }]),
+    undefined,
+  )
+})
+
+test("a saved import selector reopens 11 journal drafts without the model or any writes", async () => {
+  const taskId = status.taskId
+  const conversation = {
+    identity: "actor",
+    organizationId: 7,
+    companyId: 3,
+    conversationKey: "thread",
+  }
+  assert.deepEqual(
+    parseStoredImportTaskIds(
+      JSON.stringify({
+        importTaskIds: [taskId, taskId],
+        savedStatus: "posted",
+      }),
+    ),
+    [taskId],
+  )
+  assert.equal(
+    parseStoredImportTaskIds(JSON.stringify({ importTaskIds: ["../../task"] })),
+    undefined,
+  )
+  assert.equal(
+    parseStoredImportTaskIds(
+      JSON.stringify({ importTaskIds: new Array(5).fill(taskId) }),
+    ),
+    undefined,
+  )
+  assert.equal(parseStoredImportTaskIds("bad JSON"), undefined)
+  const entries = Array.from({ length: 11 }, (_, index) => ({
+    itemId: String(index + 1),
+    batchId: "71",
+    sourceRevision: 2,
+    sourceFile: "electricity.csv",
+    sourceRow: index + 2,
+    sourceSha256: "a".repeat(64),
+    reference: `SOURCE-${index + 1}`,
+    date: "2024-03-01",
+    description: "Electricity expense",
+    amount: index === 10 ? "82400" : "50000",
+  }))
+  const task = {
+    organizationId: "7",
+    companyId: "3",
+    requestId: taskId,
+    conversationKey: "thread",
+    status: "needs_review",
+    decision: {
+      id: `${taskId}:purpose`,
+      revision: 2,
+      status: "approved",
+      question: "How should these files be used?",
+      options: [{ id: "prepare_import", label: "Prepare import" }],
+      allowOther: true,
+      selectedOptionId: "prepare_import",
+      otherText: null,
+      decisionId: "b".repeat(32),
+    },
+    decisionReceipt: null,
+    decisionHistory: [],
+    files: [
+      {
+        fileName: "electricity.csv",
+        size: 9,
+        sha256: "a".repeat(64),
+        ordinal: 0,
+      },
+    ],
+    reviews: [
+      {
+        id: "71",
+        title: "Electricity",
+        targetEntity: "source_observation",
+        total: 11,
+        pending: 0,
+        confirmed: 11,
+        excluded: 0,
+      },
+    ],
+    warnings: [],
+    error: null,
+    createdAt: new Date(now).toISOString(),
+  }
+  const recordIds = entries.map((_, index) => String(100 + index))
+  const workflow = {
+    version: 1,
+    requestId: taskId,
+    companyId: "3",
+    organizationId: "7",
+    capabilities: [],
+    proposals: [
+      {
+        id: "8",
+        requestKey: "f".repeat(32),
+        revision: 1,
+        digest: "c".repeat(64),
+        kind: "historical_expense_journals",
+        status: "verified",
+        createdAt: new Date(now).toISOString(),
+        approvedAt: new Date(now).toISOString(),
+        summary: {
+          recordCount: 11,
+          lineCount: 22,
+          blockedCount: 0,
+          totalDebit: "582400",
+          totalCredit: "582400",
+          currencyId: "2",
+          dateFrom: "2024-03-01",
+          dateTo: "2024-03-01",
+        },
+        sources: entries.map((entry) => ({
+          itemId: entry.itemId,
+          batchId: entry.batchId,
+          revision: entry.sourceRevision,
+        })),
+        entries,
+        issues: [],
+        configuration: {
+          journalId: "7",
+          debitAccountId: "8",
+          creditAccountId: "9",
+          currencyId: "2",
+          dateField: "date",
+          amountField: "amount",
+          descriptionField: null,
+          postingDate: null,
+          reason: "Historical electricity expense",
+        },
+        execution: {
+          phase: "complete",
+          parentRequestId: "d".repeat(32),
+          lineRequestId: "e".repeat(32),
+          parentJobId: "2",
+          lineJobId: "3",
+        },
+        result: {
+          verifiedAt: new Date(now).toISOString(),
+          recordCount: 11,
+          lineCount: 22,
+          totalDebit: "582400",
+          totalCredit: "582400",
+          companyId: "3",
+          currencyId: "2",
+          recordIds,
+          lineIds: Array.from({ length: 22 }, (_, index) =>
+            String(200 + index),
+          ),
+          postedCount: 0,
+        },
+        lastError: null,
+      },
+    ],
+  }
+  const urls: string[] = []
+  const fetcher = async (url: string, options?: RequestInit) => {
+    assert.equal(options?.cache, "no-store")
+    assert.equal(options?.method ?? "GET", "GET")
+    urls.push(url)
+    return Response.json(url.includes("/workflow?") ? workflow : task)
+  }
+  const restored = await readChatImportTaskStatus(fetcher, conversation, taskId)
+  assert.deepEqual(restored.fileNames, ["electricity.csv"])
+  const receipt = restored.proposals[0]?.verifiedResult
+  assert.equal(receipt?.recordCount, 11)
+  assert.equal(receipt?.lineCount, 22)
+  assert.equal(receipt?.totalDebit, "582400")
+  assert.equal(receipt?.postedCount, 0)
+  assert.deepEqual(receipt?.records?.[10], {
+    id: "110",
+    reference: "SOURCE-11",
+  })
+  assert.deepEqual(urls, [
+    `/api/import-tasks/${taskId}?companyId=3`,
+    `/api/import-tasks/${taskId}/workflow?companyId=3`,
+  ])
+  await assert.rejects(
+    readChatImportTaskStatus(
+      fetcher,
+      { ...conversation, conversationKey: "another" },
+      taskId,
+    ),
+    /conversation/,
+  )
+  await assert.rejects(
+    readChatImportTaskStatus(
+      fetcher,
+      { ...conversation, organizationId: 9 },
+      taskId,
+    ),
+    /organization/,
+  )
+  const posting = {
+    taskId,
+    companyId: "3",
+    organizationId: "7",
+    proposalId: "8",
+    recordCount: 11,
+    postedCount: 6,
+    draftCount: 4,
+    otherCount: 0,
+    unavailableCount: 1,
+    checkedAt: new Date(now).toISOString(),
+  }
+  const outcome = await readChatImportPostingStatus(
+    async (url, options) => {
+      assert.equal(
+        url,
+        `/api/import-tasks/${taskId}/workflow/proposals/8/posting-status?companyId=3`,
+      )
+      assert.equal(options?.method ?? "GET", "GET")
+      return Response.json(posting)
+    },
+    restored,
+    restored.proposals[0]!,
+  )
+  assert.equal(outcome.postedCount, 6)
+  assert.equal(outcome.unavailableCount, 1)
+  await assert.rejects(
+    readChatImportPostingStatus(
+      async () => Response.json({ ...posting, unavailableCount: 0 }),
+      restored,
+      restored.proposals[0]!,
+    ),
+    /does not match/,
+  )
+})
 
 test("deterministic task cards keep source decisions distinct from verified drafts", () => {
   const cards = parseImportTaskStatuses([

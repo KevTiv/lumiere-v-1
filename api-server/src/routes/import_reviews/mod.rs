@@ -5,6 +5,7 @@ mod history_data;
 mod history_period;
 mod import_binding;
 mod model;
+mod module_backfill;
 mod native_requests;
 #[cfg(test)]
 mod postgres_tests;
@@ -480,6 +481,11 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/history/source/rows", get(history_data::rows))
         .route("/import-reviews", get(list).post(create))
         .route("/import-reviews/:id", get(read))
+        .route(
+            "/import-reviews/:id/module-backfill",
+            post(module_backfill::write),
+        )
+        .route("/module-backfill/:module", get(module_backfill::read))
         .route("/import-reviews/:batch/items/:item", patch(decide))
         .route("/import-reviews/:batch/decisions", post(decide_bulk))
         .route("/import-reviews/:batch/items/:item/history", get(history))

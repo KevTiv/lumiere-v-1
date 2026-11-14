@@ -1,4 +1,18 @@
 {
+  "moduleCsvHistory": {
+    "title": "Historique CSV",
+    "salesDescription": "Ventes confirmées dans les fichiers CSV. Les récapitulatifs peuvent se chevaucher par boutique et période.",
+    "description": "Données source confirmées dans les imports CSV de la société.",
+    "search": "Rechercher dans l’historique CSV",
+    "productCustomer": "Produit ou client",
+    "location": "Emplacement",
+    "quantity": "Quantité",
+    "unitPrice": "Prix unitaire",
+    "amount": "Montant enregistré",
+    "sourceRow": "{{file}} · ligne {{row}}",
+    "showDataset": "Afficher toutes les lignes de ce jeu de données",
+    "openReview": "Ouvrir la revue des sources"
+  },
   "aiHarness": {
     "platformProfile": {
       "tab": "Profil IA",

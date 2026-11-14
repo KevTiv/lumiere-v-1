@@ -1,6 +1,7 @@
 'use client';
 
 import { saleOrderListFieldAliases } from '@lumiere/ui/lib/sales-entity-configs';
+import { ModuleCsvHistory, useCanReadModuleCsvHistory } from "../../../components/module-csv-history"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
 import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
 import { useCurrencyFormat } from "@lumiere/ui"
@@ -831,7 +832,20 @@ function SalesClientLoaded({
     return csvImportForm(t, t(titleKey[csvKind]));
   }, [csvKind, t]);
 
-  const moduleConfig = useMemo(() => salesModuleConfig(t), [t]);
+  const canReadCsvHistory = useCanReadModuleCsvHistory(organizationId);
+  const moduleConfig = useMemo((): ModuleConfig => {
+    const config = salesModuleConfig(t);
+    if (!canReadCsvHistory) return config;
+    return {
+      ...config,
+      tabs: [...config.tabs, {
+        id: 'csv-history',
+        label: t('moduleCsvHistory.title', { defaultValue: 'CSV history' }),
+        type: 'custom',
+        customContent: <ModuleCsvHistory organizationId={organizationId} view="sales" />,
+      }],
+    };
+  }, [canReadCsvHistory, organizationId, t]);
 
   const salesTabIds = useMemo(() => {
     const workTabId = moduleWorkBoardTabId(moduleConfig);

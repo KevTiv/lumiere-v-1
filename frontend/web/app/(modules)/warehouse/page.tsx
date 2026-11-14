@@ -1,7 +1,8 @@
 import { getStdbSession } from "@/lib/api-session";
 import { serverPrefetchQueryLists } from "@/lib/server-query";
 import { InventoryClient } from "../inventory/inventory-client";
-import { SourceHistoryLink } from "../../../components/source-history-link";
+import { ModuleBackfillRecords } from "../../../components/module-backfill-records";
+import { ModuleCsvHistoryDisclosure } from "../../../components/module-csv-history";
 
 const WAREHOUSE_RESOURCES = [
   "products", "stock-quants", "stock-pickings", "warehouses",
@@ -19,7 +20,7 @@ export default async function WarehousePage() {
 
   return (
     <>
-      <SourceHistoryLink organizationId={session.organizationId} />
+      <ModuleCsvHistoryDisclosure organizationId={session.organizationId} view="warehouse" />
       <InventoryClient
         workspace="warehouse"
         organizationId={session.organizationId}
@@ -35,6 +36,7 @@ export default async function WarehousePage() {
         initialReplenishmentRules={replenishmentRules}
         initialStockProductionSerials={serials}
       />
+      <ModuleBackfillRecords organizationId={session.organizationId} module="warehouse" />
     </>
   );
 }

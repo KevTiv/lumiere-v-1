@@ -107,10 +107,12 @@ const MAX_ASSISTANT_STREAM_BYTES = 4 * 1024 * 1024
 const MAX_ASSISTANT_EVENT_LENGTH = 1024 * 1024
 const MAX_ASSISTANT_ANSWER_LENGTH = 256 * 1024
 
-/** Consume the gateway's already-admitted SSE response. Publish only a complete turn.
- * The gateway emits sources then done; EOF, errors and malformed metadata are uncertain.
- */
-export async function readAssistantStream<T>(response: Response, parseMetadata: (raw: string) => T): Promise<T & { answer: string }> {
+/** Deliver admitted text provisionally. Only a complete stream returns answer metadata. */
+export async function readAssistantStream<T>(
+  response: Response,
+  parseMetadata: (raw: string) => T,
+  onDelta?: (text: string) => void,
+): Promise<T & { answer: string }> {
   if (!response.ok) throw await httpResponseError(response, "Assistant stream rejected")
   if (!response.body || !response.headers.get("content-type")?.includes("text/event-stream")) {
     throw new Error("Assistant stream is unavailable")
@@ -147,7 +149,9 @@ export async function readAssistantStream<T>(response: Response, parseMetadata: 
       const parts = buffer.split(/\r?\n\r?\n/)
       buffer = parts.pop() ?? ""
       if (buffer.length > MAX_ASSISTANT_EVENT_LENGTH) throw new Error("Assistant stream event exceeds its size limit")
+      const priorLength = answer.length
       for (const part of parts) event(part)
+      if (answer.length > priorLength) onDelta?.(answer.slice(priorLength))
       if (done) break
     }
     if (buffer.trim()) event(buffer)

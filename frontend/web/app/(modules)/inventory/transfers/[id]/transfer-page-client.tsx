@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { useErpSession } from '@lumiere/erp-session';
 import Link from 'next/link';
+import { AskAboutRecordButton } from '../../../../../components/ask-about-record-button';
 import { RecordHeaderActions } from '../../../../../components/record-header-actions';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeftRight, ListChecks, ListOrdered, ShoppingCart } from 'lucide-react';
@@ -39,9 +41,10 @@ import {
 } from '@lumiere/ui/components/alert-dialog';
 import { Badge } from '@lumiere/ui/components/badge';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
+import { ModuleDataNotice } from '@lumiere/ui/pages/module-data-notice';
+import { canUseModuleData, moduleCollection } from '@lumiere/ui/lib/module-data-state';
 import { useWorkspaceProfile } from '@lumiere/ui/lib/workspace-profile-context';
 import { variantTag, type AnyWorkflowAction, type RowValueMap } from '@lumiere/erp-workflows';
-import type { StockLocation, StockMove, StockPicking } from '@lumiere/stdb/types';
 import {
   useProducts,
   useProductionLots,
@@ -65,9 +68,6 @@ import { transferStatusBar } from '../../transfer-status';
 
 interface TransferPageClientProps {
   transferId: string;
-  initialPickings?: StockPicking[];
-  initialMoves?: StockMove[];
-  initialLocations?: StockLocation[];
   organizationId?: number;
 }
 
@@ -84,19 +84,26 @@ const TAB_IDS = ['overview', 'moves', 'operations', 'backorders', 'discussion', 
 type TabId = (typeof TAB_IDS)[number];
 
 export function TransferPageClient(props: TransferPageClientProps) {
+  const { t } = useTranslation();
+  const { identity, activeCompanyReady } = useErpSession();
+  const companyId = useDefaultOperatingCompanyBigInt(props.organizationId);
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />;
   }
-  return <TransferPageLoaded {...props} organizationId={props.organizationId} />;
+  if (!activeCompanyReady || companyId == null) {
+    return <p role="status">{!activeCompanyReady
+      ? t('availableHistory.loadingCompany', { defaultValue: 'Loading the current company…' })
+      : t('inventory.transfers.selectCompany', { defaultValue: 'Select an operating company to open this transfer.' })}</p>;
+  }
+  return <TransferPageLoaded key={`${identity}:${props.organizationId}:${companyId}:${props.transferId}`}
+    transferId={props.transferId} organizationId={props.organizationId} operatingCompanyId={companyId} />;
 }
 
 function TransferPageLoaded({
   transferId,
-  initialPickings,
-  initialMoves,
-  initialLocations,
   organizationId,
-}: TransferPageClientProps & { organizationId: number }) {
+  operatingCompanyId,
+}: { transferId: string; organizationId: number; operatingCompanyId: bigint }) {
   const { t } = useTranslation();
   const workspaceProfile = useWorkspaceProfile();
   useInventoryModuleSubscription(workspaceProfile === 'finance-alpha' ? 'warehouse' : 'inventory');
@@ -105,12 +112,11 @@ function TransferPageLoaded({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { orgId } = orgBigInts(organizationId);
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
 
-  const { data: pickings = [], isLoading: pickingsLoading } = useStockPickings(orgId, initialPickings);
-  const { data: moves = [] } = useStockMoves(orgId, initialMoves);
-  const { data: locations = [] } = useStockLocations(orgId, initialLocations);
-  const moveLinesQuery = useStockMoveLines(orgId);
+  const { rows: pickings, state: pickingState } = moduleCollection(useStockPickings(orgId, undefined, true, operatingCompanyId));
+  const { rows: moves, state: movesState } = moduleCollection(useStockMoves(orgId, undefined, true, operatingCompanyId));
+  const { rows: locations } = moduleCollection(useStockLocations(orgId));
+  const { rows: moveLines, state: moveLineState } = moduleCollection(useStockMoveLines(orgId, operatingCompanyId));
   const { data: products = [] } = useProducts(orgId);
   const { data: lots = [] } = useProductionLots(orgId);
 
@@ -157,9 +163,9 @@ function TransferPageLoaded({
       if (lot.id != null && name) lotNameById.set(String(lot.id), name);
     }
     const moveIds = new Set(transferMoves.map((move) => String(move.id)));
-    const lines = moveLinesForTransfer(transferId, (moveLinesQuery.data ?? []) as Row[], moveIds);
+    const lines = moveLinesForTransfer(transferId, moveLines as Row[], moveIds);
     return detailedOperationRows(lines, { productNameById, locationNameById, lotNameById });
-  }, [products, locations, lots, transferMoves, transferId, moveLinesQuery.data]);
+  }, [products, locations, lots, transferMoves, transferId, moveLines]);
   const backorders = useMemo(
     () => transferBackorders(transfer ?? {}, pickings as unknown as Row[]),
     [transfer, pickings],
@@ -209,8 +215,12 @@ function TransferPageLoaded({
     await action.execute(action.prepare?.(record)).catch(() => undefined);
   }, []);
 
+  if (pickingState.status === 'denied' || pickingState.status === 'error') {
+    return <ModuleDataNotice state={pickingState} />;
+  }
   if (!transfer) {
-    if (pickingsLoading) {
+    if (pickingState.status === 'partial') return <ModuleDataNotice state={pickingState} />;
+    if (pickingState.status === 'loading') {
       return (
         <div className="space-y-4" data-testid="transfer-page-loading">
           <Skeleton className="h-6 w-64" />
@@ -225,7 +235,7 @@ function TransferPageLoaded({
           <EmptyTitle>{t('inventory.transfers.notFound', { defaultValue: 'Transfer not found' })}</EmptyTitle>
           <EmptyDescription>
             {t('inventory.transfers.notFoundHint', {
-              defaultValue: 'It may have been deleted, or belong to another organization.',
+              defaultValue: 'It may have been removed or belong to another company.',
             })}
           </EmptyDescription>
         </EmptyHeader>
@@ -275,6 +285,7 @@ function TransferPageLoaded({
 
   return (
     <>
+      <ModuleDataNotice state={pickingState} />
       <RecordPage
         testIdPrefix="transfer"
         breadcrumbs={[
@@ -363,14 +374,15 @@ function TransferPageLoaded({
         }
         actions={
           <>
-          <RecordHeaderActions model="transfer" record={transfer} organizationId={orgId} companyId={operatingCompanyId ?? undefined} />
-          <RecordWorkflowActions
+          {pickingState.status === 'ready' ? <AskAboutRecordButton entityType="stock_picking" recordId={transferId} label={label} activeTab={activeTab} /> : null}
+          {pickingState.status === 'ready' ? <RecordHeaderActions model="transfer" record={transfer} organizationId={orgId} companyId={operatingCompanyId} /> : null}
+          {pickingState.status === 'ready' ? <RecordWorkflowActions
             actions={headerActions}
             record={record}
             onRun={(action, row) => void runWorkflowAction(action, row)}
             primaryActionIds={PRIMARY_ACTION_IDS}
             pendingActionIds={workflow.isPending ? new Set(headerActions.map((action) => action.id)) : undefined}
-          />
+          /> : null}
           </>
         }
         activeTab={activeTab}
@@ -385,31 +397,37 @@ function TransferPageLoaded({
             id: 'moves',
             label: t('inventory.stockMoves.title'),
             content: (
-              <EntityView config={{ ...movesConfig, title: '', description: undefined }} data={transferMoves} useCard={false} />
+              <>
+                <ModuleDataNotice state={movesState} />
+                {canUseModuleData(movesState) ? <EntityView config={{ ...movesConfig, title: '', description: undefined }} data={transferMoves} isLoading={movesState.status === 'loading'} useCard={false} /> : null}
+              </>
             ),
           },
           {
             id: 'operations',
             label: t('inventory.transfers.detailedOperations', { defaultValue: 'Detailed operations' }),
             content: (
-              <ReadOnlyRows
-                id="transfer-detailed-operations"
-                testId="transfer-detailed-operations"
-                isLoading={moveLinesQuery.isLoading}
-                error={moveLinesQuery.error}
-                rows={operationRows}
-                emptyMessage={t('inventory.transfers.detailedOperationsEmpty', {
-                  defaultValue: 'No detailed operations yet. They appear once the transfer is reserved or processed.',
-                })}
-                columns={[
-                  { key: 'product', label: t('inventory.transfers.ops.product', { defaultValue: 'Product' }), width: 'min-w-40' },
-                  { key: 'lot', label: t('inventory.transfers.ops.lot', { defaultValue: 'Lot / Serial' }) },
-                  { key: 'fromLocation', label: t('inventory.transfers.ops.from', { defaultValue: 'From' }), width: 'min-w-32' },
-                  { key: 'toLocation', label: t('inventory.transfers.ops.to', { defaultValue: 'To' }), width: 'min-w-32' },
-                  { key: 'quantityReserved', label: t('inventory.transfers.ops.reserved', { defaultValue: 'Reserved' }), type: 'number', align: 'right' },
-                  { key: 'quantityDone', label: t('inventory.transfers.ops.done', { defaultValue: 'Done' }), type: 'number', align: 'right' },
-                ]}
-              />
+              <>
+                <ModuleDataNotice state={moveLineState} />
+                {canUseModuleData(moveLineState) ? <ReadOnlyRows
+                  id="transfer-detailed-operations"
+                  testId="transfer-detailed-operations"
+                  isLoading={moveLineState.status === 'loading'}
+                  error={null}
+                  rows={operationRows}
+                  emptyMessage={t('inventory.transfers.detailedOperationsEmpty', {
+                    defaultValue: 'No detailed operations yet. They appear once the transfer is reserved or processed.',
+                  })}
+                  columns={[
+                    { key: 'product', label: t('inventory.transfers.ops.product', { defaultValue: 'Product' }), width: 'min-w-40' },
+                    { key: 'lot', label: t('inventory.transfers.ops.lot', { defaultValue: 'Lot / Serial' }) },
+                    { key: 'fromLocation', label: t('inventory.transfers.ops.from', { defaultValue: 'From' }), width: 'min-w-32' },
+                    { key: 'toLocation', label: t('inventory.transfers.ops.to', { defaultValue: 'To' }), width: 'min-w-32' },
+                    { key: 'quantityReserved', label: t('inventory.transfers.ops.reserved', { defaultValue: 'Reserved' }), type: 'number', align: 'right' },
+                    { key: 'quantityDone', label: t('inventory.transfers.ops.done', { defaultValue: 'Done' }), type: 'number', align: 'right' },
+                  ]}
+                /> : null}
+              </>
             ),
           },
           {
@@ -452,7 +470,7 @@ function TransferPageLoaded({
         ]}
       />
 
-      <AlertDialog open={pendingConfirm != null} onOpenChange={(open) => !open && setPendingConfirm(null)}>
+      <AlertDialog open={pendingConfirm != null && pickingState.status === 'ready'} onOpenChange={(open) => !open && setPendingConfirm(null)}>
         <AlertDialogContent data-testid="transfer-action-confirm">
           <AlertDialogHeader>
             <AlertDialogTitle>{pendingConfirm?.label}</AlertDialogTitle>
@@ -464,7 +482,7 @@ function TransferPageLoaded({
               onClick={() => {
                 const action = pendingConfirm;
                 setPendingConfirm(null);
-                if (action) void action.execute(action.prepare?.(record)).catch(() => undefined);
+                if (action && pickingState.status === 'ready') void action.execute(action.prepare?.(record)).catch(() => undefined);
               }}
             >
               {t('erpWorkflow.confirm.confirm')}

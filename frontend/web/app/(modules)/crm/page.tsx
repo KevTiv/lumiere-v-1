@@ -1,3 +1,4 @@
+import { ModuleCsvHistoryDisclosure } from "../../../components/module-csv-history"
 import { getStdbSession } from "@/lib/api-session"
 import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { CrmClient } from "./crm-client"
@@ -16,11 +17,14 @@ export default async function CrmPage() {
   )
 
   return (
-    <CrmClient
-      initialLeads={leads}
-      initialOpportunities={opportunities}
-      initialContacts={contacts}
-      organizationId={session.organizationId}
-    />
+    <>
+      <ModuleCsvHistoryDisclosure organizationId={session.organizationId} view="crm" />
+      <CrmClient
+        initialLeads={leads}
+        initialOpportunities={opportunities}
+        initialContacts={contacts}
+        organizationId={session.organizationId}
+      />
+    </>
   )
 }

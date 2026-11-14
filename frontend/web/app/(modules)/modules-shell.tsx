@@ -33,6 +33,7 @@ import { isSavedGuide, type GuideDocument, type GuideDraft, type GuideReference,
 import { EntityCurrencyBoundary } from "@/lib/entity-currency-boundary"
 import { useErpSession } from "@lumiere/erp-session"
 import type { ChatContext, ChatMessage, ChatMessageSourceRef, ChatAction } from "@lumiere/ui"
+import type { ChatNativeActionOutcome } from "@lumiere/ui/lib/ai-chat-types"
 import {
   atCommandsToIncludeTypes,
   buildAiUiContext,
@@ -72,7 +73,8 @@ import { useAiAgents } from "@lumiere/query-hooks/hooks/ai-agents"
 import { chatAgentOptions } from "@/lib/chat-agent-options"
 import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext, useErpAiErrorQuestion } from "@/lib/erp-ai-context"
 import { isAssistantErrorQuestion } from "@/lib/assistant-error-help"
-import { AI_WORKSPACE_SCOPES, resolveAiWorkspaceScope } from "@/lib/ai-workspace-scope"
+import { AI_WORKSPACE_SCOPES, aiWorkspaceScopesForProfile, resolveAiWorkspaceScope } from "@/lib/ai-workspace-scope"
+import { useErpAiSelectionReporter } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { performSignOut } from "@/lib/auth-sign-out"
 import {
   assistantAnswer, assistantAnswerMetadata, assistantSetupFailure, coordinateAssistantTurn,
@@ -95,7 +97,7 @@ import type { ImportPreparation } from "@/lib/import-preparation"
 type SelectionImportHandler = (files: File[], preparation: ImportPreparation) => Promise<void>
 
 import { recordPageHref } from "@/lib/record-page-href"
-import { scopedImportTaskStatuses } from "@/lib/import-task-status"
+import { parseStoredImportTaskIds, scopedImportTaskStatuses } from "@/lib/import-task-status"
 import { assistantPresentationReply, modelNativeChatActions, parseNativeChatActions, withNativeActionsMetadata } from "@/lib/assistant-native-actions"
 import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
 import {
@@ -166,6 +168,18 @@ function historyModuleLabel(module: string) {
   return label ?? (module === "ai-assistant" ? "AI Assistant" : module.charAt(0).toUpperCase() + module.slice(1))
 }
 
+type TurnProgress = ComponentProps<typeof AIChatPanel>["turnProgress"]
+type TurnProjection = NonNullable<ComponentProps<typeof AIChatPanel>["turnProjection"]>
+type InFlightTurn = {
+  controller: AbortController
+  progress?: TurnProgress
+  canStop?: boolean
+  stopped?: boolean
+  projection?: Extract<TurnProjection, { settled: false }>
+  frame?: number
+}
+const MAX_RECENT_CHAT_TURNS = 4
+
 function readStoredTurnId(raw?: string | null): string | undefined {
   if (!raw) return undefined
   try {
@@ -176,8 +190,13 @@ function readStoredTurnId(raw?: string | null): string | undefined {
   }
 }
 
-function withStoredTurnMetadata(turnId: string, earlierContextUnavailable: boolean | undefined, raw: string | null) {
-  return JSON.stringify({ ...(raw ? JSON.parse(raw) : {}), turnId, ...(earlierContextUnavailable && { earlierContextUnavailable }) })
+function withStoredTurnMetadata(turnId: string, earlierContextUnavailable: boolean | undefined, raw: string | null, importTaskIds?: string[]) {
+  return JSON.stringify({
+    ...(raw ? JSON.parse(raw) : {}),
+    turnId,
+    ...(earlierContextUnavailable && { earlierContextUnavailable }),
+    ...(importTaskIds?.length && { importTaskIds }),
+  })
 }
 
 function ErpAiChatPanel({
@@ -196,6 +215,7 @@ function ErpAiChatPanel({
 }) {
   const { organizationId, identity } = useErpSession()
   const { route, module, activeTab, selection } = useErpAiRouteContext()
+  const selectionReporter = useErpAiSelectionReporter()
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
   const operatingCompanyId = useOperatingCompanyId(organizationId)
@@ -230,16 +250,22 @@ function ErpAiChatPanel({
   const availableHistory = !history.unavailable && (!history.session.isError || Boolean(history.session.data))
   const [failedHistoryScope, setFailedHistoryScope] = useState<string | null>(null)
   const [, refreshSending] = useState(0)
-  const inFlight = useRef(new Map<string, AbortController>())
+  const inFlight = useRef(new Map<string, InFlightTurn>())
+  const recentTurns = useRef(new Map<string, TurnProjection>())
   const currentHistoryScope = useRef(historyScope)
   currentHistoryScope.current = historyScope
   const currentActorHistory = useRef({ scope: actorHistoryScope })
   if (currentActorHistory.current.scope !== actorHistoryScope) currentActorHistory.current = { scope: actorHistoryScope }
   useEffect(() => {
     const requests = inFlight.current
+    const recent = recentTurns.current
     return () => {
-      for (const controller of requests.values()) controller.abort()
+      for (const { controller, frame } of requests.values()) {
+        controller.abort()
+        if (frame !== undefined) cancelAnimationFrame(frame)
+      }
       requests.clear()
+      recent.clear()
     }
   }, [actorHistoryScope])
   const updateChatSession = useUpdateAiChatSession(readScope)
@@ -279,9 +305,11 @@ function ErpAiChatPanel({
   activeScope.current = actorHistoryScope
   const currentActionContext = useRef({ actionScope, actorHistoryScope, checkPermission, permissionsReady, allowedActionModules, pageComposition })
   currentActionContext.current = { actionScope, actorHistoryScope, checkPermission, permissionsReady, allowedActionModules, pageComposition }
+  const contextOptions = useMemo(() => aiWorkspaceScopesForProfile(workspaceProfile), [workspaceProfile])
+  const activeScopeOption = contextOptions.some(option => option.value === selectedScope) ? selectedScope : "current"
   const workspaceScope = useMemo(
-    () => resolveAiWorkspaceScope(selectedScope, route, selection),
-    [selectedScope, route, selection],
+    () => resolveAiWorkspaceScope(activeScopeOption, route, selection, contextOptions),
+    [activeScopeOption, contextOptions, route, selection],
   )
 
   const persistActionDrafts = usePersistGatewayActionDrafts(orgId, operatingCompanyId ?? 0)
@@ -304,7 +332,7 @@ function ErpAiChatPanel({
 
   const chatContext = useMemo(
     (): ChatContext => ({
-      activeView: workspaceScope.usesCurrentPage ? module ?? route : workspaceScope.label,
+      activeView: workspaceScope.usesCurrentPage ? (module ? historyModuleLabel(module) : workspaceScope.label) : workspaceScope.label,
       route: workspaceScope.pathname,
       module: workspaceScope.usesCurrentPage ? module ?? undefined : undefined,
       activeTab: workspaceScope.usesCurrentPage ? activeTab ?? undefined : undefined,
@@ -316,34 +344,48 @@ function ErpAiChatPanel({
 
   const initialMessages = useMemo((): ChatMessage[] => {
     if (!sessionKey || !actorHistoryScope || !availableHistory) return []
-    return history.messageRows.filter((row) => String(row.organizationId ?? row.organization_id) === String(orgId)
-      && String(row.companyId ?? row.company_id) === String(operatingCompanyId)).map((row) => ({
-      id: String(row.id),
-      role:
-        row.role === "user" || row.role === "assistant" || row.role === "system"
-          ? row.role
-          : "assistant",
-      content: row.content,
-      timestamp: dateFromStored(row.createDate ?? row.create_date),
-      sources: parseStoredSources(row.sourcesJson ?? row.sources_json),
-      actions: [...(parseStoredChatActions(row.metadata) ?? []), ...parseNativeChatActions(row.metadata, actionScope)] as ChatAction[],
-      guides: parseStoredGuideReferences(row.metadata),
-      recoveryPath: parseStoredAssistantRecovery(row.metadata),
-      metadata: {
-        model: row.model ?? undefined,
-        duration:
-          row.durationMs != null
-            ? Number(row.durationMs)
-            : row.duration_ms != null
-              ? Number(row.duration_ms)
-              : undefined,
-        runId: parseStoredChatRunId(row.metadata),
-        companyId: operatingCompanyId ?? undefined,
-        turnId: row.turnId || readStoredTurnId(row.metadata),
-        historyTruncated: row.historyTruncated === true,
-      },
-    }))
+    return history.messageRows
+      .filter((row) => String(row.organizationId ?? row.organization_id) === String(orgId)
+        && String(row.companyId ?? row.company_id) === String(operatingCompanyId))
+      .map((row): ChatMessage => {
+        const sources = parseStoredSources(row.sourcesJson ?? row.sources_json)
+        return {
+          id: String(row.id),
+          role:
+            row.role === "user" || row.role === "assistant" || row.role === "system"
+              ? row.role
+              : "assistant",
+          content: row.content,
+          timestamp: dateFromStored(row.createDate ?? row.create_date),
+          sources,
+          actions: [...(parseStoredChatActions(row.metadata) ?? []), ...parseNativeChatActions(row.metadata, actionScope)] as ChatAction[],
+          guides: parseStoredGuideReferences(row.metadata),
+          importTaskIds: row.role === "assistant" ? parseStoredImportTaskIds(row.metadata, sources) : undefined,
+          recoveryPath: parseStoredAssistantRecovery(row.metadata),
+          metadata: {
+            model: row.model ?? undefined,
+            duration:
+              row.durationMs != null
+                ? Number(row.durationMs)
+                : row.duration_ms != null
+                  ? Number(row.duration_ms)
+                  : undefined,
+            runId: parseStoredChatRunId(row.metadata),
+            companyId: operatingCompanyId ?? undefined,
+            turnId: row.turnId || readStoredTurnId(row.metadata),
+            historyTruncated: row.historyTruncated === true,
+          },
+        }
+      })
   }, [availableHistory, history.messageRows, sessionKey, actorHistoryScope, orgId, operatingCompanyId, actionScope])
+
+  useEffect(() => {
+    const recent = recentTurns.current.get(historyScope)
+    if (recent && initialMessages.some(message => message.role === "assistant" && message.metadata?.turnId === recent.id)) {
+      recentTurns.current.delete(historyScope)
+      refreshSending(version => version + 1)
+    }
+  }, [historyScope, initialMessages])
 
   const ensureSession = useCallback(async (question?: string) => {
     if (!sessionKey || !orgReady || operatingCompanyId == null || operatingCompanyId <= 0) throw new Error("Conversation context is unavailable")
@@ -373,6 +415,7 @@ function ErpAiChatPanel({
       actions?: ChatAction[]
       runId?: number
       guides?: GuideReference[]
+      importTaskIds?: string[]
       recoveryPath?: ChatMessage["recoveryPath"]
     }) => {
       if (!sessionKey || !orgReady || operatingCompanyId == null || operatingCompanyId <= 0) return
@@ -413,7 +456,7 @@ function ErpAiChatPanel({
               args.guides,
             ),
             args.recoveryPath,
-          )),
+          ), args.importTaskIds),
         }) },
       })
       if (result === "failed") setFailedHistoryScope(historyScope)
@@ -509,43 +552,59 @@ function ErpAiChatPanel({
         if (!operatingCompanyId || (draft.companyId != null && draft.companyId !== operatingCompanyId)) throw new Error("Draft scope changed")
         return fetchAiActionDraftPayload(orgId, operatingCompanyId, draft.draftId)
       },
-      onNativeAction: (proposed: AssistantAction, messageId: string) => {
+      onNativeAction: (proposed: AssistantAction, messageId: string): Promise<ChatNativeActionOutcome> => {
         const validate = () => {
           const current = currentActionContext.current
+          if (currentHistoryScope.current !== historyScope) return { outcome: "scope_changed" } as const
           const action = current.actionScope && decodeAssistantAction(proposed, current.actionScope, { allowedModules: current.allowedActionModules, allowedPageModules: ASSISTANT_PAGE_MODULES })
           const capability = action && getAssistantCapability(action.capabilityKey)
-          if (!action || !capability || !current.actorHistoryScope) throw new Error(i18n.t("aiChat.native.scopeChanged"))
-          if (!current.permissionsReady || !current.checkPermission(capability.permission.resource, capability.permission.action).allowed) throw new Error(i18n.t("aiChat.native.denied"))
-          return { action, capability, scopeKey: current.actorHistoryScope }
+          if (!action || !capability || !current.actorHistoryScope) return { outcome: "scope_changed" } as const
+          if (!current.permissionsReady || !current.checkPermission(capability.permission.resource, capability.permission.action).allowed) return { outcome: "denied" } as const
+          return { action, capability, scopeKey: current.actorHistoryScope } as const
         }
         const initial = validate()
+        if (initial.outcome) return Promise.resolve(initial.outcome)
         const currentPage = currentActionContext.current.pageComposition?.page
         const changesPage = !isAssistantPageAction(initial.action) || currentPage?.moduleId !== initial.capability.module || Boolean(initial.action.pageId && currentPage?.pageId !== initial.action.pageId)
-        const open = () => {
-          try {
-            const { action, capability, scopeKey } = validate()
-            const href = assistantActionHref(action)
-            if (!href) throw new Error(i18n.t("aiChat.native.formUnavailable"))
-            if (isAssistantPageAction(action)) {
-              const composer = currentActionContext.current.pageComposition
-              if (!composer) throw new Error(i18n.t("aiChat.native.pageUnavailable"))
-              const origin = action.kind === "add_widget" && !action.widgetKey && sessionKey && /^[1-9][0-9]{0,19}$/.test(messageId)
-                ? { sessionKey, messageId } : undefined
-              const result = composer.requestPage({ requestId: crypto.randomUUID(), scopeKey, moduleId: capability.module, pageId: action.pageId, kind: action.kind, widgetKey: action.widgetKey, prompt: action.prompt, origin })
-              if (result !== "pending") throw new Error(i18n.t(result === "busy" ? "aiChat.native.pageBusy" : "aiChat.native.scopeChanged"))
-              // Preserve the current date range and filters when opening this page's editor.
-              if (composer.page?.moduleId !== capability.module || (action.pageId && composer.page.pageId !== action.pageId)) router.push(href)
-            } else if (action.kind === "open_form") {
-              if (!nativeForms || !capability.tab) throw new Error(i18n.t("aiChat.native.formUnavailable"))
-              const result = nativeForms.requestForm({ requestId: crypto.randomUUID(), scopeKey, moduleId: capability.module, tabId: capability.tab, prompt: action.prompt })
-              if (result !== "pending") throw new Error(i18n.t(result === "busy" ? "aiChat.native.formBusy" : "aiChat.native.scopeChanged"))
-            }
-            if (!isAssistantPageAction(action)) router.push(href)
-            revealWorkspace.current()
-          } catch (error) { toast.error(error instanceof Error ? error.message : i18n.t("aiChat.native.openFailed")) }
-        }
-        if (changesPage && navigationGuard) navigationGuard.proceed(open)
-        else open()
+        return new Promise((resolve, reject) => {
+          const open = () => {
+            try {
+              const current = validate()
+              if (current.outcome) { resolve(current.outcome); return }
+              const { action, capability, scopeKey } = current
+              const href = assistantActionHref(action)
+              if (!href) { resolve("unavailable"); return }
+              if (isAssistantPageAction(action)) {
+                const composer = currentActionContext.current.pageComposition
+                if (!composer) { resolve("unavailable"); return }
+                const origin = action.kind === "add_widget" && !action.widgetKey && sessionKey && /^[1-9][0-9]{0,19}$/.test(messageId)
+                  ? { sessionKey, messageId } : undefined
+                const result = composer.requestPage({
+                  requestId: crypto.randomUUID(), scopeKey, moduleId: capability.module, pageId: action.pageId,
+                  kind: action.kind, widgetKey: action.widgetKey, prompt: action.prompt, origin,
+                  onPresentationOutcome: resolve,
+                })
+                if (result !== "pending") { resolve(result); return }
+                // Preserve the current date range and filters when opening this page's editor.
+                if (composer.page?.moduleId !== capability.module || (action.pageId && composer.page.pageId !== action.pageId)) router.push(href)
+              } else {
+                if (action.kind === "open_form") {
+                  if (!nativeForms || !capability.tab) { resolve("unavailable"); return }
+                  const result = nativeForms.requestForm({
+                    requestId: crypto.randomUUID(), scopeKey, moduleId: capability.module, tabId: capability.tab,
+                    prompt: action.prompt, onPresentationOutcome: resolve,
+                  })
+                  if (result !== "pending") { resolve(result); return }
+                }
+                router.push(href)
+                if (action.kind !== "open_form") resolve("requested")
+              }
+              revealWorkspace.current()
+            } catch (error) { reject(error) }
+          }
+          if (changesPage && navigationGuard) navigationGuard.proceed(open, () => resolve("cancelled"))
+          else open()
+        })
       },
       onOpenDocumentSource: (source: ChatMessageSourceRef) => {
         if (!actorHistoryScope || source.source_kind !== "managed_document_selection" ||
@@ -589,8 +648,9 @@ function ErpAiChatPanel({
   const runTurn = useCallback(
     async (
       userText: string,
-      stream: boolean,
       signal: AbortSignal,
+      setProgress: (progress: TurnProgress, canStop?: boolean) => void,
+      onDelta?: (delta: string) => void,
       guideRefs?: GuideReference[],
       questionGuide?: GuideDraft,
       hasUnsavedGuideEdits = false,
@@ -612,6 +672,10 @@ function ErpAiChatPanel({
       const isCurrent = () => !signal.aborted && currentActorHistory.current === actorRequest
       const selectedReferences = questionGuide ? undefined : historyRefs
       const turnMeta = { turnId, actorRequest, historyRefs: selectedReferences }
+      const saveReply = (args: Omit<Parameters<typeof persistExchange>[0], keyof typeof turnMeta>) => {
+        setProgress("saving_reply")
+        return persistExchange({ ...turnMeta, ...args })
+      }
       const started = performance.now()
       const continuity = { chat_session_key: sessionKey, history_refs: selectedReferences?.length ? [...selectedReferences] : undefined }
       await ensureSession(userText)
@@ -627,6 +691,7 @@ function ErpAiChatPanel({
           throw new Error("The selected AI agent is no longer available. Choose another agent.")
         }
         try {
+          setProgress("answering", Boolean(onDelta))
           const answer = await rag.mutateAsync({
             query: selectedDocument.action === "explain"
               ? "Explain the selected spreadsheet cells."
@@ -639,7 +704,7 @@ function ErpAiChatPanel({
           })
           if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
           const sources = answer.sources.map(mapRagSourceToChatSource)
-          await persistExchange({ ...turnMeta, userText, assistantText: answer.answer, sources, uiContext: null, runId: answer.run_id })
+          await saveReply({ userText, assistantText: answer.answer, sources, uiContext: null, runId: answer.run_id })
           if (selectedReferences?.length && isCurrent()) clearReferences(sessionKey)
           return { content: answer.answer, sources, runId: answer.run_id, earlierContextUnavailable: answer.earlier_context_unavailable }
         } catch (error) {
@@ -647,14 +712,17 @@ function ErpAiChatPanel({
           const setup = assistantSetupFailure(error)
           if (!setup) throw error
           return { content: setup.message, recoveryPath: setup.recoveryPath, sources: [] as ChatMessageSourceRef[] }
+        } finally {
+          setProgress(undefined)
         }
       }
       const { includeTypes, uiContext } = buildRequestContext(userText, questionGuide)
       const turnPage = !questionGuide && workspaceScope.usesCurrentPage && pageComposition?.page?.moduleId === module ? pageComposition.page : undefined
-      const focusedImport = importTasks.focusedTask
+      const focusedImport = questionGuide ? undefined : importTasks.focusedTask
       const importTaskRefs = focusedImport?.companyId === String(operatingCompanyId)
         ? [{ taskId: focusedImport.requestId, companyId: focusedImport.companyId }]
         : undefined
+      const importTaskIds = importTaskRefs?.map(reference => reference.taskId)
       let presentationResolution = !questionGuide && !selectedReferences?.length && !isAssistantErrorQuestion(userText) && actionScope
         ? resolveAssistantActionRequest(userText, {
           scope: actionScope,
@@ -672,46 +740,64 @@ function ErpAiChatPanel({
       }
       const presentation = presentationResolution ? assistantPresentationReply(presentationResolution, (key) => i18n.t(key)) : undefined
       if (presentation) {
-        await persistExchange({ ...turnMeta, userText, assistantText: presentation.content, sources: presentation.sources, uiContext, actions: presentation.actions })
+        await saveReply({ userText, assistantText: presentation.content, sources: presentation.sources, uiContext, actions: presentation.actions })
         return presentation
       }
+      const prepareDrafts = !questionGuide && !selectedReferences?.length && !isAssistantErrorQuestion(userText) && looksLikeActionDraftRequest(userText)
+      let answerFinished = false
       const turn = await coordinateAssistantTurn({
         isCurrent,
         answer: async () => {
-          if (selectedAgent !== "default" && requestedAgentId == null) {
-            throw new Error("The selected AI agent is no longer available. Choose another agent.")
-          }
-          if (!stream) return assistantAnswer(await rag.mutateAsync({
-            query: questionGuide ? guideDraftQuestion(questionGuide, userText, hasUnsavedGuideEdits) : userText, companyId: operatingCompanyId,
-            ...continuity,
-            signal,
-            include_types: includeTypes, ui_context: uiContext, guide_refs: guideRefs, import_task_refs: importTaskRefs,
-            ...(requestedAgentId ? { agent_id: requestedAgentId } : {}),
-          }))
-          const response = await fetch("/api/ai/rag/stream", {
-            signal,
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              query: questionGuide ? guideDraftQuestion(questionGuide, userText, hasUnsavedGuideEdits) : userText, companyId: operatingCompanyId,
+          try {
+            if (selectedAgent !== "default" && requestedAgentId == null) {
+              throw new Error("The selected AI agent is no longer available. Choose another agent.")
+            }
+            setProgress("answering", Boolean(onDelta) && !prepareDrafts)
+            const query = questionGuide ? guideDraftQuestion(questionGuide, userText, hasUnsavedGuideEdits) : userText
+            if (!onDelta) return assistantAnswer(await rag.mutateAsync({
+              query, companyId: operatingCompanyId,
               ...continuity,
+              signal,
+              include_types: includeTypes, ui_context: uiContext, guide_refs: guideRefs, import_task_refs: importTaskRefs,
               ...(requestedAgentId ? { agent_id: requestedAgentId } : {}),
-              ...(includeTypes.length ? { include_types: includeTypes } : {}),
-              ...(uiContext ? { ui_context: uiContext } : {}),
-              ...(guideRefs?.length ? { guide_refs: guideRefs } : {}),
-              ...(importTaskRefs?.length ? { import_task_refs: importTaskRefs } : {}),
-            }),
-          })
-          // Never fall back after dispatch: a missing reply does not prove no run occurred.
-          return readAssistantStream(response, (data) => assistantAnswerMetadata(JSON.parse(data)))
+            }))
+            const response = await fetch("/api/ai/rag/stream", {
+              signal,
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                query, companyId: operatingCompanyId,
+                ...continuity,
+                ...(requestedAgentId ? { agent_id: requestedAgentId } : {}),
+                ...(includeTypes.length ? { include_types: includeTypes } : {}),
+                ...(uiContext ? { ui_context: uiContext } : {}),
+                ...(guideRefs?.length ? { guide_refs: guideRefs } : {}),
+                ...(importTaskRefs?.length ? { import_task_refs: importTaskRefs } : {}),
+              }),
+            })
+            // A missing reply does not establish the gateway outcome, so do not redispatch.
+            return await readAssistantStream(response, (data) => assistantAnswerMetadata(JSON.parse(data)), (delta) => {
+              if (isCurrent()) onDelta(delta)
+            })
+          } finally {
+            answerFinished = true
+            if (!prepareDrafts) setProgress(undefined)
+          }
         },
-        drafts: !questionGuide && !selectedReferences?.length && !isAssistantErrorQuestion(userText) && looksLikeActionDraftRequest(userText) ? () => resolveActionDrafts(userText, uiContext) : undefined,
+        drafts: prepareDrafts ? async () => {
+          setProgress("preparing_draft")
+          try {
+            return await resolveActionDrafts(userText, uiContext)
+          } finally {
+            if (!answerFinished) setProgress("answering")
+          }
+        } : undefined,
       })
       if ("kind" in turn) return { content: "", sources: [] as ChatMessageSourceRef[] }
       const out = turn.answer.kind === "ready" ? turn.answer.value : undefined
       const sources = (out?.sources ?? []).map(mapRagSourceToChatSource)
       const guides = out?.guides
-      const taskStatuses = scopedImportTaskStatuses(out?.importTasks, { organizationId: orgId, companyId: operatingCompanyId, taskIds: importTaskRefs?.map(reference => reference.taskId) ?? [] })
+      const taskStatuses = scopedImportTaskStatuses(out?.importTasks, { organizationId: orgId, companyId: operatingCompanyId, taskIds: importTaskIds ?? [] })
       const draftActions = turn.drafts.kind === "ready" ? turn.drafts.value : []
       const nativeActions = actionScope ? modelNativeChatActions(out?.ui_actions ?? [], actionScope, userText, turnPage)
         .filter(action => {
@@ -734,43 +820,86 @@ function ErpAiChatPanel({
       }
       const recoveryPath = answerRecovery?.recoveryPath ?? draftRecovery?.recoveryPath
       const content = parts.join("\n\n")
-      await persistExchange({
-        ...turnMeta,
-        userText, assistantText: content, sources, uiContext, guides,
+      await saveReply({
+        userText, assistantText: content, sources, uiContext, guides, importTaskIds,
         earlierContextUnavailable: out?.earlierContextUnavailable,
         durationMs: Math.round(performance.now() - started), model: out?.model ?? null,
         actions: actions.length ? actions : undefined, runId: out?.run_id, recoveryPath,
       })
       if (out && selectedReferences?.length && isCurrent()) clearReferences(sessionKey)
-      return { content, runId: out?.run_id, sources, guides, recoveryPath, importTasks: taskStatuses, actions: actions.length ? actions : undefined, earlierContextUnavailable: out?.earlierContextUnavailable }
+      return { content, runId: out?.run_id, sources, guides, recoveryPath, importTaskIds, importTasks: taskStatuses, actions: actions.length ? actions : undefined, earlierContextUnavailable: out?.earlierContextUnavailable }
     },
     [orgId, orgReady, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, sessionKey, actorHistoryScope, history.archived, availableHistory, historyRefs, clearReferences, ensureSession, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft],
   )
-  const sendTurn = useCallback(async (text: string, stream: boolean, turnId?: string, guideRefs?: GuideReference[], guide?: GuideDraft, hasUnsavedGuideEdits = false) => {
+  const sendTurn = useCallback(async (text: string, onDelta?: (delta: string) => void, turnId?: string, guideRefs?: GuideReference[], guide?: GuideDraft, hasUnsavedGuideEdits = false) => {
     if (inFlight.current.has(historyScope) || inFlight.current.size >= 2) {
       throw new Error(i18n.t("aiChat.history.waitForReply", { defaultValue: "Wait for an Assistant response to finish before sending another message." }))
     }
-    const controller = new AbortController()
-    inFlight.current.set(historyScope, controller)
+    const request: InFlightTurn = {
+      controller: new AbortController(),
+      projection: onDelta && turnId ? { id: turnId, userText: text, content: "", timestamp: new Date(), settled: false } : undefined,
+    }
+    const setProgress = (progress: TurnProgress, canStop = false) => {
+      if (request.controller.signal.aborted || inFlight.current.get(historyScope) !== request) return
+      request.progress = progress
+      request.canStop = canStop
+      refreshSending(version => version + 1)
+    }
+    const deliverDelta = onDelta ? (delta: string) => {
+      if (inFlight.current.get(historyScope) !== request) return
+      const projection = request.projection
+      if (projection) {
+        // readAssistantStream bounds reply size before emitting any delta.
+        request.projection = { ...projection, content: projection.content + delta }
+        if (request.frame === undefined) {
+          request.frame = requestAnimationFrame(() => {
+            request.frame = undefined
+            if (currentHistoryScope.current === historyScope) refreshSending(version => version + 1)
+          })
+        }
+      }
+      onDelta(delta)
+    } : undefined
+    const rememberTurn = (outcome: { reply: Awaited<ReturnType<typeof runTurn>> & { stopped?: boolean } } | { error: string }) => {
+      if (!request.projection || inFlight.current.get(historyScope) !== request) return
+      const recent = recentTurns.current
+      recent.set(historyScope, { ...request.projection, ...outcome, settled: true })
+      const oldest = recent.keys().next().value
+      if (recent.size > MAX_RECENT_CHAT_TURNS && oldest !== undefined) recent.delete(oldest)
+    }
+    recentTurns.current.delete(historyScope)
+    inFlight.current.set(historyScope, request)
     refreshSending(version => version + 1)
     try {
-      return await runTurn(text, stream, controller.signal, guideRefs, guide, hasUnsavedGuideEdits, turnId)
+      const result = await runTurn(text, request.controller.signal, setProgress, deliverDelta, guideRefs, guide, hasUnsavedGuideEdits, turnId)
+      const reply = request.stopped ? { content: "", sources: [], stopped: true } : result
+      rememberTurn({ reply })
+      return reply
+    } catch (error) {
+      rememberTurn({ error: error instanceof Error ? error.message : String(error) })
+      throw error
     } finally {
-      if (inFlight.current.get(historyScope) === controller) {
+      if (request.frame !== undefined) cancelAnimationFrame(request.frame)
+      if (inFlight.current.get(historyScope) === request) {
         inFlight.current.delete(historyScope)
         refreshSending(version => version + 1)
       }
     }
   }, [historyScope, runTurn])
-  const onSendMessage = useCallback((text: string, turnId?: string) => sendTurn(text, false, turnId), [sendTurn])
+  const stopReply = useCallback(() => {
+    if (currentHistoryScope.current !== historyScope) return
+    const request = inFlight.current.get(historyScope)
+    if (!request?.canStop) return
+    request.stopped = true
+    request.canStop = false
+    request.progress = undefined
+    request.controller.abort()
+    refreshSending(version => version + 1)
+  }, [historyScope])
+  const pendingTurn = inFlight.current.get(historyScope)
+  const onSendMessage = useCallback((text: string, turnId?: string) => sendTurn(text, undefined, turnId), [sendTurn])
   const onStreamMessage = useCallback<NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>>(
-    async (text, handlers) => {
-      const reply = await sendTurn(text, true, handlers.turnId)
-      handlers.onDelta(reply.content)
-      handlers.onSources(reply.sources)
-      if (reply.actions) handlers.onActions?.(reply.actions)
-      return reply
-    }, [sendTurn],
+    (text, handlers) => sendTurn(text, handlers.onDelta, handlers.turnId), [sendTurn],
   )
 
   const onGuideSaved = useCallback(async (guide: GuideDocument) => {
@@ -802,7 +931,7 @@ function ErpAiChatPanel({
       references = [{ guideId: guide.guideId, revision: guide.revision }]
     }
     if (draftOverride) currentGuide = guideQuestionEdits(currentGuide, draftOverride)
-    const reply = await sendTurn(question, false, undefined, references, currentGuide, Boolean(draftOverride))
+    const reply = await sendTurn(question, undefined, undefined, references, currentGuide, Boolean(draftOverride))
     if (activeScope.current !== scope) throw new Error("The company changed while answering. Reopen the guide in the current company.")
     return reply.content
   }, [sendTurn, operatingCompanyId, actorHistoryScope, sessionKey])
@@ -889,8 +1018,12 @@ function ErpAiChatPanel({
       initialMessages={initialMessages}
       conversationKey={historyScope}
       draft={history.draft}
-      sendPending={inFlight.current.has(historyScope)}
+      sendPending={Boolean(pendingTurn)}
+      turnProjection={pendingTurn?.projection ?? recentTurns.current.get(historyScope)}
+      turnProgress={pendingTurn?.progress}
+      onStopReply={pendingTurn?.canStop ? stopReply : undefined}
       renderMessageActions={renderMessageActions}
+      renderImportTask={importTasks.renderReceipt}
       renderCitation={renderCitation}
       composerContext={composerContext}
       history={actorHistoryScope ? {
@@ -943,8 +1076,9 @@ function ErpAiChatPanel({
             versionId={sourcePreview.versionId} onOpenChange={open => { if (!open) setSourcePreview(null) }} />
         ) : null}
       </>}
-      contextOptions={AI_WORKSPACE_SCOPES}
-      selectedContext={selectedScope}
+      contextOptions={contextOptions}
+      selectedContext={activeScopeOption}
+      onClearSelection={workspaceScope.selection ? selectionReporter?.clearSelection : undefined}
       onContextChange={setSelectedScope}
       agentOptions={chatAgents}
       selectedAgent={selectedAgent}
@@ -953,6 +1087,8 @@ function ErpAiChatPanel({
       onStreamMessage={onStreamMessage}
       onImportFiles={importTasks.onImportFiles}
       importFileNames={importTasks.fileNames}
+      importFocusedFileNames={importTasks.focusedFileNames}
+      onClearImportFocus={importTasks.clearFocus}
       showWorkbench={!firstOrgProfile && permissionsReady && checkPermission("dashboard:analytics", "read").allowed}
       importTaskContent={<>
         {orgReady && identity && operatingCompanyId ? (

@@ -1,3 +1,4 @@
+import { ModuleCsvHistoryDisclosure } from "../../../components/module-csv-history"
 import { getStdbSession } from "@/lib/api-session";
 import { serverPrefetchQueryLists } from "@/lib/server-query";
 import { InventoryClient } from "../inventory/inventory-client";
@@ -14,12 +15,15 @@ export default async function ProductsPage() {
     CATALOG_RESOURCES,
   );
   return (
-    <InventoryClient
-      workspace="products"
-      initialProducts={products}
-      initialProductCategories={productCategories}
-      initialUoms={uoms}
-      organizationId={session.organizationId}
-    />
+    <>
+      <ModuleCsvHistoryDisclosure organizationId={session.organizationId} view="products" />
+      <InventoryClient
+        workspace="products"
+        initialProducts={products}
+        initialProductCategories={productCategories}
+        initialUoms={uoms}
+        organizationId={session.organizationId}
+      />
+    </>
   );
 }

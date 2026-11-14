@@ -3,8 +3,12 @@
 import { usePageCompositionActionSlot } from "@lumiere/ui/pages/page-composition-host"
 import { OperationalPageComposition } from "../../../components/operational-page-composition"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
+import { useQuery } from "@tanstack/react-query"
+import { useErpSession } from "@lumiere/erp-session"
+import { apiFetch } from "@lumiere/query-hooks/http"
+import { AskAboutRecordButton } from "../../../components/ask-about-record-button"
 import { useTranslation } from "@lumiere/i18n"
 import { moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
@@ -48,10 +52,13 @@ import { Button, buttonVariants } from "@lumiere/ui/components/button"
 import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
+import { unwrapEntityValue } from "@lumiere/ui/lib/entity-row-values"
+import { isoToDate, microsToDate, stdbTimestampToDate } from "@lumiere/erp-shared/timestamp-values"
 import { Ban, CheckCheck, CircleCheck, ExternalLink, Pencil, Plus, RotateCcw, Users } from "lucide-react"
-import { TASK_BOARD_STATES, taskBoardState, type TaskBoardState } from "../projects/project-record"
+import { projectStatusTag, TASK_BOARD_STATES, taskBoardState, type TaskBoardState } from "../projects/project-record"
 import { taskAttachmentCounts, taskBoardItemInState, toTaskBoardItem } from "./task-board-items"
 import { TaskAssigneesDialog } from "./task-assignees-dialog"
+import { matchesTaskRecord, taskRecordTarget, type TaskRecordLink } from "./task-record-link"
 
 const TASK_COLUMN_COLORS = ["bg-info", "bg-warning", "bg-category-3", "bg-success", "bg-destructive"] as const
 
@@ -59,6 +66,7 @@ interface TasksClientProps {
   organizationId?: number
   initialTasks?: ProjectTask[]
   initialProjects?: ProjectProject[]
+  taskLink?: TaskRecordLink
 }
 
 type ModalState =
@@ -78,10 +86,17 @@ function getTaskFieldValue(task: Record<string, unknown>, fieldName: string): un
       return String(task.priority ?? "0")
     case "plannedHours":
       return task.plannedHours ?? ""
-    case "dateDeadline":
-      return task.dateDeadline
-        ? new Date(Number(task.dateDeadline) / 1000).toISOString().split("T")[0]
-        : ""
+    case "wbsCode":
+      return task.wbsCode ?? ""
+    case "milestoneId":
+      return String(unwrapEntityValue(task.milestoneId) ?? "")
+    case "dateDeadline": {
+      const raw = unwrapEntityValue(task.dateDeadline)
+      const deadline = typeof raw === "number" || typeof raw === "bigint" || typeof raw === "string" && /^-?\d+$/.test(raw)
+        ? microsToDate(raw)
+        : typeof raw === "string" ? isoToDate(raw) : stdbTimestampToDate(raw)
+      return deadline?.toISOString().split("T")[0] ?? ""
+    }
     case "description":
       return task.description ?? ""
     case "kanbanState":
@@ -102,19 +117,47 @@ function TasksClientLoaded({
   organizationId,
   initialTasks,
   initialProjects,
+  taskLink,
 }: TasksClientProps & { organizationId: number }) {
   useProjectsModuleSubscription()
   const { t } = useTranslation()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+  const session = useErpSession()
   const [modal, setModal] = useState<ModalState>({ type: null })
   const [assignmentTaskId, setAssignmentTaskId] = useState<string | null>(null)
-  const { permissionsReady, checkPermission } = useRBAC()
+  const { permissionsReady, checkPermission, currentUser, roles, policies } = useRBAC()
   const canCreate = permissionsReady !== false && checkPermission("project_task", "create").allowed
-
-  const tasksRead = moduleCollection(useTasks(orgId, initialTasks))
+  const linkedTaskId = taskRecordTarget(taskLink, operatingCompanyId)
+  const linkScopeReady = permissionsReady === true && session.activeCompanyReady === true
+    && session.organizationId === organizationId && currentUser?.id === session.identity
+    && Boolean(session.identity) && session.identity !== "unknown"
+  const canReadLinkedTask = linkScopeReady && linkedTaskId !== undefined && checkPermission("project_task", "read").allowed
+  const linkScope = JSON.stringify([organizationId, String(operatingCompanyId), session.identity, currentUser, roles, policies, linkedTaskId])
+  const currentLinkScope = useRef(linkScope)
+  currentLinkScope.current = linkScope
+  const linkedTaskQuery = useQuery({
+    queryKey: ["project-task-record", linkScope],
+    enabled: canReadLinkedTask,
+    gcTime: 0,
+    retry: false,
+    refetchOnMount: "always",
+    queryFn: async ({ signal }) => {
+      const response = await apiFetch(`/api/authoritative/tasks/${linkedTaskId}?companyId=${operatingCompanyId}`, { cache: "no-store", signal })
+      if (response.status === 403 || response.status === 404) return null
+      if (!response.ok) throw new Error("Task read failed")
+      const { data } = await response.json() as { data?: unknown }
+      return linkedTaskId && matchesTaskRecord(data, linkedTaskId, orgId, operatingCompanyId) ? data as ProjectTask : null
+    },
+  })
+  const linkedTask = canReadLinkedTask && linkedTaskQuery.isSuccess
+    ? linkedTaskQuery.data
+    : null
+  const linkedTaskStatus = linkedTask ? projectStatusTag(linkedTask.state) : undefined
+  const canEditLinkedTask = Boolean(linkedTask) && checkPermission("project_task", "write").allowed
+  const tasksRead = moduleCollection(useTasks(orgId, initialTasks, { enabled: !taskLink }))
   const tasks = tasksRead.rows
-  const canAssign = tasksRead.state.status === "ready" && permissionsReady !== false && checkPermission("project_task", "write").allowed
+  const canAssign = taskLink ? canEditLinkedTask : tasksRead.state.status === "ready" && permissionsReady !== false && checkPermission("project_task", "write").allowed
   const { data: projects = [] } = useProjects(orgId, initialProjects)
   const createTask = useCreateTask(orgId, operatingCompanyId)
   const updateTask = useUpdateTask(orgId, operatingCompanyId)
@@ -129,12 +172,12 @@ function TasksClientLoaded({
   const taskStageFieldOptions = useMemo(() => {
     const optional = { value: "", label: "—" }
     const fromPairs = taskStagePairOptionsFromTasks(
-      tasks as Record<string, unknown>[],
+      (linkedTask ? [linkedTask] : tasks) as Record<string, unknown>[],
       projects as Record<string, unknown>[],
     )
     if (fromPairs.length > 0) return [optional, ...fromPairs]
     return [{ value: "", label: t("common.lookup.noTaskStages"), disabled: true }]
-  }, [tasks, projects, t])
+  }, [linkedTask, tasks, projects, t])
 
   const taskFormConfig = useMemo(
     () =>
@@ -151,12 +194,16 @@ function TasksClientLoaded({
         projectId: projectFieldOptions,
         stageId: taskStageFieldOptions,
       })
+      const milestoneId = getTaskFieldValue(task, "milestoneId")
       return {
         ...base,
         sections: base.sections.map((section) => ({
           ...section,
           fields: section.fields.map((field) => ({
             ...field,
+            ...(field.name === "milestoneId" && milestoneId ? {
+              options: [{ label: `#${milestoneId}`, value: String(milestoneId) }],
+            } : {}),
             defaultValue: getTaskFieldValue(task, field.name),
           })) as typeof section.fields,
         })) as typeof base.sections,
@@ -230,8 +277,8 @@ function TasksClientLoaded({
 
   const openEditTask = (taskId: string) => {
     if (!canAssign) return
-    const task = tasks.find((row) => String(row.id) === taskId)
-    if (!task) return
+    const task = taskLink ? linkedTask : tasks.find((row) => String(row.id) === taskId)
+    if (!task || String(task.id) !== taskId) return
     setModal({
       type: "edit",
       form: buildEditTaskForm(task),
@@ -280,26 +327,37 @@ function TasksClientLoaded({
       if (!p) throw new Error(t("tasks.errors.incomplete", { defaultValue: "Enter a task title and check the task details before saving. Your entries are retained." }))
       await createTask.mutateAsync(projectsParamsToJson(p))
     } else if (action === "updateTask" && modal.type === "edit") {
+      if (taskLink && (linkedTaskQuery.isFetching || String(linkedTask?.id) !== String(modal.entityId))) {
+        throw new Error(t("tasks.link.unavailable", { defaultValue: "This task is unavailable in the current company." }))
+      }
       const p = toUpdateTaskParams(formData)
       if (!p) throw new Error(t("tasks.errors.incomplete", { defaultValue: "Enter a task title and check the task details before saving. Your entries are retained." }))
       await updateTask.mutateAsync({
         taskId: modal.entityId,
         params: projectsParamsToJson(p),
       })
+      if (taskLink && currentLinkScope.current === linkScope) await linkedTaskQuery.refetch()
     }
   }
 
   const isPending =
     createTask.isPending || updateTask.isPending || updateTaskState.isPending
-  const assignmentTask = tasks.find((task) => String(task.id) === assignmentTaskId)
+  const assignmentTask = taskLink
+    ? linkedTask?.id != null && String(linkedTask.id) === assignmentTaskId ? linkedTask : undefined
+    : tasks.find((task) => String(task.id) === assignmentTaskId)
   const { target: compositionTarget, slot: compositionSlot } = usePageCompositionActionSlot()
+  const editScope = taskLink ? linkScope : null
+  useEffect(() => {
+    setModal({ type: null })
+    setAssignmentTaskId(null)
+  }, [editScope])
 
   return (
     <div className="flex min-h-[calc(100vh-12rem)] flex-col gap-4">
       <DashboardHeader
         title={t("tasks.page.title")}
         description={t("tasks.page.description")}
-        primaryAction={canCreate ? <Button
+        primaryAction={!taskLink && canCreate ? <Button
           size="sm"
           onClick={() => setModal({ type: "create", form: taskFormConfig, action: "createTask" })}
         >
@@ -317,33 +375,82 @@ function TasksClientLoaded({
       <OperationalPageComposition moduleId="tasks" title={t("tasks.page.title")} actionTarget={compositionTarget}>
         <div className="flex min-h-[calc(100dvh-12rem)] min-w-0 flex-col gap-4">
 
-          <ModuleDataNotice state={tasksRead.state} />
-          {tasksRead.state.status === "loading" ? <Skeleton className="h-96 w-full" /> : null}
-          {(tasksRead.state.status === "ready" || tasksRead.state.status === "partial") && <TaskBoardView
-            className="min-h-0 flex-1"
-            items={boardItems}
-            columns={boardColumns}
-            onMove={canAssign ? handleMoveTask : undefined}
-            onTaskClick={canAssign ? openEditTask : undefined}
-            onCreateInColumn={canCreate ? () => setModal({ type: "create", form: taskFormConfig, action: "createTask" }) : undefined}
-            priorityLabel={(priority) => t(`projects.tasks.priority.${priority}`, { defaultValue: priority })}
-            projects={projectOptions}
-            storageKey="lumiere:tasks-board-view"
-            renderTable={(visibleIds) => (
-              <EntityView
-                config={tableConfig}
-                useCard={false}
-                data={tasks.filter((task) => visibleIds.has(String(task.id)))}
-                onRowClick={canAssign ? (row) => openEditTask(String(row.id)) : undefined}
-              />
-            )}
-          />}
+          {taskLink ? (
+            <section className="space-y-3 rounded-lg border bg-card p-4" aria-label={t("tasks.link.title", { defaultValue: "Linked task" })}>
+              {linkedTask ? (
+                <>
+                  <h2 className="break-words font-semibold">{linkedTask.name}</h2>
+                  <p className="text-sm text-muted-foreground">
+                    #{String(linkedTask.id)}
+                    {linkedTaskStatus ? ` · ${t(`tasks.board.columns.${linkedTaskStatus}`, { defaultValue: linkedTaskStatus })}` : null}
+                  </p>
+                  <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-muted-foreground">{t("projects.forms.editTask.fields.dateDeadline")}</dt>
+                      <dd>{String(getTaskFieldValue(linkedTask, "dateDeadline") || "—")}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">{t("tasks.link.assignees", { defaultValue: "Assignees" })}</dt>
+                      <dd className="break-words">{toTaskBoardItem(linkedTask, { projectNames, identityLabels, attachmentCounts }).assignees.map(({ name }) => name).join(", ") || "—"}</dd>
+                    </div>
+                  </dl>
+                  <div className="flex flex-wrap gap-2">
+                    <AskAboutRecordButton entityType="project_task" recordId={String(linkedTask.id)} label={linkedTask.name} activeTab="tasks" />
+                    {canEditLinkedTask ? (
+                      <Button size="sm" variant={taskLink.view === "assign" ? "outline" : "default"} onClick={() => openEditTask(String(linkedTask.id))}>
+                        {taskLink.view === "edit" ? t("tasks.link.review", { defaultValue: "Review task changes" }) : t("common.edit")}
+                      </Button>
+                    ) : null}
+                    {canEditLinkedTask ? (
+                      <Button size="sm" variant={taskLink.view === "assign" ? "default" : "outline"} onClick={() => setAssignmentTaskId(String(linkedTask.id))}>
+                        {t("tasks.link.assign", { defaultValue: "Assign people" })}
+                      </Button>
+                    ) : null}
+                  </div>
+                </>
+              ) : linkedTaskQuery.isFetching ? (
+                <p role="status" className="text-sm">{t("tasks.link.loading", { defaultValue: "Loading task…" })}</p>
+              ) : linkedTaskQuery.isError && canReadLinkedTask ? (
+                <div className="space-y-2">
+                  <p role="alert" className="text-sm">{t("tasks.link.error", { defaultValue: "The task could not be loaded." })}</p>
+                  <Button size="sm" variant="outline" onClick={() => { void linkedTaskQuery.refetch() }}>{t("common.retry")}</Button>
+                </div>
+              ) : (
+                <p role="status" className="text-sm">{t("tasks.link.unavailable", { defaultValue: "This task is unavailable in the current company." })}</p>
+              )}
+              <Link href="/tasks" className="inline-block text-sm text-primary underline-offset-4 hover:underline">{t("workspace.actions.openMyWork", { defaultValue: "Open my work" })}</Link>
+            </section>
+          ) : (
+            <>
+              <ModuleDataNotice state={tasksRead.state} />
+              {tasksRead.state.status === "loading" ? <Skeleton className="h-96 w-full" /> : null}
+              {(tasksRead.state.status === "ready" || tasksRead.state.status === "partial") && <TaskBoardView
+                className="min-h-0 flex-1"
+                items={boardItems}
+                columns={boardColumns}
+                onMove={canAssign ? handleMoveTask : undefined}
+                onTaskClick={canAssign ? openEditTask : undefined}
+                onCreateInColumn={canCreate ? () => setModal({ type: "create", form: taskFormConfig, action: "createTask" }) : undefined}
+                priorityLabel={(priority) => t(`projects.tasks.priority.${priority}`, { defaultValue: priority })}
+                projects={projectOptions}
+                storageKey="lumiere:tasks-board-view"
+                renderTable={(visibleIds) => (
+                  <EntityView
+                    config={tableConfig}
+                    useCard={false}
+                    data={tasks.filter((task) => visibleIds.has(String(task.id)))}
+                    onRowClick={canAssign ? (row) => openEditTask(String(row.id)) : undefined}
+                  />
+                )}
+              />}
+            </>
+          )}
 
           <FormModal
             open={modal.type === "create" ? canCreate : modal.type === "edit" && canAssign}
             onOpenChange={(open) => !open && setModal({ type: null })}
             config={modal.type ? modal.form : taskFormConfig}
-            isPending={isPending}
+            isPending={isPending || Boolean(taskLink && linkedTaskQuery.isFetching)}
             formLeadingActions={modal.type === "edit" && canAssign ? (
               <Button type="button" variant="outline" disabled={isPending} onClick={() => setAssignmentTaskId(String(modal.entityId))}>
                 <Users className="mr-2 h-4 w-4" /> Assign people
@@ -357,9 +464,12 @@ function TasksClientLoaded({
             }}
           />
           {assignmentTask && canAssign ? (
-            <TaskAssigneesDialog key={`${organizationId}:${assignmentTask.companyId}:${assignmentTask.id}`} organizationId={orgId} task={assignmentTask} onClose={() => setAssignmentTaskId(null)} />
+            <TaskAssigneesDialog key={`${organizationId}:${assignmentTask.companyId}:${assignmentTask.id}`} organizationId={orgId} task={assignmentTask} onClose={() => {
+              setAssignmentTaskId(null)
+              if (taskLink) void linkedTaskQuery.refetch()
+            }} />
           ) : null}
-          <TaskSummary items={boardItems} state={tasksRead.state} />
+          {taskLink ? null : <TaskSummary items={boardItems} state={tasksRead.state} />}
         </div>
       </OperationalPageComposition>
     </div>

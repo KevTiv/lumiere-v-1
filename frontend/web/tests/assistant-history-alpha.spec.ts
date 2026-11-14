@@ -81,6 +81,43 @@ test("reopens an exact current Warehouse transfer from archived chat without wri
   expect(writes).toEqual([])
 })
 
+test("reviews the seeded Warehouse receipt and opens the count wizard without writing stock", async ({ page }) => {
+  const id = Number(process.env.ASSISTANT_HISTORY_WAREHOUSE_TRANSFER)
+  expect(Number.isSafeInteger(id) && id > 0, "Run with the seeded assistant-history CI fixture").toBe(true)
+  await signIn(page)
+  await page.goto("/warehouse")
+  const before = await readTransfer(page, id)
+  await openErpAiChat(page)
+  const assistant = page.getByTestId("erp-ai-chat-panel")
+  await assistant.getByRole("button", { name: "History", exact: true }).click()
+  await assistant.getByRole("button", { name: "New chat", exact: true }).click()
+  const input = assistant.getByTestId("erp-ai-chat-input")
+  const writes: string[] = []
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname
+    if (request.method() === "POST" && /^\/(?:api|v1)\/(?:operations|compat\/reducer)\/.*stock/.test(pathname)) writes.push(pathname)
+  })
+  await input.fill(`Receive stock transfer ${id}`)
+  await assistant.getByTestId("erp-ai-chat-send").click()
+  await assistant.getByRole("button", { name: `Review stock transfer receipt #${id}`, exact: true }).click()
+  await expect(page).toHaveURL((url) =>
+    url.pathname === `/inventory/transfers/${id}` && url.searchParams.get("tab") === "operations",
+  )
+  const transfer = page.getByTestId("transfer-page")
+  await expect(transfer.getByTestId("transfer-title")).toHaveText("WH/IN/SEED-0001")
+  await expect(transfer.getByRole("tab", { name: "Detailed operations" })).toHaveAttribute("aria-selected", "true")
+  await expect(transfer.getByRole("link", { name: "Warehouse", exact: true })).toHaveAttribute("href", "/warehouse")
+  expect(await readTransfer(page, id)).toEqual(before)
+  await page.goto("/warehouse")
+  await openErpAiChat(page)
+  await input.fill("Open cycle count wizard")
+  await assistant.getByTestId("erp-ai-chat-send").click()
+  await assistant.getByRole("button", { name: "Open cycle count wizard", exact: true }).click()
+  await expect(page).toHaveURL((url) => url.pathname === "/warehouse" && url.searchParams.get("tab") === "cycle-wizard")
+  await expect(page.getByTestId("module-tab-warehouse-cycle-wizard")).toHaveAttribute("aria-selected", "true")
+  expect(writes).toEqual([])
+})
+
 test("saves a chart from Assistant and reopens its exact placement from archived history", async ({ page }) => {
   test.setTimeout(180_000)
   const companyId = process.env.ASSISTANT_HISTORY_COMPANY

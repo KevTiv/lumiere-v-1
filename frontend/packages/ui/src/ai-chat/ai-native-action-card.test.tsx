@@ -44,7 +44,7 @@ describe("native assistant action card", () => {
       />,
     )
     expect(onOpen).not.toHaveBeenCalled()
-    expect(screen.getByText("aiChat.native.reviewHint")).toBeTruthy()
+    expect(screen.getByText("aiChat.native.formHint")).toBeTruthy()
   })
 
   it("dispatches the exact scoped intention only once while the host is opening it", async () => {
@@ -96,6 +96,47 @@ describe("native assistant action card", () => {
     )
     expect(screen.queryByText("Private old-company details")).toBeNull()
     expect(onOpen).toHaveBeenCalledOnce()
+  })
+
+  it("keeps opening visible until the native form acknowledges it", async () => {
+    let finish!: (result: "opened") => void
+    const onOpen = vi.fn(
+      () =>
+        new Promise<"opened">((resolve) => {
+          finish = resolve
+        }),
+    )
+    render(
+      <AiNativeActionCard
+        action={action}
+        label="Prepare invoice"
+        onOpen={onOpen}
+      />,
+    )
+    fireEvent.click(screen.getByRole("button", { name: "Prepare invoice" }))
+    expect(screen.getByRole("status").textContent).toBe("aiChat.native.opening")
+    await act(async () => finish("opened"))
+    expect(screen.getByRole("status").textContent).toBe(
+      "aiChat.native.formOpenedStatus",
+    )
+    expect(screen.queryByRole("link")).toBeNull()
+  })
+
+  it("shows a declined native handoff as cancelled and leaves the action available", async () => {
+    render(
+      <AiNativeActionCard
+        action={action}
+        label="Prepare invoice"
+        onOpen={() => "cancelled"}
+      />,
+    )
+    const button = screen.getByRole("button", {
+      name: "Prepare invoice",
+    }) as HTMLButtonElement
+    fireEvent.click(button)
+    await screen.findByText("aiChat.native.openCancelled")
+    expect(button.disabled).toBe(false)
+    expect(screen.queryByRole("alert")).toBeNull()
   })
 
   it("suppresses a late failure when the displayed action changes scope", async () => {

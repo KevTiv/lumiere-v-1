@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useErpSession } from "@lumiere/erp-session"
+import { accountMoveBatchHref } from "@lumiere/erp-shared/record-links"
 import { useTranslation } from "@lumiere/i18n"
 import { useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting/accounts"
 import { useAccountJournals } from "@lumiere/query-hooks/hooks/accounting/journals"
@@ -34,6 +35,7 @@ import {
   type ImportProposal,
   type ImportWorkflow,
 } from "./import-workflow"
+import { ModuleBackfillAction } from "./module-backfill-action"
 import { useImportProposalAttempt } from "./use-import-proposal-attempt"
 import { importTaskHref } from "./import-task-navigation"
 import { importWorkflowKey, useImportWorkflow } from "./use-import-workflow"
@@ -354,6 +356,10 @@ function ExecutionPanel({
         <>
           {!reviewId && <p>{t("settings.importWorkflow.chooseSource")}</p>}
           {review.error && <p role="alert">{review.error.message}</p>}
+          {review.data && !review.isError && (
+            <ModuleBackfillAction detail={review.data} organizationId={organizationId}
+              companyId={companyId} actor={actor} disabled={busy || preparationLocked} />
+          )}
           {nativeHandoff && (
             <div className="space-y-2">
               <p>{t("settings.importWorkflow.nativeHandoff")}</p>
@@ -634,6 +640,13 @@ function ExecutionPanel({
           }}
         />
       )}
+      {view === "results" && workflow.data?.backfilledRecords?.map(({ module, count }) => (
+        <p key={module}>
+          <a className="underline underline-offset-4" href={module === "sales" ? "/sales#backfilled-records" : "/warehouse#backfilled-records"}>
+            {count} {module === "sales" ? "verified customer sales" : "verified inventory counts"}
+          </a>
+        </p>
+      ))}
       {view === "results" && nativeResults.length > 0 && (
         <section
           className="space-y-3"
@@ -1201,7 +1214,7 @@ function ProposalDetails({
                 <li key={id}>
                   <a
                     className="underline"
-                    href={`/accounting/invoices/${id}?companyId=${companyId}`}
+                    href={accountMoveBatchHref([id], companyId)}
                   >
                     {proposal.entries[index]?.reference ??
                       t("settings.importWorkflow.record", { id })}

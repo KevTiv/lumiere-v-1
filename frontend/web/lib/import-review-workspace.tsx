@@ -63,6 +63,7 @@ import {
 } from "./import-review-uncertainty"
 import { ImportReviewEditor, ReviewRequestError } from "./import-review-editor"
 import { ImportReviewBulk } from "./import-review-bulk"
+import { ModuleBackfillAction } from "./module-backfill-action"
 import { ImportReviewDecisionSummary } from "./import-review-decision-summary"
 import { resetHistoryQueries } from "./history-data"
 import { sourceHistoryLink } from "./source-observation"
@@ -687,6 +688,10 @@ function ReviewWorkspace({
                       "Check the current import result before loading another source.",
                   })}
             </p>
+          ) : null}
+          {allowImport ? (
+            <ModuleBackfillAction detail={detail.data} companyId={companyId}
+              organizationId={organizationId} actor={actor} disabled={unavailable || !!selected || !!continuationBlock} />
           ) : null}
           <ImportReviewDecisionSummary
             detail={detail.data}

@@ -462,7 +462,7 @@ export function ModuleView({
             </div>
             {visibleTabs.length > 1 && (
               <div ref={tabListRef} className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]" data-testid={`module-tabs-${config.id}`}>
-                <TabsList variant="line" className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto">
+                <TabsList variant="line" className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
                   {visibleTabs.map((tab) => (
                     <TabsTrigger
                       key={tab.id}

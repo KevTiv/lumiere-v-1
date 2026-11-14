@@ -513,8 +513,11 @@ async function main() {
       body: { query: "Which mapping did we confirm?", companyId, chat_session_key: sessionKey },
       expected: 503,
     })
-    assert.equal(result.value?.code, "ai_generation_admission_unavailable",
-      "The isolated Gateway must build context and reach the spend admission boundary")
+    assert.equal(
+      result.value?.code,
+      "ai_generation_admission_unavailable",
+      `The isolated Gateway must reach spend admission after building context. ${path} returned ${result.status} (${result.value?.code ?? "no error code"}).`,
+    )
     const checkpoint = (await getContext(env, admin, companyId, sessionKey)).value
     assert.ok(checkpoint.revision >= previousRevision + 2, "Both the Gateway path and the direct probe must advance the checkpoint")
     previousRevision = checkpoint.revision

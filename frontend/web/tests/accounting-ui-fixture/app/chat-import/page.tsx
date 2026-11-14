@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { LumiereApiProvider } from "@lumiere/api-client"
 import { ErpSessionProvider } from "@lumiere/erp-session"
@@ -9,6 +10,7 @@ import { AIChatPanel } from "@lumiere/ui"
 import { ThemeProvider } from "@lumiere/ui/components/theme-provider"
 import { RBACProvider } from "@lumiere/ui/lib/rbac-context"
 import { useChatImportTasks } from "../../../../lib/chat-import-tasks"
+import { DataImportWorkspace } from "../../../../lib/data-import-workspace"
 import { webApi } from "../../../../lib/lumiere-web-http"
 
 function ChatFixture({ identity, companyId }: { identity: string; companyId: number }) {
@@ -40,6 +42,7 @@ function ChatFixture({ identity, companyId }: { identity: string; companyId: num
 }
 
 export default function Page() {
+  const search = useSearchParams()
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }))
   const [actor, setActor] = useState("ab".repeat(32))
   const [companyId, setCompanyId] = useState(9001)
@@ -55,7 +58,13 @@ export default function Page() {
                   <button type="button" onClick={() => setCompanyId(9002)}>Change import company</button>
                   <button type="button" onClick={() => setActor("cd".repeat(32))}>Change import actor</button>
                 </div>
-                <div className="min-h-0 flex-1"><ChatFixture identity={actor} companyId={companyId} /></div>
+                <div className="min-h-0 flex-1">
+                  {search.get("surface") === "settings" ? (
+                    <DataImportWorkspace organizationId={8001} urlSearch={search.toString()} />
+                  ) : (
+                    <ChatFixture identity={actor} companyId={companyId} />
+                  )}
+                </div>
               </main>
             </ThemeProvider>
           </ErpSessionProvider>

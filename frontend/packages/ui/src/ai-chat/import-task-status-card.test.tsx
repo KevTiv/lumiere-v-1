@@ -17,6 +17,7 @@ vi.mock("@lumiere/i18n", () => ({
   }),
 }))
 import { ImportTaskStatusCard } from "./import-task-status-card"
+import { CurrencyFormatProvider } from "../lib/currency-context"
 
 function status(): ChatImportTaskStatus {
   return {
@@ -88,6 +89,63 @@ it("renders authoritative draft totals separately from source confirmation and l
   ).toContain("importTask=" + "a".repeat(32) + "&importCompany=3")
 })
 
+it("reopens the exact journal batch and labels posting only from live readback", () => {
+  const saved = status()
+  const result = saved.proposals[0]!.verifiedResult!
+  result.recordCount = 11
+  result.lineCount = 22
+  result.totalDebit = "582400"
+  result.totalCredit = "582400"
+  result.records = Array.from({ length: 11 }, (_, index) => ({
+    id: String(90 + index),
+    reference: `SOURCE-${index + 1}`,
+  }))
+  saved.fileNames = ["electricity.csv"]
+  saved.proposals[0]!.expectedRecords = 11
+  saved.sourceRows = { total: 11, ready: 11, held: 0, excluded: 0 }
+  const renderCard = (postedCount: number) => (
+    <CurrencyFormatProvider locale="en" currencies={[{ id: 1, code: "RWF" }]}>
+      <ImportTaskStatusCard
+        status={saved}
+        companyId={3}
+        postingStatuses={[
+          {
+            proposalId: "9",
+            recordCount: 11,
+            draftCount: 11 - postedCount,
+            postedCount,
+            otherCount: 0,
+            unavailableCount: 0,
+          },
+        ]}
+      />
+    </CurrencyFormatProvider>
+  )
+  const view = render(renderCard(0))
+  expect(
+    screen.getByRole("heading", { name: "11 journal drafts saved" }),
+  ).toBeTruthy()
+  expect(screen.getByText("RWF 582,400 · 22 balanced lines")).toBeTruthy()
+  const href = screen
+    .getByRole("link", { name: "View journal entries" })
+    .getAttribute("href")!
+  const params = new URL(href, "https://example.test").searchParams
+  expect(params.get("tab")).toBe("journal-entries")
+  expect(params.get("importEntryCompany")).toBe("3")
+  expect(params.get("importEntryIds")?.split(",")).toEqual(
+    result.records.map((record) => record.id),
+  )
+  view.rerender(renderCard(11))
+  expect(
+    screen.getByRole("heading", { name: "11 journal entries posted" }),
+  ).toBeTruthy()
+  expect(
+    screen.getByText(
+      "Current state · 11 posted · 0 draft · 0 other · 0 unavailable",
+    ),
+  ).toBeTruthy()
+})
+
 it("suppresses cards after a company switch and cards whose readback expired", () => {
   const saved = { ...status(), nativeResults: [nativeResult()] }
   const view = render(<ImportTaskStatusCard status={saved} companyId={4} />)
@@ -138,8 +196,8 @@ it("shows native receipts when no Accounting proposal exists and labels job coun
     screen.getByRole("region", { name: "Native import job receipts" }),
   ).toBeTruthy()
   expect(
-    screen.getByText("No saved Accounting draft proposal yet."),
-  ).toBeTruthy()
+    screen.queryByText("No saved Accounting draft proposal yet."),
+  ).toBeNull()
   expect(screen.queryByText("No saved ERP execution proposal yet.")).toBeNull()
   expect(screen.getByText("Job #20 · Partial")).toBeTruthy()
   expect(
@@ -172,7 +230,7 @@ it("keeps rolled-back job evidence separate from verified Accounting drafts", ()
     />,
   )
   expect(
-    screen.getByRole("heading", { name: "Accounting drafts" }),
+    screen.getByRole("heading", { name: "2 journal drafts saved" }),
   ).toBeTruthy()
   expect(
     screen.getByText("2 verified draft journal entries · 4 lines"),
