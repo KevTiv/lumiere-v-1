@@ -1,4 +1,18 @@
 {
+  "moduleCsvHistory": {
+    "title": "CSV history",
+    "salesDescription": "Confirmed sales reported in CSV files. Shop and period summaries may overlap.",
+    "description": "Confirmed source records from the company’s CSV imports.",
+    "search": "Search CSV history",
+    "productCustomer": "Product or customer",
+    "location": "Location",
+    "quantity": "Quantity",
+    "unitPrice": "Unit price",
+    "amount": "Recorded amount",
+    "sourceRow": "{{file}} · row {{row}}",
+    "showDataset": "Show all rows in this dataset",
+    "openReview": "Open source review"
+  },
   "activation": {
     "tasks": {
       "contact": "Add a contact",

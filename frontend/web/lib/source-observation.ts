@@ -45,17 +45,20 @@ export function interpretSourceCells(original: string): SourceInterpretation[] {
 }
 
 /** Links are navigation only. The history API resolves current actor/company access. */
-export function sourceHistoryLink(companyId: number, batchId?: string): string {
+export function sourceHistoryLink(companyId: number, batchId?: string, rowId?: string): string {
   if (!Number.isSafeInteger(companyId) || companyId <= 0)
     throw new Error("Select a valid operating company.")
   if (batchId !== undefined && !/^[1-9]\d*$/.test(batchId))
     throw new Error("Choose a valid source dataset.")
+  if (rowId !== undefined && (!batchId || !/^[1-9]\d*$/.test(rowId)))
+    throw new Error("Choose a valid source row.")
   const params = new URLSearchParams({
     section: "imports",
     historyCompany: String(companyId),
     historyVerified: "true",
   })
   if (batchId !== undefined) params.set("historyBatch", batchId)
+  if (rowId !== undefined) params.set("historyRow", rowId)
   return `/settings?${params}#available-history`
 }
 
@@ -65,8 +68,11 @@ export function sourceHistorySelection(search: string, companyId: number) {
   if (params.get("historyCompany") !== String(companyId))
     return { batchId: null, verifiedOnly: false }
   const batch = params.get("historyBatch")
+  const batchId = batch && /^[1-9]\d*$/.test(batch) ? batch : null
+  const row = params.get("historyRow")
   return {
-    batchId: batch && /^[1-9]\d*$/.test(batch) ? batch : null,
+    batchId,
+    ...(batchId && row && /^[1-9]\d*$/.test(row) ? { rowId: row } : {}),
     verifiedOnly: params.get("historyVerified") === "true",
   }
 }
