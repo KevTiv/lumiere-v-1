@@ -1,10 +1,11 @@
 import type { WorkspaceProfile } from '@lumiere/ui/lib/workspace-profile';
+import { moduleBackfillTabs } from './module-backfill-navigation';
 
 export const PRODUCT_CATALOG_TAB_IDS = ['products', 'product-categories'] as const;
 
 export const WAREHOUSE_TAB_IDS = [
   'stock', 'lots', 'serials', 'transfers', 'stock-moves', 'adjustments',
-  'cycle-counts', 'cycle-wizard', 'warehouses', 'locations', 'replenishment',
+  'cycle-counts', moduleBackfillTabs.warehouse, 'cycle-wizard', 'warehouses', 'locations', 'replenishment',
 ] as const;
 
 /** Project only the admitted Inventory tabs; canonical resources and filters stay unchanged. */

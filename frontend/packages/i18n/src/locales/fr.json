@@ -1,17 +1,27 @@
 {
-  "moduleCsvHistory": {
-    "title": "Historique CSV",
-    "salesDescription": "Ventes confirmées dans les fichiers CSV. Les récapitulatifs peuvent se chevaucher par boutique et période.",
-    "description": "Données source confirmées dans les imports CSV de la société.",
-    "search": "Rechercher dans l’historique CSV",
-    "productCustomer": "Produit ou client",
-    "location": "Emplacement",
+  "moduleRecords": {
+    "sales": "Récapitulatifs des ventes clients",
+    "warehouse": "Comptages enregistrés",
+    "period": "Période de vente",
+    "countDate": "Date du comptage",
+    "customer": "Client",
+    "product": "Produit",
     "quantity": "Quantité",
     "unitPrice": "Prix unitaire",
-    "amount": "Montant enregistré",
+    "reportedTotal": "Total déclaré",
+    "paymentComment": "Note de paiement",
+    "pieces": "Pièces",
+    "kilograms": "Kilogrammes",
+    "location": "Emplacement",
+    "source": "Source",
     "sourceRow": "{{file}} · ligne {{row}}",
-    "showDataset": "Afficher toutes les lignes de ce jeu de données",
-    "openReview": "Ouvrir la revue des sources"
+    "showAll": "Afficher tous les enregistrements",
+    "loadMore": "Charger plus",
+    "emptySales": "Aucun récapitulatif des ventes clients enregistré.",
+    "emptyCounts": "Aucun comptage enregistré.",
+    "emptyFiltered": "Aucun enregistrement ne correspond aux dates ou à l’import sélectionné.",
+    "otherCompany": "Sélectionnez la société utilisée pour cet import afin de consulter ses enregistrements.",
+    "loadError": "Impossible de charger les enregistrements."
   },
   "aiHarness": {
     "platformProfile": {

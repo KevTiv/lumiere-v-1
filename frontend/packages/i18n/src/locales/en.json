@@ -1,17 +1,27 @@
 {
-  "moduleCsvHistory": {
-    "title": "CSV history",
-    "salesDescription": "Confirmed sales reported in CSV files. Shop and period summaries may overlap.",
-    "description": "Confirmed source records from the company’s CSV imports.",
-    "search": "Search CSV history",
-    "productCustomer": "Product or customer",
-    "location": "Location",
+  "moduleRecords": {
+    "sales": "Customer sales summaries",
+    "warehouse": "Recorded counts",
+    "period": "Sales period",
+    "countDate": "Count date",
+    "customer": "Customer",
+    "product": "Product",
     "quantity": "Quantity",
     "unitPrice": "Unit price",
-    "amount": "Recorded amount",
+    "reportedTotal": "Reported total",
+    "paymentComment": "Payment note",
+    "pieces": "Pieces",
+    "kilograms": "Kilograms",
+    "location": "Location",
+    "source": "Source",
     "sourceRow": "{{file}} · row {{row}}",
-    "showDataset": "Show all rows in this dataset",
-    "openReview": "Open source review"
+    "showAll": "Show all records",
+    "loadMore": "Load more",
+    "emptySales": "No customer sales summaries have been saved.",
+    "emptyCounts": "No counts have been saved.",
+    "emptyFiltered": "No records match the selected dates or import.",
+    "otherCompany": "Switch to the company used for this import to see its records.",
+    "loadError": "Could not load records."
   },
   "activation": {
     "tasks": {
@@ -19205,6 +19215,7 @@
   "purchasing.dashboard.orderValue": "Order value",
   "purchasing.dashboard.vendorUnavailable": "Vendor unavailable",
   "availableHistory": {
+    "showDataset": "Show all rows in this dataset",
     "verifiedOnly": "Only rows with confirmed facts",
     "verifiedHint": "Includes partially reviewed rows with confirmed fields. Unconfirmed interpretations remain hidden; original text, dates and row labels remain source context. These observations do not change posted documents or current balances.",
     "confirmedValue": "Value confirmed",

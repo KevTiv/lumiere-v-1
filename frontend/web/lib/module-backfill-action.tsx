@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
-import type { BackfillModule } from "../components/module-backfill-records"
+import { moduleBackfillHref, type BackfillModule } from "./module-backfill-navigation"
 import { apiFetch } from "./api-fetch"
 import type { ReviewDetail, ReviewRow } from "./import-review-model"
 
@@ -58,12 +58,14 @@ function destination(item: ReviewRow): BackfillModule | undefined {
 
 export function ModuleBackfillAction({
   detail,
+  taskId,
   companyId,
   organizationId,
   actor,
   disabled,
 }: {
   detail: ReviewDetail
+  taskId?: string
   companyId: number
   organizationId: number
   actor: string | null | undefined
@@ -78,6 +80,7 @@ export function ModuleBackfillAction({
       <BackfillAction
         key={`${organizationId}:${companyId}:${actor}:${detail.id}:${module}`}
         batchId={detail.id}
+        taskId={taskId}
         companyId={companyId}
         organizationId={organizationId}
         actor={actor}
@@ -91,6 +94,7 @@ export function ModuleBackfillAction({
 
 function BackfillAction({
   batchId,
+  taskId,
   companyId,
   organizationId,
   actor,
@@ -99,6 +103,7 @@ function BackfillAction({
   disabled,
 }: {
   batchId: string
+  taskId?: string
   companyId: number
   organizationId: number
   actor: string | null | undefined
@@ -240,11 +245,7 @@ function BackfillAction({
         ) : null}
         <a
           className="underline underline-offset-4"
-          href={
-            sales
-              ? "/sales#backfilled-records"
-              : "/warehouse#backfilled-records"
-          }
+          href={moduleBackfillHref(module, taskId ? { id: taskId, companyId } : undefined)}
         >
           {sales ? "Open Sales records" : "Open Warehouse records"}
         </a>

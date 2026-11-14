@@ -1,7 +1,8 @@
 'use client';
 
 import { saleOrderListFieldAliases } from '@lumiere/ui/lib/sales-entity-configs';
-import { ModuleCsvHistory, useCanReadModuleCsvHistory } from "../../../components/module-csv-history"
+import { ModuleBackfillRecords, useCanReadModuleBackfill } from "../../../components/module-backfill-records"
+import { moduleBackfillTabs } from "@/lib/module-backfill-navigation"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
 import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
 import { useCurrencyFormat } from "@lumiere/ui"
@@ -832,20 +833,20 @@ function SalesClientLoaded({
     return csvImportForm(t, t(titleKey[csvKind]));
   }, [csvKind, t]);
 
-  const canReadCsvHistory = useCanReadModuleCsvHistory(organizationId);
+  const canReadBackfill = useCanReadModuleBackfill(organizationId);
   const moduleConfig = useMemo((): ModuleConfig => {
     const config = salesModuleConfig(t);
-    if (!canReadCsvHistory) return config;
+    if (!canReadBackfill) return config;
     return {
       ...config,
       tabs: [...config.tabs, {
-        id: 'csv-history',
-        label: t('moduleCsvHistory.title', { defaultValue: 'CSV history' }),
+        id: moduleBackfillTabs.sales,
+        label: t('moduleRecords.sales'),
         type: 'custom',
-        customContent: <ModuleCsvHistory organizationId={organizationId} view="sales" />,
+        customContent: <ModuleBackfillRecords organizationId={organizationId} module="sales" />,
       }],
     };
-  }, [canReadCsvHistory, organizationId, t]);
+  }, [canReadBackfill, organizationId, t]);
 
   const salesTabIds = useMemo(() => {
     const workTabId = moduleWorkBoardTabId(moduleConfig);

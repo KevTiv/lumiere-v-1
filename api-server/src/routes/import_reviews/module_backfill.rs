@@ -59,6 +59,30 @@ struct Selection {
 pub(super) struct ReadQuery {
     company_id: u64,
     before_id: Option<i64>,
+    task_id: Option<String>,
+    from: Option<String>,
+    through: Option<String>,
+}
+
+impl ReadQuery {
+    fn validate(&self) -> Result<(), ApiError> {
+        if self
+            .task_id
+            .as_deref()
+            .is_some_and(|task| !super::tasks::valid_request_id(task))
+        {
+            return Err(ApiError::BadRequest("Invalid import task ID".into()));
+        }
+        for date in [&self.from, &self.through].into_iter().flatten() {
+            calendar_date(date).map_err(ApiError::BadRequest)?;
+        }
+        if matches!((&self.from, &self.through), (Some(from), Some(through)) if from > through) {
+            return Err(ApiError::BadRequest(
+                "Date range start must be on or before its end".into(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Serialize)]
@@ -517,13 +541,47 @@ pub(super) async fn read(
     Path(module): Path<Module>,
     Query(query): Query<ReadQuery>,
 ) -> Result<Json<Value>, ApiError> {
+    query.validate()?;
     let ctx = scope(&state, &session, query.company_id).await?;
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
     let client = pool.get().await.map_err(ApiError::internal)?;
-    let rows = client.query("SELECT id,batch_id,source_file,source_row,period_start::text,period_end::text,facts,item_id,source_revision
-        FROM lumiere_platform.module_backfill_record WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric
-        AND module=$3 AND ($4::bigint IS NULL OR id < $4) ORDER BY id DESC LIMIT 101",
-        &[&ctx.organization_id().to_string(),&query.company_id.to_string(),&module.name(),&query.before_id]).await.map_err(ApiError::internal)?;
+    let rows = client
+        .query(
+            "SELECT record.id, record.batch_id, record.source_file, record.source_row,
+                    record.period_start::text, record.period_end::text, record.facts,
+                    record.item_id, record.source_revision
+             FROM lumiere_platform.module_backfill_record record
+             WHERE record.organization_id = $1::text::numeric
+               AND record.company_id = $2::text::numeric
+               AND record.module = $3
+               AND ($5::text IS NULL OR EXISTS (
+                   SELECT 1 FROM lumiere_platform.import_task_review link
+                   WHERE link.organization_id = record.organization_id AND link.company_id = record.company_id
+                     AND link.batch_id = record.batch_id AND link.actor_identity = $8 AND link.request_id = $5
+               ))
+               AND ($6::text IS NULL OR record.period_end >= $6::text::date)
+               AND ($7::text IS NULL OR record.period_start <= $7::text::date)
+               AND ($4::bigint IS NULL OR (record.period_end, record.id) < (
+                   SELECT cursor.period_end, cursor.id
+                   FROM lumiere_platform.module_backfill_record cursor
+                   WHERE cursor.id = $4 AND cursor.organization_id = $1::text::numeric
+                     AND cursor.company_id = $2::text::numeric AND cursor.module = $3
+               ))
+             ORDER BY record.period_end DESC, record.id DESC
+             LIMIT 101",
+            &[
+                &ctx.organization_id().to_string(),
+                &query.company_id.to_string(),
+                &module.name(),
+                &query.before_id,
+                &query.task_id,
+                &query.from,
+                &query.through,
+                &ctx.actor_identity(),
+            ],
+        )
+        .await
+        .map_err(ApiError::internal)?;
     let next = (rows.len() > 100).then(|| rows[99].get::<_, i64>("id").to_string());
     let data = rows.iter().take(100).map(|row| json!({
         "id":row.get::<_,i64>("id").to_string(),"batchId":row.get::<_,i64>("batch_id").to_string(),
@@ -537,6 +595,26 @@ pub(super) async fn read(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn read_filters_require_valid_dates_and_import_identity() {
+        let mut query = ReadQuery {
+            company_id: 4097,
+            before_id: None,
+            task_id: Some("a".repeat(32)),
+            from: Some("2022-06-13".into()),
+            through: Some("2022-06-13".into()),
+        };
+        assert!(query.validate().is_ok());
+        query.through = Some("2022-06-12".into());
+        assert!(query.validate().is_err());
+        query.through = Some("2022-02-29".into());
+        assert!(query.validate().is_err());
+        query.through = None;
+        assert!(query.validate().is_ok());
+        query.task_id = Some("invalid".into());
+        assert!(query.validate().is_err());
+    }
 
     fn source(fields: &[(&str, &str, &str)]) -> ReviewItem {
         serde_json::from_value(json!({
