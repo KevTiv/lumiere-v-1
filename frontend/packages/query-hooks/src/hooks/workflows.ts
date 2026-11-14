@@ -7,6 +7,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import type { JsonObject } from "@lumiere/api-client/json-object"
 import { responseErrorMessage } from "@lumiere/api-client/response-error"
 
 import {
@@ -263,7 +264,7 @@ export function usePublishWorkflowVersion(organizationId: bigint, _companyId?: n
     }) => {
       const { urlPath, init } = stdbBffCommandPost("publish_workflow_version", { workflowVersionId: input.workflowVersionId, expectedRevision: input.expectedDraftRevision })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to publish workflow version")
+      if (!r.ok) throw new Error(await responseErrorMessage(r, "Failed to publish workflow version"))
       await requireWorkflowVersionState(organizationId, input.workflowVersionId, "Published")
     },
     onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
@@ -397,16 +398,25 @@ export function useCancelWorkflow(organizationId: bigint) {
   })
 }
 
+export type WorkflowSimulationInput = {
+  workflowVersionId: bigint | number | string
+  params: SimulateWorkflowParams
+  sampleFields?: { fieldKey: string; value: JsonObject }[]
+}
+
 export function useSimulateWorkflow(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: {
-      workflowVersionId: bigint | number | string
-      params: SimulateWorkflowParams
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost("simulate_workflow", { workflowVersionId: input.workflowVersionId, params: stdbParamsToJson(input.params as object, "SimulateWorkflowParams") })
+    mutationFn: async ({ workflowVersionId, params, sampleFields }: WorkflowSimulationInput) => {
+      const payload = stdbParamsToJson(params, "SimulateWorkflowParams")
+      if (sampleFields) {
+        const snapshot = stdbParamsToJson(params.snapshot)
+        snapshot.fields = sampleFields.map(({ fieldKey, value }) => ({ field_key: fieldKey, value }))
+        payload.snapshot = snapshot
+      }
+      const { urlPath, init } = stdbBffCommandPost("simulate_workflow", { workflowVersionId, params: payload })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to simulate workflow")
+      if (!r.ok) throw new Error(await responseErrorMessage(r, "Failed to simulate workflow"))
     },
     onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
   })

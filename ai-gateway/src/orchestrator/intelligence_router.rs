@@ -28,6 +28,7 @@ use super::{
     model_configuration::{
         IntelligenceRole, IntelligenceRoute, IntelligenceRouteResolver, ModelProfile,
     },
+    skill_access::{ActorSkillAccess, SkillAccessError},
     spend_admission::{
         spend_binding_for_profile, SpendAdmittedLlm, SpendLedger, UnresolvedProviderAttempt,
     },
@@ -263,6 +264,7 @@ pub(crate) async fn run_catalogued_generation_surface(
     bounded_state: serde_json::Value,
     generation_instructions: Option<String>,
     generation_max_tokens: Option<u32>,
+    skill_access: &ActorSkillAccess<'_>,
 ) -> Result<GovernedProgramOutcome> {
     let catalog = governed_program_for_skill(skill_key).with_context(|| {
         format!("skill '{skill_key}' is not registered in governed program catalog")
@@ -290,7 +292,8 @@ pub(crate) async fn run_catalogued_generation_surface(
         company_id,
         run.run_id,
     )
-    .with_skill_gate(reader, skill_key);
+    .with_skill_gate(reader, skill_key)
+    .with_actor_skill_access(skill_access, skill_key);
     let checkpoint_store = StdbProgramCheckpointStore { writer, reader };
     let recorder = StdbIntelligenceEventRecorder { writer, reader };
     let context = GovernedProgramContext {
@@ -332,6 +335,7 @@ pub(crate) async fn gate_rag_answer_with_review(
     evidence: &TextEvidence,
     passages: &[SourcePassage],
     reviewed_claims: Option<&dyn super::reviewed_claims::ReviewedClaimResolver>,
+    skill_access: &ActorSkillAccess<'_>,
 ) -> Result<GatedTextAnswer> {
     let resolver = IntelligenceRouteResolver::new(
         store,
@@ -351,7 +355,8 @@ pub(crate) async fn gate_rag_answer_with_review(
         IntelligenceRole::Review,
         &NoopShadowDecisionRecorder,
     )?
-    .with_skill_gate(store.reader, "rag_generation");
+    .with_skill_gate(store.reader, "rag_generation")
+    .with_actor_skill_access(skill_access, "rag_generation");
     let checker = DecisionClaimCoverageChecker {
         reviewer: &reviewer,
     };
@@ -396,6 +401,7 @@ pub(super) struct RoutedDecisionProvider<'a> {
     role: IntelligenceRole,
     shadow_recorder: &'a dyn ShadowDecisionRecorder,
     next_scope: AtomicU32,
+    actor_skill_access: Option<(&'a ActorSkillAccess<'a>, &'a str)>,
     skill_gate: Option<(&'a stdb_client::StdbClient, &'a str)>,
 }
 
@@ -425,6 +431,7 @@ impl<'a> RoutedDecisionProvider<'a> {
             role,
             shadow_recorder,
             next_scope: AtomicU32::new(1),
+            actor_skill_access: None,
             skill_gate: None,
         })
     }
@@ -514,6 +521,9 @@ impl<'a> RoutedDecisionProvider<'a> {
         call_scope: u32,
     ) -> Result<DecisionResponse> {
         self.require_skill_enabled().await?;
+        if let Some((access, skill_key)) = self.actor_skill_access {
+            access.require(skill_key).await?;
+        }
         let binding = spend_binding_for_profile(
             self.agent,
             profile,
@@ -527,6 +537,15 @@ impl<'a> RoutedDecisionProvider<'a> {
         LlmDecisionAdapter::from_profile(&admitted, profile)
             .decide(request)
             .await
+    }
+
+    pub(super) fn with_actor_skill_access(
+        mut self,
+        access: &'a ActorSkillAccess<'a>,
+        skill_key: &'a str,
+    ) -> Self {
+        self.actor_skill_access = Some((access, skill_key));
+        self
     }
 }
 
@@ -553,7 +572,10 @@ impl DecisionProvider for RoutedDecisionProvider<'_> {
                         return Ok(response);
                     }
                     Err(error) if error.is::<UnresolvedProviderAttempt>() => return Err(error),
-                    Err(error) if error.is::<crate::error::SkillUnavailable>() => {
+                    Err(error)
+                        if error.is::<crate::error::SkillUnavailable>()
+                            || error.is::<SkillAccessError>() =>
+                    {
                         return Err(error)
                     }
                     Err(error) => {
@@ -579,6 +601,7 @@ pub(super) struct RoutedReasoningProvider<'a> {
     company_id: u64,
     run_id: u64,
     next_scope: AtomicU32,
+    actor_skill_access: Option<(&'a ActorSkillAccess<'a>, &'a str)>,
 }
 
 impl<'a> RoutedReasoningProvider<'a> {
@@ -600,7 +623,17 @@ impl<'a> RoutedReasoningProvider<'a> {
             company_id,
             run_id,
             next_scope: AtomicU32::new(1),
+            actor_skill_access: None,
         }
+    }
+
+    pub(super) fn with_actor_skill_access(
+        mut self,
+        access: &'a ActorSkillAccess<'a>,
+        skill_key: &'a str,
+    ) -> Self {
+        self.actor_skill_access = Some((access, skill_key));
+        self
     }
 }
 
@@ -614,6 +647,9 @@ impl ReasoningProvider for RoutedReasoningProvider<'_> {
         let mut failures = Vec::new();
         for profile in profiles {
             for attempt_no in 0..=profile.max_retries.min(MAX_SAFE_RETRIES) {
+                if let Some((access, skill_key)) = self.actor_skill_access {
+                    access.require(skill_key).await?;
+                }
                 let binding = spend_binding_for_profile(
                     self.agent,
                     &profile,
@@ -658,6 +694,7 @@ pub(super) struct RoutedGenerationProvider<'a> {
     company_id: u64,
     run_id: u64,
     next_scope: AtomicU32,
+    actor_skill_access: Option<(&'a ActorSkillAccess<'a>, &'a str)>,
     skill_gate: Option<(&'a stdb_client::StdbClient, &'a str)>,
 }
 
@@ -680,12 +717,22 @@ impl<'a> RoutedGenerationProvider<'a> {
             company_id,
             run_id,
             next_scope: AtomicU32::new(1),
+            actor_skill_access: None,
             skill_gate: None,
         }
     }
 
     fn with_skill_gate(mut self, stdb: &'a stdb_client::StdbClient, key: &'a str) -> Self {
         self.skill_gate = Some((stdb, key));
+        self
+    }
+
+    pub(super) fn with_actor_skill_access(
+        mut self,
+        access: &'a ActorSkillAccess<'a>,
+        skill_key: &'a str,
+    ) -> Self {
+        self.actor_skill_access = Some((access, skill_key));
         self
     }
 }
@@ -722,6 +769,9 @@ impl GenerationProvider for RoutedGenerationProvider<'_> {
                         key,
                     )
                     .await?;
+                }
+                if let Some((access, skill_key)) = self.actor_skill_access {
+                    access.require(skill_key).await?;
                 }
                 let binding = spend_binding_for_profile(
                     self.agent,

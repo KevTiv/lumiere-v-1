@@ -12,6 +12,7 @@ import {
   fetchSessionOrganizationId,
   fetchWorkflowIdByKey,
   isAiGatewayAvailable,
+  openWorkflowVersionRow,
   scalarQueryId,
   smokeName,
   waitForWorkflowVersionStatus,
@@ -65,6 +66,12 @@ async function ownerSql(sql: string): Promise<Row[]> {
   return (sets[0]?.rows ?? []).map((values) =>
     Object.fromEntries(names.map((name, index) => [name, values[index]])),
   )
+}
+
+async function testWorkflowDraft(page: Page, versionId: number) {
+  await openWorkflowVersionRow(page, versionId)
+  await page.getByRole("button", { name: "Test draft", exact: true }).click()
+  await expect(page.getByText("Draft test completed.")).toBeVisible({ timeout: 30_000 })
 }
 
 /** The hex identity inside a SATS `Identity` or `Option<Identity>` cell, or null. */
@@ -348,7 +355,9 @@ test.describe("AI human review and workflow provenance", () => {
           description: none,
           trigger: { tag: "Manual" },
           schemaVersion: 1,
-          snapshotFields: [],
+          snapshotFields: [
+            { fieldKey: "amount_total", valueType: { tag: "Money" }, nullable: false },
+          ],
           metadata: none,
         },
       ])
@@ -425,6 +434,15 @@ test.describe("AI human review and workflow provenance", () => {
         revision,
         { node_key: "review", decision_ids: [decisionId], claim_ids: [claimId] },
       ])
+      await openWorkflowVersionRow(page, firstVersionId)
+      await page.getByTestId("workflow-version-publish").click()
+      await expect(page.getByTestId("workflow-row-dialog-error")).toContainText("Run Test draft")
+      await page.getByText("Draft test inputs", { exact: true }).click()
+      await page
+        .getByLabel("Sample fields (optional)")
+        .fill('{"amount_total":{"money":{"minor_units":12500,"currency":"EUR"}}}')
+      await page.getByRole("button", { name: "Test draft", exact: true }).click()
+      await expect(page.getByText("Draft test completed.")).toBeVisible({ timeout: 30_000 })
       await callReducerBff(page, "publish_workflow_version", [organizationId, firstVersionId, revision])
       await waitForWorkflowVersionStatus(page, firstVersionId, "Published")
 
@@ -529,6 +547,7 @@ test.describe("AI human review and workflow provenance", () => {
       await expect(page.getByText(`component #${secondComponentId}: confirmed.`)).toBeVisible({ timeout: 30_000 })
       expect((await rowById("ai_artifact_component", secondComponentId)).link_state).toBe("linked")
 
+      await testWorkflowDraft(page, secondVersionId)
       await callReducerBff(page, "publish_workflow_version", [organizationId, secondVersionId, revision])
       await waitForWorkflowVersionStatus(page, secondVersionId, "Published")
 

@@ -11,6 +11,7 @@
     "/api/ai/evidence/ingestion/documents/lifecycle",
     "/api/ai/skills/certifications",
     "/api/ai/skills/provision-surfaces",
+    "/api/ai/skills/published/42/run",
     "/api/ai/evidence/runs/history",
     "/api/ai/skills/report-analysis",
     "/api/ai/evidence/runs/inspect",
@@ -41,8 +42,12 @@
     "/api/ai/harness/profile",
     "/api/ai/skills/certifications",
     "/api/ai/skills/certifications/42",
+    "/api/ai/skills/user-access",
     "/api/ai/knowledge/skill-promotions/company/42",
     "/api/ai/chat/decisions",
     "/api/ai/chat/widget-receipts"
+  ],
+  "put": [
+    "/api/ai/skills/user-access"
   ]
 }

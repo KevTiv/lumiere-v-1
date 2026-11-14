@@ -405,6 +405,11 @@
             "name": "identity_hex",
             "rustType": "String",
             "required": true
+          },
+          {
+            "name": "stdb_token",
+            "rustType": "String",
+            "required": true
           }
         ]
       },
