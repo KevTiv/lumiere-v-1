@@ -8,7 +8,7 @@ import { workspaceStyles } from "../lib/workspace-styles"
 /** Same workspace appearance for small, locally controlled module shells. */
 export function WorkspaceTabsList({ className, ...props }: ComponentProps<typeof TabsList>) {
   return <TabsList {...props} data-ui="workspace-nav" className={cn(
-    workspaceStyles.workspaceNav, "h-auto w-full justify-start group-data-horizontal/tabs:h-auto", className,
+    workspaceStyles.workspaceNav, "h-auto w-full justify-start group-data-[orientation=horizontal]/tabs:h-auto", className,
   )} />
 }
 

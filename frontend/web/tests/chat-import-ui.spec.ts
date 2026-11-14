@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Locator, type Page } from "@playwright/test"
 import type { ChatImportTask as Task } from "../lib/chat-import-task"
 
 // Production chat/task components, synthetic HTTP only. Original private farm
@@ -138,6 +138,21 @@ async function approvePreparation(page: Page) {
   await expect(page.getByRole("button", { name: "Review Synthetic farm history", exact: true })).toBeVisible()
 }
 
+async function expectPanelBelowImportTabs(workspace: Locator, stage: string) {
+  const tabs = workspace.getByRole("tablist", { name: "Import task stages" })
+  const panel = workspace.getByRole("tabpanel", { name: stage, exact: true })
+  await expect(panel).toBeVisible()
+  await expect.poll(async () => {
+    const [tabBounds, panelBounds] = await Promise.all([
+      tabs.boundingBox(),
+      panel.boundingBox(),
+    ])
+    return tabBounds && panelBounds
+      ? panelBounds.y - (tabBounds.y + tabBounds.height)
+      : Number.NEGATIVE_INFINITY
+  }).toBeGreaterThanOrEqual(0)
+}
+
 async function mockSourceReview(page: Page, inspection = false) {
   await page.route("**/api/query/**", route => {
     const path = new URL(route.request().url()).pathname
@@ -269,6 +284,7 @@ test("a prepared task opens its exact source in the existing review workspace", 
   await page.getByRole("button", { name: "Review Synthetic farm history", exact: true }).click()
   const dialog = page.getByRole("dialog")
   await expect(dialog.getByRole("heading", { name: "Review source and prepare import", exact: true })).toBeVisible()
+  await expectPanelBelowImportTabs(dialog.getByTestId("saved-import-workspace"), "Decisions")
   const row = dialog.getByRole("row").filter({ has: page.getByRole("cell", { name: "Synthetic historical sausage", exact: true }) })
   await expect(row).toContainText("Historical observation: actual weight remains unknown.")
   await row.getByRole("button", { name: "Review and correct", exact: true }).click()
@@ -276,6 +292,28 @@ test("a prepared task opens its exact source in the existing review workspace", 
   expect(requests.posts).toBe(1)
   expect(requests.decisionPosts).toHaveLength(1)
   expect(requests.preparations).toBe(1)
+  expect(requests.businessWrites).toBe(0)
+})
+
+test("saved import stages sit above their panels in the narrow Settings workspace", async ({ page }) => {
+  const requests = await mockTasks(page)
+  await mockSourceReview(page)
+  await openChat(page)
+  await dropCsvFiles(page)
+  await approvePreparation(page)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto("/chat-import?surface=settings")
+  const savedTasks = page.getByRole("region", { name: "Saved import tasks" })
+  await savedTasks.getByRole("button", { name: "Open saved task", exact: true }).click()
+
+  const workspace = page.getByTestId("saved-import-workspace")
+  const tabs = workspace.getByRole("tablist", { name: "Import task stages" })
+  await expectPanelBelowImportTabs(workspace, "Sources")
+  for (const stage of ["Decisions", "ERP preview", "ERP results"]) {
+    await tabs.getByRole("tab", { name: stage, exact: true }).click()
+    await expectPanelBelowImportTabs(workspace, stage)
+  }
   expect(requests.businessWrites).toBe(0)
 })
 
