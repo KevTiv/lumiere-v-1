@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { createLumiereApiClient, LumiereApiProvider } from "@lumiere/api-client"
-import { ErpSessionProvider } from "@lumiere/erp-session"
+import { ErpSessionProvider, useErpSession } from "@lumiere/erp-session"
 import { I18nProvider } from "@lumiere/i18n"
 import { DocumentViewerDialog } from "../../../../components/document-viewer-dialog"
+import { documentViewerCompanyId } from "../../../../lib/document-viewer"
 import { ThemeProvider } from "../../../../../packages/ui/src/components/theme-provider"
 import {
   FileBrowser,
@@ -15,6 +16,17 @@ import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
 
 const api = createLumiereApiClient({ baseUrl: "" })
 const files = [
+  {
+    id: "12",
+    name: "Acceptance records",
+    fileName: "acceptance.csv",
+    mimetype: "text/csv",
+    size: 64,
+    folderId: null,
+    updatedAt: 1794096000000,
+    modifiedBy: "Synthetic viewer",
+    companyId: 4,
+  },
   {
     id: "1",
     name: "Farm records",
@@ -146,8 +158,10 @@ const actor = {
 }
 
 function ViewerFixture() {
+  const { activeCompanyId } = useErpSession()
   const [hydrated, setHydrated] = useState(false)
   const [documentId, setDocumentId] = useState<string | null>(null)
+  const [openedFromDocuments, setOpenedFromDocuments] = useState(false)
   const [browser, setBrowser] = useState<FileBrowserState>({
     folderId: null,
     search: "",
@@ -157,7 +171,11 @@ function ViewerFixture() {
   useEffect(() => setHydrated(true), [])
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-4">
-      <p data-testid="document-viewer-disclosure" data-hydrated={hydrated}>
+      <p
+        data-testid="document-viewer-disclosure"
+        data-hydrated={hydrated}
+        data-active-company={activeCompanyId}
+      >
         Synthetic file viewer fixture. Production components with mocked HTTP
         responses; no authentication or ERP operations.
       </p>
@@ -168,7 +186,10 @@ function ViewerFixture() {
           files={files}
           state={browser}
           onStateChange={setBrowser}
-          onOpenFile={setDocumentId}
+          onOpenFile={(id) => {
+            setOpenedFromDocuments(true)
+            setDocumentId(id)
+          }}
         />
       </section>
       <section aria-label="ERP attachment entry point">
@@ -182,7 +203,10 @@ function ViewerFixture() {
             resModel: "account_move",
             resId: 41,
           }))}
-          onOpen={setDocumentId}
+          onOpen={(id) => {
+            setOpenedFromDocuments(false)
+            setDocumentId(id)
+          }}
           onUpload={async () => {
             throw new Error("Uploads are disabled in this fixture")
           }}
@@ -192,6 +216,13 @@ function ViewerFixture() {
       <DocumentViewerDialog
         organizationId={7n}
         documentId={documentId}
+        documentCompanyId={
+          openedFromDocuments
+            ? documentViewerCompanyId(
+                files.find((file) => file.id === documentId),
+              )
+            : undefined
+        }
         onOpenChange={(open) => {
           if (!open) setDocumentId(null)
         }}
@@ -212,7 +243,7 @@ export default function Page() {
             value={{
               identity: actor.id,
               organizationId: 7,
-              companyIds: [3],
+              companyIds: [3, 4],
               connected: true,
             }}
           >
