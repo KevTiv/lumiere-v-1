@@ -79,6 +79,7 @@ import { firstFileFromFormValue } from '@/lib/document-blob-upload';
 import { useManagedDocumentUpload } from '@/lib/use-managed-document-upload';
 import { DocumentUploadReceipts } from '../../../../components/document-upload-receipts';
 import { DocumentViewerDialog } from '../../../../components/document-viewer-dialog';
+import { documentViewerCompanyId } from '@/lib/document-viewer';
 import { toSetDocumentRetentionParams } from '@/lib/documents-create-params';
 import { useDocumentsModuleSubscription } from '@/lib/module-subscription-hooks';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
@@ -517,7 +518,7 @@ function DocumentPageLoaded({
   return (
     <>
       <DocumentUploadReceipts rows={versionReceipts} error={uploads.error} onResume={uploads.resume} />
-      <DocumentViewerDialog organizationId={orgId} documentId={preview ? documentId : null} versionId={preview?.versionId} onOpenChange={(open) => { if (!open) setPreview(null); }} />
+      <DocumentViewerDialog organizationId={orgId} documentId={preview ? documentId : null} documentCompanyId={documentViewerCompanyId(document)} versionId={preview?.versionId} onOpenChange={(open) => { if (!open) setPreview(null); }} />
       <RecordPage
         testIdPrefix="document"
         breadcrumbs={[

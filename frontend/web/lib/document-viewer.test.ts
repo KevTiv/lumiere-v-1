@@ -5,6 +5,7 @@ import {
   DocumentCsvError,
   DocumentViewerError,
   documentPreview,
+  documentViewerCompanyId,
   parseDocumentCsv,
   readDocumentOfficePreview,
   readDocumentViewerFile,
@@ -118,6 +119,30 @@ test("viewer rejects missing, deleted, foreign and ambiguous document scope", ()
   assert.throws(
     () => resolve({ scope: { organizationId: 7n, companyId: null } }),
     errorCode("unavailable"),
+  )
+})
+
+test("a listed document can resolve in its own company or explicit organization scope", () => {
+  const listed = { ...document, companyId: 4 }
+  const companyId = documentViewerCompanyId(listed)
+  assert.equal(companyId, 4n)
+  assert.equal(documentViewerCompanyId({ company_id: "4" }), 4n)
+  assert.equal(documentViewerCompanyId({ companyId: null }), null)
+  assert.equal(documentViewerCompanyId({}), undefined)
+  assert.equal(documentViewerCompanyId({ companyId: 0 }), undefined)
+  assert.equal(
+    resolve({
+      scope: { ...scope, companyId: 4n },
+      documents: [listed],
+    }).source.versionId,
+    "11",
+  )
+  assert.equal(
+    resolve({
+      scope: { ...scope, companyId: null },
+      documents: [{ ...document, companyId: null }],
+    }).source.url,
+    url,
   )
 })
 

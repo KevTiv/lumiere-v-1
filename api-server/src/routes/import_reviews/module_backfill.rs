@@ -1,4 +1,4 @@
-//! Reviewed sales summaries and physical counts have a durable module record.
+//! Reviewed sales, including daily shop sales, and physical counts have durable module records.
 use std::{collections::BTreeMap, sync::Arc};
 
 use axum::{
@@ -29,13 +29,22 @@ use crate::{
 #[serde(rename_all = "snake_case")]
 pub(super) enum Module {
     Sales,
+    ShopSales,
     Warehouse,
 }
 
 impl Module {
-    fn name(self) -> &'static str {
+    fn storage_name(self) -> &'static str {
+        match self {
+            Self::Sales | Self::ShopSales => "sales",
+            Self::Warehouse => "warehouse",
+        }
+    }
+
+    fn record_kind(self) -> &'static str {
         match self {
             Self::Sales => "sales",
+            Self::ShopSales => "shop_sale",
             Self::Warehouse => "warehouse",
         }
     }
@@ -119,6 +128,15 @@ enum Facts<'a> {
         amount: &'a str,
         currency: String,
         reported_payment: Option<&'a str>,
+    },
+    ShopSale {
+        shop: &'a str,
+        product: &'a str,
+        quantity: &'a str,
+        unit: Option<&'a str>,
+        unit_price: &'a str,
+        amount: &'a str,
+        currency: String,
     },
     Warehouse {
         product: &'a str,
@@ -213,6 +231,65 @@ fn customer<'a>(
     }
 }
 
+fn matches_sale_amount(quantity: &str, price: &str, amount: &str) -> bool {
+    let recorded = decimal(amount).and_then(|amount| amount.checked_mul(1_000_000));
+    decimal(quantity)
+        .zip(decimal(price))
+        .and_then(|(quantity, price)| quantity.checked_mul(price))
+        .is_some_and(|product| Some(product) == recorded)
+}
+
+fn prepare_shop_sale(
+    row: ReviewedFacts<'_>,
+) -> Result<(NaiveDate, NaiveDate, Facts<'_>), &'static str> {
+    let date = row
+        .date(&["sale_date"], &[])
+        .ok_or("Confirm the exact sale date")?;
+    if let Some(source_date) = &row.original.business_date {
+        if source_date.precision != super::history_period::DatePrecision::Day
+            || source_date
+                .from
+                .as_deref()
+                .and_then(|day| calendar_date(day).ok())
+                != Some(date)
+        {
+            return Err("The sale date must match the original single-day report");
+        }
+    }
+    let shop = row.value(&["shop"], &[]).ok_or("Confirm the source shop")?;
+    let product = row
+        .value(&["product_label"], &[])
+        .ok_or("Confirm the sold product")?;
+    let positive = |key| {
+        row.number(&[key], &[])
+            .filter(|value| decimal(value).is_some_and(|n| n > 0))
+    };
+    let quantity = positive("sold_quantity").ok_or("Confirm a positive sold quantity")?;
+    let unit_price = positive("sale_unit_price").ok_or("Confirm a positive sale price")?;
+    let amount = positive("sale_amount").ok_or("Confirm the recorded sale total")?;
+    if !matches_sale_amount(quantity, unit_price, amount) {
+        return Err("Reconcile quantity, unit price, and recorded total");
+    }
+    let currency = row
+        .value(&["currency_code"], &[])
+        .filter(|code| code.len() == 3 && code.bytes().all(|b| b.is_ascii_alphabetic()))
+        .ok_or("Confirm the sales currency")?
+        .to_uppercase();
+    Ok((
+        date,
+        date,
+        Facts::ShopSale {
+            shop,
+            product,
+            quantity,
+            unit: row.value(&["source_unit"], &[]),
+            unit_price,
+            amount,
+            currency,
+        },
+    ))
+}
+
 fn prepare<'a>(
     module: Module,
     row: ReviewedFacts<'a>,
@@ -220,6 +297,7 @@ fn prepare<'a>(
     selected_customer: Option<&str>,
 ) -> Result<(NaiveDate, NaiveDate, Facts<'a>), &'static str> {
     match module {
+        Module::ShopSales => prepare_shop_sale(row),
         Module::Sales => {
             let source_customer = row
                 .value(
@@ -265,11 +343,7 @@ fn prepare<'a>(
                     &["Recorded sales total (RWF)"],
                 )
                 .ok_or("Confirm the recorded sales total")?;
-            if decimal(quantity)
-                .zip(decimal(unit_price))
-                .and_then(|(qty, price)| qty.checked_mul(price))
-                != decimal(amount).and_then(|amount| amount.checked_mul(1_000_000))
-            {
+            if !matches_sale_amount(quantity, unit_price, amount) {
                 return Err("Reconcile quantity, unit price, and recorded total");
             }
             let currency = row
@@ -402,7 +476,7 @@ pub(super) async fn write(
     let ctx = scope(&state, &session, body.company_id).await?;
     let org = ctx.organization_id();
     let company = body.company_id;
-    let module = body.module.name();
+    let module = body.module.storage_name();
     if batch <= 0 || body.rows.is_empty() || body.rows.len() > 200 {
         return Err(ApiError::BadRequest("select 1–200 reviewed rows".into()));
     }
@@ -424,7 +498,7 @@ pub(super) async fn write(
     }
     let contacts = match body.module {
         Module::Sales => load_customers(&state, &ctx, company).await?,
-        Module::Warehouse => Vec::new(),
+        Module::ShopSales | Module::Warehouse => Vec::new(),
     };
     let org = org.to_string();
     let company = company.to_string();
@@ -518,7 +592,7 @@ pub(super) async fn write(
         results.push(json!({"itemId":id.to_string(),"status":status,"recordId":saved.get::<_, i64>("id").to_string()}));
     }
     tx.commit().await.map_err(ApiError::internal)?;
-    Ok(Json(json!({"module":module,"results":results})))
+    Ok(Json(json!({"module":body.module,"results":results})))
 }
 
 pub(super) async fn task_results(
@@ -528,13 +602,14 @@ pub(super) async fn task_results(
 ) -> Result<Vec<Value>, ApiError> {
     let rows = tx
         .query(
-            "SELECT record.module,count(*)::bigint AS count
+            "SELECT CASE WHEN record.facts->>'kind' = 'shop_sale' THEN 'shop_sales'
+                      ELSE record.module END AS module, count(*)::bigint AS count
          FROM lumiere_platform.module_backfill_record record
          WHERE record.organization_id=$1::text::numeric AND record.company_id=$2::text::numeric
          AND EXISTS (SELECT 1 FROM lumiere_platform.import_task_review link
              WHERE link.organization_id=record.organization_id AND link.company_id=record.company_id
              AND link.batch_id=record.batch_id AND link.actor_identity=$3 AND link.request_id=$4)
-         GROUP BY record.module ORDER BY record.module",
+         GROUP BY 1 ORDER BY 1",
             &[
                 &scope.organization.to_string(),
                 &scope.company.to_string(),
@@ -573,8 +648,8 @@ pub(super) async fn read(
              FROM lumiere_platform.module_backfill_record record
              WHERE record.organization_id = $1::text::numeric
                AND record.company_id = $2::text::numeric
-               AND record.module = $3
-               AND ($9::bigint IS NULL OR record.id = $9)
+               AND record.module = $3 AND record.facts->>'kind' = $9
+               AND ($10::bigint IS NULL OR record.id = $10)
                AND ($5::text IS NULL OR EXISTS (
                    SELECT 1 FROM lumiere_platform.import_task_review link
                    WHERE link.organization_id = record.organization_id AND link.company_id = record.company_id
@@ -587,18 +662,20 @@ pub(super) async fn read(
                    FROM lumiere_platform.module_backfill_record cursor
                    WHERE cursor.id = $4 AND cursor.organization_id = $1::text::numeric
                      AND cursor.company_id = $2::text::numeric AND cursor.module = $3
+                     AND cursor.facts->>'kind' = $9
                ))
              ORDER BY record.period_end DESC, record.id DESC
              LIMIT 101",
             &[
                 &ctx.organization_id().to_string(),
                 &query.company_id.to_string(),
-                &module.name(),
+                &module.storage_name(),
                 &query.before_id,
                 &query.task_id,
                 &query.from,
                 &query.through,
                 &ctx.actor_identity(),
+                &module.record_kind(),
                 &query.record_id,
             ],
         )
@@ -712,6 +789,55 @@ mod tests {
         assert_eq!(result["currency"], "RWF");
         assert!(result["unit"].is_null());
         assert_eq!(result["reportedPayment"], "PAYEMENT CHEQ");
+    }
+
+    #[test]
+    fn builds_dated_shop_sales_without_customer_or_payment() {
+        let mut row = source(&[
+            ("shop", "Shop", "KIMIRONKO"),
+            ("sale_date", "Sale date", "2024-04-12"),
+            ("product_label", "Product", "WHOLE CHICKENS"),
+            ("sold_quantity", "Quantity", "8.125"),
+            ("sale_unit_price", "Unit price", "4000"),
+            ("sale_amount", "Recorded total", "32500"),
+            ("currency_code", "Currency", "RWF"),
+        ]);
+        row.business_date = Some(super::super::history_period::BusinessDate {
+            precision: super::super::history_period::DatePrecision::Day,
+            from: Some("2024-04-12".into()),
+            to_exclusive: Some("2024-04-13".into()),
+            raw: None,
+        });
+        let prepare_row = |row: &ReviewItem| {
+            let review = ReviewedFacts {
+                original: row,
+                values: &row.proposed,
+                confirmed: &[],
+                fully_confirmed: true,
+            };
+            prepare(Module::ShopSales, review, &[], None)
+                .map(|(start, end, facts)| (start, end, serde_json::to_value(facts).unwrap()))
+        };
+        let (start, end, facts) = prepare_row(&row).unwrap();
+        assert_eq!(start.to_string(), "2024-04-12");
+        assert_eq!(start, end);
+        assert_eq!(facts["kind"], "shop_sale");
+        assert_eq!(facts["shop"], "KIMIRONKO");
+        assert_eq!(facts["product"], "WHOLE CHICKENS");
+        assert_eq!(facts["quantity"], "8.125");
+        assert_eq!(facts["unitPrice"], "4000");
+        assert_eq!(facts["amount"], "32500");
+        assert!(facts.get("customerId").is_none());
+        assert!(facts.get("reportedPayment").is_none());
+
+        row.proposed
+            .insert("sale_amount".into(), Some("32499".into()));
+        assert!(prepare_row(&row).is_err());
+        row.proposed
+            .insert("sale_amount".into(), Some("32500".into()));
+        row.proposed
+            .insert("sale_date".into(), Some("2024-04-13".into()));
+        assert!(prepare_row(&row).is_err());
     }
 
     #[test]

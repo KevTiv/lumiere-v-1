@@ -24,6 +24,7 @@ type Receipt = {
     periodEnd?: string
     facts?: {
       customer?: string
+      shop?: string
       product?: string
       quantity?: string
       unit?: string
@@ -55,6 +56,11 @@ function destination(item: ReviewRow): BackfillModule | undefined {
   )
     return "sales"
   if (
+    ["shop", "sale_date", "product_label", "sold_quantity", "sale_unit_price", "sale_amount", "currency_code"]
+      .every((key) => keys.has(key))
+  )
+    return "shop_sales"
+  if (
     (labels.has("Recorded piece count") &&
       labels.has("Recorded weight (kg)")) ||
     (keys.has("pieces") && keys.has("kilograms"))
@@ -78,7 +84,7 @@ export function ModuleBackfillAction({
   disabled: boolean
 }) {
   if (detail.targetEntity !== "source_observation") return null
-  return (["sales", "warehouse"] as const).map((module) => {
+  return (["sales", "shop_sales", "warehouse"] as const).map((module) => {
     const items = detail.items.filter(
       (item) => item.state !== "excluded" && destination(item) === module,
     )
@@ -199,7 +205,8 @@ function BackfillAction({
         ])
     },
   })
-  const sales = module === "sales"
+  const customerSales = module === "sales"
+  const warehouse = module === "warehouse"
   const pendingPreview =
     preview?.key === key
       ? preview.receipt.results.filter(
@@ -245,9 +252,11 @@ function BackfillAction({
           disabled={disabled || write.isPending}
           onClick={() => write.mutate(true)}
         >
-          {sales
-            ? "Preview customer sales backfill"
-            : "Preview inventory count backfill"}
+          {warehouse
+            ? "Preview inventory count backfill"
+            : customerSales
+              ? "Preview customer sales backfill"
+              : "Preview shop sales backfill"}
         </Button>
         {ready.length > 0 ? (
           <Button
@@ -259,7 +268,7 @@ function BackfillAction({
               : `Save and verify ${ready.length} records`}
           </Button>
         ) : null}
-        {sales ? (
+        {customerSales ? (
           <Button
             variant="ghost"
             disabled={disabled || write.isPending}
@@ -272,10 +281,10 @@ function BackfillAction({
           className="underline underline-offset-4"
           href={moduleBackfillHref(module, taskId ? { id: taskId, companyId } : undefined)}
         >
-          {sales ? "Open Sales records" : "Open Warehouse records"}
+          {warehouse ? "Open Warehouse records" : "Open Sales records"}
         </a>
       </div>
-      {showMatches && sales ? (
+      {showMatches && customerSales ? (
         contacts.isPending ? (
           <p>Loading customers…</p>
         ) : contacts.isError ? (
@@ -313,11 +322,10 @@ function BackfillAction({
               {periodStart === periodEnd
                 ? periodStart
                 : `${periodStart} – ${periodEnd}`}{" "}
-              · {facts?.customer ? `${facts.customer} · ` : ""}
-              {facts?.product}
-              {sales
-                ? ` · ${facts?.quantity}${facts?.unit ? ` ${facts.unit}` : ""} × ${facts?.unitPrice} = ${facts?.amount} ${facts?.currency}`
-                : ` · ${facts?.pieces} pieces · ${facts?.kilograms} kg`}
+              · {[facts?.customer ?? facts?.shop, facts?.product].filter(Boolean).join(" · ")}
+              {warehouse
+                ? ` · ${facts?.pieces} pieces · ${facts?.kilograms} kg`
+                : ` · ${facts?.quantity}${facts?.unit ? ` ${facts.unit}` : ""} × ${facts?.unitPrice} = ${facts?.amount} ${facts?.currency}`}
             </li>
           ))}
         </ul>

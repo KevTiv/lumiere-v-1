@@ -35,16 +35,17 @@ test("changing tabs leaves the owner queue on the previous history entry", () =>
 
 test("import results open their owning list and keep the task filter on that tab", () => {
   const task = "a".repeat(32)
-  for (const [module, tab, defaultTab] of [
-    ["sales", "customer-sales", "orders"],
-    ["warehouse", "recorded-counts", "stock"],
+  for (const [module, workspace, tab, defaultTab] of [
+    ["sales", "sales", "customer-sales", "orders"],
+    ["shop_sales", "sales", "shop-sales", "orders"],
+    ["warehouse", "warehouse", "recorded-counts", "stock"],
   ] as const) {
     const href = moduleBackfillHref(module, { id: task, companyId: 7 })
-    assert.equal(href, `/${module}?tab=${tab}&backfillTask=${task}&backfillCompany=7`)
+    assert.equal(href, `/${workspace}?tab=${tab}&backfillTask=${task}&backfillCompany=7`)
     const { pathname, search } = new URL(href, "https://example.test")
     assert.equal(moduleTabDestination({
       pathname, query: search, tab: defaultTab, defaultTab, validTabs: [tab, defaultTab],
-    }), `/${module}`)
+    }), `/${workspace}`)
   }
 })
 
@@ -128,4 +129,23 @@ test("sales summary details preserve currency, exact decimals and incomplete sou
       reportedPayment: { kind: "value", value: "" },
     },
   )
+})
+
+test("shop sale receipts open an exact Sales record with its stored shop and prices", () => {
+  assert.equal(
+    moduleBackfillRecordHref("shop_sales", { companyId: 7, recordId: "51" }),
+    "/sales?tab=shop-sales&backfillCompany=7&backfillRecord=51",
+  )
+  const fields = moduleBackfillSavedFields({
+    kind: "shop_sale",
+    shop: "Kicukiro",
+    product: "Whole chicken",
+    quantity: "12.00",
+    unit: null,
+    unitPrice: "5000.000",
+    amount: "60000.00",
+    currency: "RWF",
+  }, (key) => key)
+  assert.deepEqual(fields.map(({ id }) => id), ["shop", "product", "quantity", "unit", "unitPrice", "amount", "currency"])
+  assert.deepEqual(fields.find(({ id }) => id === "unitPrice")?.after, { kind: "value", value: "5000.000" })
 })

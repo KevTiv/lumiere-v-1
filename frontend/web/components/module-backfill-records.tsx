@@ -40,6 +40,7 @@ import {
 } from '@/lib/module-backfill-navigation'
 import {
   moduleBackfillSavedFields,
+  moduleBackfillRecordKind,
   type ModuleBackfillRecord,
 } from '@/lib/module-backfill-record'
 
@@ -161,16 +162,18 @@ function Records({
       const { data } = await loadRecords(module, params, signal)
       return data.length === 1 &&
         data[0]?.id === validRecordId &&
-        data[0].facts.kind === module
+        data[0].facts.kind === moduleBackfillRecordKind[module]
         ? data[0]
         : null
     },
     retry: false,
     refetchOnMount: 'always',
   })
-  const title = t(
-    module === 'sales' ? 'moduleRecords.sales' : 'moduleRecords.warehouse',
-  )
+  const title = t({
+    sales: 'moduleRecords.sales',
+    shop_sales: 'moduleRecords.shopSales',
+    warehouse: 'moduleRecords.warehouse',
+  }[module])
   const rows = records.data?.pages.flatMap((page) => page.data) ?? []
   const dateFormatter = new Intl.DateTimeFormat(
     formattingLocale(i18n.language),
@@ -234,9 +237,11 @@ function Records({
         <p role="status" className="text-sm text-muted-foreground">
           {t(
             period === 'all' && !taskId
-              ? module === 'sales'
-                ? 'moduleRecords.emptySales'
-                : 'moduleRecords.emptyCounts'
+              ? ({
+                  sales: 'moduleRecords.emptySales',
+                  shop_sales: 'moduleRecords.emptyShopSales',
+                  warehouse: 'moduleRecords.emptyCounts',
+                } as const)[module]
               : 'moduleRecords.emptyFiltered',
           )}
         </p>
@@ -248,18 +253,20 @@ function Records({
               <TableRow>
                 <TableHead scope="col">
                   {t(
-                    module === 'sales'
-                      ? 'moduleRecords.period'
-                      : 'moduleRecords.countDate',
+                    {
+                      sales: 'moduleRecords.period',
+                      shop_sales: 'moduleRecords.saleDate',
+                      warehouse: 'moduleRecords.countDate',
+                    }[module],
                   )}
                 </TableHead>
-                {module === 'sales' && (
+                {module !== 'warehouse' && (
                   <TableHead scope="col">
-                    {t('moduleRecords.customer')}
+                    {t(module === 'sales' ? 'moduleRecords.customer' : 'moduleRecords.shop')}
                   </TableHead>
                 )}
                 <TableHead scope="col">{t('moduleRecords.product')}</TableHead>
-                {module === 'sales' ? (
+                {module !== 'warehouse' ? (
                   <>
                     <TableHead scope="col" className="text-right">
                       {t('moduleRecords.quantity')}
@@ -270,9 +277,11 @@ function Records({
                     <TableHead scope="col" className="text-right">
                       {t('moduleRecords.reportedTotal')}
                     </TableHead>
-                    <TableHead scope="col">
-                      {t('moduleRecords.paymentComment')}
-                    </TableHead>
+                    {module === 'sales' && (
+                      <TableHead scope="col">
+                        {t('moduleRecords.paymentComment')}
+                      </TableHead>
+                    )}
                   </>
                 ) : (
                   <>
@@ -307,9 +316,9 @@ function Records({
                       </>
                     )}
                   </TableCell>
-                  {facts.kind === 'sales' ? (
+                  {facts.kind !== 'warehouse' ? (
                     <>
-                      <TableCell>{facts.customer}</TableCell>
+                      <TableCell>{facts.kind === 'sales' ? facts.customer : facts.shop}</TableCell>
                       <TableCell>{facts.product}</TableCell>
                       <TableCell className="text-right tabular-nums">
                         {[facts.quantity, facts.unit].filter(Boolean).join(' ')}
@@ -320,7 +329,9 @@ function Records({
                       <TableCell className="text-right tabular-nums">
                         {facts.amount} {facts.currency}
                       </TableCell>
-                      <TableCell>{facts.reportedPayment ?? '—'}</TableCell>
+                      {facts.kind === 'sales' && (
+                        <TableCell>{facts.reportedPayment ?? '—'}</TableCell>
+                      )}
                     </>
                   ) : (
                     <>
@@ -400,9 +411,11 @@ function Records({
         >
           <SheetHeader>
             <SheetTitle>
-              {module === 'sales'
-                ? t('moduleRecords.savedSale')
-                : t('moduleRecords.savedCount')}
+              {t({
+                sales: 'moduleRecords.savedSale',
+                shop_sales: 'moduleRecords.savedShopSale',
+                warehouse: 'moduleRecords.savedCount',
+              }[module])}
             </SheetTitle>
             <SheetDescription>{title}</SheetDescription>
           </SheetHeader>
@@ -454,7 +467,11 @@ function SavedRecord({
       <dl className="grid gap-x-4 gap-y-3 rounded-md border border-border px-3 py-3 sm:grid-cols-2">
         <div>
           <dt className="text-xs font-medium text-muted-foreground">
-            {record.facts.kind === 'sales' ? t('moduleRecords.period') : t('moduleRecords.countDate')}
+            {t({
+              sales: 'moduleRecords.period',
+              shop_sale: 'moduleRecords.saleDate',
+              warehouse: 'moduleRecords.countDate',
+            }[record.facts.kind])}
           </dt>
           <dd className="tabular-nums">
             <time dateTime={periodStart}>{dateFormatter.format(start)}</time>

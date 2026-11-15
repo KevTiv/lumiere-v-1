@@ -1,18 +1,24 @@
 import type { HistoryFieldDiffRow } from '@lumiere/ui/entity-views/history-field-diff'
+import type { BackfillModule } from './module-backfill-navigation'
+
+export const moduleBackfillRecordKind = {
+  sales: 'sales',
+  shop_sales: 'shop_sale',
+  warehouse: 'warehouse',
+} as const satisfies Record<BackfillModule, string>
 
 type Facts =
-  | {
-      kind: 'sales'
-      customer: string
-      sourceCustomer?: string
+  | ({
       product: string
       quantity: string
       unit: string | null
       unitPrice: string
       amount: string
       currency: string
-      reportedPayment: string | null
-    }
+    } & (
+      | { kind: 'sales'; customer: string; sourceCustomer?: string; reportedPayment: string | null }
+      | { kind: 'shop_sale'; shop: string }
+    ))
   | {
       kind: 'warehouse'
       product: string
@@ -36,6 +42,7 @@ export type ModuleBackfillRecord = {
 
 const labels = {
   customer: 'moduleRecords.customer',
+  shop: 'moduleRecords.shop',
   sourceCustomer: 'moduleRecords.sourceCustomer',
   product: 'moduleRecords.product',
   quantity: 'moduleRecords.quantity',
@@ -58,23 +65,26 @@ export function moduleBackfillSavedFields(
   translate: (key: (typeof labels)[Field]) => string,
 ): HistoryFieldDiffRow[] {
   const fields: [Field, Value][] =
-    facts.kind === 'sales'
+    facts.kind === 'warehouse'
       ? [
-          ['customer', facts.customer],
-          ['sourceCustomer', facts.sourceCustomer],
+          ['product', facts.product],
+          ['pieces', facts.pieces],
+          ['kilograms', facts.kilograms],
+          ['location', facts.location],
+        ]
+      : [
+          ...(facts.kind === 'sales'
+            ? [['customer', facts.customer], ['sourceCustomer', facts.sourceCustomer]] satisfies [Field, Value][]
+            : [['shop', facts.shop]] satisfies [Field, Value][]),
           ['product', facts.product],
           ['quantity', facts.quantity],
           ['unit', facts.unit],
           ['unitPrice', facts.unitPrice],
           ['amount', facts.amount],
           ['currency', facts.currency],
-          ['reportedPayment', facts.reportedPayment],
-        ]
-      : [
-          ['product', facts.product],
-          ['pieces', facts.pieces],
-          ['kilograms', facts.kilograms],
-          ['location', facts.location],
+          ...(facts.kind === 'sales'
+            ? [['reportedPayment', facts.reportedPayment]] satisfies [Field, Value][]
+            : []),
         ]
   return fields.map(([id, value]) => ({
     id,

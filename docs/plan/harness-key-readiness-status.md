@@ -386,10 +386,10 @@ Published global skill definitions are prerequisites: registration must not
 promote arbitrary tenant skills or fabricate release certification.
 
 Fresh databases register Lumière's built-in skills automatically at module
-initialization. After upgrading an existing database, use the existing platform
-operator to re-apply the active AI template with `--activate --env` or save the
-active AI profile in Workbench. Activation inserts missing built-in catalog
-entries and preserves existing IDs, company configurations, and disablements.
+initialization. The production publisher reconciles missing built-in catalog
+entries on existing databases and verifies the catalog before releasing the
+rest of the stack. Reconciliation preserves existing IDs, company
+configurations, and disablements.
 
 Enrollment is handled by the server's `enroll_ai_company_defaults` path and
 company lifecycle integration. It creates scoped tenant records using the active

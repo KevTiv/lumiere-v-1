@@ -58,6 +58,8 @@ import {
 export type DocumentViewerDialogProps = {
   organizationId: bigint
   documentId: string | null
+  /** The owning company from the Documents listing. Other surfaces use the active company. */
+  documentCompanyId?: bigint | null
   versionId?: string
   recordHref?: string
   onOpenChange(open: boolean): void
@@ -67,6 +69,7 @@ export type DocumentViewerDialogProps = {
 export function DocumentViewerDialog({
   organizationId,
   documentId,
+  documentCompanyId,
   versionId,
   recordHref,
   onOpenChange,
@@ -85,11 +88,21 @@ export function DocumentViewerDialog({
       revision: permissionRevision.current.revision + 1,
     }
   }
+  const activeCompany = session.activeCompanyId
+  const activeCompanyId =
+    typeof activeCompany === "number" &&
+    Number.isSafeInteger(activeCompany) &&
+    activeCompany > 0
+      ? BigInt(activeCompany)
+      : null
+  const companyId =
+    documentCompanyId === undefined ? activeCompanyId : documentCompanyId
   const scopeKey = JSON.stringify([
     String(organizationId),
     session.organizationId,
     session.identity,
-    session.activeCompanyId,
+    activeCompany,
+    companyId?.toString() ?? null,
   ])
   const target = JSON.stringify([documentId, versionId])
   const fullscreen = documentId !== null && fullscreenTarget === target
@@ -103,23 +116,30 @@ export function DocumentViewerDialog({
           : null
     opening.current = { target, scope: scopeKey }
   }
-  const companyId = session.activeCompanyId
   const scopeReady =
     organizationId > 0n &&
     String(session.organizationId) === String(organizationId) &&
     Boolean(session.identity) &&
     session.identity !== "unknown" &&
     session.activeCompanyReady === true &&
-    (companyId === null ||
-      (typeof companyId === "number" &&
-        Number.isSafeInteger(companyId) &&
-        companyId > 0 &&
-        session.companyIds?.includes(companyId) === true))
+    (activeCompany === null ||
+      (activeCompanyId !== null &&
+        typeof activeCompany === "number" &&
+        session.companyIds?.includes(activeCompany) === true))
   const permissionReady =
     permissionsReady && currentUser?.id === session.identity
   const currentScope = opening.current?.scope === scopeKey
+  const canReadCompany =
+    companyId === null ||
+    session.companyIds?.some(
+      (allowed) =>
+        Number.isSafeInteger(allowed) && BigInt(allowed) === companyId,
+    ) === true
   const canRead =
-    scopeReady && permissionReady && checkPermission("document", "read").allowed
+    scopeReady &&
+    permissionReady &&
+    canReadCompany &&
+    checkPermission("document", "read").allowed
   const includeVersions = checkPermission("document_version", "read").allowed
 
   return (
@@ -179,6 +199,9 @@ export function DocumentViewerDialog({
             documentId={documentId}
             initialVersionId={versionId}
             includeVersions={includeVersions}
+            allowSelectionActions={
+              companyId === null || companyId === activeCompanyId
+            }
             fullscreen={fullscreen}
             onSelectionComplete={() => {
               setFullscreenTarget(null)
@@ -188,11 +211,7 @@ export function DocumentViewerDialog({
               setFullscreenTarget(next ? target : null)
             }
             recordHref={recordHref}
-            scope={{
-              organizationId,
-              companyId:
-                typeof companyId === "number" ? BigInt(companyId) : null,
-            }}
+            scope={{ organizationId, companyId }}
           />
         ) : null}
       </DialogContent>
@@ -292,6 +311,7 @@ function DocumentViewerBody({
   documentId,
   initialVersionId,
   includeVersions,
+  allowSelectionActions,
   fullscreen,
   onFullscreenChange,
   onSelectionComplete,
@@ -301,6 +321,7 @@ function DocumentViewerBody({
   documentId: string
   initialVersionId?: string
   includeVersions: boolean
+  allowSelectionActions: boolean
   fullscreen: boolean
   onFullscreenChange(fullscreen: boolean): void
   onSelectionComplete(): void
@@ -632,7 +653,9 @@ function DocumentViewerBody({
             }
           }}
           onSelectionAction={
-            selectionActions && active.manifest.source.versionId
+            allowSelectionActions &&
+            selectionActions &&
+            active.manifest.source.versionId
               ? async (action, selection, signal, parsing) => {
                   await selectionActions(
                     action,

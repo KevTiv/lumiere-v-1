@@ -1009,5 +1009,6 @@ pub fn apply_global_migrations(ctx: &ReducerContext) -> Result<(), String> {
     if !user.is_superuser {
         return Err("Only superusers may apply global migrations".to_string());
     }
+    crate::ai::platform_defaults::ensure_builtin_skill_catalog(ctx)?;
     apply_pending_global_migrations(ctx)
 }
