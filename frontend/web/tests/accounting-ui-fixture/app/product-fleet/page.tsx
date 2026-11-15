@@ -13,6 +13,7 @@ import { fleetVehiclesTableConfig } from "@lumiere/ui/lib/fleet-entity-configs";
 import { productsTableConfig } from "@lumiere/ui/lib/inventory-entity-configs";
 import type { EntityRow } from "@lumiere/ui/lib/entity-view-types";
 import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state";
+import { useModuleTab } from "../../../../hooks/use-module-tab";
 import {
   fleetModuleConfig,
   inventoryModuleConfig,
@@ -263,6 +264,10 @@ function Preview() {
                   : tab,
               ),
             };
+  const { activeTab, setActiveTab } = useModuleTab(
+    config.defaultTab ?? config.tabs[0]?.id ?? "",
+    config.tabs.map((tab) => tab.id),
+  );
   const history = fleetHistoryRows(services, {
     vehicles: rows,
     serviceTypes: [{ id: "91", name: "Scheduled maintenance" }],
@@ -358,6 +363,8 @@ function Preview() {
       <ModuleView
         key={module}
         config={config}
+        activeTab={module === "inventory" ? activeTab : undefined}
+        onActiveTabChange={module === "inventory" ? setActiveTab : undefined}
         data={tabData}
         dataState={module === "warehouse" ? warehouseDataStates(sourceStates) : sourceStates}
         onFormSubmit={async () => {

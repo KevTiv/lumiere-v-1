@@ -30,7 +30,7 @@ export function useModuleTab(
   const rawTab = searchParams.get('tab')
   const activeTab = rawTab && validTabs.includes(rawTab) ? rawTab : defaultTab
 
-  const setActiveTab = useCallback(
+  const navigateToTab = useCallback(
     (tab: string, filter?: ModuleTabFilter) => {
       const destination = moduleTabDestination({ pathname, query: searchParams.toString(), tab, defaultTab, validTabs, filter })
       if (destination) router[history](destination, { scroll: false })
@@ -38,5 +38,7 @@ export function useModuleTab(
     [searchParams, router, pathname, defaultTab, validTabs, history],
   )
 
-  return { activeTab, setActiveTab }
+  const setActiveTab = useCallback((tab: string) => navigateToTab(tab), [navigateToTab])
+
+  return { activeTab, setActiveTab, navigateToTab }
 }

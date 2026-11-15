@@ -111,6 +111,10 @@ fn references(resources: &[ActivityReference]) -> Result<Vec<EntityRef>> {
         })
         .collect()
 }
+#[derive(Debug, thiserror::Error)]
+#[error("query embedding failed at {0}")]
+pub(super) struct QueryEmbeddingStage(pub &'static str);
+
 /// Reuses one settled vector for the same actor/model/query, including lost replies.
 /// Callers may reuse it across document and activity ANN, but still reauthorize hits.
 pub(crate) async fn admitted_query_vector(
@@ -124,7 +128,7 @@ pub(crate) async fn admitted_query_vector(
     generation_skill_key: Option<&str>,
 ) -> Result<Vec<f32>> {
     if query.trim().is_empty() || query.len() > 8192 || !state.config.embedding_enabled() {
-        anyhow::bail!("query embeddings are disabled or outside their input bound");
+        return Err(QueryEmbeddingStage("configuration_or_input_bound").into());
     }
     let bounds = super::evidence::require_scoped_capability_grant(
         state,
@@ -134,20 +138,21 @@ pub(crate) async fn admitted_query_vector(
         company,
         RETRIEVE_CAPABILITY,
     )
-    .await?;
+    .await
+    .context(QueryEmbeddingStage("evidence_grant"))?;
     if bounds.max_rows == 0 || bounds.max_bytes < query.len() as u64 {
-        anyhow::bail!("query exceeds evidence grant");
+        return Err(QueryEmbeddingStage("evidence_grant_bound").into());
     }
     state
         .vector_store
         .check_ready()
         .await
-        .context("document embedding collection is incompatible")?;
+        .context(QueryEmbeddingStage("document_collection"))?;
     state
         .rig
         .check_ready()
         .await
-        .context("activity embedding collection is incompatible")?;
+        .context(QueryEmbeddingStage("activity_collection"))?;
     let resolved;
     let agent = match agent {
         Some(agent) => agent,
@@ -161,15 +166,16 @@ pub(crate) async fn admitted_query_vector(
                 None,
                 state.config.ollama_supports_tool_calling,
             )
-            .await?;
+            .await
+            .context(QueryEmbeddingStage("embedding_agent"))?;
             &resolved
         }
     };
-    ensure_allowed_action(agent, "embedding_query")?;
+    ensure_allowed_action(agent, "embedding_query").context(QueryEmbeddingStage("agent_action"))?;
     let reader = state
         .spend_read_stdb
         .as_deref()
-        .context("embedding spend reader unavailable")?;
+        .context(QueryEmbeddingStage("spend_reader"))?;
     let model = state.config.embedding_model_name();
     let scope = MeteredScope {
         organization_id: org,
@@ -227,7 +233,8 @@ async fn execute_query_embedding(
             scope.company_id,
             key,
         )
-        .await?;
+        .await
+        .context(QueryEmbeddingStage("skill_recheck"))?;
     }
     execute_metered(stdb, reader, scope, || async {
         let response = embedder.embed_batch_with_usage(&[query.to_owned()]).await?;
@@ -244,6 +251,7 @@ async fn execute_query_embedding(
         })
     })
     .await
+    .context(QueryEmbeddingStage("metered_execution"))
 }
 
 pub async fn post_search(
@@ -655,6 +663,10 @@ mod tests {
             .await
             .unwrap_err();
             assert!(error.is::<crate::error::SkillUnavailable>());
+            assert_eq!(
+                error.downcast_ref::<QueryEmbeddingStage>().unwrap().0,
+                "skill_recheck"
+            );
         }
         server.abort();
     }

@@ -25,7 +25,7 @@ export function trackingDetailConfig(
       title: section.title,
       fields: section.fields.map((field) => ({
         key: field.name,
-        label: field.label,
+        label: field.label ?? humanizeEnumValue(field.name),
         width: field.width,
         render: (_value, record) => {
           const key =

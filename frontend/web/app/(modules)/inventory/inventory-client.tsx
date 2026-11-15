@@ -539,7 +539,7 @@ function InventoryClientLoaded({
     ],
     [canReadBackfill, t, workspace],
   );
-  const { activeTab, setActiveTab } = useModuleTab(
+  const { activeTab, setActiveTab, navigateToTab } = useModuleTab(
     workspace === 'products' ? 'products' : workspace === 'warehouse' ? 'stock' : 'dashboard',
     inventoryTabIds,
   );
@@ -2213,14 +2213,14 @@ function InventoryClientLoaded({
         <LocationHierarchyPanel
           locations={locations}
           quants={locationQuants}
-          onViewQuants={(locationId) => setActiveTab('stock', {
+          onViewQuants={(locationId) => navigateToTab('stock', {
             key: STOCK_LOCATION_FILTER_KEY,
             value: locationId,
           })}
         />
       ),
     }),
-    [t, locations, locationsLoading, locationQuants, setActiveTab],
+    [t, locations, locationsLoading, locationQuants, navigateToTab],
   );
 
   const qualityAlertTableConfig = useQualityAlertTableConfig({

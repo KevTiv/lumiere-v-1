@@ -167,6 +167,7 @@ for (const width of [390, 1440]) {
       workspace.getByTestId("module-panel-inventory-dashboard"),
     ).toBeVisible();
     await stock.press("Enter");
+    await expect(page).toHaveURL((url) => url.searchParams.get("tab") === "stock");
     await expect(stock).toHaveAttribute("aria-current", "page");
     const stockPanel = workspace.getByTestId("module-panel-inventory-stock");
     const stockTable = stockPanel.getByRole("table");
@@ -202,6 +203,7 @@ for (const width of [390, 1440]) {
     await expect(stockTable.getByRole("row")).toHaveCount(2);
     await expect(stockTable).toContainText("Reusable delivery crate");
     await movements.press("Enter");
+    await expect(page).toHaveURL((url) => url.searchParams.get("tab") === "transfers");
     await expect(movements).toHaveAttribute("aria-current", "page");
     const transfers = workspace.getByTestId("module-panel-inventory-transfers");
     await expect(
@@ -209,6 +211,7 @@ for (const width of [390, 1440]) {
     ).toBeVisible();
     await expect(transfers).toContainText("IN-00052");
     await page.goBack();
+    await expect(page).toHaveURL((url) => url.searchParams.get("tab") === "stock");
     await expect(stockPanel).toBeVisible();
 
     await openWorkspace(
