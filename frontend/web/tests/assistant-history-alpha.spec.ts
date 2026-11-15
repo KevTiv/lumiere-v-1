@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises"
 
 import type { BusinessHistoryActivityPage } from "@lumiere/query-hooks/hooks/business-history-model"
-import { devices, expect, test, type Page } from "@playwright/test"
+import { devices, expect, test, type Page, type Response } from "@playwright/test"
 import { buildNavGroups } from "@lumiere/ui/lib/navigation-catalog"
 import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
 
@@ -15,6 +15,12 @@ const alphaRoutes = buildNavGroups((key) => key, { workspaceProfile: profile })
   .flatMap(({ items }) => items)
   .map(({ surfaceId, href }) => ({ surfaceId, href }))
 
+async function activityPage(response: Response, action: string): Promise<BusinessHistoryActivityPage> {
+  const body = await response.text()
+  expect(response.ok(), `${action} returned HTTP ${response.status()}: ${body.slice(0, 300)}`).toBe(true)
+  return JSON.parse(body) as BusinessHistoryActivityPage
+}
+
 async function openActivity(page: Page, module: string, companyId: string, checkEventLink: boolean) {
   const requestPath = `/api/history/activity/${module}`
   const [response] = await Promise.all([
@@ -24,8 +30,7 @@ async function openActivity(page: Page, module: string, companyId: string, check
     page.getByTestId("module-history-open").click(),
   ])
   await expect(page).toHaveURL((url) => url.searchParams.get("history") === "activity")
-  expect(response.ok(), `${module} Activity must return the authorized company page`).toBe(true)
-  const history = (await response.json()) as BusinessHistoryActivityPage
+  const history = await activityPage(response, `${module} Activity`)
   expect(history).toMatchObject({ module, companyId, coverage: { status: "partial" } })
 
   const dialog = page.getByRole("dialog", { name: "Activity", exact: true })
@@ -52,8 +57,7 @@ async function openActivity(page: Page, module: string, companyId: string, check
         }),
         event.getByRole("link", { name: "Open change", exact: true }).click(),
       ])
-      expect(exactResponse.ok(), "The saved event must resolve by exact identity").toBe(true)
-      expect(await exactResponse.json()).toMatchObject({ module, companyId, data: [firstEvent], nextCursor: null })
+      expect(await activityPage(exactResponse, `${module} Activity event ${firstEvent.id}`)).toMatchObject({ module, companyId, data: [firstEvent], nextCursor: null })
       await expect(page).toHaveURL((url) =>
         url.searchParams.get("history") === "activity" &&
         url.searchParams.get("historyEvent") === firstEvent.id &&

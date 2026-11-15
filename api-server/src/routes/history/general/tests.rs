@@ -28,6 +28,31 @@ fn evidence(changes: Value) -> Value {
 }
 
 #[test]
+fn overview_resource_predicate_preserves_the_catalog_and_legacy_aliases() {
+    let adapters = activity_adapters("overview");
+    let predicate = activity_resource_predicate(&adapters);
+    for adapter in &adapters {
+        assert!(
+            predicate.contains(&resource_predicate(adapter)),
+            "{}",
+            adapter.table
+        );
+    }
+    let mut depth = 0;
+    let mut max_depth = 0;
+    for byte in predicate.bytes() {
+        match byte {
+            b'(' => depth += 1,
+            b')' => depth -= 1,
+            _ => continue,
+        }
+        max_depth = max_depth.max(depth);
+    }
+    assert_eq!(depth, 0);
+    assert!(max_depth <= adapters.len().next_power_of_two().ilog2() + 1);
+}
+
+#[test]
 fn closed_alpha_adapters_use_existing_registry_owners() {
     let adapters = record_adapters();
     let mut tables = HashSet::new();

@@ -286,6 +286,22 @@ fn resource_predicate(adapter: &RecordAdapter) -> String {
     )
 }
 
+/// Keep SpacetimeDB's SQL expression tree shallow for the Overview adapter catalog.
+fn activity_resource_predicate(adapters: &[RecordAdapter]) -> String {
+    match adapters {
+        [] => "false".into(),
+        [adapter] => resource_predicate(adapter),
+        _ => {
+            let (left, right) = adapters.split_at(adapters.len() / 2);
+            format!(
+                "({} OR {})",
+                activity_resource_predicate(left),
+                activity_resource_predicate(right),
+            )
+        }
+    }
+}
+
 fn require_history_access(access: &FieldAccessContext) -> Result<(), ApiError> {
     if !permission_allowed(access, "business_history", "read") {
         return Err(ApiError::Forbidden(
@@ -721,9 +737,12 @@ struct ProviderPage {
 
 fn provider_unavailable(error: ApiError) -> ApiError {
     match error {
-        ApiError::Internal(_) | ApiError::InternalSource(_) => ApiError::Unavailable(
-            "Change history evidence is temporarily unavailable. Verify the database schema release matches this API.".into(),
-        ),
+        ApiError::Internal(_) | ApiError::InternalSource(_) => {
+            tracing::warn!(error = ?error, "business history provider read failed");
+            ApiError::Unavailable(
+                "Change history evidence is temporarily unavailable. Verify the database schema release matches this API.".into(),
+            )
+        }
         other => other,
     }
 }
@@ -781,11 +800,7 @@ async fn scan_provider(
         });
     }
     let org = context.organization_id();
-    let resources = permitted
-        .iter()
-        .map(resource_predicate)
-        .collect::<Vec<_>>()
-        .join(" OR ");
+    let resources = activity_resource_predicate(&permitted);
     let record_predicate = record
         .map(|id| format!(" AND record_id = {id}"))
         .unwrap_or_default();
