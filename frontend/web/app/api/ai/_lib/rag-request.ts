@@ -6,6 +6,7 @@ import { z } from "zod"
 
 import { sanitizeRagUiContext } from "@lumiere/erp-shared/ai-ui-context"
 import type { ApiSession } from "@/lib/api-session"
+import { serverFarmOperationsEnabled } from "@/lib/server-farm-operations"
 
 import type { JsonObject } from "./route-helpers"
 import {
@@ -241,12 +242,10 @@ export async function prepareRagPayload(params: {
   const limit = boundedInteger(body.limit, 20, 1, 40)
   const include_types = sanitizeIncludeTypes(body.include_types)
   const ui_context = sanitizeRagUiContext(body.ui_context)
-  const page = await serverRagPageCatalog({
-    session,
-    orgId,
-    companyId,
-    uiContext: ui_context,
-  })
+  const [page, farmOperationsEnabled] = await Promise.all([
+    serverRagPageCatalog({ session, orgId, companyId, uiContext: ui_context }),
+    serverFarmOperationsEnabled(session, companyId),
+  ])
 
   const payload: RagPayload = {
     ...agentSelection,
@@ -256,7 +255,7 @@ export async function prepareRagPayload(params: {
     limit,
     stdb_token: session.stdbToken,
     identity_hex: session.identityHex,
-    ui_action_offers: serverRagUiActionOffers(session, page),
+    ui_action_offers: serverRagUiActionOffers(session, page, farmOperationsEnabled),
   }
   if (include_types?.length) payload.include_types = include_types
   if (ui_context) payload.ui_context = ui_context

@@ -25,8 +25,8 @@ pub(super) struct Capability {
 }
 
 /// Keep availability in the server that owns dispatch, rather than in each client.
-pub(super) fn catalog() -> Vec<Capability> {
-    vec![
+pub(super) fn catalog(farm_enabled: bool) -> Vec<Capability> {
+    let mut capabilities = vec![
         Capability {
             key: "historical_expense_journals",
             module: "accounting",
@@ -83,7 +83,24 @@ pub(super) fn catalog() -> Vec<Capability> {
         held("calendar", "calendar", "Dated source evidence", &[], "A source date does not automatically create a calendar event.", "/calendar"),
         held("settings", "settings", "Import setup", &[], "Company settings and accounting references must be configured through their existing authorized workflows.", "/settings"),
         held("ai_assistant", "ai-assistant", "Import assistance", &[], "Chat reads the same saved task and decisions; suggested interpretations require confirmation before execution.", "/ai-assistant"),
-    ]
+    ];
+    if farm_enabled {
+        capabilities.push(Capability {
+            key: "historical_farm_events",
+            module: "farm-batches",
+            label: "Historical farm activity and cost links",
+            target_entities: &["farm_event"],
+            required_facts: &[
+                "flock and stable event references",
+                "business date",
+                "event type and measurement or exact posted cost evidence",
+            ],
+            readiness: Readiness::TaskExecution,
+            blocking_reason: None,
+            destination: "/farm-batches",
+        });
+    }
+    capabilities
 }
 
 fn native(

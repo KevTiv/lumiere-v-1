@@ -594,6 +594,7 @@
     "manufacturing": "Inganda",
     "map": "Ikarita",
     "fleet": "Ibinyabiziga",
+    "farmBatches": "Amatsinda y’amatungo",
     "helpdesk": "Ubufasha",
     "workflows": "Imigendekere y’akazi",
     "documents": "Inyandiko",
@@ -4391,6 +4392,11 @@
       "status": "Uko bihagaze",
       "importedRows": "Byinjijwe",
       "errorRows": "Amakosa"
+    },
+    "importPreparation": {
+      "worksheet": "Urupapuro",
+      "worksheetHint": "Hitamo impapuro ushaka gushyiramo. Buri rupapuro rugumana imirongo yarwo y’umwimerere kandi rushobora kugira uburyo bwarwo bwo guhuza inkingi.",
+      "worksheets": "Impapuro zo gutegura"
     },
     "backToSettings": "Subira ku igenamiterere",
     "adminAccess": "Uburenganzira bw’umuyobozi",

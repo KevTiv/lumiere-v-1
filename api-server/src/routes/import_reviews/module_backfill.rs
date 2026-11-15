@@ -446,6 +446,11 @@ pub(super) async fn write(
         }
         let original: ReviewItem =
             serde_json::from_value(item.get("source_json")).map_err(ApiError::internal)?;
+        if original.source.multi_worksheet {
+            results.push(json!({"itemId":id.to_string(),"status":"held",
+                "reason":"This workflow requires a single-sheet source to distinguish rows. Select a single-sheet export for this Sales or Warehouse backfill."}));
+            continue;
+        }
         let values =
             serde_json::from_value(item.get("proposed_json")).map_err(ApiError::internal)?;
         let confirmed: Vec<String> =

@@ -166,9 +166,10 @@ class RepositoryTests(unittest.TestCase):
 
     def test_every_current_alpha_surface_has_an_owner(self):
         self.assertEqual(set(self.payload["scope"]["surfaces"]), set(inventory.MODULES))
+        service_surfaces = {path["surface"] for path in self.payload["service_paths"]}
         for row in self.payload["surfaces"]:
             if row["surface"] != "overview":
-                self.assertGreater(row["operation_candidates"], 0, row)
+                self.assertTrue(row["operation_candidates"] > 0 or row["surface"] in service_surfaces, row)
         self.assertEqual(self.payload["summary"]["runtime_certified"], 0)
 
     def test_canonical_ids_and_native_locations_are_unique(self):

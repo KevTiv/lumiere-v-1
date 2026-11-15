@@ -78,6 +78,7 @@ class Section:
     last_column: int
     identity_namespace: str | None
     identity_fields: tuple[str, ...]
+    worksheet_name: str | None
 
 
 @dataclass(frozen=True)
@@ -129,12 +130,13 @@ class FilePreparation:
     sections: tuple[Section, ...]
     expected_layout_sha256: str | None = None
     managed_selection: ManagedSelection | None = None
+    worksheet_names: tuple[str, ...] = ()
 
 
 def parse_section(value: Any) -> Section:
     allowed = {"key", "headerRecord", "firstRecord", "lastRecord", "targetEntity",
                "expectedHeaders", "headerMap", "aliases", "transforms", "firstColumn",
-               "lastColumn", "identityNamespace", "identityFields"}
+               "lastColumn", "identityNamespace", "identityFields", "worksheetName"}
     row = object_keys(value, allowed, {"key", "headerRecord", "firstRecord", "lastRecord",
                                      "targetEntity", "expectedHeaders"}, "A source section")
     key = bounded_text(row["key"], 64, "Section identity")
@@ -146,7 +148,7 @@ def parse_section(value: Any) -> Section:
     if not header < first <= last:
         raise PreparationError("A section needs a header before its ordered data records.")
     target = row["targetEntity"]
-    if not isinstance(target, str) or target not in {"product", "contact", "stock_location", "source_observation"}:
+    if not isinstance(target, str) or target not in {"product", "contact", "stock_location", "source_observation", "farm_event"}:
         raise PreparationError("This destination requires a registered preparation contract.")
     headers = row["expectedHeaders"]
     if (not isinstance(headers, list) or not 1 <= len(headers) <= 200
@@ -197,8 +199,9 @@ def parse_section(value: Any) -> Section:
         raise PreparationError("An explicit identity namespace and its fields must be selected together.")
     if namespace is not None:
         bounded_text(namespace, 200, "Identity namespace")
+    worksheet = bounded_text(row["worksheetName"], 255, "Worksheet name") if "worksheetName" in row else None
     return Section(key, header, first, last, target, tuple(headers), dict(mapping), tuple(aliases),
-                   tuple(transforms), start_column, end_column, namespace, tuple(identity_fields))
+                   tuple(transforms), start_column, end_column, namespace, tuple(identity_fields), worksheet)
 
 
 def parse_preparation(value: Any) -> dict[str, FilePreparation]:
@@ -218,7 +221,8 @@ def parse_preparation(value: Any) -> dict[str, FilePreparation]:
     result = {}
     for value in files:
         row = object_keys(value, {"fileName", "sourceSha256", "delimiter", "decimalSeparator",
-                                 "groupingSeparator", "dateOrder", "sections", "expectedLayoutSha256", "managedSelection"},
+                                 "groupingSeparator", "dateOrder", "sections", "expectedLayoutSha256", "managedSelection",
+                                 "worksheetNames"},
                           {"fileName", "sourceSha256"}, "File preparation")
         name = bounded_text(row["fileName"], 300, "Prepared filename")
         digest = row["sourceSha256"]
@@ -246,16 +250,30 @@ def parse_preparation(value: Any) -> dict[str, FilePreparation]:
         sections = tuple(parse_section(section) for section in source_sections)
         if len({section.key for section in sections}) != len(sections):
             raise PreparationError("Section identities must be distinct within a file.")
+        worksheets = row.get("worksheetNames", [])
+        if not isinstance(worksheets, list) or len(worksheets) > 20 or ("worksheetNames" in row and not worksheets):
+            raise PreparationError("Choose between 1 and 20 worksheets.")
+        for worksheet in worksheets:
+            bounded_text(worksheet, 255, "Worksheet name")
+        if len(set(worksheets)) != len(worksheets):
+            raise PreparationError("Choose distinct worksheets.")
+        if worksheets and (not name.lower().endswith(".xlsx") or delimiter is not None or "managedSelection" in row):
+            raise PreparationError("Choose workbook sheets only for original XLSX uploads.")
         for index, section in enumerate(sections):
+            if ((section.worksheet_name is not None and section.worksheet_name not in worksheets)
+                    or (len(worksheets) > 1 and section.worksheet_name is None)):
+                raise PreparationError("Bind each source section to a selected worksheet.")
             for previous in sections[:index]:
                 rows_overlap = max(section.header_record, previous.header_record) <= min(section.last_record, previous.last_record)
                 columns_overlap = max(section.first_column, previous.first_column) <= min(section.last_column, previous.last_column)
-                if rows_overlap and columns_overlap:
+                same_worksheet = len(worksheets) <= 1 or section.worksheet_name == previous.worksheet_name
+                if same_worksheet and rows_overlap and columns_overlap:
                     raise PreparationError("Source sections cannot reuse the same source cells.")
         selection = parse_managed_selection(row["managedSelection"]) if "managedSelection" in row else None
         if selection and (recipe or layout or sections):
             raise PreparationError("A document selection cannot be combined with reusable preparation rules.")
-        result[name] = FilePreparation(name, digest, delimiter, decimal, grouping, order, sections, layout, selection)
+        result[name] = FilePreparation(name, digest, delimiter, decimal, grouping, order, sections, layout, selection,
+                                       tuple(worksheets))
     return result
 
 

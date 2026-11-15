@@ -64,6 +64,7 @@ import {
 import { ImportReviewEditor, ReviewRequestError } from "./import-review-editor"
 import { ImportReviewBulk } from "./import-review-bulk"
 import { ModuleBackfillAction } from "./module-backfill-action"
+import { FarmImportAction } from "./farm-import-action"
 import { ImportReviewDecisionSummary } from "./import-review-decision-summary"
 import { resetHistoryQueries } from "./history-data"
 import { sourceHistoryLink } from "./source-observation"
@@ -334,7 +335,7 @@ function ReviewWorkspace({
   const visible = matching.slice(currentPage * 50, currentPage * 50 + 50)
   const unavailable = busy || locked || uncertainUndo
   const sourceLabel = (item: ReviewRow) =>
-    `${item.source.source.file} · ${t(item.source.source.rowBasis === "import_row" ? "settings.importReview.importRow" : "settings.importReview.sourceLine", { row: item.source.source.row })}`
+    `${item.source.source.file}${item.source.source.sheet ? ` · ${item.source.source.sheet}` : ""} · ${t(item.source.source.rowBasis === "import_row" ? "settings.importReview.importRow" : "settings.importReview.sourceLine", { row: item.source.source.row })}`
   const chooseBatch = (id: string) => {
     requireCurrentScope()
     if (allowedReviewIds && !allowedReviewIds.includes(id)) return
@@ -654,7 +655,7 @@ function ReviewWorkspace({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-medium">{detail.data.title}</h3>
             <div className="flex flex-wrap gap-2">
-              {allowImport ? <Button
+              {allowImport && detail.data.targetEntity !== "farm_event" ? <Button
                 variant="outline"
                 disabled={
                   !confirmed ||
@@ -693,14 +694,18 @@ function ReviewWorkspace({
             <ModuleBackfillAction detail={detail.data} taskId={historySource?.taskId} companyId={companyId}
               organizationId={organizationId} actor={actor} disabled={unavailable || !!selected || !!continuationBlock} />
           ) : null}
-          <ImportReviewDecisionSummary
+          {allowImport && detail.data.targetEntity === "farm_event" ? (
+            <FarmImportAction key={detail.data.id} detail={detail.data} companyId={companyId}
+              disabled={unavailable || !!selected || !!continuationBlock} />
+          ) : null}
+          {detail.data.targetEntity !== "farm_event" ? <ImportReviewDecisionSummary
             detail={detail.data}
             organizationId={organizationId}
             companyId={companyId}
             canPrepareImport={canPrepareImport}
             allowImport={allowImport}
-          />
-          {allowImport && !canPrepareImport && !selected && !unavailable ? (
+          /> : null}
+          {allowImport && detail.data.targetEntity !== "farm_event" && !canPrepareImport && !selected && !unavailable ? (
             <a
               className="text-sm font-medium underline underline-offset-4"
               href={sourceHistoryLink(companyId, detail.data.id)}

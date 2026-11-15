@@ -215,6 +215,8 @@ export interface ImportWorkflow {
   nativeResults: ImportNativeResult[]
   nativeResultsMore: boolean
   backfilledRecords?: Array<{ module: "sales" | "warehouse"; count: number }>
+  farmResults?: Array<{ batchId: string; count: number }>
+  farmResultsMore?: boolean
 }
 export type WorkflowFetch = (
   url: string,
@@ -404,6 +406,8 @@ export async function readImportWorkflow(
       nativeResults: z.array(nativeResultSchema).max(20).default([]),
       nativeResultsMore: z.boolean().default(false),
       backfilledRecords: z.array(z.object({ module: z.enum(["sales", "warehouse"]), count })).optional(),
+      farmResults: z.array(z.object({ batchId: positiveId, count })).max(20).optional(),
+      farmResultsMore: z.boolean().optional(),
     })
     .parse(body)
   if (

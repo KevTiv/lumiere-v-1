@@ -1134,7 +1134,10 @@ pub fn set_company_vertical_pack(
         .find(&company_id)
         .ok_or("Company not found")?;
     check_permission(ctx, company.organization_id, "company", "write")?;
-    if params.pack_key != "distributor_wholesaler" {
+    if !matches!(
+        params.pack_key.as_str(),
+        "distributor_wholesaler" | "farm_operations"
+    ) {
         return Err("unsupported company vertical pack".to_string());
     }
     let existing = ctx

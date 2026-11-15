@@ -7,6 +7,7 @@ import {
   ASSISTANT_PAGE_MODULES,
   ASSISTANT_PROMPT_LIMIT,
   assistantActionHref,
+  assistantSurfaceNavigationKey,
   decodeAssistantAction,
   getAssistantCapability,
   parseAssistantWidgetKey,
@@ -359,13 +360,13 @@ test("prompts are bounded plain instructions, never automatically applied values
   )
 })
 
-test("catalog covers all ten Alpha modules without hidden family discovery", () => {
+test("catalog covers the Alpha modules without hidden family discovery", () => {
   assert.equal(
     new Set(ALPHA_ASSISTANT_CAPABILITIES.map((item) => item.key)).size,
     ALPHA_ASSISTANT_CAPABILITIES.length,
   )
   for (const module of ALPHA_ASSISTANT_MODULES)
-    assert.ok(getAssistantCapability(`${module}.navigate`))
+    assert.ok(getAssistantCapability(assistantSurfaceNavigationKey(module)))
   for (const hidden of [
     "inventory",
     "manufacturing",
@@ -377,6 +378,22 @@ test("catalog covers all ten Alpha modules without hidden family discovery", () 
     "ai-harness",
   ])
     assert.equal(getAssistantCapability(`${hidden}.navigate`), undefined)
+})
+
+test("farm requests open exact scoped forms and records", () => {
+  assert.equal(assistantActionHref(action("Open Farm Batches")), "/farm-batches")
+  assert.equal(assistantActionHref(action("Create a flock")), "/farm-batches?form=new-batch")
+  assert.equal(assistantActionHref(action("Open flock 9007199254740993")), "/farm-batches/9007199254740993")
+  assert.equal(assistantActionHref(action("Record mortality for flock 42")), "/farm-batches/42?form=new-event&eventKind=mortality")
+  assert.equal(assistantActionHref(action("Show metrics for flock 42")), "/farm-batches/42?view=metrics")
+  const selected = resolveAssistantActionRequest("Log weigh-in", {
+    scope, module: "farm-batches", selection: { entityType: "farm_batch", entityId: "42" },
+  })
+  assert.equal(selected.kind === "action" && assistantActionHref(selected.action), "/farm-batches/42?form=new-event&eventKind=weighIn")
+  assert.equal(getAssistantCapability("farm.batch.mortality")?.permission.action, "write")
+  assert.equal(resolveAssistantActionRequest("Open flock 42", {
+    scope, allowedModules: ["warehouse"],
+  }).kind, "clarify")
 })
 
 const page: AssistantPageCatalog = {

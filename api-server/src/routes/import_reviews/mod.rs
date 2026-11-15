@@ -1,6 +1,7 @@
 //! Durable, tenant-scoped source review and approved import workflows.
 //! Business writes use the existing validated native import owner.
 mod capabilities;
+mod farm_import;
 mod history_data;
 mod history_period;
 mod import_binding;
@@ -486,6 +487,10 @@ pub fn router() -> Router<Arc<AppState>> {
             post(module_backfill::write),
         )
         .route("/module-backfill/:module", get(module_backfill::read))
+        .route(
+            "/import-reviews/:batch/farm-events",
+            post(farm_import::write),
+        )
         .route("/import-reviews/:batch/items/:item", patch(decide))
         .route("/import-reviews/:batch/decisions", post(decide_bulk))
         .route("/import-reviews/:batch/items/:item/history", get(history))

@@ -23,6 +23,7 @@ use super::{scope, Scope, StorageScope};
 use crate::{
     cold_tier::pg_pool,
     error::ApiError,
+    routes::farm_batches::{authorize as authorize_farm, FarmAccess},
     routes::import::{read_workflow_import, submit_workflow_import, WorkflowImportRequest},
     session::ApiSession,
     state::AppState,
@@ -46,11 +47,22 @@ async fn read(
     let tx = client.transaction().await.map_err(ApiError::internal)?;
     let proposals = storage::list(&tx, scoped, &task).await?;
     let backfilled_records = super::module_backfill::task_results(&tx, scoped, &task).await?;
+    let farm_enabled =
+        match authorize_farm(&state, &session, query.company_id, FarmAccess::Read).await {
+            Ok(_) => true,
+            Err(ApiError::Forbidden(_)) => false,
+            Err(error) => return Err(error),
+        };
+    let (farm_results, farm_results_more) = if farm_enabled {
+        super::farm_import::task_results(&tx, scoped, &task).await?
+    } else {
+        (Vec::new(), false)
+    };
     tx.commit().await.map_err(ApiError::internal)?;
     let (native_results, native_results_more) =
         super::native_requests::list(&context, query.company_id, &task).await?;
     Ok(Json(
-        json!({"version":1,"organizationId":context.organization_id().to_string(),"requestId":task,"companyId":query.company_id.to_string(),"capabilities":super::capabilities::catalog(),"proposals":proposals,"nativeResults":native_results,"nativeResultsMore":native_results_more,"backfilledRecords":backfilled_records}),
+        json!({"version":1,"organizationId":context.organization_id().to_string(),"requestId":task,"companyId":query.company_id.to_string(),"capabilities":super::capabilities::catalog(farm_enabled),"proposals":proposals,"nativeResults":native_results,"nativeResultsMore":native_results_more,"backfilledRecords":backfilled_records,"farmResults":farm_results,"farmResultsMore":farm_results_more}),
     ))
 }
 

@@ -35,6 +35,31 @@ fn recipe_snapshots_keep_typed_rules_and_pin_accepted_source_layout() -> Result<
 }
 
 #[test]
+fn workbook_recipe_pins_all_selected_sheets_as_one_source() -> Result<()> {
+    let source = Source {
+        name: "farm.xlsx".into(),
+        ..source()
+    };
+    let options = json!({"version":1, "files":[{"fileName":"farm.xlsx",
+        "sourceSha256":"a".repeat(64), "worksheetNames":["Intake","Growth"]}]});
+    let covered_sheet = |name: &str| {
+        json!({"fileName":"farm.xlsx","sourceSha256":"a".repeat(64),"status":"prepared",
+            "worksheet":name,"layoutSha256":"b".repeat(64),"workbookLayoutSha256":"d".repeat(64),
+            "sections":[{"headerSha256":"c".repeat(64)}]})
+    };
+    let mut coverage = json!({"version":1,"complete":true,
+        "files":[covered_sheet("Intake"),covered_sheet("Growth")]});
+    let sources = [source];
+    let document = recipe_document(&options, &coverage, &sources)?;
+    let slot = &document.slots[0].options;
+    ensure!(slot.worksheet_names.as_deref() == Some(&["Intake".to_owned(), "Growth".to_owned()]));
+    ensure!(slot.expected_layout_sha256 == Some("d".repeat(64)));
+    coverage["files"][1] = covered_sheet("Intake");
+    ensure!(recipe_document(&options, &coverage, &sources).is_err());
+    Ok(())
+}
+
+#[test]
 fn incomplete_stale_unknown_and_unstructured_rules_cannot_be_saved() {
     let mut incomplete = coverage();
     incomplete["complete"] = json!(false);

@@ -122,7 +122,7 @@ describe("first-org product surface census", () => {
         surface.firstOrgExposure === "hidden"
       ) {
         expect(isFirstOrgSurfaceAdmitted(surface.id, true)).toBe(false)
-        if (surface.boundedAlpha) {
+        if (surface.boundedAlpha && surface.id !== "farm-batches") {
           expect(visibleSurfaceIds).toContain(surface.id)
         } else {
           expect(visibleSurfaceIds).not.toContain(surface.id)
@@ -149,7 +149,7 @@ describe("first-org product surface census", () => {
 
   it("admits only the documented bounded alpha workspaces without awarding U5", () => {
     const alpha = PRODUCT_SURFACES.filter((surface) => surface.boundedAlpha)
-    expect(alpha.map((surface) => surface.id)).toEqual(["products", "warehouse", "inventory", "fleet"])
+    expect(alpha.map((surface) => surface.id)).toEqual(["products", "warehouse", "inventory", "farm-batches", "fleet"])
 
     for (const surface of alpha) {
       expect(surface).toMatchObject({
@@ -190,6 +190,16 @@ describe("first-org product surface census", () => {
       boundedAlpha: { scope: "inventory-workspace" },
     })
     expect(getProductSurfaceForPathname("/products/42")?.id).toBe("products")
+  })
+
+  it("discovers Farm Batches only for an enabled company", () => {
+    const flatten = (farmOperationsEnabled: boolean) => buildNavGroups((key) => key, {
+      firstOrgProfile: true, workspaceProfile: "finance-alpha", farmOperationsEnabled,
+    }).flatMap(({ items }) => items)
+    expect(flatten(false).some(({ surfaceId }) => surfaceId === "farm-batches")).toBe(false)
+    expect(flatten(true).find(({ surfaceId }) => surfaceId === "farm-batches")).toMatchObject({
+      href: "/farm-batches", resource: "farm_batch",
+    })
   })
 
   it("rejects unknown and unrelated routes for members and administrators", () => {

@@ -2,6 +2,7 @@ import {
   ALPHA_ASSISTANT_CAPABILITIES,
   ASSISTANT_PAGE_CAPABILITIES,
   ASSISTANT_PAGE_WIDGET_LIMIT,
+  assistantSurfaceNavigationKey,
   getAssistantCapability,
   isAssistantPageModule,
   parseAssistantWidgetKey,
@@ -26,12 +27,18 @@ export interface RagUiActionOffer {
 export function serverRagUiActionOffers(
   authority: SessionPermissionAuthority,
   page?: AssistantPageCatalog,
+  farmOperationsEnabled = false,
 ): RagUiActionOffer[] {
   const offers: RagUiActionOffer[] = ALPHA_ASSISTANT_CAPABILITIES.filter(
     (capability) => {
       if (!isWorkspaceSurfaceVisible("finance-alpha", capability.module))
         return false
-      const surface = getAssistantCapability(`${capability.module}.navigate`)
+      // Farm records are read directly from the scoped farm API. The gateway
+      // has no corresponding retrieval snapshot for model-selected identities.
+      if (capability.module === "farm-batches" &&
+          (!farmOperationsEnabled || capability.kind === "open_record" || capability.kind === "prepare_workflow" || capability.key.endsWith(".list")))
+        return false
+      const surface = getAssistantCapability(assistantSurfaceNavigationKey(capability.module))
       return (
         surface != null &&
         sessionAllowsPermission(authority, surface.permission.resource, "read") &&

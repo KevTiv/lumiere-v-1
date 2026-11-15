@@ -35,6 +35,7 @@ interface DashboardSidebarProps {
   aiChatOpen?: boolean
   /** Apply the fail-closed first-test-organization product admission profile. */
   firstOrgProfile?: boolean
+  farmOperationsEnabled?: boolean
   /** Optional nav badge counts keyed by href (e.g. pending AI approvals). */
   navBadges?: Record<string, number>
 }
@@ -53,6 +54,7 @@ function DashboardSidebarContent({
   onOpenAIChat,
   aiChatOpen = false,
   firstOrgProfile = false,
+  farmOperationsEnabled = false,
   navBadges,
 }: DashboardSidebarProps) {
   const { state, isMobile, toggleSidebar, setOpenMobile } = useSidebar()
@@ -86,8 +88,8 @@ function DashboardSidebarContent({
 
   const userIsAdmin = isAdmin()
   const navGroups = useMemo(
-    (): NavGroup[] => buildNavGroups(t, { workspaceProfile, firstOrgProfile, isAdmin: userIsAdmin }),
-    [workspaceProfile, firstOrgProfile, t, userIsAdmin],
+    (): NavGroup[] => buildNavGroups(t, { workspaceProfile, firstOrgProfile, isAdmin: userIsAdmin, farmOperationsEnabled }),
+    [workspaceProfile, firstOrgProfile, t, userIsAdmin, farmOperationsEnabled],
   )
   const quickActionIsVisible = (surfaceId: string) =>
     isWorkspaceSurfaceVisible(workspaceProfile, surfaceId) &&

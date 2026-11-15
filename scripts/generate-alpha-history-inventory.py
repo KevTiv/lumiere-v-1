@@ -46,6 +46,7 @@ MODULES = {
         "inventory/replenishment.rs", "inventory/warehouse_sync.rs",
     ]},
     "fleet": {"owner": "COV-15", "domains": ["fleet"]},
+    "farm-batches": {"owner": "Farm Operations", "domains": []},
     "documents": {"owner": "COV-18", "domains": ["documents"]},
     "calendar": {"owner": "COV-19", "files": ["workflow/calendar.rs"]},
     "tasks": {"owner": "COV-10/COV-21", "files": ["crm/activities.rs"]},
@@ -91,6 +92,14 @@ SERVICE_PATHS = [
     ("native-import-recovery", "api-server/src/routes/import.rs", "read_exact_outcome", "settings"),
     ("review-import-binding", "api-server/src/routes/import_reviews/import_binding.rs", "record_review_binding", "settings"),
     ("review-import-binding-read", "api-server/src/routes/import_reviews/import_binding.rs", "read_review_binding", "settings"),
+    ("farm-batch-create", "api-server/src/routes/farm_batches/mod.rs", "create", "farm-batches"),
+    ("farm-event-append", "api-server/src/routes/farm_batches/mod.rs", "append_event", "farm-batches"),
+    ("farm-event-revision", "api-server/src/routes/farm_batches/mod.rs", "revise_event", "farm-batches"),
+    ("farm-event-history-read", "api-server/src/routes/farm_batches/mod.rs", "history", "farm-batches"),
+    ("farm-processing-link", "api-server/src/routes/farm_batches/native_links/processing.rs", "link_processing", "farm-batches"),
+    ("farm-processing-run", "api-server/src/routes/farm_batches/native_links/processing.rs", "run_processing", "farm-batches"),
+    ("farm-cost-link", "api-server/src/routes/farm_batches/native_links.rs", "link_cost", "farm-batches"),
+    ("farm-import-apply", "api-server/src/routes/import_reviews/farm_import.rs", "apply", "farm-batches"),
 ]
 
 
@@ -371,13 +380,16 @@ def service_paths(root: Path) -> list[dict[str, Any]]:
         match = re.search(rf"\basync\s+fn\s+{function}\s*\(", text)
         if match is None:
             raise ValueError(f"unresolved source/import service path: {source}::{function}")
+        farm = surface == "farm-batches"
         result.append({
             "path_id": identity, "surface": surface, "source": source,
             "function": function, "line": text.count("\n", 0, match.start()) + 1,
-            "owner": "source-review/import API",
+            "owner": "Farm Operations API" if farm else "source-review/import API",
             "authority": "existing-service-owner-not-a-new-native-operation",
-            "history_policy": "review-store-or-exact-native-receipt-owner-review-required",
-            "source_link_policy": "exact-review-revision-admission-and-import-outcome-required",
+            "history_policy": ("scoped-farm-revision-or-exact-native-link-owner-review-required" if farm
+                               else "review-store-or-exact-native-receipt-owner-review-required"),
+            "source_link_policy": ("exact-farm-event-revision-and-current-source-authorization-required" if farm
+                                   else "exact-review-revision-admission-and-import-outcome-required"),
             "runtime_evidence": [], "certification": "not-certified-by-static-inventory",
         })
     return result

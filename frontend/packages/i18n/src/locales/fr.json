@@ -594,6 +594,7 @@
     "manufacturing": "Fabrication",
     "map": "Carte",
     "fleet": "Parc automobile",
+    "farmBatches": "Lots d’élevage",
     "helpdesk": "Assistance",
     "workflows": "Circuits de traitement",
     "documents": "Documents",
@@ -4391,6 +4392,11 @@
       "status": "Statut",
       "importedRows": "Importé",
       "errorRows": "Erreurs"
+    },
+    "importPreparation": {
+      "worksheet": "Feuille de calcul",
+      "worksheetHint": "Sélectionnez les feuilles à inclure. Chaque feuille conserve ses lignes d’origine et peut avoir sa propre correspondance de colonnes.",
+      "worksheets": "Feuilles à préparer"
     },
     "backToSettings": "Retour aux paramètres",
     "adminAccess": "Accès administrateur",

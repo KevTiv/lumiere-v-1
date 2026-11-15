@@ -15,6 +15,7 @@ mod country_packs;
 mod crm;
 mod documents;
 mod evidence_inspection;
+pub(crate) mod farm_batches;
 mod finance_reviews;
 pub(crate) mod health;
 mod history;
@@ -56,6 +57,7 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(crate::evidence_ingestion::router())
         .merge(evidence_inspection::router())
         .merge(finance_reviews::router())
+        .merge(farm_batches::router())
         .merge(auth::router())
         .merge(session::router())
         .merge(crm::router())

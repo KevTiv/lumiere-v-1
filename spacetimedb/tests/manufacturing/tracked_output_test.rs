@@ -5,6 +5,8 @@ use std::time::Duration;
 
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::organization::{set_company_vertical_pack, SetCompanyVerticalPackParams};
+use crate::core::reference::{uom, UOM};
 use crate::inventory::product::{product, Product};
 use crate::inventory::stock::{stock_move, stock_quant, StockQuant};
 use crate::inventory::tracking::{
@@ -23,7 +25,8 @@ use crate::manufacturing::manufacturing_orders::{
     confirm_manufacturing_order, consume_mo_materials, create_manufacturing_order,
     finish_manufacturing_order_with_tracking, mrp_production, produce_manufacturing_order,
     scrap_manufacturing_material, scrap_tracked_manufacturing_output, start_manufacturing_order,
-    CreateMrpProductionParams, FinishManufacturingTrackingParams, ManufacturingByproductTracking,
+    update_manufacturing_order, CreateMrpProductionParams, FinishManufacturingTrackingParams,
+    ManufacturingByproductTracking, UpdateManufacturingOrderParams,
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::BomType;
@@ -377,6 +380,7 @@ pub fn run_manufacturing_tracked_output_test(ctx: &ReducerContext) -> Result<(),
     {
         return Err("serial scrap replay changed effects".to_string());
     }
+    test_farm_actual_lot_consumption(ctx)?;
     test_material_wastage(ctx)?;
     test_serial_primary_lot_byproduct(ctx)?;
     Ok(())
@@ -908,5 +912,179 @@ fn test_material_wastage(ctx: &ReducerContext) -> Result<(), String> {
     {
         return Err("material scrap after consumption was accepted".to_string());
     }
+    Ok(())
+}
+
+fn test_farm_actual_lot_consumption(ctx: &ReducerContext) -> Result<(), String> {
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let primary = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("farm output product fixture missing")?;
+    let count_unit = ctx
+        .db
+        .uom()
+        .id()
+        .find(&primary.uom_id)
+        .ok_or("farm count unit fixture missing")?;
+    ctx.db.uom().id().update(UOM {
+        symbol: "ea".into(),
+        is_reference_unit: true,
+        ..count_unit.clone()
+    });
+    let kg = ctx.db.uom().insert(UOM {
+        id: 0,
+        name: "Kilogram".into(),
+        symbol: "kg".into(),
+        is_reference_unit: true,
+        ..count_unit
+    });
+    ctx.db.product().id().update(Product {
+        uom_id: kg.id,
+        tracking: "lot".to_string(),
+        ..primary.clone()
+    });
+    let live = ctx.db.product().insert(Product {
+        id: 0,
+        name: "Live flock fixture".into(),
+        tracking: "lot".into(),
+        ..primary.clone()
+    });
+    let live_lot = create_lot(ctx, &fixture, live.id, "Live flock lot")?;
+    let another_lot = create_lot(ctx, &fixture, live.id, "Separate flock lot")?;
+    let output_lot = create_lot(ctx, &fixture, primary.id, "Processed flock lot")?;
+    let base = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&primary.id)
+        .find(|row| row.company_id == fixture.company_id && row.location_id == fixture.location_id)
+        .ok_or("farm source quant fixture missing")?;
+    let source = ctx.db.stock_quant().insert(StockQuant {
+        id: 0,
+        product_id: live.id,
+        lot_id: Some(live_lot),
+        quantity: 100.0,
+        available_quantity: 100.0,
+        reserved_quantity: 0.0,
+        inventory_quantity: 100.0,
+        value: 100.0 * base.cost,
+        ..base.clone()
+    });
+    let untouched = ctx.db.stock_quant().insert(StockQuant {
+        id: 0,
+        lot_id: Some(another_lot),
+        ..source.clone()
+    });
+    let bom = create_test_bom(
+        ctx,
+        &fixture,
+        primary.id,
+        vec![BomLineInput {
+            product_id: live.id,
+            product_qty: 1.0,
+            product_uom_id: live.uom_id,
+            sequence: 1,
+            manual_consumption: false,
+            attachments_count: 0,
+            operation_id: None,
+            child_bom_id: None,
+            bom_product_template_attribute_value_ids: Vec::new(),
+            possible_bom_product_template_attribute_value_ids: Vec::new(),
+            metadata: None,
+        }],
+    )?;
+    let mo = create_test_mo(ctx, &fixture, bom, "FARM-ACTUAL-LOT")?;
+    update_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo, UpdateManufacturingOrderParams {
+        product_qty: Some(120.0), date_planned_start: None, date_planned_finished: None, date_deadline: None, origin: None,
+        metadata: Some(Some(serde_json::json!({"farm_processing_v1": {
+            "liveLotId": live_lot.to_string(), "outputLotId": output_lot.to_string(), "farmEventId":"13", "headcount": 80,
+        }}).to_string())),
+    })?;
+    confirm_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo)?;
+    start_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo)?;
+    produce_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo, 120.0)?;
+    let tracking = FinishManufacturingTrackingParams {
+        lot_id: Some(output_lot),
+        serial_id: None,
+        byproducts: vec![],
+    };
+    reject_close_without_effect(ctx, &fixture, mo, tracking.clone(), 0)?;
+    set_company_vertical_pack(
+        ctx,
+        fixture.company_id,
+        SetCompanyVerticalPackParams {
+            pack_key: "farm_operations".into(),
+            enabled: true,
+            configuration: None,
+        },
+    )?;
+    reject_close_without_effect(
+        ctx,
+        &fixture,
+        mo,
+        FinishManufacturingTrackingParams {
+            lot_id: Some(another_lot),
+            ..tracking.clone()
+        },
+        0,
+    )?;
+    let quantity = |id| {
+        ctx.db
+            .stock_quant()
+            .id()
+            .find(&id)
+            .map(|quant| quant.quantity)
+    };
+    if quantity(source.id) != Some(100.0) {
+        return Err("unapproved farm output changed live stock".into());
+    }
+    finish_manufacturing_order_with_tracking(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo,
+        tracking.clone(),
+    )?;
+    let order = ctx
+        .db
+        .mrp_production()
+        .id()
+        .find(&mo)
+        .ok_or("farm processing order missing")?;
+    let [input_move] = order.move_raw_ids.as_slice() else {
+        return Err("farm processing did not own one live move".into());
+    };
+    let [output_move] = order.move_finished_ids.as_slice() else {
+        return Err("farm processing did not own one output move".into());
+    };
+    let input = ctx
+        .db
+        .stock_move()
+        .id()
+        .find(input_move)
+        .ok_or("farm live move missing")?;
+    let output = ctx
+        .db
+        .stock_move()
+        .id()
+        .find(output_move)
+        .ok_or("farm processed move missing")?;
+    if !input.is_done
+        || input.lot_id != Some(live_lot)
+        || input.quantity_done != 80.0
+        || !output.is_done
+        || output.lot_id != Some(output_lot)
+        || output.quantity_done != 120.0
+        || quantity(source.id) != Some(20.0)
+        || quantity(untouched.id) != Some(100.0)
+    {
+        return Err(
+            "farm processing did not conserve the exact live lot and measured output".into(),
+        );
+    }
+    reject_close_without_effect(ctx, &fixture, mo, tracking, 2)?;
     Ok(())
 }
