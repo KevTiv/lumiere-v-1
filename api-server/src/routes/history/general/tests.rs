@@ -582,6 +582,51 @@ async fn generic_pagination_reaches_sparse_history_beyond_organization_latest_50
 }
 
 #[tokio::test]
+async fn private_profile_history_respects_current_membership_and_delegation() {
+    use super::super::tests as fixture;
+    let server = fixture::server(vec![], None, true, true, false).await;
+    let context = fixture::context(
+        &server,
+        fixture::access(
+            &[
+                "business_history:read",
+                "user_profile:read",
+                "user_organization:read",
+            ],
+            None,
+        ),
+    );
+    let adapter = record_adapter("user_profile").unwrap();
+    for (record, allowed) in [(9, true), (10, false), (11, true), (12, false)] {
+        let source = require_record(&server.owner, &context, &adapter, 7, record).await;
+        assert_eq!(source.is_ok(), allowed);
+        if !allowed {
+            assert!(matches!(source, Err(ApiError::NotFound(_))));
+        }
+    }
+    let limited = fixture::access(&["business_history:read", "user_profile:read"], None);
+    assert!(
+        !profile_source_exists(&server.owner, &context, 11, &limited)
+            .await
+            .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn private_crm_history_uses_the_authorized_exact_record_owner() {
+    use super::super::tests as fixture;
+    let server = fixture::server(vec![], None, true, true, false).await;
+    let context = fixture::context(
+        &server,
+        fixture::access(&["business_history:read", "contact:read"], None),
+    );
+    let adapter = record_adapter("contact").unwrap();
+    require_record(&server.owner, &context, &adapter, 7, 9)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn exact_activity_reads_a_single_provider_without_scanning_older_events() {
     use super::super::tests as fixture;
     let mut public = evidence(json!([{"field":"name","before":"seed","after":"renamed"}]));

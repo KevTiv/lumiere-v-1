@@ -495,9 +495,13 @@ pub(super) async fn require_record_with_access(
         if draft_source_exists(owner, context, company, record).await? {
             return Ok(());
         }
+    } else if adapter.resource == "user-profile" {
+        if profile_source_exists(owner, context, record, access).await? {
+            return Ok(());
+        }
     } else if exact_source_resource(adapter.resource) {
         if execute_authorized_resource_record(
-            context.client(),
+            source_read_client(owner, context, adapter.resource),
             adapter.resource,
             context.organization_id(),
             company,
@@ -536,6 +540,74 @@ async fn draft_source_exists(
     }
 }
 
+/// The owner returns only the identity needed to verify the exact current member.
+async fn profile_source_exists(
+    owner: &StdbClient,
+    context: &TrustedOperationContext,
+    record: u64,
+    access: &FieldAccessContext,
+) -> Result<bool, ApiError> {
+    let org = context.organization_id();
+    let profiles = owner
+        .query_sql(&format!(
+            "SELECT id, identity FROM user_profile WHERE organization_id = {org} AND id = {record} LIMIT 2"
+        ))
+        .await
+        .map_err(ApiError::internal)?;
+    let [profile] = profiles.as_slice() else {
+        return Ok(false);
+    };
+    if number(profile, "id", "id") != Some(record) {
+        return Err(malformed_evidence());
+    }
+    let identity = profile
+        .get("identity")
+        .and_then(identity_cell_to_hex)
+        .and_then(|identity| parse_stdb_identity_hex(&identity))
+        .ok_or_else(malformed_evidence)?;
+    if identity == context.actor_identity() {
+        // The enclosing history read has already resolved this actor's membership.
+        return Ok(true);
+    }
+    if !permission_allowed(access, "user_organization", "read") {
+        return Ok(false);
+    }
+    let actor =
+        stdb_auth::identity_sql_literal(context.actor_identity()).map_err(ApiError::Internal)?;
+    let scopes = context.client().query_sql(&format!(
+        "SELECT company_id FROM delegated_admin_scope WHERE organization_id = {org} AND user_identity = {actor} AND is_active = true LIMIT 2"
+    )).await.map_err(ApiError::internal)?;
+    let member = stdb_auth::identity_sql_literal(&identity).map_err(ApiError::Internal)?;
+    let memberships = context.client().query_sql(&format!(
+        "SELECT id, company_id FROM user_organization WHERE organization_id = {org} AND user_identity = {member} AND is_active = true LIMIT 2"
+    )).await.map_err(ApiError::internal)?;
+    let [membership] = memberships.as_slice() else {
+        return Ok(false);
+    };
+    match scopes.as_slice() {
+        [] => Ok(true),
+        [scope] => Ok(number(scope, "company_id", "companyId")
+            .filter(|id| *id > 0)
+            .is_some_and(|company| number(membership, "company_id", "companyId") == Some(company))),
+        _ => Ok(false),
+    }
+}
+
+/// Use the same private CRM and workflow owners as the ordinary query routes.
+fn source_read_client<'a>(
+    owner: &'a StdbClient,
+    context: &'a TrustedOperationContext,
+    resource: &str,
+) -> &'a StdbClient {
+    if crate::workflow_reads::is_private_workflow_resource(resource)
+        || crate::query_exec::crm_resource(resource)
+    {
+        owner
+    } else {
+        context.client()
+    }
+}
+
 async fn read_source_rows(
     owner: &StdbClient,
     context: &TrustedOperationContext,
@@ -543,18 +615,8 @@ async fn read_source_rows(
     company: u64,
     access: &FieldAccessContext,
 ) -> Result<Vec<Value>, ApiError> {
-    // Match the canonical query route's private workflow owner. This fixed
-    // dispatch retains its current candidate/identity/company policy; it does
-    // not grant owner SQL authority to another URL-selected table.
-    let client = if crate::workflow_reads::is_private_workflow_resource(adapter.resource)
-        || crate::query_exec::crm_resource(adapter.resource)
-    {
-        owner
-    } else {
-        context.client()
-    };
     execute_resource_query_for_company(
-        client,
+        source_read_client(owner, context, adapter.resource),
         adapter.resource,
         context.organization_id(),
         context.actor_identity(),
@@ -867,9 +929,15 @@ async fn scan_provider(
                 if !draft_source_exists(owner, context, company, source_record).await? {
                     continue;
                 }
+            } else if adapter.resource == "user-profile" {
+                if !profile_source_exists(owner, context, source_record, context.field_access())
+                    .await?
+                {
+                    continue;
+                }
             } else if exact_source_resource(adapter.resource) {
                 if execute_authorized_resource_record(
-                    context.client(),
+                    source_read_client(owner, context, adapter.resource),
                     adapter.resource,
                     org,
                     company,
@@ -1115,9 +1183,13 @@ async fn read_general(
             if !draft_source_exists(owner, context, company, record_id).await? {
                 continue;
             }
+        } else if adapter.resource == "user-profile" {
+            if !profile_source_exists(owner, context, record_id, &current_access).await? {
+                continue;
+            }
         } else if exact_source_resource(adapter.resource) {
             if execute_authorized_resource_record(
-                context.client(),
+                source_read_client(owner, context, adapter.resource),
                 adapter.resource,
                 org,
                 company,

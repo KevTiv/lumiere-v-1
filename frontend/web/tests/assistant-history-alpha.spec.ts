@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises"
 
 import type { BusinessHistoryActivityPage } from "@lumiere/query-hooks/hooks/business-history-model"
-import { devices, expect, test, type Page, type Response } from "@playwright/test"
+import { devices, expect, test, type Page, type Request } from "@playwright/test"
 import { buildNavGroups } from "@lumiere/ui/lib/navigation-catalog"
 import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
 
@@ -15,22 +15,34 @@ const alphaRoutes = buildNavGroups((key) => key, { workspaceProfile: profile })
   .flatMap(({ items }) => items)
   .map(({ surfaceId, href }) => ({ surfaceId, href }))
 
-async function activityPage(response: Response, action: string): Promise<BusinessHistoryActivityPage> {
-  const body = await response.text()
-  expect(response.ok(), `${action} returned HTTP ${response.status()}: ${body.slice(0, 300)}`).toBe(true)
-  return JSON.parse(body) as BusinessHistoryActivityPage
+async function activityPage(
+  page: Page,
+  path: string,
+  trigger: () => Promise<void>,
+  eventId?: string,
+): Promise<BusinessHistoryActivityPage> {
+  const [request] = await Promise.all([
+    page.waitForEvent("requestfinished", {
+      predicate: (request: Request) => {
+        const url = new URL(request.url())
+        return request.method() === "GET" && url.pathname === path &&
+          url.searchParams.get("eventId") === (eventId ?? null)
+      },
+      timeout: 30_000,
+    }),
+    trigger(),
+  ])
+  const response = await request.response()
+  if (!response?.ok()) {
+    throw new Error(`${path} returned HTTP ${response?.status() ?? "unavailable"} ${response?.statusText() ?? ""}`)
+  }
+  return await response.json() as BusinessHistoryActivityPage
 }
 
 async function openActivity(page: Page, module: string, companyId: string, checkEventLink: boolean) {
   const requestPath = `/api/history/activity/${module}`
-  const [response] = await Promise.all([
-    page.waitForResponse(
-      (response) => response.request().method() === "GET" && new URL(response.url()).pathname === requestPath,
-    ),
-    page.getByTestId("module-history-open").click(),
-  ])
+  const history = await activityPage(page, requestPath, () => page.getByTestId("module-history-open").click())
   await expect(page).toHaveURL((url) => url.searchParams.get("history") === "activity")
-  const history = await activityPage(response, `${module} Activity`)
   expect(history).toMatchObject({ module, companyId, coverage: { status: "partial" } })
 
   const dialog = page.getByRole("dialog", { name: "Activity", exact: true })
@@ -49,15 +61,9 @@ async function openActivity(page: Page, module: string, companyId: string, check
     if (checkEventLink) {
       const details = event.locator(":scope > details")
       await details.locator(":scope > summary").click()
-      const [exactResponse] = await Promise.all([
-        page.waitForResponse((response) => {
-          const url = new URL(response.url())
-          return response.request().method() === "GET" &&
-            url.pathname === requestPath && url.searchParams.get("eventId") === firstEvent.id
-        }),
-        event.getByRole("link", { name: "Open change", exact: true }).click(),
-      ])
-      expect(await activityPage(exactResponse, `${module} Activity event ${firstEvent.id}`)).toMatchObject({ module, companyId, data: [firstEvent], nextCursor: null })
+      const exact = await activityPage(page, requestPath,
+        () => event.getByRole("link", { name: "Open change", exact: true }).click(), firstEvent.id)
+      expect(exact).toMatchObject({ module, companyId, data: [firstEvent], nextCursor: null })
       await expect(page).toHaveURL((url) =>
         url.searchParams.get("history") === "activity" &&
         url.searchParams.get("historyEvent") === firstEvent.id &&
