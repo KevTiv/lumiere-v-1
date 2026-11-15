@@ -3111,7 +3111,7 @@ function InventoryClientLoaded({
               customContent: (
                 <InventoryOpsPanel
                   organizationId={orgId}
-                  companyId={activeCompanyReady ? operatingCompanyId : undefined}
+                  companyId={operatingCompanyId}
                   productNames={productLabelById}
                 />
               ),
@@ -3191,7 +3191,6 @@ function InventoryClientLoaded({
     canReadBackfill,
     organizationId,
     orgId,
-    activeCompanyReady,
     setup.status,
     stockMoveTabActions,
     inventoryCountTabActions,

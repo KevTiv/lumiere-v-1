@@ -1,11 +1,13 @@
 import { createElement, type ReactNode } from "react";
-import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { cleanup, render, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "../../../query-hooks/node_modules/@tanstack/react-query";
 import { isInventoryWorkspaceReadEnabled, type InventoryWorkspace } from "../../../stdb/src/subscriptions/inventory-workspace";
 
 const state = vi.hoisted(() => ({ rows: vi.fn() }));
 vi.mock("@lumiere/erp-session", () => ({ useErpSession: () => ({ activeCompanyId: 41, activeCompanyReady: true }) }));
+vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock("@lumiere/ui/lib/rbac-context", () => ({ useRBAC: () => ({ permissionsReady: true, checkPermission: () => ({ allowed: true }) }) }));
 vi.mock("../../../query-hooks/src/http", () => ({
   apiFetch: vi.fn(), fetchQueryList: state.rows, rqBigIntKey: String,
   coalesceQueryInitialData: (rows: unknown) => rows,
@@ -14,8 +16,26 @@ import { useProducts } from "../../../query-hooks/src/hooks/inventory/products";
 import { useQualityAlerts, useQualityChecks } from "../../../query-hooks/src/hooks/inventory/quality";
 import { usePickingWaves, useStockLocations, useStockQuants } from "../../../query-hooks/src/hooks/inventory/stock-operations";
 import { useWarehouse3D } from "../../../query-hooks/src/hooks/inventory/warehouses";
+import { InventoryOpsPanel } from "../../../../web/app/(modules)/inventory/inventory-ops-panel";
 
 afterEach(() => { cleanup(); state.rows.mockReset(); });
+
+it("reads each Inventory exception queue for the resolved operating company", async () => {
+  state.rows.mockResolvedValue([]);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client }, children);
+  const panel = (companyId: bigint) => createElement(InventoryOpsPanel, { organizationId: 7n, companyId, productNames: new Map() });
+  const queuePaths = (companyId: bigint) => ["expired-lots", "open-qc", "short-atp"].map(
+    (queue) => `/api/query/inventory-exceptions-${queue}?companyId=${companyId}`,
+  );
+  const requests = () => state.rows.mock.calls.map(([path]) => path).sort();
+
+  const { rerender } = render(panel(41n), { wrapper });
+  await waitFor(() => expect(requests()).toEqual(queuePaths(41n)));
+  rerender(panel(42n));
+  await waitFor(() => expect(requests()).toEqual([...queuePaths(41n), ...queuePaths(42n)].sort()));
+  client.clear();
+});
 
 it("activates bounded reads across workspace changes and keeps excluded reads idle after invalidation", async () => {
   state.rows.mockResolvedValue([]);
