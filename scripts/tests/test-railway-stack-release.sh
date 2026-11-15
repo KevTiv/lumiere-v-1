@@ -586,6 +586,19 @@ case "$1" in
         ;;
     esac
     ;;
+  sql)
+    [[ "$3" == 'SELECT skill_key, is_system FROM ai_skill WHERE organization_id = 0' ]]
+    if [[ "${TEST_CATALOG_FORM:-complete}" == incomplete && ! -e "$TEST_CATALOG_MIGRATION_LOG" ]] ||
+       [[ "${TEST_CATALOG_FORM:-complete}" == unrepaired ]]; then
+      printf '[{"rows":[]}]\n'
+    else
+      jq '[{rows: map([.skill_key, true])}]' "$TEST_BUILTIN_SKILL_CATALOG"
+    fi
+    ;;
+  call)
+    [[ "$3" == apply_global_migrations ]]
+    printf '%s\n' "$3" >> "$TEST_CATALOG_MIGRATION_LOG"
+    ;;
   *)
     exit 91
     ;;
@@ -598,6 +611,8 @@ EOF
 chmod +x "$publisher_bin/spacetime" "$publisher_bin/sleep"
 
 export TEST_PUBLISHER_CONFIG_LOG="$TMP/publisher-config-paths"
+export TEST_CATALOG_MIGRATION_LOG="$TMP/catalog-migration.log"
+export TEST_BUILTIN_SKILL_CATALOG="$ROOT/spacetimedb/assets/ai-builtin-skills.json"
 
 publisher_output="$(env \
   "PATH=$publisher_bin:$PATH" \
@@ -606,6 +621,28 @@ publisher_output="$(env \
   STDB_SERVER_TOKEN=not-a-real-secret \
   bash "$ROOT/scripts/railway-publish-spacetimedb.sh")"
 grep -Fq 'SpacetimeDB publish and schema verification passed for lumiere-test' <<<"$publisher_output"
+test ! -e "$TEST_CATALOG_MIGRATION_LOG"
+
+env \
+  "PATH=$publisher_bin:$PATH" \
+  TEST_CATALOG_FORM=incomplete \
+  STDB_HOST=http://spacetimedb.test \
+  STDB_MODULE=lumiere-test \
+  STDB_SERVER_TOKEN=not-a-real-secret \
+  bash "$ROOT/scripts/railway-publish-spacetimedb.sh" >/dev/null
+test "$(cat "$TEST_CATALOG_MIGRATION_LOG")" = apply_global_migrations
+
+if env \
+  "PATH=$publisher_bin:$PATH" \
+  TEST_CATALOG_FORM=unrepaired \
+  STDB_HOST=http://spacetimedb.test \
+  STDB_MODULE=lumiere-test \
+  STDB_SERVER_TOKEN=not-a-real-secret \
+  bash "$ROOT/scripts/railway-publish-spacetimedb.sh" >"$TMP/unrepaired-catalog.log" 2>&1; then
+  echo "publisher accepted an incomplete built-in AI catalog" >&2
+  exit 1
+fi
+grep -Fq 'Built-in AI skills still missing after migration:' "$TMP/unrepaired-catalog.log"
 
 env \
   "PATH=$publisher_bin:$PATH" \

@@ -1074,7 +1074,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn built_in_generation_uses_catalog_and_company_binding_without_release_queries() {
+    async fn built_in_skills_use_catalog_and_company_binding_without_release_queries() {
         use axum::{extract::State, routing::post, Json, Router};
         use std::sync::{Arc, Mutex};
         async fn sql(
@@ -1098,7 +1098,10 @@ pub(crate) mod tests {
             .route("/v1/database/fixture/sql", post(sql))
             .with_state(state.clone());
         let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        for key in super::super::generation_surface_certification::KEYS {
+        for key in super::super::generation_surface_certification::KEYS
+            .into_iter()
+            .chain([crate::harness::low_stock::LOW_STOCK_SKILL_KEY])
+        {
             for case in ["active", "disabled", "inactive", "missing", "foreign"] {
                 *state.lock().unwrap() = (key, case);
                 let result = require_enabled_skill(&stdb, 1, 3, key).await;
