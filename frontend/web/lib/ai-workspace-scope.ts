@@ -27,6 +27,7 @@ export const AI_WORKSPACE_SCOPES: readonly AiWorkspaceScopeOption[] = [
   { value: "module:reports", label: "Reports", group: "Modules", pathname: "/reports", commands: ["reports"] },
   { value: "module:products", label: "Products", group: "Modules", pathname: "/products", commands: ["inventory"] },
   { value: "module:warehouse", label: "Warehouse", group: "Modules", pathname: "/warehouse", commands: ["inventory"] },
+  { value: "module:farm-batches", label: "Farm Batches", group: "Modules", pathname: "/farm-batches" },
   { value: "module:fleet", label: "Fleet", group: "Modules", pathname: "/fleet" },
   { value: "module:overview", label: "Overview", group: "Modules", pathname: "/overview" },
   { value: "module:tasks", label: "My work", group: "Modules", pathname: "/tasks" },
@@ -36,9 +37,14 @@ export const AI_WORKSPACE_SCOPES: readonly AiWorkspaceScopeOption[] = [
   { value: "module:settings", label: "Settings", group: "Modules", pathname: "/settings" },
 ]
 
-export function aiWorkspaceScopesForProfile(profile: WorkspaceProfile): readonly AiWorkspaceScopeOption[] {
+export function aiWorkspaceScopesForProfile(
+  profile: WorkspaceProfile,
+  farmOperationsEnabled = false,
+): readonly AiWorkspaceScopeOption[] {
   return AI_WORKSPACE_SCOPES.filter((option) =>
-    option.group !== "Modules" || isWorkspaceSurfaceVisible(profile, option.value.slice("module:".length)),
+    option.group !== "Modules" ||
+    (isWorkspaceSurfaceVisible(profile, option.value.slice("module:".length)) &&
+      (option.value !== "module:farm-batches" || farmOperationsEnabled)),
   )
 }
 

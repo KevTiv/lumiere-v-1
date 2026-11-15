@@ -19,7 +19,7 @@ export type ProductSurfaceTarget =
 export type FirstOrgExposure = "enabled" | "admin-only" | "hidden" | "review"
 
 export interface BoundedAlphaAdmission {
-  scope: "product-catalog" | "warehouse-operations" | "inventory-workspace" | "fleet-register-and-history"
+  scope: "product-catalog" | "warehouse-operations" | "inventory-workspace" | "fleet-register-and-history" | "farm-operations"
   decisionRecord: `docs/plans/${string}`
 }
 
@@ -184,6 +184,10 @@ export const PRODUCT_SURFACES: readonly ProductSurfaceDefinition[] = [
     "COV-07",
     "module:manufacturing",
   ),
+  pendingU5("farm-batches", "/farm-batches", "t0-business", "Farm Operations", "farm_batch", "farm-operations", {
+    scope: "farm-operations",
+    decisionRecord: "docs/plans/farm-batches-alpha.md",
+  }),
   pendingU5(
     "fleet",
     "/fleet",

@@ -36,6 +36,7 @@ export interface ErpCommandPaletteProps {
   onOpenJournal?: () => void
   /** Apply the fail-closed first-test-organization product admission profile. */
   firstOrgProfile?: boolean
+  farmOperationsEnabled?: boolean
   /** Record page of a model (e.g. `recordPageHref`); models with no page fall back to their module tab. */
   recordHref?: (model: string, id: string) => string | undefined
 }
@@ -47,6 +48,7 @@ export function ErpCommandPalette({
   onOpenNotebook,
   onOpenJournal,
   firstOrgProfile = false,
+  farmOperationsEnabled = false,
   recordHref,
 }: ErpCommandPaletteProps) {
   const [internalOpen, setOpenState] = useState(false)
@@ -69,8 +71,8 @@ export function ErpCommandPalette({
   const workspaceProfile = useWorkspaceProfile()
   const userIsAdmin = isAdmin()
   const navGroups = useMemo(
-    (): NavGroup[] => buildNavGroups(t, { workspaceProfile, firstOrgProfile, isAdmin: userIsAdmin }),
-    [workspaceProfile, firstOrgProfile, t, userIsAdmin],
+    (): NavGroup[] => buildNavGroups(t, { workspaceProfile, firstOrgProfile, isAdmin: userIsAdmin, farmOperationsEnabled }),
+    [workspaceProfile, firstOrgProfile, t, userIsAdmin, farmOperationsEnabled],
   )
   const quickActionIsVisible = useCallback(
     (surfaceId: string) =>

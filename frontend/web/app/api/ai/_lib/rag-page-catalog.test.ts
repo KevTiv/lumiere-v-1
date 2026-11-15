@@ -261,12 +261,20 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
     rows: [baseRow],
   }))
   const scopeChecks: number[] = []
+  const farmPackChecks: number[] = []
   const request = loadModule<typeof import("./rag-request")>(
     "./rag-request.ts",
     {
       "next/server": { NextResponse: Response },
       zod: { z },
       "@lumiere/erp-shared/ai-ui-context": uiContext,
+      "@/lib/server-farm-operations": {
+        serverFarmOperationsEnabled: async (actualSession: ApiSession, company: number) => {
+          assert.equal(actualSession, session)
+          farmPackChecks.push(company)
+          return false
+        },
+      },
       "./route-helpers": {
         positiveInteger,
         boundedInteger: () => 20,
@@ -369,6 +377,7 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
   if (rejected.ok) throw new Error("Expected company authorization to fail")
   assert.equal(rejected.response.status, 403)
   assert.deepEqual(scopeChecks, [12, 13])
+  assert.deepEqual(farmPackChecks, [12])
   assert.equal(requests.length, 1)
 
   const oversized = await request.prepareRagPayload({

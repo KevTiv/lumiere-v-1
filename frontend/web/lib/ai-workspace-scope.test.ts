@@ -60,4 +60,5 @@ test("Finance Alpha offers every active workspace and omits the full-profile mod
   ].map(module => `module:${module}`).sort())
   assert.equal(resolveAiWorkspaceScope("module:manufacturing", "/crm", null, options).pathname, "/crm")
   assert.ok(aiWorkspaceScopesForProfile("full").some(option => option.value === "module:manufacturing"))
+  assert.ok(aiWorkspaceScopesForProfile("finance-alpha", true).some(option => option.value === "module:farm-batches"))
 })

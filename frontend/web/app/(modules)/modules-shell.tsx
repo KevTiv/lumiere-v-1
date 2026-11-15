@@ -74,6 +74,8 @@ import { chatAgentOptions } from "@/lib/chat-agent-options"
 import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext, useErpAiErrorQuestion } from "@/lib/erp-ai-context"
 import { isAssistantErrorQuestion } from "@/lib/assistant-error-help"
 import { AI_WORKSPACE_SCOPES, aiWorkspaceScopesForProfile, resolveAiWorkspaceScope } from "@/lib/ai-workspace-scope"
+import { useFarmOperationsEnabled } from "@/lib/use-farm-operations-enabled"
+import { parseFarmComparisonRequest, readAssistantFarmMetrics } from "@/lib/assistant-farm-metrics"
 import { useErpAiSelectionReporter } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { performSignOut } from "@/lib/auth-sign-out"
 import {
@@ -201,6 +203,7 @@ function withStoredTurnMetadata(turnId: string, earlierContextUnavailable: boole
 
 function ErpAiChatPanel({
   firstOrgProfile,
+  farmOperationsEnabled,
   onRevealWorkspace,
   onRevealChat,
   selectionDraft,
@@ -208,6 +211,7 @@ function ErpAiChatPanel({
   ...props
 }: Omit<ComponentProps<typeof AIChatPanel>, "onSendMessage" | "context"> & {
   firstOrgProfile: boolean
+  farmOperationsEnabled: boolean
   onRevealWorkspace: () => void
   onRevealChat: () => void
   selectionDraft: DocumentSelectionDraft | null
@@ -229,7 +233,7 @@ function ErpAiChatPanel({
     ? { actorId: identity, organizationId: String(organizationId), companyId: String(operatingCompanyId) } : null,
   [identity, orgReady, organizationId, operatingCompanyId])
   const allowedActionModules = useMemo(() => [...new Set(ALPHA_ASSISTANT_CAPABILITIES.map(capability => capability.module))]
-    .filter(moduleId => isWorkspaceSurfaceVisible(workspaceProfile, moduleId)), [workspaceProfile])
+    .filter(moduleId => isWorkspaceSurfaceVisible(workspaceProfile, moduleId) && (moduleId !== "farm-batches" || farmOperationsEnabled)), [workspaceProfile, farmOperationsEnabled])
   const agentsQuery = useAiAgents(orgId, orgReady && operatingCompanyId != null)
   const chatAgents = useMemo(
     () => chatAgentOptions(agentsQuery.data ?? [], operatingCompanyId),
@@ -305,7 +309,10 @@ function ErpAiChatPanel({
   activeScope.current = actorHistoryScope
   const currentActionContext = useRef({ actionScope, actorHistoryScope, checkPermission, permissionsReady, allowedActionModules, pageComposition })
   currentActionContext.current = { actionScope, actorHistoryScope, checkPermission, permissionsReady, allowedActionModules, pageComposition }
-  const contextOptions = useMemo(() => aiWorkspaceScopesForProfile(workspaceProfile), [workspaceProfile])
+  const contextOptions = useMemo(
+    () => aiWorkspaceScopesForProfile(workspaceProfile, farmOperationsEnabled),
+    [workspaceProfile, farmOperationsEnabled],
+  )
   const activeScopeOption = contextOptions.some(option => option.value === selectedScope) ? selectedScope : "current"
   const workspaceScope = useMemo(
     () => resolveAiWorkspaceScope(activeScopeOption, route, selection, contextOptions),
@@ -588,16 +595,19 @@ function ErpAiChatPanel({
                 // Preserve the current date range and filters when opening this page's editor.
                 if (composer.page?.moduleId !== capability.module || (action.pageId && composer.page.pageId !== action.pageId)) router.push(href)
               } else {
-                if (action.kind === "open_form") {
+                const farmEventForm = capability.module === "farm-batches" && action.kind === "prepare_workflow"
+                if (action.kind === "open_form" || farmEventForm) {
                   if (!nativeForms || !capability.tab) { resolve("unavailable"); return }
                   const result = nativeForms.requestForm({
                     requestId: crypto.randomUUID(), scopeKey, moduleId: capability.module, tabId: capability.tab,
-                    prompt: action.prompt, onPresentationOutcome: resolve,
+                    prompt: action.prompt,
+                    targetRecordId: farmEventForm ? action.recordId : undefined,
+                    onPresentationOutcome: resolve,
                   })
                   if (result !== "pending") { resolve(result); return }
                 }
                 router.push(href)
-                if (action.kind !== "open_form") resolve("requested")
+                if (action.kind !== "open_form" && !farmEventForm) resolve("requested")
               }
               revealWorkspace.current()
             } catch (error) { reject(error) }
@@ -723,6 +733,23 @@ function ErpAiChatPanel({
         ? [{ taskId: focusedImport.requestId, companyId: focusedImport.companyId }]
         : undefined
       const importTaskIds = importTaskRefs?.map(reference => reference.taskId)
+      const farmComparison = !questionGuide && !selectedReferences?.length
+        ? parseFarmComparisonRequest(userText)
+        : undefined
+      if (farmComparison && farmOperationsEnabled) {
+        const locale = i18n.resolvedLanguage ?? "en"
+        const [firstId, secondId] = farmComparison
+        const first = await readAssistantFarmMetrics(firstId, operatingCompanyId, locale, signal)
+        const second = first && isCurrent()
+          ? await readAssistantFarmMetrics(secondId, operatingCompanyId, locale, signal, first.asOf)
+          : undefined
+        if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
+        const content = first && second
+          ? `${first.content}\n\n${second.content}`
+          : "Both farm batches must be available in this company to compare their metrics."
+        await saveReply({ userText, assistantText: content, sources: [], uiContext })
+        return { content, sources: [] as ChatMessageSourceRef[] }
+      }
       let presentationResolution = !questionGuide && !selectedReferences?.length && !isAssistantErrorQuestion(userText) && actionScope
         ? resolveAssistantActionRequest(userText, {
           scope: actionScope,
@@ -740,6 +767,16 @@ function ErpAiChatPanel({
       }
       const presentation = presentationResolution ? assistantPresentationReply(presentationResolution, (key) => i18n.t(key)) : undefined
       if (presentation) {
+        const farmAction = presentationResolution?.kind === "action"
+          ? presentationResolution.action
+          : undefined
+        if (farmAction?.capabilityKey === "farm.batch.metrics" && farmAction.recordId) {
+          const verified = await readAssistantFarmMetrics(
+            farmAction.recordId, operatingCompanyId, i18n.resolvedLanguage ?? "en", signal,
+          )
+          if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
+          presentation.content = verified?.content ?? "Farm metrics could not be read for this batch. Open its metrics to check access or retry."
+        }
         await saveReply({ userText, assistantText: presentation.content, sources: presentation.sources, uiContext, actions: presentation.actions })
         return presentation
       }
@@ -829,7 +866,7 @@ function ErpAiChatPanel({
       if (out && selectedReferences?.length && isCurrent()) clearReferences(sessionKey)
       return { content, runId: out?.run_id, sources, guides, recoveryPath, importTaskIds, importTasks: taskStatuses, actions: actions.length ? actions : undefined, earlierContextUnavailable: out?.earlierContextUnavailable }
     },
-    [orgId, orgReady, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, sessionKey, actorHistoryScope, history.archived, availableHistory, historyRefs, clearReferences, ensureSession, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft],
+    [orgId, orgReady, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, sessionKey, actorHistoryScope, history.archived, availableHistory, historyRefs, clearReferences, ensureSession, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft, farmOperationsEnabled],
   )
   const sendTurn = useCallback(async (text: string, onDelta?: (delta: string) => void, turnId?: string, guideRefs?: GuideReference[], guide?: GuideDraft, hasUnsavedGuideEdits = false) => {
     if (inFlight.current.has(historyScope) || inFlight.current.size >= 2) {
@@ -1152,6 +1189,7 @@ function ModulesContent({
   const orgReady = organizationId != null && organizationId > 0
   const operatingCompanyId = useOperatingCompanyId(organizationId)
   const nativeFormScope = assistantHistoryScope(identity, organizationId, operatingCompanyId)
+  const farmOperationsEnabled = useFarmOperationsEnabled(operatingCompanyId)
   const nativeForms = useAssistantNativeFormController(nativeFormScope)
   useEffect(() => {
     const status = nativeForms.outcome?.status
@@ -1230,6 +1268,7 @@ function ModulesContent({
         sidebar={(collapsed) => (
           <DashboardSidebar
             firstOrgProfile={firstOrgProfile}
+            farmOperationsEnabled={farmOperationsEnabled}
             forceCollapsed={collapsed}
             navBadges={navBadges}
             onOpenJournal={journalVisible ? () => setIsJournalOpen(true) : undefined}
@@ -1242,6 +1281,7 @@ function ModulesContent({
           <>
             <ErpAiChatPanel
               firstOrgProfile={firstOrgProfile}
+              farmOperationsEnabled={farmOperationsEnabled}
               selectionDraft={selectionDraft}
               registerSelectionImport={registerSelectionImport}
               open={isAIChatOpen}
@@ -1279,6 +1319,7 @@ function ModulesContent({
               open={isSearchOpen}
               onOpenChange={setIsSearchOpen}
               firstOrgProfile={firstOrgProfile}
+              farmOperationsEnabled={farmOperationsEnabled}
               recordHref={recordPageHref}
               onOpenAIChat={openAiChat}
               onOpenNotebook={notebookVisible ? openNotebook : undefined}

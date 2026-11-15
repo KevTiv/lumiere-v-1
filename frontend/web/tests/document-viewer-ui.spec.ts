@@ -411,9 +411,11 @@ async function setup(page: Page) {
     })
   })
   await page.goto("/document-viewer", { waitUntil: "domcontentloaded" })
+  // The dev server's page bundles can take several seconds to load in CI.
   await expect(page.getByTestId("document-viewer-disclosure")).toHaveAttribute(
     "data-hydrated",
     "true",
+    { timeout: 20_000 },
   )
   return state
 }

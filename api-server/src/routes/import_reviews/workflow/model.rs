@@ -403,6 +403,12 @@ fn build_entry(
             "This source was excluded and will not create ERP records.",
         ));
     }
+    if row.source.source.multi_worksheet {
+        return Err((
+            "worksheet_scope_unsupported",
+            "Import expense journals from a single-sheet export so the journal can distinguish the original rows.",
+        ));
+    }
     if !matches!(row.target.as_str(), "source_observation" | "hr_expense")
         || confirmed_value(row, "observation_kind") != Some("expense")
     {

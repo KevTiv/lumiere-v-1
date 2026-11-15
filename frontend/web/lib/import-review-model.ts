@@ -5,6 +5,7 @@ export type ReviewField = {
   label: string
   kind: "text" | "decimal" | "date" | "choice"
   sourceValue: string | null
+  sourceColumn?: number
   required: boolean
   options?: string[]
   export?: boolean
@@ -21,6 +22,7 @@ export type ReviewSource = {
     file: string
     row: number
     sha256: string
+    sheet?: string
     rowBasis?: "source_line" | "import_row"
   }
   issue: string

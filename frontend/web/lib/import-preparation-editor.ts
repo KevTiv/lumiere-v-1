@@ -80,6 +80,23 @@ export const preparationFieldLabels = {
   reported_destination: "Reported payment destination",
   business_interpretation: "Business meaning",
   observation_kind: "Historical fact type",
+  flock_reference: "Flock reference",
+  event_reference: "Event reference",
+  event_kind: "Event type",
+  species: "Species",
+  location: "Farm or house",
+  count: "Headcount",
+  sample_count: "Birds weighed",
+  total_weight_kg: "Total sample weight (kg)",
+  feed_product: "Feed product",
+  quantity_kg: "Feed consumed (kg)",
+  live_weight_kg: "Live input weight (kg)",
+  sellable_weight_kg: "Sellable weight (kg)",
+  from_exclusive: "Feed coverage start date (exclusive)",
+  journal_line_id: "Posted journal line ID",
+  cost_kind: "Cost source type",
+  expense_report_id: "Expense report ID",
+  allocation_basis: "Cost allocation basis",
 } as const
 
 export type PreparationField = keyof typeof preparationFieldLabels
@@ -145,6 +162,26 @@ export const preparationTargetFields: Record<
     "barcode",
     "active",
     "is_scrap",
+  ],
+  farm_event: [
+    "flock_reference",
+    "event_reference",
+    "event_kind",
+    "business_date",
+    "species",
+    "location",
+    "count",
+    "sample_count",
+    "total_weight_kg",
+    "feed_product",
+    "quantity_kg",
+    "live_weight_kg",
+    "sellable_weight_kg",
+    "from_exclusive",
+    "journal_line_id",
+    "cost_kind",
+    "expense_report_id",
+    "allocation_basis",
   ],
   source_observation: [
     "date",
@@ -316,21 +353,35 @@ export function canSavePreparationRecipe(task: ChatImportTask): boolean {
     !!task.coverage?.complete &&
     !!task.preparation?.files.length &&
     task.preparation.files.every((file) => {
-      const coverage = task.coverage?.files.find(
-        (source) =>
-          source.fileName === file.fileName &&
-          source.sourceSha256 === file.sourceSha256,
-      )
+      const entries =
+        task.coverage?.files.filter(
+          (source) =>
+            source.fileName === file.fileName &&
+            source.sourceSha256 === file.sourceSha256 &&
+            source.status === "prepared",
+        ) ?? []
+      const coverage = entries[0]
+      const layout = file.worksheetNames
+        ? coverage?.workbookLayoutSha256
+        : coverage?.layoutSha256
       return (
-        coverage?.status === "prepared" &&
-        !!coverage.layoutSha256 &&
-        coverage.sections.some((section) => !!section.headerSha256) &&
+        !!layout &&
+        entries.length === (file.worksheetNames?.length ?? 1) &&
+        entries.every(
+          (entry) =>
+            (!file.worksheetNames ||
+              (entry.worksheet != null &&
+                file.worksheetNames.includes(entry.worksheet) &&
+                entry.workbookLayoutSha256 === layout)) &&
+            entry.sections.some((section) => !!section.headerSha256),
+        ) &&
         !!(
           file.delimiter ||
           file.decimalSeparator ||
           file.groupingSeparator ||
           file.dateOrder ||
-          file.sections?.length
+          file.sections?.length ||
+          file.worksheetNames?.length
         )
       )
     })
@@ -368,7 +419,12 @@ export function recipeMatchesPreparation(
       })
     return (
       identity(slot.options) ===
-      identity({ ...rules, expectedLayoutSha256: coverage!.layoutSha256! })
+      identity({
+        ...rules,
+        expectedLayoutSha256: (file.worksheetNames
+          ? coverage!.workbookLayoutSha256
+          : coverage!.layoutSha256)!,
+      })
     )
   })
 }
