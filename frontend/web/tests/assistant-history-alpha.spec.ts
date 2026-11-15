@@ -88,14 +88,9 @@ async function openActivity(page: Page, module: string, companyId: string, check
   return Boolean(firstEvent)
 }
 
-async function openAssistantHistory(page: Page, mode: "side" | "full") {
-  await openErpAiChat(page)
+async function expectAssistantHistory(page: Page, mode: "side" | "full") {
   const assistant = page.getByTestId("erp-ai-chat-panel")
-  if (mode === "full") {
-    await assistant.getByRole("button", { name: "Open full workspace", exact: true }).click()
-  }
   await expect(assistant).toHaveAttribute("data-mode", mode)
-  await assistant.getByRole("button", { name: "History", exact: true }).click()
   await expect(assistant.getByRole("searchbox", { name: "Search conversations", exact: true })).toBeVisible()
   await expect(assistant.getByRole("button", { name: "Fresh thread", exact: true })).toBeVisible()
   await expectNoAppError(page)
@@ -121,13 +116,16 @@ test("opens company Activity and personal Assistant history across Finance Alpha
       await expect(page).toHaveURL((url) => url.pathname === href)
       const hasEvent = await openActivity(page, surfaceId, companyId, !checkedEventLink)
       if (hasEvent) checkedEventLink = true
-      await openAssistantHistory(page, "side")
+      await openErpAiChat(page)
+      await page.getByTestId("erp-ai-chat-panel").getByRole("button", { name: "History", exact: true }).click()
+      await expectAssistantHistory(page, "side")
     })
     visited.push(surfaceId)
   }
   await test.step("ai-assistant", async () => {
-    await page.goto("/overview", { waitUntil: "domcontentloaded" })
-    await openAssistantHistory(page, "full")
+    const assistant = page.getByTestId("erp-ai-chat-panel")
+    await assistant.getByRole("button", { name: "Open full workspace", exact: true }).click()
+    await expectAssistantHistory(page, "full")
   })
   visited.push("ai-assistant")
   await writeFile(info.outputPath("alpha-history-surfaces.json"), JSON.stringify(visited))
