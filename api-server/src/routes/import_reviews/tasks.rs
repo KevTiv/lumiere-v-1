@@ -18,6 +18,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::Semaphore,
 };
+use tokio_postgres::Transaction;
 
 use crate::{cold_tier::pg_pool, error::ApiError, state::AppState, web_session::OrgSession};
 
@@ -46,6 +47,8 @@ struct Submission {
     request_id: String,
     conversation_key: String,
     files: Vec<SourceFile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    initial_mode: Option<ProcessingMode>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     preparation: Option<Value>,
 }
@@ -178,7 +181,10 @@ fn decode_submission(body: &Submission) -> Result<(Vec<Original>, String), ApiEr
     // scope and file ordering fields to the immutable request identity.
     let mut identity = json!({"companyId":body.company_id.to_string(),"conversationKey":body.conversation_key,
         "files":originals.iter().map(|s|json!({"fileName":s.file_name,"sha256":s.sha256,"size":s.bytes.len()})).collect::<Vec<_>>()});
-    // Preserve old request hashes when no options were selected.
+    // Preserve old request hashes when no mode or options were selected.
+    if let Some(mode) = body.initial_mode {
+        identity["initialMode"] = json!(mode);
+    }
     if let Some(options) = &body.preparation {
         identity["preparation"] = options.clone();
     }
@@ -205,6 +211,31 @@ async fn accept(
         for (ordinal, source) in originals.iter().enumerate() {
             let ordinal = ordinal as i32;
             tx.execute("INSERT INTO lumiere_platform.import_task_source (organization_id,company_id,actor_identity,request_id,ordinal,file_name,source_sha256,original_bytes) VALUES ($1::text::numeric,$2::text::numeric,$3,$4,$5,$6,$7,$8)", &[&org,&company,&scope.actor,&body.request_id,&ordinal,&source.file_name,&source.sha256,&source.bytes]).await.map_err(ApiError::internal)?;
+        }
+        if let Some(mode) = body.initial_mode {
+            // The submission opts in to preparation only. Record its purpose
+            // alongside the originals, before any work starts.
+            let decision_id = hex::encode(Sha256::digest(format!(
+                "import-initial-mode/v1\0{}",
+                body.request_id
+            )))[..32]
+                .to_owned();
+            append_decision(
+                &tx,
+                scope,
+                &body.request_id,
+                hash,
+                &decision,
+                &DecisionBody {
+                    company_id: scope.company,
+                    decision_id,
+                    expected_revision: 1,
+                    option_id: mode.as_str().to_owned(),
+                    other_text: None,
+                },
+                false,
+            )
+            .await?;
         }
     } else {
         let existing = tx.query_one("SELECT request_sha256,company_id::text FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric AND actor_identity=$2 AND request_id=$3", &[&org,&scope.actor,&body.request_id]).await.map_err(ApiError::internal)?;
@@ -303,16 +334,43 @@ async fn save_decision(
         tx.commit().await.map_err(ApiError::internal)?;
         return Ok(receipt);
     }
-    if task.get::<_, String>("state") != "awaiting_decision"
+    let state: String = task.get("state");
+    let promotes_inspection = state == "inspection_ready" && body.option_id == "prepare_import";
+    if (state != "awaiting_decision" && !promotes_inspection)
         || task.get::<_, i32>("decision_revision") != body.expected_revision
     {
         return Err(ApiError::Conflict(
             "the file decision changed; refresh its current question before answering".into(),
         ));
     }
-    let revision = body.expected_revision + 1;
     let question: Value = task.get("decision_request");
-    let payload_hash = decision_payload_hash(request, &source_hash, &question, body)?;
+    let receipt = append_decision(
+        &tx,
+        scope,
+        request,
+        &source_hash,
+        &question,
+        body,
+        promotes_inspection,
+    )
+    .await?;
+    tx.commit().await.map_err(ApiError::internal)?;
+    Ok(receipt)
+}
+
+async fn append_decision(
+    tx: &Transaction<'_>,
+    scope: StorageScope<'_>,
+    request: &str,
+    source_hash: &str,
+    question: &Value,
+    body: &DecisionBody,
+    promotes_inspection: bool,
+) -> Result<Value, ApiError> {
+    let org = scope.organization.to_string();
+    let company = scope.company.to_string();
+    let revision = body.expected_revision + 1;
+    let payload_hash = decision_payload_hash(request, source_hash, question, body)?;
     let row=tx.query_opt("INSERT INTO lumiere_platform.import_task_decision (organization_id,company_id,actor_identity,request_id,decision_id,revision,request_sha256,payload_sha256,option_id,other_text,question_json) VALUES ($1::text::numeric,$2::text::numeric,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT DO NOTHING RETURNING decision_id,option_id,other_text,revision,created_at::text",&[&org,&company,&scope.actor,&request,&body.decision_id,&revision,&source_hash,&payload_hash,&body.option_id,&body.other_text,&question]).await.map_err(ApiError::internal)?.ok_or_else(||ApiError::Conflict("this decision identity was already used for a different task or answer".into()))?;
     let mode = ProcessingMode::from_str(&body.option_id).map(ProcessingMode::as_str);
     let state = if mode.is_some() {
@@ -322,8 +380,27 @@ async fn save_decision(
     };
     let receipt = decision_receipt(&row);
     let next_question = decision_request(request, revision, mode.is_some(), &receipt);
-    tx.execute("UPDATE lumiere_platform.import_task SET state=$5,decision_revision=$6,approved_mode=$7,decision_request=$8 WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4",&[&org,&company,&scope.actor,&request,&state,&revision,&mode,&next_question]).await.map_err(ApiError::internal)?;
-    tx.commit().await.map_err(ApiError::internal)?;
+    if promotes_inspection {
+        tx.execute(
+            "UPDATE lumiere_platform.import_task_review SET from_inspection=true
+             WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric
+               AND actor_identity=$3 AND request_id=$4",
+            &[&org, &company, &scope.actor, &request],
+        )
+        .await
+        .map_err(ApiError::internal)?;
+    }
+    tx.execute(
+        "UPDATE lumiere_platform.import_task SET state=$5,decision_revision=$6,approved_mode=$7,decision_request=$8,
+             inspection_json=CASE WHEN $9 THEN jsonb_build_object('warnings',warnings,'coverage',coverage_json,'preparationReceipt',preparation_receipt_json) ELSE inspection_json END,
+             warnings=CASE WHEN $9 THEN '[]'::jsonb ELSE warnings END,
+             coverage_json=CASE WHEN $9 THEN NULL ELSE coverage_json END,
+             preparation_receipt_json=CASE WHEN $9 THEN NULL ELSE preparation_receipt_json END
+         WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4",
+        &[&org, &company, &scope.actor, &request, &state, &revision, &mode, &next_question, &promotes_inspection],
+    )
+    .await
+    .map_err(ApiError::internal)?;
     Ok(receipt)
 }
 
@@ -505,12 +582,18 @@ async fn finish(
     request: &str,
     prepared: &Preparation,
     mode: ProcessingMode,
+    revision: i32,
 ) -> Result<(), ApiError> {
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
     let org = scope.organization.to_string();
     let company = scope.company.to_string();
-    let task = tx.query_one("SELECT state,approved_mode FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 FOR UPDATE", &[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?;
+    let task = tx.query_one("SELECT state,approved_mode,decision_revision FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 FOR UPDATE", &[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?;
+    if task.get::<_, i32>("decision_revision") != revision {
+        // A concurrent inspection can finish after the task advances to
+        // preparation. Its output belongs to the earlier decision.
+        return Ok(());
+    }
     if task.get::<_, Option<String>>("approved_mode").as_deref() != Some(mode.as_str()) {
         return Err(ApiError::Conflict(
             "file processing requires an explicit decision for this mode".into(),
@@ -523,7 +606,7 @@ async fn finish(
             // are identical. Prior business effects remain guarded separately.
             let hash = hex::encode(Sha256::digest(
                 serde_json::to_vec(
-                    &json!({"version":1,"actor":scope.actor,"requestId":request,"dataset":dataset}),
+                    &json!({"version":1,"actor":scope.actor,"requestId":request,"mode":mode,"dataset":dataset}),
                 )
                 .map_err(ApiError::internal)?,
             ));
@@ -570,7 +653,7 @@ pub(super) async fn read_task(
         .map_err(ApiError::internal)?;
     let org = scope.organization.to_string();
     let company = scope.company.to_string();
-    let task = tx.query_opt("SELECT request_id,company_id::text,conversation_key,state,warnings,error,created_at::text,decision_request,preparation_json,coverage_json,preparation_receipt_json FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4", &[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?
+    let task = tx.query_opt("SELECT request_id,company_id::text,conversation_key,state,warnings,error,created_at::text,decision_request,preparation_json,coverage_json,preparation_receipt_json,inspection_json FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4", &[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?
         .ok_or_else(||ApiError::NotFound("import task not found".into()))?;
     let sources = tx
         .query(
@@ -606,7 +689,7 @@ pub(super) async fn read_task(
         )
         .await
         .map_err(ApiError::internal)?;
-    let reviews = tx.query("SELECT batch.id::text,batch.title,batch.target_entity,count(item.id)::int AS total,count(item.id) FILTER (WHERE item.state='needs_review')::int AS pending,count(item.id) FILTER (WHERE item.state='confirmed')::int AS confirmed,count(item.id) FILTER (WHERE item.state='excluded')::int AS excluded FROM lumiere_platform.import_task_review link JOIN lumiere_platform.import_review_batch batch ON batch.organization_id=link.organization_id AND batch.company_id=link.company_id AND batch.id=link.batch_id LEFT JOIN lumiere_platform.import_review_item item ON item.organization_id=batch.organization_id AND item.company_id=batch.company_id AND item.batch_id=batch.id WHERE link.organization_id=$1::text::numeric AND link.company_id=$2::text::numeric AND link.actor_identity=$3 AND link.request_id=$4 GROUP BY batch.id ORDER BY batch.id", &[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?;
+    let reviews = tx.query("SELECT batch.id::text,batch.title,batch.target_entity,link.from_inspection,count(item.id)::int AS total,count(item.id) FILTER (WHERE item.state='needs_review')::int AS pending,count(item.id) FILTER (WHERE item.state='confirmed')::int AS confirmed,count(item.id) FILTER (WHERE item.state='excluded')::int AS excluded FROM lumiere_platform.import_task_review link JOIN lumiere_platform.import_review_batch batch ON batch.organization_id=link.organization_id AND batch.company_id=link.company_id AND batch.id=link.batch_id LEFT JOIN lumiere_platform.import_review_item item ON item.organization_id=batch.organization_id AND item.company_id=batch.company_id AND item.batch_id=batch.id WHERE link.organization_id=$1::text::numeric AND link.company_id=$2::text::numeric AND link.actor_identity=$3 AND link.request_id=$4 GROUP BY batch.id,link.from_inspection ORDER BY batch.id", &[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?;
     let decisions=tx.query("SELECT decision_id,option_id,other_text,revision,created_at::text FROM lumiere_platform.import_task_decision WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 ORDER BY revision DESC LIMIT 100",&[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?;
     tx.commit().await.map_err(ApiError::internal)?;
     let history = decisions.iter().map(decision_receipt).collect::<Vec<_>>();
@@ -637,9 +720,30 @@ pub(super) async fn read_task(
             })
         })
         .collect::<Vec<_>>();
-    Ok(
-        json!({"organizationId":scope.organization.to_string(),"requestId":task.get::<_,String>("request_id"),"companyId":task.get::<_,String>("company_id"),"conversationKey":task.get::<_,String>("conversation_key"),"status":task.get::<_,String>("state"),"warnings":task.get::<_,Value>("warnings"),"error":task.get::<_,Option<String>>("error"),"createdAt":task.get::<_,String>("created_at"),"preparation":task.get::<_,Option<Value>>("preparation_json"),"coverage":task.get::<_,Option<Value>>("coverage_json"),"preparationReceipt":task.get::<_,Option<Value>>("preparation_receipt_json"),"decision":decision,"decisionReceipt":latest,"decisionHistory":history,"files":files,"reviews":reviews.iter().map(|r|json!({"id":r.get::<_,String>("id"),"title":r.get::<_,String>("title"),"targetEntity":r.get::<_,String>("target_entity"),"total":r.get::<_,i32>("total"),"pending":r.get::<_,i32>("pending"),"confirmed":r.get::<_,i32>("confirmed"),"excluded":r.get::<_,i32>("excluded")})).collect::<Vec<_>>()}),
-    )
+    let mut active = Vec::new();
+    let mut archived = Vec::new();
+    for review in reviews {
+        let summary = json!({
+            "id": review.get::<_, String>("id"),
+            "title": review.get::<_, String>("title"),
+            "targetEntity": review.get::<_, String>("target_entity"),
+            "total": review.get::<_, i32>("total"),
+            "pending": review.get::<_, i32>("pending"),
+            "confirmed": review.get::<_, i32>("confirmed"),
+            "excluded": review.get::<_, i32>("excluded"),
+        });
+        if review.get::<_, bool>("from_inspection") {
+            archived.push(summary);
+        } else {
+            active.push(summary);
+        }
+    }
+    let mut view = json!({"organizationId":scope.organization.to_string(),"requestId":task.get::<_,String>("request_id"),"companyId":task.get::<_,String>("company_id"),"conversationKey":task.get::<_,String>("conversation_key"),"status":task.get::<_,String>("state"),"warnings":task.get::<_,Value>("warnings"),"error":task.get::<_,Option<String>>("error"),"createdAt":task.get::<_,String>("created_at"),"preparation":task.get::<_,Option<Value>>("preparation_json"),"coverage":task.get::<_,Option<Value>>("coverage_json"),"preparationReceipt":task.get::<_,Option<Value>>("preparation_receipt_json"),"decision":decision,"decisionReceipt":latest,"decisionHistory":history,"files":files,"reviews":active});
+    if let Some(mut inspection) = task.get::<_, Option<Value>>("inspection_json") {
+        inspection["reviews"] = json!(archived);
+        view["inspection"] = inspection;
+    }
+    Ok(view)
 }
 
 async fn create(
@@ -683,15 +787,21 @@ async fn prepare_saved(
         let mode = mode.ok_or_else(|| {
             ApiError::Conflict("file processing requires an approved mode".into())
         })?;
+        let revision = task["decision"]["revision"]
+            .as_i64()
+            .and_then(|value| i32::try_from(value).ok())
+            .ok_or_else(|| ApiError::Internal("missing saved file decision revision".into()))?;
         let preparation = run_preparation(&body, mode).await.and_then(|p| {
             validate_preparation(&p, &originals, mode)?;
             Ok(p)
         });
         match preparation {
-            Ok(prepared) => finish(&pool, scoped, &body.request_id, &prepared, mode).await?,
+            Ok(prepared) => {
+                finish(pool, scoped, &body.request_id, &prepared, mode, revision).await?
+            }
             Err(ApiError::BadRequest(error)) => {
                 let client = pool.get().await.map_err(ApiError::internal)?;
-                client.execute("UPDATE lumiere_platform.import_task SET state='failed',error=$5 WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 AND state='saved'", &[&scoped.organization.to_string(),&scoped.company.to_string(),&scoped.actor,&body.request_id,&error]).await.map_err(ApiError::internal)?;
+                client.execute("UPDATE lumiere_platform.import_task SET state='failed',error=$5 WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 AND state='saved' AND decision_revision=$6", &[&scoped.organization.to_string(),&scoped.company.to_string(),&scoped.actor,&body.request_id,&error,&revision]).await.map_err(ApiError::internal)?;
             }
             Err(error) => return Err(error),
         }
@@ -755,6 +865,7 @@ async fn resume_task(
                 content_base64: STANDARD.encode(&s.bytes),
             })
             .collect(),
+        initial_mode: None,
         preparation: task
             .get("preparation")
             .filter(|value| !value.is_null())
@@ -830,6 +941,7 @@ pub(super) async fn create_prepared_task_from_saved_sources(
             .ok_or_else(|| ApiError::Internal("saved task conversation is missing".into()))?
             .into(),
         files,
+        initial_mode: None,
         preparation: Some(preparation),
     };
     let (originals, hash) = decode_submission(&body)?;

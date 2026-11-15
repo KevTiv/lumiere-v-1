@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "@lumiere/i18n"
 import { ChatDecisionCard } from "@lumiere/ui"
 import type { ChatDecisionAnswer } from "@lumiere/ui/lib/chat-decision-types"
+import type { ChatImportInitialMode } from "@lumiere/ui/lib/chat-import-files"
 import { FileIdentity } from "@lumiere/ui/components/file-identity"
 import { Button } from "@lumiere/ui/components/button"
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
@@ -12,16 +13,40 @@ import { apiFetch } from "./api-fetch"
 import { ChatImportReceipt, chatImportReceiptKey } from "./chat-import-receipt"
 import { ChatReconciliationPreview } from "./chat-reconciliation-preview"
 import { DataImportWorkspace } from "./data-import-workspace"
-import type { ImportPreparation } from "./import-preparation"
+import { SavedImportTaskPicker, useSavedImportTaskList } from "./saved-import-task-picker"
 import { importTaskHref, type ImportTaskView } from "./import-task-navigation"
+import type { ImportPreparation } from "./import-preparation"
 import {
-  chatImportScopeKey, listChatImportTasks, parseChatImportTask, recoverChatImportPointer, recoverChatImportDecision,
+  canPrepareInspectedImport, chatImportScopeKey, listChatImportTasks, parseChatImportTask,
+  readChatImportTask, recoverChatImportPointer, recoverChatImportDecision,
   retryChatImportDecision, submitChatImportDecision, submitChatImportFiles,
   type ChatImportDecisionAnswer, type ChatImportDecisionPointer, type ChatImportPointer, type ChatImportScope, type ChatImportTask,
 } from "./chat-import-task"
 
 function mergeTask(tasks: ChatImportTask[], task: ChatImportTask): ChatImportTask[] {
   return [task, ...tasks.filter(existing => existing.requestId !== task.requestId)].slice(0, 100)
+}
+
+async function resumeImportTask(scope: ChatImportScope, task: ChatImportTask, isCurrent: () => boolean) {
+  const response = await apiFetch(
+    `/api/import-tasks/${task.requestId}/resume?companyId=${scope.companyId}`,
+    { method: "POST" },
+  ).catch(() => null)
+  if (!isCurrent()) throw new Error("The active import changed.")
+  if (response?.ok) {
+    return parseChatImportTask(await response.json(), scope, task.requestId)
+  }
+  const saved = await readChatImportTask(apiFetch, scope, task.requestId)
+  if (saved) return saved
+  throw new Error("The saved task could not be checked. Reopen it in Data import.")
+}
+
+function ChatSavedImportPicker({ scope, onSelect }: {
+  scope: ChatImportScope
+  onSelect: (taskId: string) => void
+}) {
+  const tasks = useSavedImportTaskList(scope)
+  return <SavedImportTaskPicker query={tasks} onSelect={onSelect} />
 }
 
 /** Chat coordinates durable preparation; reviewed records still use the existing import workspace. */
@@ -50,7 +75,7 @@ export function useChatImportTasks(args: {
     decisionPointers: Record<string, ChatImportDecisionPointer>;
     available: boolean; busy: boolean; error: string | null;
   }>({ key: null, epoch, tasks: [], pointer: null, decisionPointers: {}, available: false, busy: false, error: null })
-  const [review, setReview] = useState<{ key: string; epoch: number; taskId: string; id?: string; view: ImportTaskView; inspectionOnly: boolean } | null>(null)
+  const [review, setReview] = useState<{ key: string; epoch: number; taskId: string | null; id?: string; view: ImportTaskView } | null>(null)
   const [focus, setFocus] = useState<{ key: string; epoch: number; taskId: string | null; task?: ChatImportTask } | null>(null)
   const isCurrent = useCallback(() => mounted.current && currentScope.current.key === key && currentScope.current.epoch === epoch, [key, epoch])
 
@@ -98,17 +123,26 @@ export function useChatImportTasks(args: {
     void reload()
   }, [key, epoch, reload])
 
-  const importFiles = useCallback(async (files: File[], preparation?: ImportPreparation) => {
+  const importFiles = useCallback(async (files: File[], intent?: ChatImportInitialMode | ImportPreparation) => {
     if (!scope || !isCurrent() || running.current?.epoch === epoch || authorization.current.epoch !== epoch || !authorization.current.available) throw new Error("Check access to saved imports and wait for the current submission before adding files.")
     const operation = { epoch, version: ++loadVersion.current }
     running.current = operation
     const current = () => isCurrent() && running.current === operation && loadVersion.current === operation.version
     setState(previous => ({ ...previous, busy: true, error: null }))
+    const preparation = typeof intent === "object" ? intent : undefined
+    const initialMode = typeof intent === "string" ? intent : preparation ? "prepare_import" : "inspect_only"
     try {
-      const task = await submitChatImportFiles({ files, scope, storage: window.localStorage, fetcher: apiFetch, isCurrent: current, knownTasks: state.key === key && state.epoch === epoch ? state.tasks : [], preparation })
-      if (current()) {
-        setState(previous => ({ ...previous, tasks: mergeTask(previous.tasks, task), pointer: null }))
-        setFocus({ key: key!, epoch, taskId: task.requestId })
+      const task = await submitChatImportFiles({
+        files, scope, storage: window.localStorage, fetcher: apiFetch, isCurrent: current,
+        knownTasks: state.key === key && state.epoch === epoch ? state.tasks : [],
+        preparation, initialMode,
+      })
+      if (!current()) return
+      setState(previous => ({ ...previous, tasks: mergeTask(previous.tasks, task), pointer: null }))
+      setFocus({ key: key!, epoch, taskId: task.requestId })
+      if (task.status === "saved") {
+        const scanned = await resumeImportTask(scope, task, current)
+        if (current()) setState(previous => ({ ...previous, tasks: mergeTask(previous.tasks, scanned) }))
       }
     } catch (error) {
       if (current()) {
@@ -132,9 +166,7 @@ export function useChatImportTasks(args: {
     const current = () => isCurrent() && running.current === operation && loadVersion.current === operation.version
     setState(previous => ({ ...previous, busy: true, error: null }))
     try {
-      const response = await apiFetch(`/api/import-tasks/${task.requestId}/resume?companyId=${scope.companyId}`, { method: "POST" })
-      if (!response.ok) throw new Error("Preparation could not be resumed. The original files remain saved; check the task before retrying.")
-      const saved = parseChatImportTask(await response.json(), scope, task.requestId)
+      const saved = await resumeImportTask(scope, task, current)
       if (current()) {
         setState(previous => ({ ...previous, tasks: mergeTask(previous.tasks, saved) }))
         void queryClient.invalidateQueries({ queryKey: chatImportReceiptKey(scope, task.requestId) })
@@ -203,16 +235,23 @@ export function useChatImportTasks(args: {
       ? focus.task ?? visible.tasks.find(task => task.requestId === focus.taskId)
       : visible.tasks.length === 1 ? visible.tasks[0] : undefined
     : undefined
+  const selectedImport = focusedTask?.requestId === selectedReview?.taskId
+    ? focusedTask
+    : visible?.tasks.find(task => task.requestId === selectedReview?.taskId)
+  const inspecting = selectedImport?.decision.selectedOptionId === "inspect_only"
+  const openSavedTask = (taskId: string | null, view: ImportTaskView = "sources", id?: string) => {
+    if (key && visible?.available) setReview({ key, epoch, taskId, id, view })
+  }
   const openTask = (task: ChatImportTask, view: ImportTaskView, id?: string) => {
-    if (!key || !visible?.available) return
     focusTask(task)
-    setReview({ key, epoch, taskId: task.requestId, id, view, inspectionOnly: task.decision.selectedOptionId === "inspect_only" })
+    openSavedTask(task.requestId, view, id)
   }
   const renderReceipt = (taskId: string) => {
     if (!scope) return null
     const saved = visible?.tasks.find(task => task.requestId === taskId)
+      ?? (focusedTask?.requestId === taskId ? focusedTask : undefined)
     return <ChatImportReceipt
-      scope={scope}
+      scope={saved ? { ...scope, conversationKey: saved.conversationKey } : scope}
       taskId={taskId}
       onOpen={saved && !args.readonly ? view => openTask(saved, view) : undefined}
     />
@@ -232,7 +271,12 @@ export function useChatImportTasks(args: {
     </div>
   ) : null
   const content = args.readonly ? archivedContent : scope && visible ? <div className="space-y-3" data-testid="chat-import-tasks">
-    {visible.available ? <ChatReconciliationPreview key={key} organizationId={scope.organizationId} companyId={scope.companyId} /> : null}
+    {visible.available ? <>
+      <ChatReconciliationPreview key={key} organizationId={scope.organizationId} companyId={scope.companyId} />
+      <Button type="button" variant="outline" size="sm" disabled={visible.busy} onClick={() => openSavedTask(null)}>
+        {t("settings.importTask.continueShortcut", { defaultValue: "Continue saved import" })}
+      </Button>
+    </> : null}
     {visible.busy ? <p role="status" className="text-sm">{t("aiChat.import.savingTask", { defaultValue: "Saving files or checking the selected action…" })}</p> : null}
     {visible.error ? <p role="alert" className="text-sm text-destructive">{visible.error}</p> : null}
     {visible.pointer ? <p role="status" className="text-sm">{t("aiChat.import.uncertain", { defaultValue: "An upload has no confirmed result yet. Check again, or select the same original files in the same order to retry its saved request." })}</p> : null}
@@ -266,6 +310,9 @@ export function useChatImportTasks(args: {
           <a className="underline" href={`/api/import-tasks/${file.previousMatch.requestId}/files/${file.previousMatch.ordinal}?companyId=${scope.companyId}`} download={file.previousMatch.fileName}>
             {t("aiChat.import.downloadEarlierSource", { fileName: file.previousMatch.fileName })}
           </a>
+          {file.previousMatch.kind === "identical" ? <a className="ml-3 underline" href={importTaskHref({
+            companyId: scope.companyId, taskId: file.previousMatch.requestId, view: "sources",
+          })}>{t("settings.importTask.openTask", { defaultValue: "Open saved task" })}</a> : null}
         </div> : null}
       </li>)}</ul>
       {task.warnings.map((warning, i) => <p key={i} className="text-muted-foreground">{warning}</p>)}
@@ -293,7 +340,18 @@ export function useChatImportTasks(args: {
         onSubmit={answer => answerTask(task, answer)}
       /> : null}
       {task.status === "saved" ? <Button type="button" variant="outline" size="sm" disabled={visible.busy} onClick={() => void resume(task)}>{task.decision.selectedOptionId === "inspect_only" ? t("aiChat.import.resumeInspection", { defaultValue: "Resume inspection" }) : t("aiChat.import.resume", { defaultValue: "Resume preparation" })}</Button> : null}
-      <Button type="button" variant="outline" size="sm" disabled={visible.busy} onClick={() => openTask(task, "sources")}>{t("settings.importTask.openTask", { defaultValue: "Open saved task" })}</Button>
+      {canPrepareInspectedImport(task) && !visible.decisionPointers[task.requestId] ? <Button type="button" size="sm"
+        disabled={visible.busy}
+        onClick={() => void answerTask(task, {
+          requestId: task.decision.id, expectedRevision: task.decision.revision, optionId: "prepare_import",
+        }).catch(() => undefined)}
+      >{t("aiChat.import.approvePreparation", { defaultValue: "Approve preparation" })}</Button> : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={visible.busy} onClick={() => openTask(task, "sources")}>{t("settings.importTask.openTask", { defaultValue: "Open saved task" })}</Button>
+        <a className="text-sm underline underline-offset-4" href={importTaskHref({
+          companyId: scope.companyId, taskId: task.requestId, view: task.reviews.length ? "decisions" : "sources",
+        })}>{t("settings.importTask.permalink", { defaultValue: "Open this task in Data import" })}</a>
+      </div>
       {focusedTask?.requestId === task.requestId
         ? <div className="space-y-2">
           <p className="text-xs text-muted-foreground">{t("settings.importTask.chatFocus", { defaultValue: "Using this saved task for your next chat question." })}</p>
@@ -308,11 +366,23 @@ export function useChatImportTasks(args: {
     {selectedReview ? <Dialog open onOpenChange={open => { if (!open) { setReview(null); void reload() } }}>
       <DialogContent size="document" layout="bounded">
         <DialogHeader>
-          <DialogTitle>{selectedReview.inspectionOnly ? t("aiChat.import.inspectionTitle", { defaultValue: "Inspect saved source files" }) : t("aiChat.import.reviewTitle", { defaultValue: "Review source and prepare import" })}</DialogTitle>
-          <DialogDescription>{selectedReview.inspectionOnly ? t("aiChat.import.inspectionDescription", { defaultValue: "Review the source evidence. This action does not prepare business records." }) : t("aiChat.import.reviewDescription", { defaultValue: "Resolve uncertain values, then use the import preview to confirm the records to create." })}</DialogDescription>
+          <DialogTitle>{!selectedReview.taskId
+            ? t("settings.importTask.continueShortcut", { defaultValue: "Continue saved import" })
+            : inspecting
+              ? t("aiChat.import.inspectionTitle", { defaultValue: "Inspect saved source files" })
+              : t("aiChat.import.reviewTitle", { defaultValue: "Review source and prepare import" })}</DialogTitle>
+          <DialogDescription>{!selectedReview.taskId
+            ? t("settings.importTask.savedTasksHint", {
+              defaultValue: "Continue files and decisions saved for this company, including imports started in another conversation.",
+            })
+            : inspecting
+              ? t("aiChat.import.inspectionDescription", { defaultValue: "Review the source evidence. This action does not prepare business records." })
+              : t("aiChat.import.reviewDescription", { defaultValue: "Resolve uncertain values, then use the import preview to confirm the records to create." })}</DialogDescription>
         </DialogHeader>
         <DialogBody>
-          <DataImportWorkspace organizationId={scope.organizationId} taskId={selectedReview.taskId} initialReviewId={selectedReview.id} initialView={selectedReview.view} inspectionOnly={selectedReview.inspectionOnly} syncUrl={false} onTaskFocus={focusTask} />
+          {selectedReview.taskId
+            ? <DataImportWorkspace organizationId={scope.organizationId} taskId={selectedReview.taskId} initialReviewId={selectedReview.id} initialView={selectedReview.view} syncUrl={false} onTaskFocus={focusTask} />
+            : <ChatSavedImportPicker scope={scope} onSelect={openSavedTask} />}
         </DialogBody>
       </DialogContent>
     </Dialog> : null}

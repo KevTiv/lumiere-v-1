@@ -3,30 +3,23 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
-import { moduleBackfillHref, type BackfillModule } from "./module-backfill-navigation"
 import { apiFetch } from "./api-fetch"
-import type { ReviewDetail, ReviewRow } from "./import-review-model"
+import type {
+  ReviewDetail,
+  ReviewedRecordOperation,
+  ReviewRow,
+} from "./import-review-model"
 
 type Receipt = {
   results: Array<{
     itemId: string
     status: "ready" | "saved" | "matched" | "held" | "conflict"
     reason?: string
-    recordId?: string
+    recordId?: string | null
     digest?: string
     periodStart?: string
     periodEnd?: string
-    facts?: {
-      customer?: string
-      product?: string
-      quantity?: string
-      unit?: string
-      unitPrice?: string
-      amount?: string
-      currency?: string
-      pieces?: string
-      kilograms?: string
-    }
+    facts?: Record<string, string | null>
   }>
 }
 type Contact = {
@@ -36,24 +29,17 @@ type Contact = {
   is_customer?: boolean
 }
 
-function destination(item: ReviewRow): BackfillModule | undefined {
-  const labels = new Set(item.source.fields.map((field) => field.label))
-  const keys = new Set(item.source.fields.map((field) => field.key))
-  if (
-    (labels.has("Source customer label") &&
-      labels.has("Recorded sales total (RWF)")) ||
-    (keys.has("customer_label") &&
-      keys.has("quantity") &&
-      keys.has("unit_price") &&
-      keys.has("amount"))
-  )
-    return "sales"
-  if (
-    (labels.has("Recorded piece count") &&
-      labels.has("Recorded weight (kg)")) ||
-    (keys.has("pieces") && keys.has("kilograms"))
-  )
-    return "warehouse"
+function destinationHref(
+  destination: string,
+  taskId: string | undefined,
+  companyId: number,
+) {
+  if (!taskId) return destination
+  const [path, query] = destination.split("?", 2)
+  const params = new URLSearchParams(query)
+  params.set("backfillTask", taskId)
+  params.set("backfillCompany", String(companyId))
+  return `${path}?${params}`
 }
 
 export function ModuleBackfillAction({
@@ -71,20 +57,20 @@ export function ModuleBackfillAction({
   actor: string | null | undefined
   disabled: boolean
 }) {
-  if (detail.targetEntity !== "source_observation") return null
-  return (["sales", "warehouse"] as const).map((module) => {
+  return detail.reviewOperations?.map((operation) => {
+    const eligible = new Set(operation.itemIds)
     const items = detail.items.filter(
-      (item) => item.state !== "excluded" && destination(item) === module,
+      (item) => item.state !== "excluded" && eligible.has(item.id),
     )
     return items.length ? (
       <BackfillAction
-        key={`${organizationId}:${companyId}:${actor}:${detail.id}:${module}`}
+        key={`${organizationId}:${companyId}:${actor}:${detail.id}:${operation.key}:${operation.version}`}
         batchId={detail.id}
         taskId={taskId}
         companyId={companyId}
         organizationId={organizationId}
         actor={actor}
-        module={module}
+        operation={operation}
         items={items}
         disabled={disabled}
       />
@@ -99,7 +85,7 @@ function BackfillAction({
   organizationId,
   actor,
   items,
-  module,
+  operation,
   disabled,
 }: {
   batchId: string
@@ -108,7 +94,7 @@ function BackfillAction({
   organizationId: number
   actor: string | null | undefined
   items: ReviewRow[]
-  module: BackfillModule
+  operation: ReviewedRecordOperation
   disabled: boolean
 }) {
   const cache = useQueryClient()
@@ -118,6 +104,7 @@ function BackfillAction({
     key: string
     receipt: Receipt
   } | null>(null)
+  const canMatchCustomer = operation.reviewedRecord.inputs.includes("customer")
   const key = JSON.stringify(
     items.map((item) => [item.id, item.revision, overrides[item.id]]),
   )
@@ -127,7 +114,7 @@ function BackfillAction({
       : []
   const contacts = useQuery({
     queryKey: ["module-backfill-contacts", organizationId, companyId, actor],
-    enabled: showMatches && module === "sales",
+    enabled: showMatches && canMatchCustomer,
     queryFn: async ({ signal }): Promise<Contact[]> => {
       const response = await apiFetch(
         `/api/query/contacts?companyId=${companyId}`,
@@ -141,9 +128,10 @@ function BackfillAction({
   const write = useMutation({
     mutationFn: async (previewOnly: boolean): Promise<Receipt> => {
       const results: Receipt["results"] = []
+      const digests = new Map(ready.map((row) => [row.itemId, row.digest]))
       const selected = previewOnly
         ? items
-        : items.filter((item) => ready.some((row) => row.itemId === item.id))
+        : items.filter((item) => digests.has(item.id))
       for (let start = 0; start < selected.length; start += 200) {
         const response = await apiFetch(
           `/api/import-reviews/${batchId}/module-backfill`,
@@ -152,15 +140,13 @@ function BackfillAction({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               companyId,
-              module,
+              module: operation.reviewedRecord.dispatch,
               preview: previewOnly,
               rows: selected.slice(start, start + 200).map((item) => ({
                 itemId: item.id,
                 revision: item.revision,
                 customerId: overrides[item.id] || undefined,
-                expectedDigest: previewOnly
-                  ? undefined
-                  : ready.find((row) => row.itemId === item.id)?.digest,
+                expectedDigest: previewOnly ? undefined : digests.get(item.id),
               })),
             }),
           },
@@ -192,7 +178,6 @@ function BackfillAction({
         ])
     },
   })
-  const sales = module === "sales"
   const pendingPreview =
     preview?.key === key
       ? preview.receipt.results.filter(
@@ -220,9 +205,7 @@ function BackfillAction({
           disabled={disabled || write.isPending}
           onClick={() => write.mutate(true)}
         >
-          {sales
-            ? "Preview customer sales backfill"
-            : "Preview inventory count backfill"}
+          Preview {operation.label.toLowerCase()}
         </Button>
         {ready.length > 0 ? (
           <Button
@@ -234,7 +217,7 @@ function BackfillAction({
               : `Save and verify ${ready.length} records`}
           </Button>
         ) : null}
-        {sales ? (
+        {canMatchCustomer ? (
           <Button
             variant="ghost"
             disabled={disabled || write.isPending}
@@ -245,12 +228,12 @@ function BackfillAction({
         ) : null}
         <a
           className="underline underline-offset-4"
-          href={moduleBackfillHref(module, taskId ? { id: taskId, companyId } : undefined)}
+          href={destinationHref(operation.destination, taskId, companyId)}
         >
-          {sales ? "Open Sales records" : "Open Warehouse records"}
+          Open {operation.label.toLowerCase()}
         </a>
       </div>
-      {showMatches && sales ? (
+      {showMatches && canMatchCustomer ? (
         contacts.isPending ? (
           <p>Loading customers…</p>
         ) : contacts.isError ? (
@@ -283,16 +266,21 @@ function BackfillAction({
       ) : null}
       {ready.length ? (
         <ul className="max-h-60 list-disc space-y-1 overflow-y-auto pl-5">
-          {ready.map(({ itemId, periodStart, periodEnd, facts }) => (
+          {ready.map(({ itemId, periodStart, periodEnd, facts, recordId }) => (
             <li key={itemId}>
               {periodStart === periodEnd
                 ? periodStart
-                : `${periodStart} – ${periodEnd}`}{" "}
-              · {facts?.customer ? `${facts.customer} · ` : ""}
-              {facts?.product}
-              {sales
-                ? ` · ${facts?.quantity}${facts?.unit ? ` ${facts.unit}` : ""} × ${facts?.unitPrice} = ${facts?.amount} ${facts?.currency}`
-                : ` · ${facts?.pieces} pieces · ${facts?.kilograms} kg`}
+                : `${periodStart} – ${periodEnd}`}
+              {recordId && <span> · Already saved</span>}
+              {operation.reviewedRecord.previewFields.map(({ key, label }) => {
+                const value = facts?.[key]
+                return value ? (
+                  <span key={key}>
+                    {" · "}
+                    {label} {value}
+                  </span>
+                ) : null
+              })}
             </li>
           ))}
         </ul>

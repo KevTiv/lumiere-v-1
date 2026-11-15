@@ -9,7 +9,8 @@ import binascii
 import csv
 from collections import Counter, defaultdict
 from datetime import date, timedelta
-from decimal import DecimalException
+from decimal import Decimal, DecimalException
+from fractions import Fraction
 import hashlib
 import importlib.util
 import io
@@ -333,6 +334,13 @@ AUDIT_ISSUES = {
     "unlabeled_primary_subtotal": "An unlabeled subtotal was detected and needs review.",
     "settlement_section_without_primary_subtotal": "Settlement entries start before a product subtotal can be identified.",
 }
+SHOP_SALE_AMOUNT_FIELDS = ("sold_quantity", "sale_unit_price", "sale_amount")
+SHOP_SALE_HEADERS = (
+    {"qte s", "qtes s", "quantite vendue", "quantites vendues", "sold quantity"},
+    {"pu", "p u", "prix unitaire", "unit price"},
+    {"total", "montant", "montant total", "sale amount", "sales total"},
+)
+REPORT_CURRENCY = re.compile(r"\b(?:RWF|FRW|BIF|CDF|EUR|GBP|KES|TZS|UGX|USD)\b", re.IGNORECASE)
 
 
 def mapped_field(key, value, required=False):
@@ -730,7 +738,9 @@ def prepare_file(file, mode, duplicate):
         else:
             fail("A selected structured table has no data rows to review.")
     else:
-        batches = [("source_observation", observation_items(file, file["blocks"], inspection_only=mode == "inspect_only"))]
+        batches = [("source_observation", observation_items(
+            file, file["blocks"], inspection_only=mode == "inspect_only", duplicate=duplicate
+        ))]
     if not file["sections"]:
         file["sections"] = [automatic_section(file, f"table-{index}", target, items)
                             for index, (target, items) in enumerate(batches, 1) if items]
@@ -760,6 +770,86 @@ DATE_HEADERS = {"date", "as_of", "invoice_date", "business_date", "count_date", 
 def source_day(raw, *, day_first=False, order="iso"):
     """Locale dates require a reviewed option or an already verified farm layout."""
     return rules.parse_date(raw, "dmy" if day_first else order)
+
+
+def shop_sale_report(file, block):
+    """Bind a dated sales proposal to the recognizable sales columns of an audit."""
+    day = business_date(block)
+    if (day["precision"] != "day" or block["shop_basis"] != "explicit_report_heading"
+            or set(block["issues"]) & {"file_and_title_shop_disagree", "duplicate_audit_dataset",
+                                       "conflicting_same_title_audits"}):
+        return None
+    column = block["sale_first_column"]
+    header = file["rows"][block["header_row"] - 1][1][column:column + 3]
+    labels = [farm.source_notes.normalized(REPORT_CURRENCY.sub("", value)) for value in header]
+    if len(labels) != 3 or not all(label in choices for label, choices in zip(labels, SHOP_SALE_HEADERS)):
+        return None
+    currencies = {}
+    for text in (block["title"], *header):
+        for raw in REPORT_CURRENCY.findall(text):
+            code = raw.upper()
+            currencies["RWF" if code == "FRW" else code] = raw
+    currency, raw_currency = next(iter(currencies.items())) if len(currencies) == 1 else (None, None)
+    return column, currency, raw_currency
+
+
+def shop_sale_amounts(line, raw_amounts):
+    # The source parser also supports loose historical observations. Require
+    # ordinary fixed-point source cells and the native operation's value bounds.
+    if len(raw_amounts) != 3 or not all(re.fullmatch(r"[+]?[0-9][0-9., ]*", raw.strip()) for raw in raw_amounts):
+        return None
+    values = [proposed_value(line[key] or "", "decimal") for key in SHOP_SALE_AMOUNT_FIELDS]
+    if not all(values):
+        return None
+    quantity, price, amount = map(Fraction, values)
+    if min(quantity, price, amount) <= 0 or quantity * price != amount:
+        return None
+    return dict(zip(SHOP_SALE_AMOUNT_FIELDS, zip(raw_amounts, values)))
+
+
+def audit_observation(block, line, cells, sale_report, inspection_only):
+    date_evidence = business_date(block)
+    line_issues = set(block["issues"] + line["issues"])
+    sale_amounts = None
+    if sale_report and line["raw_product_label"]:
+        column, currency, raw_currency = sale_report
+        sale_amounts = shop_sale_amounts(line, cells[column:column + 3])
+    fields = [field("product_label", line["raw_product_label"], required=sale_amounts is not None)]
+    proposed = {"product_label": line["product_label"]}
+    issues = []
+    if sale_amounts is None:
+        fields.append(field("unit", None, required=not inspection_only))
+        proposed["unit"] = None
+    else:
+        sale_date = date_evidence["from"]
+        fields.extend([
+            field("observation_kind", "historical_shop_sale"),
+            field("shop", block["shop"], required=True),
+            field("sale_date", sale_date, kind="date", required=True),
+            field("currency_code", raw_currency, required=True),
+            field("source_unit", None),
+        ])
+        proposed.update({"observation_kind": "historical_shop_sale", "shop": block["shop"],
+                         "sale_date": sale_date, "currency_code": currency, "source_unit": None})
+        issues.append("Verify the dated shop sale before saving it in Sales.")
+        if currency is None:
+            issues.append("Confirm the sales currency from the source or company records.")
+        subtotal = block["totals"].get("sale_amount", {})
+        declared = subtotal.get("declared")
+        if declared is not None and Decimal(declared) != Decimal(subtotal["sum_of_nonblank_lines"]):
+            line_issues.add("sale_amount_subtotal_mismatch")
+    issues.extend(AUDIT_ISSUES.get(issue, issue.replace("_", " ")) for issue in sorted(line_issues))
+    for key in ["opening_quantity", "received_quantity", "available_quantity", "closing_quantity",
+                "consumed_quantity", "cost_unit_price", "consumed_cost", *SHOP_SALE_AMOUNT_FIELDS]:
+        required = sale_amounts is not None and key in sale_amounts
+        if required:
+            original, value = sale_amounts[key]
+        else:
+            original = line[key]
+            value = proposed_value(original or "", "decimal")
+        fields.append(field(key, original, kind="decimal", required=required))
+        proposed[key] = value
+    return date_evidence, fields, proposed, issues
 
 
 def supplementary_date_facts(file):
@@ -804,8 +894,11 @@ def supplementary_date_facts(file):
     return facts
 
 
-def observation_items(file, blocks, *, inspection_only=False):
+def observation_items(file, blocks, *, inspection_only=False, duplicate=False):
     by_record = {line["source"]["row"]: (block, line) for block in blocks for line in block["lines"]}
+    sale_reports = {} if inspection_only or duplicate else {
+        block["source"]["row"]: shop_sale_report(file, block) for block in blocks
+    }
     items = []
     supplementary = supplementary_date_facts(file)
     # Use the same tail interpretation as offline recovery, retaining every raw
@@ -887,17 +980,12 @@ def observation_items(file, blocks, *, inspection_only=False):
         if record_index in by_record:
             block, line = by_record[record_index]
             label = line["product_label"]
-            issues.extend(AUDIT_ISSUES.get(issue, issue.replace("_", " "))
-                          for issue in sorted(set(block["issues"] + line["issues"])))
-            fields.extend([field("product_label", line["raw_product_label"]), field("unit", None, required=not inspection_only)])
-            proposed.update({"product_label": line["product_label"], "unit": None})
-            for key in ["opening_quantity", "received_quantity", "available_quantity", "closing_quantity",
-                        "consumed_quantity", "cost_unit_price", "consumed_cost", "sold_quantity", "sale_unit_price", "sale_amount"]:
-                # The raw row keeps the original spelling, including invalid numerics.
-                value = line[key]
-                fields.append(field(key, value, kind="decimal"))
-                proposed[key] = proposed_value(value or "", "decimal")
-            item["businessDate"] = business_date(block)
+            item["businessDate"], audit_fields, audit_proposed, audit_issues = audit_observation(
+                block, line, cells, sale_reports.get(block["source"]["row"]), inspection_only
+            )
+            fields.extend(audit_fields)
+            proposed.update(audit_proposed)
+            issues.extend(audit_issues)
         if record_index in tail_items:
             tail = tail_items[record_index]
             issues.append(tail["issue"])
@@ -1014,8 +1102,10 @@ def prepare(payload):
 
     all_blocks = []
     for file in decoded:
-        file["blocks"] = ([] if file["options"] and file["options"].managed_selection else
-                          farm.audit_blocks(file["name"], [cells for _, cells in file["rows"]]))
+        options = file["options"]
+        parse_number = (lambda value: rules.parse_decimal(value, options)) if options and options.decimal_separator else farm.number
+        file["blocks"] = ([] if options and options.managed_selection else
+                          farm.audit_blocks(file["name"], [cells for _, cells in file["rows"]], parse_number))
         all_blocks.extend(file["blocks"])
     warnings = set()
     for index, block in enumerate(all_blocks):

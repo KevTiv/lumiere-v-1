@@ -222,5 +222,89 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
     ensure!(entry["previousValues"]["quantity"].is_null());
     ensure!(entry["previousConfirmedFields"] == json!(["unit_price"]));
     ensure!(entry["previousState"] == "needs_review");
+    verify_replayed_backfill_receipt(pool, scoped, dataset, batch, id).await?;
+    Ok(())
+}
+
+async fn verify_replayed_backfill_receipt(
+    pool: &deadpool_postgres::Pool,
+    scoped: StorageScope<'_>,
+    mut dataset: Dataset,
+    original_batch: i64,
+    original_item: i64,
+) -> Result<()> {
+    // A changed review document can still reference the exact same original row.
+    dataset.title.push_str(" replay");
+    let replay = create_draft(pool, scoped, &dataset).await?.0;
+    let replay_batch: i64 = replay["id"].as_str().unwrap().parse()?;
+    let mut client = pool.get().await?;
+    client
+        .batch_execute(include_str!("../../cold_tier/import_tasks_expand.sql"))
+        .await?;
+    client
+        .batch_execute(include_str!("../../cold_tier/module_backfill_expand.sql"))
+        .await?;
+    client
+        .batch_execute(include_str!(
+            "../../cold_tier/module_backfill_matches_expand.sql"
+        ))
+        .await?;
+    let tx = client.transaction().await?;
+    let replay_item: i64 = tx
+        .query_one(
+            "SELECT id FROM lumiere_platform.import_review_item WHERE batch_id=$1",
+            &[&replay_batch],
+        )
+        .await?
+        .get(0);
+    let record_id: i64 = tx
+        .query_one(
+            r#"INSERT INTO lumiere_platform.module_backfill_record
+             (organization_id, company_id, module, batch_id, item_id, source_revision,
+              source_sha256, source_row, source_file, period_start, period_end, facts, created_by)
+             VALUES (8001, 9001, 'sales', $1, $2, 2, repeat('a',64), 8, 'shop.csv',
+                     '2022-06-13', '2022-06-13', '{"kind":"sales"}', 'actor-one')
+             RETURNING id"#,
+            &[&original_batch, &original_item],
+        )
+        .await?
+        .get(0);
+    let task = "b".repeat(32);
+    tx.execute(
+        "INSERT INTO lumiere_platform.import_task
+         (organization_id, company_id, actor_identity, request_id, conversation_key, request_sha256, decision_request)
+         VALUES (8001, 9001, 'actor-one', $1, 'other-chat', repeat('c',64), '{}')",
+        &[&task],
+    )
+    .await?;
+    for batch in [original_batch, replay_batch] {
+        tx.execute(
+            "INSERT INTO lumiere_platform.import_task_review VALUES (8001, 9001, 'actor-one', $1, $2)",
+            &[&task, &batch],
+        )
+        .await?;
+    }
+    tx.execute(
+        "INSERT INTO lumiere_platform.module_backfill_review_match
+         (organization_id, company_id, batch_id, item_id, source_revision, record_id)
+         VALUES (8001, 9001, $1, $2, 1, $3), (8001, 9001, $1, $2, 2, $3)",
+        &[&replay_batch, &replay_item, &record_id],
+    )
+    .await?;
+    let results = module_backfill::task_results(&tx, scoped, &task).await?;
+    ensure!(results == vec![json!({"module":"sales","count":1})]);
+    let other_actor = StorageScope {
+        actor: "actor-two",
+        ..scoped
+    };
+    ensure!(module_backfill::task_results(&tx, other_actor, &task)
+        .await?
+        .is_empty());
+    tx.execute(
+        "DELETE FROM lumiere_platform.import_task_review WHERE batch_id = $1",
+        &[&original_batch],
+    )
+    .await?;
+    ensure!(module_backfill::task_results(&tx, scoped, &task).await? == results);
     Ok(())
 }

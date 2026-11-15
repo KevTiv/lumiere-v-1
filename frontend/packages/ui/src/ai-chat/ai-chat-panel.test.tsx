@@ -186,6 +186,19 @@ describe("AI chat workspace", () => {
     expect(input.value).toBe("Keep my question")
   })
 
+  it("carries the explicit import mode without sending or replacing the instruction", async () => {
+    const onImportFiles = vi.fn(async () => {})
+    const onSendMessage = vi.fn()
+    const file = new File(["name\nEggs"], "products.csv", { type: "text/csv" })
+    render(<AIChatPanel open onClose={vi.fn()} config={{ enableFileUpload: true }} onImportFiles={onImportFiles} onSendMessage={onSendMessage} />)
+    const input = screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: "Please prepare an import from these files" } })
+    fireEvent.drop(screen.getByTestId("erp-ai-chat-panel"), { dataTransfer: { types: ["Files"], files: [file] } })
+    await waitFor(() => expect(onImportFiles).toHaveBeenCalledExactlyOnceWith([file], "prepare_import"))
+    expect(input.value).toBe("Please prepare an import from these files")
+    expect(onSendMessage).not.toHaveBeenCalled()
+  })
+
   it("accepts multiple files from the picker and clears it for future selection", async () => {
     const onImportFiles = vi.fn(async () => {})
     render(<AIChatPanel open docked onClose={vi.fn()} config={{ enableFileUpload: true }} onImportFiles={onImportFiles} importFileNames={["saved-counts.csv"]} />)

@@ -62,7 +62,7 @@ pub(super) async fn record(
         "SELECT link.request_id FROM lumiere_platform.import_task_review link
          JOIN lumiere_platform.import_task task ON task.organization_id=link.organization_id AND task.company_id=link.company_id AND task.actor_identity=link.actor_identity AND task.request_id=link.request_id
          WHERE link.organization_id=$1::text::numeric AND link.company_id=$2::text::numeric AND link.actor_identity=$3
-           AND link.batch_id=ANY($4::bigint[]) AND task.approved_mode='prepare_import' AND task.state='needs_review'
+           AND link.batch_id=ANY($4::bigint[]) AND NOT link.from_inspection AND task.approved_mode='prepare_import' AND task.state='needs_review'
          GROUP BY link.request_id HAVING count(DISTINCT link.batch_id)=$5 ORDER BY link.request_id LIMIT 21",
         &[&scope.organization.to_string(),&scope.company.to_string(),&scope.actor,&batches,&(batches.len() as i64)]
     ).await.map_err(ApiError::internal)?;
