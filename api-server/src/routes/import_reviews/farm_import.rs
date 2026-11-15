@@ -732,11 +732,15 @@ pub(super) async fn write(
            AND item.batch_id=$3 AND item.id=ANY($4::bigint[]) AND batch.target_entity='farm_event'
            AND EXISTS (
              SELECT 1 FROM lumiere_platform.import_task_review link
+               JOIN lumiere_platform.import_task task USING
+                 (organization_id,company_id,actor_identity,request_id)
                JOIN lumiere_platform.import_task_source source
                  ON (source.organization_id,source.company_id,source.actor_identity,source.request_id)
                   = (link.organization_id,link.company_id,link.actor_identity,link.request_id)
              WHERE (link.organization_id,link.company_id,link.batch_id)
                  = (item.organization_id,item.company_id,item.batch_id)
+               AND NOT link.from_inspection
+               AND task.approved_mode='prepare_import' AND task.state='needs_review'
                AND source.file_name=item.source_json->'source'->>'file'
                AND source.source_sha256=item.source_json->'source'->>'sha256'
            )
@@ -745,7 +749,7 @@ pub(super) async fn write(
     ).await.map_err(ApiError::internal)?;
     if rows.len() != ids.len() {
         return Err(ApiError::Conflict(
-            "Rows must belong to this saved farm import source.".into(),
+            "Rows must belong to this prepared farm import source.".into(),
         ));
     }
 

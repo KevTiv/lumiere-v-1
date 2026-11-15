@@ -506,12 +506,48 @@ pub(super) async fn write(
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
-    let items = tx.query("SELECT item.id,item.revision,item.state,item.source_json,item.proposed_json,item.confirmed_fields
-        FROM lumiere_platform.import_review_item item JOIN lumiere_platform.import_review_batch batch
-        ON batch.organization_id=item.organization_id AND batch.company_id=item.company_id AND batch.id=item.batch_id
-        WHERE item.organization_id=$1::text::numeric AND item.company_id=$2::text::numeric
-        AND item.batch_id=$3 AND item.id=ANY($4::bigint[]) AND batch.target_entity='source_observation'
-        ORDER BY item.id FOR SHARE OF item", &[&org,&company,&batch,&ids]).await.map_err(ApiError::internal)?;
+    let eligible: bool = tx
+        .query_one(
+            "WITH links AS (
+                 SELECT link.from_inspection, task.approved_mode, task.state
+                 FROM lumiere_platform.import_task_review link
+                 JOIN lumiere_platform.import_task task USING
+                     (organization_id, company_id, actor_identity, request_id)
+                 WHERE link.organization_id=$1::text::numeric
+                   AND link.company_id=$2::text::numeric AND link.batch_id=$3
+             )
+             SELECT NOT EXISTS (SELECT 1 FROM links)
+                 OR EXISTS (SELECT 1 FROM links WHERE NOT from_inspection
+                     AND approved_mode='prepare_import' AND state='needs_review')",
+            &[&org, &company, &batch],
+        )
+        .await
+        .map_err(ApiError::internal)?
+        .get(0);
+    if !eligible {
+        return Err(ApiError::Conflict(
+            "Prepare the import before previewing or saving ERP records.".into(),
+        ));
+    }
+    let items = tx
+        .query(
+            "SELECT item.id, item.revision, item.state, item.source_json, item.proposed_json, item.confirmed_fields,
+                    existing.id AS existing_id, existing.period_start::text AS existing_start,
+                    existing.period_end::text AS existing_end, existing.facts AS existing_facts
+             FROM lumiere_platform.import_review_item item
+             JOIN lumiere_platform.import_review_batch batch
+               ON batch.organization_id=item.organization_id AND batch.company_id=item.company_id AND batch.id=item.batch_id
+             LEFT JOIN lumiere_platform.module_backfill_record existing
+               ON $6::boolean AND existing.organization_id=item.organization_id AND existing.company_id=item.company_id
+               AND existing.module=$5 AND existing.source_sha256=item.source_json #>> '{source,sha256}'
+               AND existing.source_row=(item.source_json #>> '{source,row}')::bigint
+             WHERE item.organization_id=$1::text::numeric AND item.company_id=$2::text::numeric
+               AND item.batch_id=$3 AND item.id=ANY($4::bigint[]) AND batch.target_entity='source_observation'
+             ORDER BY item.id FOR SHARE OF item",
+            &[&org, &company, &batch, &ids, &module, &body.preview],
+        )
+        .await
+        .map_err(ApiError::internal)?;
     if items.len() != ids.len() {
         return Err(ApiError::Conflict(
             "selected rows are outside this source review".into(),
@@ -566,7 +602,19 @@ pub(super) async fn write(
                 .map_err(ApiError::internal)?,
         ));
         if body.preview {
-            results.push(json!({"itemId":id.to_string(),"status":"ready","periodStart":start,"periodEnd":end,"facts":facts,"digest":digest}));
+            let existing_id = item.get::<_, Option<i64>>("existing_id");
+            if existing_id.is_some()
+                && (item.get::<_, Option<String>>("existing_start").as_ref() != Some(&start)
+                    || item.get::<_, Option<String>>("existing_end").as_ref() != Some(&end)
+                    || item.get::<_, Option<Value>>("existing_facts").as_ref() != Some(&facts))
+            {
+                results.push(json!({"itemId":id.to_string(),"status":"conflict","reason":"A saved record for this source row has different values."}));
+            } else {
+                results.push(json!({
+                    "itemId":id.to_string(), "status":"ready", "periodStart":start, "periodEnd":end,
+                    "facts":facts, "digest":digest, "recordId":existing_id.map(|id| id.to_string())
+                }));
+            }
             continue;
         }
         if selection.expected_digest.as_deref() != Some(digest.as_str()) {
@@ -581,12 +629,23 @@ pub(super) async fn write(
             ON CONFLICT (organization_id,company_id,module,source_sha256,source_row) DO NOTHING",
             &[&org,&company,&module,&batch,&id,&revision,&source.sha256,&number,&source.file,&start,&end,&facts,&ctx.actor_identity()]
         ).await.map_err(ApiError::internal)?;
-        let saved = tx.query_one("SELECT id,period_start::text,period_end::text,facts FROM lumiere_platform.module_backfill_record
+        let saved = tx.query_one("SELECT id,batch_id,period_start::text,period_end::text,facts FROM lumiere_platform.module_backfill_record
             WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND module=$3 AND source_sha256=$4 AND source_row=$5",
             &[&org,&company,&module,&source.sha256,&number]).await.map_err(ApiError::internal)?;
         let same = saved.get::<_, Value>("facts") == facts
-            && saved.get::<_, String>(1) == start
-            && saved.get::<_, String>(2) == end;
+            && saved.get::<_, String>(2) == start
+            && saved.get::<_, String>(3) == end;
+        let record_id: i64 = saved.get("id");
+        if same && saved.get::<_, i64>("batch_id") != batch {
+            tx.execute(
+                "INSERT INTO lumiere_platform.module_backfill_review_match
+                 (organization_id, company_id, batch_id, item_id, source_revision, record_id)
+                 VALUES ($1::text::numeric, $2::text::numeric, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
+                &[&org, &company, &batch, &id, &revision, &record_id],
+            )
+            .await
+            .map_err(ApiError::internal)?;
+        }
         let status = if !same {
             "conflict"
         } else if inserted == 1 {
@@ -594,7 +653,9 @@ pub(super) async fn write(
         } else {
             "matched"
         };
-        results.push(json!({"itemId":id.to_string(),"status":status,"recordId":saved.get::<_, i64>("id").to_string()}));
+        results.push(
+            json!({"itemId":id.to_string(),"status":status,"recordId":record_id.to_string()}),
+        );
     }
     tx.commit().await.map_err(ApiError::internal)?;
     Ok(Json(json!({"module":body.module,"results":results})))
@@ -612,8 +673,9 @@ pub(super) async fn task_results(
          FROM lumiere_platform.module_backfill_record record
          WHERE record.organization_id=$1::text::numeric AND record.company_id=$2::text::numeric
          AND EXISTS (SELECT 1 FROM lumiere_platform.import_task_review link
-             WHERE link.organization_id=record.organization_id AND link.company_id=record.company_id
-             AND link.batch_id=record.batch_id AND link.actor_identity=$3 AND link.request_id=$4)
+             JOIN lumiere_platform.module_backfill_review_record source USING (organization_id, company_id, batch_id)
+             WHERE source.organization_id=record.organization_id AND source.company_id=record.company_id
+             AND source.record_id=record.id AND link.actor_identity=$3 AND link.request_id=$4)
          GROUP BY 1 ORDER BY 1",
             &[
                 &scope.organization.to_string(),
@@ -657,8 +719,9 @@ pub(super) async fn read(
                AND ($10::bigint IS NULL OR record.id = $10)
                AND ($5::text IS NULL OR EXISTS (
                    SELECT 1 FROM lumiere_platform.import_task_review link
-                   WHERE link.organization_id = record.organization_id AND link.company_id = record.company_id
-                     AND link.batch_id = record.batch_id AND link.actor_identity = $8 AND link.request_id = $5
+                   JOIN lumiere_platform.module_backfill_review_record source USING (organization_id, company_id, batch_id)
+                   WHERE source.organization_id = record.organization_id AND source.company_id = record.company_id
+                     AND source.record_id = record.id AND link.actor_identity = $8 AND link.request_id = $5
                ))
                AND ($6::text IS NULL OR record.period_end >= $6::text::date)
                AND ($7::text IS NULL OR record.period_start <= $7::text::date)

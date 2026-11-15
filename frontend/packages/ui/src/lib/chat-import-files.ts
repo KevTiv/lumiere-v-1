@@ -2,6 +2,18 @@ export const CHAT_IMPORT_MAX_FILES = 20
 export const CHAT_IMPORT_MAX_FILE_BYTES = 5_000_000
 export const CHAT_IMPORT_MAX_TOTAL_BYTES = 20_000_000
 
+export const CHAT_IMPORT_INITIAL_MODES = ["prepare_import", "inspect_only"] as const
+export type ChatImportInitialMode = (typeof CHAT_IMPORT_INITIAL_MODES)[number]
+
+/** Choose intake mode only for a direct instruction, leaving ordinary drafts alone. */
+export function chatImportInstructionMode(instruction: string): ChatImportInitialMode | undefined {
+  const text = instruction.trim()
+  if (/^(?:please\s+)?(?:prepare\s+(?:(?:an?|the)\s+)?import|import|onboard|backfill)\b/i.test(text)) {
+    return "prepare_import"
+  }
+  if (/^(?:please\s+)?(?:inspect|examine)\b/i.test(text)) return "inspect_only"
+}
+
 export type ChatImportFileProblem =
   | { code: "tooManyFiles" }
   | { code: "unsupportedFile"; fileName: string }

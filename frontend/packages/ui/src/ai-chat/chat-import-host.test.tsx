@@ -8,9 +8,11 @@ const controls = vi.hoisted(() => ({
   list: vi.fn(), submit: vi.fn(), recover: vi.fn(), fetch: vi.fn(),
   latest: null as { onImportFiles?: (files: File[]) => Promise<void>; content: ReactNode } | null,
 }))
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: Record<string, unknown> & { defaultValue?: string }) => options?.defaultValue?.replace(/\{\{(\w+)\}\}/g, (_, name) => String(options?.[name] ?? "")) ?? key }) }))
+vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ i18n: { language: "en" }, t: (key: string, options?: Record<string, unknown> & { defaultValue?: string }) => options?.defaultValue?.replace(/\{\{(\w+)\}\}/g, (_, name) => String(options?.[name] ?? "")) ?? key }) }))
 vi.mock("../../../../web/lib/api-fetch", () => ({ apiFetch: controls.fetch }))
-vi.mock("../../../../web/lib/data-import-workspace", () => ({ DataImportWorkspace: () => <p>Source review</p> }))
+vi.mock("../../../../web/lib/data-import-workspace", () => ({
+  DataImportWorkspace: ({ taskId }: { taskId?: string }) => <p data-task-id={taskId}>Source review</p>,
+}))
 vi.mock("../../../../web/lib/import-review-workspace", () => ({ ImportReviewWorkspace: () => <p>Source inspection</p> }))
 vi.mock("@lumiere/ui", async () => ({ ChatDecisionCard: (await import("./chat-decision-card")).ChatDecisionCard }))
 vi.mock("../../../../web/lib/chat-import-task", async actual => ({
@@ -222,4 +224,35 @@ it("shows the exact saved answer and instructions before an explicit approval re
   fireEvent.click(screen.getByRole("button", { name: "Retry saved answer" }))
   await screen.findByRole("radiogroup")
   expect(JSON.parse(controls.fetch.mock.calls.find(([, init]) => init?.method === "POST")![1].body)).toEqual({ companyId: 3, decisionId: savedAnswer.decisionId, expectedRevision: 1, optionId: "other", otherText: savedAnswer.otherText })
+})
+
+
+it("publishes the exact saved task before the automatic inspection returns", async () => {
+  const page = renderHost()
+  const inspected = acknowledged({ decisionId: "d".repeat(32), expectedRevision: 1, optionId: "inspect_only" })
+  const scan = deferred<Response>()
+  controls.submit.mockResolvedValueOnce({ ...inspected, status: "saved" })
+  controls.fetch.mockReturnValueOnce(scan.promise)
+  await waitFor(() => expect(controls.latest?.onImportFiles).toBeTypeOf("function"))
+  let completion!: Promise<void>
+  act(() => { completion = controls.latest!.onImportFiles!([]) })
+  const link = await screen.findByRole("link", { name: "Open this task in Data import" })
+  expect(link.getAttribute("href")).toBe(`/settings?section=imports&importTask=${inspected.requestId}&importCompany=3&importView=sources#import-task`)
+  expect(controls.submit.mock.calls[0][0].initialMode).toBe("inspect_only")
+  expect(controls.fetch).toHaveBeenCalledExactlyOnceWith(`/api/import-tasks/${inspected.requestId}/resume?companyId=3`, { method: "POST" })
+  await act(async () => { scan.resolve(Response.json(inspected)); await completion })
+  expect(screen.getByRole("button", { name: "Approve preparation" })).toBeTruthy()
+  expect(screen.getByRole("link", { name: "Open this task in Data import" })).toBeTruthy()
+  page.unmount()
+})
+
+it("lets a fresh chat reopen an actor- and company-scoped task from an earlier chat", async () => {
+  const earlier = { ...task("b"), conversationKey: "earlier", status: "saved" }
+  controls.fetch.mockResolvedValueOnce(Response.json({ tasks: [earlier], nextCursor: null }))
+  renderHost()
+  fireEvent.click(await screen.findByRole("button", { name: "Continue saved import" }))
+  fireEvent.click(await screen.findByRole("button", { name: "Open saved task" }))
+  expect((await screen.findByText("Source review")).getAttribute("data-task-id")).toBe(earlier.requestId)
+  expect(controls.fetch).toHaveBeenCalledExactlyOnceWith("/api/import-tasks?companyId=3", { cache: "no-store" })
+  expect(controls.submit).not.toHaveBeenCalled()
 })

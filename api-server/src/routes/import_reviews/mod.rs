@@ -228,8 +228,18 @@ async fn read(
     let batch=client.query_opt("SELECT id::text,title,target_entity,source_file,source_sha256 FROM lumiere_platform.import_review_batch WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND id=$3",&[&org,&company,&id]).await.map_err(ApiError::internal)?.ok_or_else(||ApiError::NotFound("source review not found".into()))?;
     let items=client.query(&format!("SELECT {ITEM_COLUMNS} FROM lumiere_platform.import_review_item WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND batch_id=$3 ORDER BY id LIMIT 1000"),&[&org,&company,&id]).await.map_err(ApiError::internal)?;
     let history=client.query(&format!("{HISTORY_SELECT} WHERE decision.organization_id=$1::text::numeric AND decision.company_id=$2::text::numeric AND item.batch_id=$3 ORDER BY decision.id DESC LIMIT 100"),&[&org,&company,&id]).await.map_err(ApiError::internal)?;
+    let target_entity: String = batch.get("target_entity");
+    let source_items = items
+        .iter()
+        .map(|row| {
+            serde_json::from_value(row.get("source_json"))
+                .map(|item| (row.get("id"), item))
+                .map_err(ApiError::internal)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let review_operations = capabilities::review_operations(&target_entity, &source_items);
     Ok(Json(
-        json!({"id":batch.get::<_,String>("id"),"title":batch.get::<_,String>("title"),"targetEntity":batch.get::<_,String>("target_entity"),"sourceFile":batch.get::<_,String>("source_file"),"sourceSha256":batch.get::<_,String>("source_sha256"),"items":items.iter().map(item_json).collect::<Vec<_>>(),"history":history.iter().map(history_json).collect::<Vec<_>>() }),
+        json!({"id":batch.get::<_,String>("id"),"title":batch.get::<_,String>("title"),"targetEntity":target_entity,"sourceFile":batch.get::<_,String>("source_file"),"sourceSha256":batch.get::<_,String>("source_sha256"),"items":items.iter().map(item_json).collect::<Vec<_>>(),"history":history.iter().map(history_json).collect::<Vec<_>>(),"reviewOperations":review_operations }),
     ))
 }
 

@@ -534,7 +534,7 @@
     },
     {
       "path": "api-server/src/routes/import_reviews/farm_import.rs",
-      "sha256": "50c96cd5aa8677c08e4c597b322aae38412bed4df8b0253f64d24e4c0ebb3352"
+      "sha256": "1809205181d0d43333ab6ac41cc3fadc3b0c3cdf7fb0bde19b16755217779fb3"
     },
     {
       "path": "api-server/src/routes/import_reviews/import_binding.rs",
@@ -542,11 +542,11 @@
     },
     {
       "path": "api-server/src/routes/import_reviews/mod.rs",
-      "sha256": "c941e1c4eecacaf975439ca76e5e408f99c632ac10ac9aea91f62680ca073771"
+      "sha256": "60bbbc87b7dcb1da1840422005f355293b9556aa7ab7b96b1ad0088f5e93db65"
     },
     {
       "path": "api-server/src/routes/import_reviews/tasks.rs",
-      "sha256": "26f05260c77dfb3a091d8904a844b6c33fb5213139dfb66119ea3b1a91d5699d"
+      "sha256": "90a25e65a0dfb35ba759eead95c77186a148f00123db8e93b2c3d8cb083ab45c"
     },
     {
       "path": "frontend/packages/ui/src/lib/product-surface-catalog.ts",
@@ -1615,7 +1615,7 @@
       "surface": "settings",
       "source": "api-server/src/routes/import_reviews/mod.rs",
       "function": "decide",
-      "line": 236,
+      "line": 246,
       "owner": "source-review/import API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "review-store-or-exact-native-receipt-owner-review-required",
@@ -1628,7 +1628,7 @@
       "surface": "settings",
       "source": "api-server/src/routes/import_reviews/mod.rs",
       "function": "decide_bulk",
-      "line": 355,
+      "line": 365,
       "owner": "source-review/import API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "review-store-or-exact-native-receipt-owner-review-required",
@@ -1641,7 +1641,7 @@
       "surface": "settings",
       "source": "api-server/src/routes/import_reviews/tasks.rs",
       "function": "finish",
-      "line": 502,
+      "line": 579,
       "owner": "source-review/import API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "review-store-or-exact-native-receipt-owner-review-required",

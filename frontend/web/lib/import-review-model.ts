@@ -71,6 +71,18 @@ export type ReviewHistory = {
   previousConfirmedFields?: string[] | null
   previousState?: ReviewRow["state"] | null
 }
+export type ReviewedRecordOperation = {
+  key: string
+  version: number
+  label: string
+  destination: string
+  reviewedRecord: {
+    dispatch: string
+    inputs: Array<"customer">
+    previewFields: Array<{ key: string; label: string }>
+  }
+  itemIds: string[]
+}
 export type ReviewDetail = {
   id: string
   title: string
@@ -78,6 +90,7 @@ export type ReviewDetail = {
   sourceFile: string
   items: ReviewRow[]
   history: ReviewHistory[]
+  reviewOperations?: ReviewedRecordOperation[]
 }
 export type ReviewedImportSource = {
   targetEntity: string

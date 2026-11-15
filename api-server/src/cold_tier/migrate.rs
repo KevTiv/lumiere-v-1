@@ -453,6 +453,20 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: include_str!("farm_import_events_expand.sql"),
     },
+    Migration {
+        version: 49,
+        name: "import_task_inspection",
+        change_set: 38,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("import_task_inspection_expand.sql"),
+    },
+    Migration {
+        version: 50,
+        name: "module_backfill_matches",
+        change_set: 39,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("module_backfill_matches_expand.sql"),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

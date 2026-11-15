@@ -56,7 +56,7 @@ import { extractGuideHtmlDerivative, safeGuideHref } from "../lib/assistant-guid
 import type { GuideReference, OpenGuideRequest } from "../lib/assistant-guide-types"
 import { aiChatCategoryPillClass } from "@/lib/theme-colors"
 import { useTranslation } from "@lumiere/i18n"
-import { validateChatImportFiles } from "../lib/chat-import-files"
+import { chatImportInstructionMode, validateChatImportFiles, type ChatImportInitialMode } from "../lib/chat-import-files"
 import { assistantStarterIds, assistantStarters } from "./assistant-starters"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "../components/select"
 import { ActionSkillList } from "./action-skill-list"
@@ -167,8 +167,8 @@ interface AIChatPanelProps {
   historySaveFailed?: boolean
   /** When set, user messages are answered via this hook (e.g. BFF → ai-gateway RAG). */
   onSendMessage?: (userText: string, turnId?: string) => Promise<ChatReply>
-  /** File-only intake attaches sources without sending or replacing the composer text. */
-  onImportFiles?: (files: File[]) => Promise<void>
+  /** File intake can use an explicit draft instruction without sending or replacing it. */
+  onImportFiles?: (files: File[], initialMode?: ChatImportInitialMode) => Promise<void>
   /** Server-backed task cards are owned by the host, separately from text replies. */
   importTaskContent?: React.ReactNode
   renderImportTask?: (taskId: string) => React.ReactNode
@@ -464,7 +464,9 @@ function AIChatConversation({
     setFileImport({ scope: fileScope, busy: true })
     const isCurrent = () => active.current && currentFileScope.current === fileScope && fileImportAttempt.current === attempt
     try {
-      await onImportFiles(files)
+      const initialMode = chatImportInstructionMode(input)
+      if (initialMode) await onImportFiles(files, initialMode)
+      else await onImportFiles(files)
       if (isCurrent()) setFileImport({ scope: fileScope, busy: false })
     } catch (error) {
       if (isCurrent()) setFileImport({ scope: fileScope, busy: false, error: error instanceof Error ? error.message : t("aiChat.import.failed", { defaultValue: "Import preparation could not be started. Check the saved task before trying again." }) })

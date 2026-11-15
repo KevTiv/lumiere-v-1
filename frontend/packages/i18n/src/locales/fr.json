@@ -11,10 +11,10 @@
   },
   "moduleRecords": {
     "shopSales": "Ventes en boutique",
-    "shop": "Boutique",
-    "emptyShopSales": "Aucune vente en boutique enregistrée.",
     "saleDate": "Date de vente",
     "savedShopSale": "Vente en boutique enregistrée",
+    "shop": "Boutique",
+    "emptyShopSales": "Aucune vente en boutique enregistrée.",
     "sales": "Récapitulatifs des ventes clients",
     "warehouse": "Comptages enregistrés",
     "period": "Période de vente",

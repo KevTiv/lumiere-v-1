@@ -377,9 +377,12 @@ function ExecutionPanel({
               )}
             </div>
           )}
-          {review.data && !expenseSource && !nativeHandoff && (
-            <p>{t("settings.importWorkflow.unsupportedSource")}</p>
-          )}
+          {review.data &&
+            !expenseSource &&
+            !nativeHandoff &&
+            !review.data.reviewOperations?.length && (
+              <p>{t("settings.importWorkflow.unsupportedSource")}</p>
+            )}
           {expenseSource && (
             <fieldset
               disabled={busy || preparationLocked}

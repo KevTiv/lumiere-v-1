@@ -76,7 +76,7 @@ def nonempty_rows(rows):
     return result
 
 
-def audit_blocks(filename, rows):
+def audit_blocks(filename, rows, parse_number=number):
     titles = [(i, next(cell for cell in row if compact(cell).upper().startswith("AUDIT ")))
               for i, row in enumerate(rows)
               if any(compact(cell).upper().startswith("AUDIT ") for cell in row)]
@@ -84,11 +84,13 @@ def audit_blocks(filename, rows):
     for n, (start, title) in enumerate(titles):
         end = titles[n + 1][0] if n + 1 < len(titles) else len(rows)
         block_rows = rows[start:end]
-        headers = [(i, r.index("DESCRIPTION")) for i, r in enumerate(block_rows)
-                   if "DESCRIPTION" in r and any(compact(c).upper() in {"S I", "SI"} for c in r)]
-        if not headers:
+        for header, row in enumerate(block_rows):
+            labels = [source_notes.normalized(cell) for cell in row]
+            if "description" in labels and ({"s i", "si"} & set(labels)):
+                d = labels.index("description")
+                break
+        else:
             continue
-        header, d = headers[0]
         dates, date_issue = period(title)
         shop = file_shop(filename)
         title_shops = [name for name in ["NYABUGOGO", "KICUKIRO", "KIMIRONKO", "ZINIA", "GISIMENT"]
@@ -97,7 +99,7 @@ def audit_blocks(filename, rows):
         issues = []
         if date_issue:
             issues.append(date_issue)
-        if reported_shop and shop != reported_shop:
+        if reported_shop and shop and shop != reported_shop:
             issues.append("file_and_title_shop_disagree")
         supplementary_start_row = end + 1
         primary_total_row = None
@@ -117,7 +119,7 @@ def audit_blocks(filename, rows):
                 supplementary_start_row = start + offset + 1
                 break
             raw_name = compact(row[d]) if len(row) > d else ""
-            values = {key: number(row[d + k + 1]) if len(row) > d + k + 1 else None
+            values = {key: parse_number(row[d + k + 1]) if len(row) > d + k + 1 else None
                       for k, key in enumerate(fields)}
             if not raw_name and any(values[k] is not None for k in ["consumed_cost", "sale_amount"]) and all(
                 values[k] is None for k in fields if k not in {"consumed_cost", "sale_amount"}
@@ -160,7 +162,7 @@ def audit_blocks(filename, rows):
         totals = {}
         if total_row:
             for key, column in [("consumed_cost", d + 7), ("sale_amount", d + 10)]:
-                declared = number(total_row[column]) if len(total_row) > column else None
+                declared = parse_number(total_row[column]) if len(total_row) > column else None
                 observed = [line[key] for line in lines if line[key] is not None]
                 computed = sum((Decimal(v) for v in observed), Decimal(0))
                 totals[key] = {"declared": declared, "sum_of_nonblank_lines": str(computed),
@@ -173,6 +175,7 @@ def audit_blocks(filename, rows):
                            for line in lines]
         block_key = digest([reported_shop or shop, compact(title), canonical_lines, totals])
         blocks.append({"id": f"audit-{block_key[:24]}", "source": source(filename, start + 1),
+                       "header_row": start + header + 1, "sale_first_column": d + 8,
                        "source_end_row": end, "title": compact(title), "file_shop": shop,
                        "shop": reported_shop or shop,
                        "shop_basis": "explicit_report_heading" if reported_shop else "source_filename",

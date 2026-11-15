@@ -70,6 +70,11 @@ test("exact saved record links retain company scope and clear on tab changes", (
     pathname, query: search, tab: "stock", defaultTab: "stock", validTabs: ["recorded-counts", "stock"],
   }), "/warehouse?company=7")
 
+  assert.equal(
+    moduleBackfillRecordHref("shop_sales", { companyId: 7, recordId: id, taskId }),
+    `/sales?tab=shop-sales&backfillCompany=7&backfillRecord=${id}&backfillTask=${taskId}`,
+  )
+
   const matchedHref = moduleBackfillRecordHref(
     "sales",
     { companyId: 7, recordId: id },

@@ -11,10 +11,10 @@
   },
   "moduleRecords": {
     "shopSales": "Ibyagurishijwe mu maduka",
-    "shop": "Iduka",
-    "emptyShopSales": "Nta byagurishijwe mu maduka byabitswe.",
     "saleDate": "Itariki y’igurisha",
     "savedShopSale": "Igurisha ryo mu iduka ryabitswe",
+    "shop": "Iduka",
+    "emptyShopSales": "Nta byagurishijwe mu maduka byabitswe.",
     "sales": "Incamake y’ibyagurishijwe ku bakiriya",
     "warehouse": "Ibarura ryanditswe",
     "period": "Igihe cy’igurisha",

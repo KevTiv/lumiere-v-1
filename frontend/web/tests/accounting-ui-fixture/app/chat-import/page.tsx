@@ -13,12 +13,14 @@ import { useChatImportTasks } from "../../../../lib/chat-import-tasks"
 import { DataImportWorkspace } from "../../../../lib/data-import-workspace"
 import { webApi } from "../../../../lib/lumiere-web-http"
 
-function ChatFixture({ identity, companyId }: { identity: string; companyId: number }) {
+function ChatFixture({ identity, companyId, conversationKey }: {
+  identity: string; companyId: number; conversationKey: string
+}) {
   const imports = useChatImportTasks({
     identity,
     organizationId: 8001,
     companyId,
-    conversationKey: "fixture-import-conversation",
+    conversationKey,
   })
   const [questions, setQuestions] = useState(0)
   return <>
@@ -29,7 +31,7 @@ function ChatFixture({ identity, companyId }: { identity: string; companyId: num
       onClose={() => undefined}
       context={{ companyId, currentUser: identity }}
       config={{ enableFileUpload: true }}
-      importScopeKey={`${identity}:8001:${companyId}:fixture-import-conversation`}
+      importScopeKey={`${identity}:8001:${companyId}:${conversationKey}`}
       importCompanyLabel={`Synthetic farm company ${companyId}`}
       onImportFiles={imports.onImportFiles}
       importTaskContent={imports.content}
@@ -62,7 +64,7 @@ export default function Page() {
                   {search.get("surface") === "settings" ? (
                     <DataImportWorkspace organizationId={8001} urlSearch={search.toString()} />
                   ) : (
-                    <ChatFixture identity={actor} companyId={companyId} />
+                    <ChatFixture identity={actor} companyId={companyId} conversationKey={search.get("thread") ?? "fixture-import-conversation"} />
                   )}
                 </div>
               </main>
