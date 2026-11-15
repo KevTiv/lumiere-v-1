@@ -124,11 +124,18 @@ for (const owner of ["modal", "page"] as const) describe(`${owner} guide revalid
 
   if (owner === "modal") it("retains a dirty editor when display translations change", async () => {
     const view = render(tree())
-    fireEvent.click(await screen.findByRole("button", { name: "Edit guide" }))
-    fireEvent.change(screen.getByLabelText("Guide content (Markdown)"), { target: { value: "Keep edits while changing preferences" } })
-    controls.t = (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key
+    const edit = await screen.findByRole("button", { name: "Edit guide" })
+    await waitFor(() => expect(edit).toHaveProperty("disabled", false))
+    fireEvent.click(edit)
+
+    const draft = "Keep edits while changing preferences"
+    fireEvent.change(screen.getByLabelText("Guide content (Markdown)"), { target: { value: draft } })
+    const translatedLabel = "Contenu du guide (Markdown)"
+    controls.t = (key, options) =>
+      key === "aiChat.guide.content" ? translatedLabel : (options?.defaultValue ?? key)
     view.rerender(tree())
-    expect(screen.getByLabelText("Guide content (Markdown)")).toHaveProperty("value", "Keep edits while changing preferences")
+
+    expect(screen.getByLabelText(translatedLabel)).toHaveProperty("value", draft)
     expect(controls.read).toHaveBeenCalledOnce()
   })
 
