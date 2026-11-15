@@ -38,6 +38,7 @@ export interface BusinessHistoryPage {
 
 export interface BusinessHistoryActivityScope extends Omit<BusinessHistoryScope, "resource" | "recordId"> {
   module: string;
+  eventId?: string;
 }
 
 export interface BusinessHistoryActivityEntry extends BusinessHistoryEntry {
@@ -208,17 +209,21 @@ export function parseBusinessHistoryPage(value: unknown, scope: BusinessHistoryS
 export function businessHistoryActivityScopeReady(scope: BusinessHistoryActivityScope): boolean {
   return Number.isSafeInteger(scope.organizationId) && scope.organizationId > 0
     && validHistoryId(scope.companyId) && resourcePattern.test(scope.module)
+    && (scope.eventId === undefined || validBusinessHistoryEventId(scope.eventId))
     && identityPattern.test(scope.actorIdentity);
 }
 
 export function businessHistoryActivityQueryKey(scope: BusinessHistoryActivityScope) {
   return ["business-history", "activity", String(scope.organizationId), scope.companyId,
-    scope.module, scope.actorIdentity, scope.authorizationKey] as const;
+    scope.module, scope.actorIdentity, scope.authorizationKey, scope.eventId ?? null] as const;
 }
 
 export function businessHistoryActivityQueryPath(scope: BusinessHistoryActivityScope, cursor: string | null) {
-  if (!businessHistoryActivityScopeReady(scope)) throw new Error("Invalid activity scope");
-  const params = new URLSearchParams({ companyId: scope.companyId, limit: "25" });
+  if (!businessHistoryActivityScopeReady(scope) || (scope.eventId && cursor !== null)) {
+    throw new Error("Invalid activity scope");
+  }
+  const params = new URLSearchParams({ companyId: scope.companyId, limit: scope.eventId ? "1" : "25" });
+  if (scope.eventId) params.set("eventId", scope.eventId);
   if (cursor !== null) params.set("cursor", cursor);
   return `/api/history/activity/${scope.module}?${params}`;
 }
@@ -236,6 +241,9 @@ export function parseBusinessHistoryActivityPage(value: unknown, scope: Business
     return { ...entry, resource: item.resource, recordId: item.recordId };
   });
   if (new Set(data.map((entry) => entry.id)).size !== data.length) throw new Error("Duplicate activity identity");
+  if (scope.eventId && (page.nextCursor !== null || data.some((entry) => entry.id !== scope.eventId))) {
+    throw new Error("Invalid exact activity event");
+  }
   return { schemaVersion: 1, module: scope.module, companyId: page.companyId,
     nextCursor: page.nextCursor, coverage: page.coverage, data };
 }

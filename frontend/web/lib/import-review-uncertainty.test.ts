@@ -201,7 +201,7 @@ test("undo restores the preceding persisted snapshot as a new decision, rejectin
     itemId: "1",
     revision: 4,
     values: item.values,
-    state: "needs_review",
+    state: item.state,
     reason: "Price verified",
     actor: "actor",
     createdAt: "now",
@@ -216,6 +216,10 @@ test("undo restores the preceding persisted snapshot as a new decision, rejectin
   assert.equal(item.values.unit_price, "4800")
   assert.throws(
     () => undoReviewDecision({ ...item, revision: 5 }, entry),
+    /Reload/,
+  )
+  assert.throws(
+    () => undoReviewDecision(item, { ...entry, previousConfirmedFields: null }),
     /Reload/,
   )
 })

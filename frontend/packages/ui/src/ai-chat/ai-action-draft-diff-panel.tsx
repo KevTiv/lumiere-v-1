@@ -1,119 +1,92 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { toSnakeCase } from "@lumiere/erp-shared/row-values"
 import { useTranslation } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import type { ChatActionDraftPayload } from "@/lib/ai-chat-types"
+import {
+  HistoryFieldDiff,
+  type HistoryDiffValue,
+  type HistoryFieldDiffRow,
+} from "../entity-views/history-field-diff"
 
-export type DraftDiffField = {
-  label: string
-  value: string
-}
+const draftFields = {
+  create_task: {
+    name: "Task name",
+    description: "Description",
+    project_id: "Project",
+    stage_id: "Stage",
+    priority: "Priority",
+    state: "State",
+    partner_id: "Partner",
+    planned_hours: "Planned hours",
+    date_deadline: "Deadline",
+  },
+  create_sale_order: {
+    partner_id: "Customer (partner)",
+    partner_invoice_id: "Invoice address",
+    partner_shipping_id: "Shipping address",
+    pricelist_id: "Pricelist",
+    currency_id: "Currency",
+    warehouse_id: "Warehouse",
+    origin: "Origin",
+    client_order_ref: "Customer reference",
+    note: "Note",
+    order_lines: "Order lines",
+  },
+  create_purchase_order: {
+    partner_id: "Vendor (partner)",
+    currency_id: "Currency",
+    origin: "Origin",
+    partner_ref: "Vendor reference",
+    notes: "Notes",
+    order_lines: "Order lines",
+  },
+  reverse_payment_transaction: {
+    transaction_id: "Payment transaction",
+    reason: "Reason",
+  },
+} as const
 
-function formatScalar(value: unknown): string {
-  if (value == null) return "—"
-  if (typeof value === "string") return value.trim() || "—"
-  if (typeof value === "number" || typeof value === "boolean")
-    return String(value)
-  if (Array.isArray(value)) {
-    if (value.length === 0) return "—"
-    return value.map((item) => formatScalar(item)).join(", ")
+function proposalValue(value: unknown): HistoryDiffValue {
+  if (value === null || typeof value === "string") {
+    return { kind: "value", value }
   }
-  return JSON.stringify(value)
+  const serialized = JSON.stringify(value, null, 2)
+  return serialized === undefined
+    ? { kind: "unavailable" }
+    : { kind: "value", value: serialized }
 }
 
-function summarizeOrderLines(lines: unknown, label: string): DraftDiffField[] {
-  if (!Array.isArray(lines) || lines.length === 0) {
-    return [{ label, value: "No lines" }]
-  }
-  const summaries = lines.map((line, index) => {
-    if (line == null || typeof line !== "object" || Array.isArray(line)) {
-      return `Line ${index + 1}: (invalid)`
-    }
-    const row = line as Record<string, unknown>
-    const productId = row.product_id ?? row.productId
-    const qty = row.quantity ?? row.product_uom_qty ?? row.product_qty
-    const price = row.price_unit ?? row.priceUnit
-    const parts = [
-      productId != null ? `product #${productId}` : null,
-      qty != null ? `qty ${qty}` : null,
-      price != null ? `@ ${price}` : null,
-    ].filter(Boolean)
-    const name =
-      typeof row.name === "string" && row.name.trim() ? row.name.trim() : null
-    return `Line ${index + 1}: ${name ?? (parts.join(", ") || "(empty)")}`
-  })
-  return [{ label, value: summaries.join("; ") }]
-}
-
-export function buildDraftDiffFields(
+function buildDraftDiffFields(
   reducerName: string,
   params: Record<string, unknown>,
-): DraftDiffField[] {
-  switch (reducerName.trim()) {
-    case "create_task":
-      return [
-        { label: "Task name", value: formatScalar(params.name) },
-        { label: "Description", value: formatScalar(params.description) },
-        { label: "Project", value: formatScalar(params.project_id) },
-        { label: "Stage", value: formatScalar(params.stage_id) },
-        { label: "Priority", value: formatScalar(params.priority) },
-        { label: "State", value: formatScalar(params.state) },
-        { label: "Partner", value: formatScalar(params.partner_id) },
-        { label: "Planned hours", value: formatScalar(params.planned_hours) },
-        { label: "Deadline", value: formatScalar(params.date_deadline) },
-      ].filter((field) => field.value !== "—")
+): HistoryFieldDiffRow[] {
+  const reducer = reducerName.trim()
+  const labels: Readonly<Record<string, string>> = Object.hasOwn(
+    draftFields,
+    reducer,
+  )
+    ? draftFields[reducer as keyof typeof draftFields]
+    : {}
+  const isCreation =
+    reducer === "create_task" ||
+    reducer === "create_sale_order" ||
+    reducer === "create_purchase_order"
+  const before: HistoryDiffValue = isCreation
+    ? { kind: "absent" }
+    : { kind: "unavailable" }
 
-    case "create_sale_order":
-      return [
-        { label: "Customer (partner)", value: formatScalar(params.partner_id) },
-        {
-          label: "Invoice address",
-          value: formatScalar(params.partner_invoice_id),
-        },
-        {
-          label: "Shipping address",
-          value: formatScalar(params.partner_shipping_id),
-        },
-        { label: "Pricelist", value: formatScalar(params.pricelist_id) },
-        { label: "Currency", value: formatScalar(params.currency_id) },
-        { label: "Warehouse", value: formatScalar(params.warehouse_id) },
-        { label: "Origin", value: formatScalar(params.origin) },
-        {
-          label: "Customer reference",
-          value: formatScalar(params.client_order_ref),
-        },
-        { label: "Note", value: formatScalar(params.note) },
-        ...summarizeOrderLines(params.order_lines, "Order lines"),
-      ].filter((field) => field.value !== "—")
-
-    case "create_purchase_order":
-      return [
-        { label: "Vendor (partner)", value: formatScalar(params.partner_id) },
-        { label: "Currency", value: formatScalar(params.currency_id) },
-        { label: "Origin", value: formatScalar(params.origin) },
-        { label: "Vendor reference", value: formatScalar(params.partner_ref) },
-        { label: "Notes", value: formatScalar(params.notes) },
-        ...summarizeOrderLines(params.order_lines, "Order lines"),
-      ].filter((field) => field.value !== "—")
-
-    case "reverse_payment_transaction":
-      return [
-        {
-          label: "Payment transaction",
-          value: formatScalar(params.transaction_id),
-        },
-        { label: "Reason", value: formatScalar(params.reason) },
-      ]
-
-    default:
-      return Object.entries(params).map(([key, value]) => ({
-        label: key.replace(/_/g, " "),
-        value: formatScalar(value),
-      }))
-  }
+  return Object.entries(params).map(([key, value]) => {
+    const field = toSnakeCase(key)
+    const label = Object.hasOwn(labels, field)
+      ? labels[field]
+      : field.replace(/_/g, " ")
+    return { id: key, label, before, after: proposalValue(value) }
+  })
 }
 
 interface AiActionDraftDiffPanelProps {
@@ -161,19 +134,17 @@ export function AiActionDraftDiffPanel({
       </div>
 
       {fields.length > 0 ? (
-        <dl
-          className={cn("divide-y divide-border/40 py-1", !nested && "px-2.5")}
-        >
-          {fields.map((field) => (
-            <div
-              key={field.label}
-              className="grid grid-cols-[minmax(0,35%)_minmax(0,1fr)] gap-2 py-1.5 text-xs"
-            >
-              <dt className="text-muted-foreground">{field.label}</dt>
-              <dd className="text-foreground wrap-break-word">{field.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <div className={cn("py-2", !nested && "px-2.5")}>
+          <HistoryFieldDiff
+            fields={fields}
+            beforeLabel={t("aiChat.draft.beforeProposal", {
+              defaultValue: "Before proposal",
+            })}
+            afterLabel={t("aiChat.draft.proposedValue", {
+              defaultValue: "Proposed value",
+            })}
+          />
+        </div>
       ) : (
         <p
           className={cn(

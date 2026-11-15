@@ -414,6 +414,7 @@ async function setup(page: Page) {
   await expect(page.getByTestId("document-viewer-disclosure")).toHaveAttribute(
     "data-hydrated",
     "true",
+    { timeout: test.info().timeout },
   )
   return state
 }

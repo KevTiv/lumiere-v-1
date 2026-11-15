@@ -12,6 +12,16 @@ This includes the ten current business modules and Documents, Calendar, My work,
 
 Record history uses server pagination rather than filtering the latest 500 organization audit rows. Organization-wide evidence has its own private table and event identity, without assigning shared records a fictitious company. Module results apply current source access independently to each event and field, including a fresh policy check before returning evidence. Company, actor and role changes clear the corresponding client scope; a protected-read denial hides sibling cached evidence until both panels are refreshed.
 
+## Alpha change review
+
+The normal module views keep their data and business dates. Sales customer summaries show the source reporting period and Warehouse counts show the count date. Their saved record links open the exact row and provide its source-review revision, when retained, and the separate save timestamp when available.
+
+Activity is available on Accounting, Sales, CRM, Purchasing, Reports, Subscriptions, Expenses, Products, Inventory, Warehouse, Fleet, Documents, Calendar, Tasks, Approvals, Settings, Overview and Assistant. Inventory uses current Product and Warehouse authority. Overview includes each canonical provider once. An Activity link keeps the route filters and selects an exact event in the current company. Exact event responses use the same current target and field checks as the feed.
+
+Record changes, import-review decisions and Assistant proposals share a comparison layout with two columns on wide panels and a stacked comparison on narrow panels. Import review keeps its immutable source values, saved revision, decision time and reason, and reports an unavailable previous value when a prior snapshot is missing. Assistant displays proposal, review and execution dates when captured, and shows the applied state only when the exact saved outcome supports it.
+
+Historical imports into Purchasing, employee expense claims and Fleet still need a native outcome owner and exact readback. Per-operation coverage, durable-store history reads and deployed role/company acceptance remain Alpha release gates.
+
 ## Capture and source evidence
 
 Eligible alpha audit producers use a fallible native capture adapter. Private evidence and its exact audit identity are recorded in the business transaction. Complete outcome owners attach those rows to their existing persistence envelope, so projection cannot advance to the history without that operation's business effects. Delegated paths awaiting that integration retain their existing audit behavior under an explicit owner policy. Standalone history journal entries are supporting evidence and do not certify complete business reconstruction. Raw caller-authored audit entries cannot create private history. Internal helper producers supply registered canonical operation names. Additional private snapshots cover selected previously unaudited material changes and product edits without expanding public audit values.

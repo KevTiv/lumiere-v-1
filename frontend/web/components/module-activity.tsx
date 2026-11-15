@@ -10,7 +10,7 @@ import { Button } from "@lumiere/ui/components/button"
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@lumiere/ui/components/sheet"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { ModuleBusinessHistory, RecordBusinessHistory } from "@lumiere/ui/entity-views/record-business-history"
-import { historyActivityHref, historyActivityModule } from "../lib/history-activity-navigation"
+import { historyActivityHref, historyActivityModule, historyActivitySelection } from "../lib/history-activity-navigation"
 import { historyRecordHref } from "../lib/history-record-href"
 
 /** A URL-backed activity drawer uses the existing route's admission and history's own read authority. */
@@ -27,6 +27,7 @@ export function ModuleActivity() {
   if (!moduleId || !permissionsReady || !session.activeCompanyReady || !session.identity
     || !checkPermission("business_history", "read").allowed) return null
   const open = search.get("history") === "activity"
+  const selection = historyActivitySelection(search)
   const navigate = (next: boolean) => {
     if (!next) setSelected(null)
     const href = historyActivityHref(pathname, search.toString(), next)
@@ -44,9 +45,19 @@ export function ModuleActivity() {
           <SheetTitle>{t("businessHistory.activity", { defaultValue: "Activity" })}</SheetTitle>
           <SheetDescription>{t("businessHistory.activityDescription", { defaultValue: "Inspect recorded changes and follow their business records." })}</SheetDescription>
         </SheetHeader>
-        {open ? <SheetBody className="pb-6"><ModuleBusinessHistory
+        {open ? <SheetBody className="space-y-4 pb-6">
+          {selection ? <Link className="inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4" href={historyActivityHref(pathname, search.toString(), true)} scroll={false}>
+            {t("businessHistory.allActivity")}
+          </Link> : null}
+          <ModuleBusinessHistory
           key={scopeKey}
           moduleId={moduleId}
+          selection={selection}
+          renderEventLink={selection ? undefined : (entry, companyId) => <Link
+            className="inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4"
+            href={historyActivityHref(pathname, search.toString(), true, { eventId: entry.id, companyId })}
+            scroll={false}
+          >{t("businessHistory.openChange")}</Link>}
           renderRecordLink={(entry) => {
             const href = historyRecordHref(entry.resource, entry.recordId)
             return <div className="flex flex-wrap items-center gap-3">

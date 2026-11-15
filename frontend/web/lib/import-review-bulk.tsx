@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { HistoryFieldDiff } from "@lumiere/ui/entity-views/history-field-diff"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -31,10 +32,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { reviewDecisionDiff, reviewSourceLabel } from "./import-review-decision-diff"
 import type { ReviewRow } from "./import-review-model"
 import {
   buildBulkConfirmationPreview,
   buildBulkReviewPreview,
+  confirmedReviewFields,
   type BulkConfirmationMode,
   type BulkConfirmationPreview,
   type BulkReviewPreview,
@@ -199,12 +202,15 @@ export function ImportReviewBulk({
   }
   const holdRow = (id: string) =>
     setHeldIds((current) => new Set(current).add(id))
-  const confirmedLabel = (confirmed: boolean) =>
-    t(
-      confirmed
-        ? "settings.importReview.grouped.valueIsConfirmed"
-        : "settings.importReview.grouped.valueIsUnconfirmed",
+  const decisionsByItem = new Map(decisions.map((decision) => [decision.itemId, decision]))
+  const diffForItem = (item: ReviewRow) =>
+    reviewDecisionDiff(
+      { ...item, confirmedFields: confirmedReviewFields(item) },
+      decisionsByItem.get(item.id)!,
+      item.source.fields,
+      t,
     )
+  const afterLabel = t(saved ? "recordChanges.afterThisSave" : "settings.importReview.grouped.proposedAfter")
   return (
     <section
       aria-label={t("settings.importReview.grouped.bulk")}
@@ -387,6 +393,11 @@ export function ImportReviewBulk({
               ? "settings.importReview.grouped.previewBoundary"
               : "settings.importReview.grouped.confirmationBoundary")}
           </p>
+          {decisions[0]?.reason && (
+            <p className="whitespace-pre-wrap break-words text-sm">
+              <span className="font-medium">{t("settings.importReview.reason")}</span>{" · "}{decisions[0].reason}
+            </p>
+          )}
           {saved ? (
             <Alert role="status">
               <AlertDescription>
@@ -400,18 +411,18 @@ export function ImportReviewBulk({
                 <TableRow>
                   <TableHead>{t("settings.importReview.source")}</TableHead>
                   <TableHead>{t("settings.importReview.item")}</TableHead>
-                  <TableHead>{t("settings.importReview.grouped.before")}</TableHead>
-                  <TableHead>{t("settings.importReview.grouped.after")}</TableHead>
+                  <TableHead>{t("recordChanges.title")}</TableHead>
                   <TableHead>{t("settings.importReview.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sharedPage.map((row) => (
                   <TableRow key={row.item.id}>
-                    <TableCell>{row.item.source.source.file} · {row.item.source.source.row}</TableCell>
-                    <TableCell>{row.item.source.label}</TableCell>
-                    <TableCell>{row.before ?? t("settings.importReview.unknown")}</TableCell>
-                    <TableCell>{row.after ?? t("settings.importReview.unknown")}</TableCell>
+                    <TableCell className="whitespace-normal">{reviewSourceLabel(row.item, t)}</TableCell>
+                    <TableCell className="whitespace-normal">{row.item.source.label}</TableCell>
+                    <TableCell className="w-full min-w-48 whitespace-normal">
+                      <HistoryFieldDiff fields={diffForItem(row.item)} afterLabel={afterLabel} />
+                    </TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"
@@ -439,89 +450,46 @@ export function ImportReviewBulk({
                   <TableRow>
                     <TableHead>{t("settings.importReview.source")}</TableHead>
                     <TableHead>{t("settings.importReview.item")}</TableHead>
-                    <TableHead>{t("settings.importReview.grouped.before")}</TableHead>
-                    <TableHead>{t("settings.importReview.grouped.after")}</TableHead>
+                    <TableHead>{t("recordChanges.title")}</TableHead>
                     <TableHead>{t("settings.importReview.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {confirmationPage.map((row) => (
                     <TableRow key={row.item.id}>
-                      <TableCell>
-                        <p>{row.item.source.source.file} · {row.item.source.source.row}</p>
+                      <TableCell className="whitespace-normal">
+                        <p>{reviewSourceLabel(row.item, t)}</p>
                         <details>
                           <summary>{t("settings.importReview.grouped.sourceHash")}</summary>
                           <p className="max-w-48 break-all">{row.item.source.source.sha256}</p>
                         </details>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex min-w-48 max-w-lg flex-col gap-2 whitespace-normal">
-                          <p>{row.item.source.label}</p>
-                          <dl className="flex flex-col gap-1">
-                            {row.fields
-                              .filter((entry) => entry.value?.trim())
-                              .map((entry) => (
-                                <div key={entry.field.key} className="flex flex-wrap gap-x-2">
-                                  <dt>{entry.field.label}:</dt>
-                                  <dd className="break-all">
-                                    {entry.value}
-                                    {entry.value !== entry.sourceValue ? (
-                                      <span>
-                                        {" "}({t("settings.importReview.grouped.proposedValue")})
-                                      </span>
-                                    ) : null}
+                      <TableCell className="whitespace-normal">{row.item.source.label}</TableCell>
+                      <TableCell className="w-full min-w-48 space-y-2 whitespace-normal">
+                        <HistoryFieldDiff fields={diffForItem(row.item)} afterLabel={afterLabel} />
+                        <details>
+                          <summary className="cursor-pointer text-muted-foreground">
+                            {t("settings.importReview.grouped.reviewValues", {
+                              count: row.fields.length,
+                            })}
+                          </summary>
+                          <dl className="mt-2 space-y-2">
+                            {row.fields.map((entry) => (
+                              <div key={entry.field.key}>
+                                <dt className="font-medium">{entry.field.label}</dt>
+                                <dd className="whitespace-pre-wrap [overflow-wrap:anywhere]">
+                                  {t("settings.importReview.grouped.original")} · {entry.sourceValue ?? t("settings.importReview.unknown")}
+                                </dd>
+                                {entry.value !== entry.sourceValue && (
+                                  <dd className="whitespace-pre-wrap [overflow-wrap:anywhere]">
+                                    {t("settings.importReview.grouped.proposedValue")} · {entry.value ?? t("settings.importReview.unknown")}
                                   </dd>
-                                </div>
-                              ))}
+                                )}
+                              </div>
+                            ))}
                           </dl>
-                          <details>
-                            <summary>
-                              {t("settings.importReview.grouped.reviewValues", {
-                                count: row.fields.length,
-                              })}
-                            </summary>
-                            <Table
-                              aria-label={t("settings.importReview.grouped.rowValues", {
-                                name: row.item.source.label,
-                              })}
-                            >
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>{t("settings.importReview.grouped.field")}</TableHead>
-                                  <TableHead>{t("settings.importReview.grouped.original")}</TableHead>
-                                  <TableHead>{t("settings.importReview.grouped.currentValue")}</TableHead>
-                                  <TableHead>{t("settings.importReview.grouped.before")}</TableHead>
-                                  <TableHead>{t("settings.importReview.grouped.after")}</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {row.fields.map((entry) => (
-                                  <TableRow key={entry.field.key}>
-                                    <TableCell>{entry.field.label}</TableCell>
-                                    <TableCell>
-                                      {entry.sourceValue ?? t("settings.importReview.unknown")}
-                                    </TableCell>
-                                    <TableCell>
-                                      <p>{entry.value ?? t("settings.importReview.unknown")}</p>
-                                      <p className="text-sm text-muted-foreground">
-                                        {t(
-                                          entry.value === entry.sourceValue
-                                            ? "settings.importReview.grouped.sourceValue"
-                                            : "settings.importReview.grouped.proposedValue",
-                                        )}
-                                      </p>
-                                    </TableCell>
-                                    <TableCell>{confirmedLabel(entry.beforeConfirmed)}</TableCell>
-                                    <TableCell>{confirmedLabel(entry.afterConfirmed)}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </details>
-                        </div>
+                        </details>
                       </TableCell>
-                      <TableCell>{t(`settings.importReview.filter.${row.beforeState}`)}</TableCell>
-                      <TableCell>{t(`settings.importReview.filter.${row.afterState}`)}</TableCell>
                       <TableCell>
                         {saved ? t("settings.importReview.grouped.rowSaved") : (
                           <Button

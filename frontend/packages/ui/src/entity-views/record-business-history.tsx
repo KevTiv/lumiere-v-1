@@ -7,7 +7,7 @@ import {
   BusinessHistoryReadError, useBusinessHistory, useBusinessHistoryActivity, useBusinessHistorySources,
 } from "@lumiere/query-hooks/hooks/business-history";
 import {
-  businessHistoryActivityScopeReady, businessHistoryScopeReady, canonicalBusinessHistoryResource, mergeBusinessHistoryPages,
+  businessHistoryActivityScopeReady, businessHistoryScopeReady, canonicalBusinessHistoryResource, mergeBusinessHistoryPages, validBusinessHistoryEventId,
   type BusinessHistoryEntry, type BusinessHistorySource,
 } from "@lumiere/query-hooks/hooks/business-history-model";
 import { validHistoryId } from "@lumiere/query-hooks/hooks/account-move-history-model";
@@ -156,13 +156,18 @@ export interface ModuleBusinessHistoryProps {
   moduleId: string;
   className?: string;
   renderRecordLink?: (entry: BusinessHistoryEntry & { resource?: string; recordId?: string }) => ReactNode;
+  renderEventLink?: (entry: BusinessHistoryEntry, companyId: string) => ReactNode;
+  selection?: { eventId: string; companyId: string };
 }
 
 /** Module feeds share the exact scope/cache/error handling used by record history. */
-export function ModuleBusinessHistory({ moduleId, className, renderRecordLink }: ModuleBusinessHistoryProps) {
+export function ModuleBusinessHistory({ moduleId, className, renderRecordLink, renderEventLink, selection }: ModuleBusinessHistoryProps) {
+  const { t } = useTranslation();
   const authority = useHistoryAuthority();
-  const scope = { ...authority.scope, module: moduleId };
-  const allowed = authority.allowed && businessHistoryActivityScopeReady(scope);
+  const scope = { ...authority.scope, module: moduleId, eventId: selection?.eventId };
+  const selectionInvalid = selection && (!validBusinessHistoryEventId(selection.eventId)
+    || !validHistoryId(selection.companyId) || selection.companyId !== scope.companyId);
+  const allowed = authority.allowed && !selectionInvalid && businessHistoryActivityScopeReady(scope);
   const query = useBusinessHistoryActivity(scope, allowed);
   let state = stateFor(authority.ready, allowed, query);
   let entries: BusinessHistoryEntry[] = [];
@@ -170,11 +175,16 @@ export function ModuleBusinessHistory({ moduleId, className, renderRecordLink }:
     try { entries = mergeBusinessHistoryPages(query.data?.pages ?? []); }
     catch { state = "error"; }
   }
+  if (selection && authority.ready && (selectionInvalid || (state === "ready" && entries.length === 0))) {
+    return <p role="status" className="text-sm text-muted-foreground">{t("businessHistory.eventUnavailable")}</p>;
+  }
   return <RecordChangeHistory state={state} variant="activity" entries={entries}
     className={className} coverage={query.data?.pages[0]?.coverage}
     hasMore={query.hasNextPage} loadingMore={query.isFetchingNextPage}
     isRefreshing={Boolean(query.isFetching && !query.isPending && !query.isFetchingNextPage)}
     onLoadMore={() => { void query.fetchNextPage(); }}
     onRefresh={allowed ? () => { void query.refetch(); } : undefined}
+    selectedEventId={selection?.eventId}
+    renderEventLink={renderEventLink && ((entry) => renderEventLink(entry, scope.companyId))}
     renderRecordLink={renderRecordLink} />;
 }

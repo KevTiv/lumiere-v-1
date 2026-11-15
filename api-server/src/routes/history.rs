@@ -66,10 +66,20 @@ struct HistoryQuery {
     company_id: u64,
     cursor: Option<String>,
     limit: Option<u32>,
+    event_id: Option<String>,
 }
 
 impl HistoryQuery {
     fn validate(&self, record_id: u64) -> Result<usize, ApiError> {
+        if self.event_id.is_some() {
+            return Err(ApiError::BadRequest(
+                "eventId is only supported for module activity".into(),
+            ));
+        }
+        self.validate_page(record_id)
+    }
+
+    fn validate_page(&self, record_id: u64) -> Result<usize, ApiError> {
         let limit = self.limit.unwrap_or(MAX_PAGE_SIZE);
         if self.company_id == 0 || record_id == 0 || !(1..=MAX_PAGE_SIZE).contains(&limit) {
             return Err(ApiError::BadRequest(

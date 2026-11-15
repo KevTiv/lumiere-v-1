@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import en from "../../../i18n/src/locales/en.json";
 
 const control = vi.hoisted(() => ({
-  actor: "ab".repeat(32), company: 11, missing: false, denied: false, fetch: vi.fn(),
+  actor: "ab".repeat(32), company: 11, missing: false, denied: false, predecessorMissing: false, fetch: vi.fn(),
 }));
 vi.mock("@lumiere/erp-session", () => ({ useErpSession: () => ({ identity: control.actor }) }));
 vi.mock("@lumiere/ui/hooks/use-identity-label-map", () => ({ useIdentityLabelMap: () => new Map() }));
@@ -24,13 +24,16 @@ import { ImportReviewPanel } from "../../../../web/lib/import-review-workspace";
 const batch = { id: "24", title: "Saved workbook", targetEntity: "source_observation", sourceFile: "history.csv", total: 1, pending: 0, confirmed: 1, excluded: 0 };
 const item = { id: "700", state: "confirmed", revision: 5, values: { amount: "999.99" }, confirmedFields: ["amount"], reason: "Current revision",
   reviewedBy: "ab".repeat(32), reviewedAt: "2026-11-05T12:00:00Z",
-  source: { key: "row1", label: "Historical source row", source: { file: "history.csv", row: 8, sha256: "cd".repeat(32) }, issue: "Confirmed source",
+  source: { key: "row1", businessDate: { precision: "day", from: "2022-06-13", toExclusive: "2022-06-14" }, label: "Historical source row", source: { file: "history.csv", row: 8, sha256: "cd".repeat(32) }, issue: "Confirmed source",
     fields: [{ key: "amount", label: "Recorded amount", kind: "decimal", required: true, sourceValue: "111.25" }], proposed: { amount: "111.25" } } };
 const revision = (number: number) => ({ itemId: "700", revision: number, values: { amount: number === 3 ? "111.25" : "999.99" },
-  confirmedFields: ["amount"], state: "confirmed", reason: number === 3 ? "Accepted for this import" : "Current revision", actor: "ab".repeat(32), createdAt: "2026-11-05T11:00:00Z" });
+  confirmedFields: ["amount"], state: "confirmed", reason: number === 3 ? "Accepted for this import" : "Current revision", actor: "ab".repeat(32), createdAt: "2026-11-05T11:00:00Z",
+  previousValues: control.predecessorMissing ? null : { amount: "102.50" },
+  previousConfirmedFields: control.predecessorMissing ? null : [],
+  previousState: control.predecessorMissing ? null : "needs_review" });
 
 beforeEach(() => {
-  control.actor = "ab".repeat(32); control.company = 11; control.missing = false; control.denied = false; control.fetch.mockReset();
+  control.actor = "ab".repeat(32); control.company = 11; control.missing = false; control.denied = false; control.predecessorMissing = false; control.fetch.mockReset();
   window.history.replaceState(null, "", "/settings?section=imports&sourceReview=24&sourceReviewCompany=11&sourceReviewItem=700&sourceReviewRevision=3#source-review-history");
   control.fetch.mockImplementation(async (path: string) => {
     const url = new URL(path, "https://erp.test");
@@ -53,12 +56,26 @@ describe("pinned source review history", () => {
   it("loads the exact imported revision and its values when the current item is newer", async () => {
     open();
     expect(await screen.findByText("111.25")).toBeTruthy();
-    expect(screen.getByText("Review item 700 · saved revision 3 ·", { exact: false })).toBeTruthy();
+    expect(screen.getByText("Review item 700 · saved revision 3")).toBeTruthy();
+    expect(screen.getByText("102.50").closest("[data-diff-mark]")?.getAttribute("data-diff-mark")).toBe("removed");
+    expect(screen.getByText("111.25").closest("[data-diff-mark]")?.getAttribute("data-diff-mark")).toBe("added");
+    expect(screen.getByText("Unconfirmed")).toBeTruthy();
+    expect(screen.getByText("Accepted for this import", { exact: false })).toBeTruthy();
+    expect(screen.getByText(/Business date · 2022-06-13/)).toBeTruthy();
     expect(screen.queryByText("999.99")).toBeNull();
     expect(screen.queryByText("Current revision")).toBeNull();
     expect(control.fetch.mock.calls.some(([path]) => String(path).includes("/24/items/700/history?companyId=11&beforeRevision=4"))).toBe(true);
     expect(document.getElementById("source-review-history")?.hasAttribute("open")).toBe(true);
     expect(screen.queryByRole("button", { name: /Undo/ })).toBeNull();
+  });
+
+  it("keeps saved values visible when the exact preceding revision is unavailable", async () => {
+    control.predecessorMissing = true;
+    open();
+    const saved = await screen.findByText("111.25");
+    expect(saved.closest("[data-diff-mark]")).toBeNull();
+    expect(screen.getAllByText("Value not recorded")).toHaveLength(3);
+    expect(screen.queryByText("102.50")).toBeNull();
   });
 
   it("shows unavailable instead of substituting another saved revision or current values", async () => {

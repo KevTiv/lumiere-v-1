@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react"
 import {
   afterAll,
@@ -208,13 +209,124 @@ describe("AI action draft readback", () => {
         }}
       />,
     )
+    expect(screen.getByRole("status").textContent).toBe("Applied")
     expect(screen.getByText("Created record #9007199254740993")).toBeTruthy()
+    expect(screen.getByText("Proposed changes")).toBeTruthy()
+    expect(screen.getByText("Proposed value")).toBeTruthy()
+    expect(screen.queryByTestId("ai-action-draft-reviewed")).toBeNull()
     expect(
       screen
         .getByRole("link", { name: "Open created record" })
         .getAttribute("href"),
     ).toBe("/sales?tab=orders&filter=id%3A9007199254740993")
     expect(screen.queryByTestId("ai-action-draft-approve")).toBeNull()
+  })
+
+  it("uses current readback for decisions and timestamps", async () => {
+    const staleDraft = {
+      ...draft,
+      status: "approved",
+      executionRecordId: "9007199254740993",
+      executionRecordHref: "/sales?tab=orders&filter=id%3A9007199254740993",
+      executedAt: "2026-09-03T11:12:13.456789Z",
+    } as const
+    const approved = {
+      ...draft,
+      status: "approved",
+      proposedAt: "2026-09-01T11:12:13.456789Z",
+      reviewedAt: "2026-09-02T11:12:13.456789Z",
+    } as const
+    const onRefresh = vi.fn(async () => approved)
+    const { container } = render(
+      <AiActionDraftCard draft={staleDraft} onRefresh={onRefresh} />,
+    )
+
+    expect(screen.getByRole("status").textContent).toBe("Checking saved draft…")
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toBe("Approved"),
+    )
+    expect(
+      screen.queryByRole("link", { name: "Open created record" }),
+    ).toBeNull()
+    expect(
+      [...container.querySelectorAll("time")].map(
+        (element) => element.dateTime,
+      ),
+    ).toEqual([approved.proposedAt, approved.reviewedAt])
+  })
+
+  it("renders the applied result from the exact approval response", async () => {
+    const executedAt = "2026-09-02T11:12:13.456789Z"
+    const onApprove = vi.fn(async () => ({
+      ...draft,
+      status: "approved" as const,
+      executionRecordId: 202,
+      executedAt,
+    }))
+    const { container } = render(
+      <AiActionDraftCard
+        draft={draft}
+        onApprove={onApprove}
+        onRefresh={async () => draft}
+      />,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toBe("Awaiting review"),
+    )
+    fireEvent.click(screen.getByTestId("ai-action-draft-reviewed"))
+    fireEvent.click(approveButton())
+    await screen.findByText("Created record #202")
+    expect(screen.getByRole("status").textContent).toBe("Applied")
+    expect(container.querySelector("time")?.dateTime).toBe(executedAt)
+    expect(screen.queryByTestId("ai-action-draft-approve")).toBeNull()
+  })
+
+  it("preserves source values and renders reversal inputs without inventing a prior value", () => {
+    render(
+      <AiActionDraftCard
+        draft={{
+          ...draft,
+          reducerName: "reverse_payment_transaction",
+          paramsJson: {
+            transactionId: "9007199254740993",
+            reason: "  Duplicate charge  ",
+          },
+        }}
+      />,
+    )
+    const diff = screen.getByTestId("history-field-diff")
+    const priorValues = diff.querySelectorAll('[data-value-kind="unavailable"]')
+    expect(priorValues).toHaveLength(2)
+    expect(diff.querySelector("[data-diff-mark]")).toBeNull()
+    expect(within(diff).getByText("Payment transaction")).toBeTruthy()
+    expect(within(diff).getByText("9007199254740993")).toBeTruthy()
+    expect(within(diff).getByText("Duplicate charge").textContent).toBe(
+      "  Duplicate charge  ",
+    )
+  })
+
+  it("shows the supplied creation parameters as additions without filling omitted fields", () => {
+    render(
+      <AiActionDraftCard
+        draft={{
+          ...draft,
+          paramsJson: {
+            partnerId: 9,
+            note: "",
+            clientOrderRef: null,
+            orderLines: [{ priceUnit: "12.3400" }],
+          },
+        }}
+      />,
+    )
+    const diff = screen.getByTestId("history-field-diff")
+    expect(diff.querySelectorAll('[data-value-kind="absent"]')).toHaveLength(4)
+    expect(diff.querySelectorAll('[data-diff-mark="added"]')).toHaveLength(4)
+    expect(within(diff).getByText("Customer (partner)")).toBeTruthy()
+    expect(within(diff).getByText(/12.3400/)).toBeTruthy()
+    expect(within(diff).getByText("Empty text")).toBeTruthy()
+    expect(within(diff).getByText("No value")).toBeTruthy()
+    expect(within(diff).queryByText("Currency")).toBeNull()
   })
 
   it("names the proposed effect from the supported action rather than the model summary", () => {
