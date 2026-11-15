@@ -844,20 +844,16 @@ pub async fn post_rag(
         None
     } else {
         Some(
-            async {
-                state.vector_store.check_ready().await?;
-                super::context::admitted_query_vector(
-                    &state,
-                    &actor,
-                    org_id,
-                    req.company_id,
-                    &req.query,
-                    "rag",
-                    Some(&agent),
-                    Some("rag_generation"),
-                )
-                .await
-            }
+            super::context::admitted_query_vector(
+                &state,
+                &actor,
+                org_id,
+                req.company_id,
+                &req.query,
+                "rag",
+                Some(&agent),
+                Some("rag_generation"),
+            )
             .await,
         )
     };
@@ -871,6 +867,14 @@ pub async fn post_rag(
             // Stop the chat turn when the skill has been disabled.
             return Err(AppError::SkillUnavailable(crate::error::SkillUnavailable));
         }
+        tracing::warn!(
+            org_id,
+            company_id = req.company_id,
+            stage = error
+                .downcast_ref::<super::context::QueryEmbeddingStage>()
+                .map_or("unknown", |stage| stage.0),
+            "Chat query embedding unavailable"
+        );
     }
     let mut retrieval_degraded = false;
     let company_result = match &query_vector {

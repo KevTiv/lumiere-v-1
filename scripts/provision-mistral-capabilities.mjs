@@ -105,7 +105,7 @@ function permits(actions, action) {
   return false
 }
 
-async function inspectCapabilities(config, client, now) {
+async function inspectCapabilities(config, client, now, requireExistingBindings) {
   const org = config.organizationId, companyId = config.companyId, agentId = config.agentId
   await client.verifyTarget(org)
   const writerIdentity = await client.writerIdentity()
@@ -192,11 +192,13 @@ async function inspectCapabilities(config, client, now) {
     check(inherited.length <= 1, 'duplicate organization skill bindings')
     const previous = scoped[0]
     check((previous ?? inherited[0])?.is_enabled !== false, 'skill is explicitly disabled')
+    if (requireExistingBindings) check(previous?.is_enabled === true, `enabled company binding required for ${surface.skillKey}`)
     const priorSettings = previous ?? inherited[0]
     const settings = priorSettings ? parsedObject(priorSettings.config_json, 'skill settings') : {}
     for (const key of ['defaultAgentId', 'default_agent_id']) check(settings[key] == null || Number(settings[key]) === agentId, 'skill is bound to another agent')
     for (const key of ['intelligencePolicyRef', 'intelligence_policy_ref']) check(settings[key] == null || settings[key] === config.intelligencePolicyRef, 'skill is bound to another policy')
     if (!previous || settings.defaultAgentId !== agentId || settings.intelligencePolicyRef !== config.intelligencePolicyRef) {
+      check(!requireExistingBindings, `confirmed company binding required for ${surface.skillKey}`)
       bindingWrites.push({ company_id: some(companyId), skill_id: surface.skillId, is_enabled: true,
         config_json: JSON.stringify({ ...settings, defaultAgentId: agentId, intelligencePolicyRef: config.intelligencePolicyRef }),
         custom_instructions: priorSettings?.custom_instructions ?? none(), tool_overrides: priorSettings?.tool_overrides ?? [], metadata: priorSettings?.metadata ?? none() })
@@ -213,16 +215,16 @@ async function inspectCapabilities(config, client, now) {
     if (!latest) { priceWrites.push({ model: meter.model, unit: meter.unit, currency: config.currency, units_per_1_k: meter.unitsPer1k }); missing.push(`meter:${meter.model}:${meter.unit}`) }
   }
   missing.unshift(...capabilityWrites.map(write => `${write.reducer}:${write.item}`))
-  if (capabilityWrites.length) {
+  if (capabilityWrites.length || (requireExistingBindings && priceWrites.length)) {
     check(typeof client.verifyActivationAuthority === 'function', 'native operator authority and deployed toggle schema probe required before capability writes')
     await client.verifyActivationAuthority(org, agentId, priceWrites.length > 0)
   }
   return { bindingWrites, priceWrites, capabilityWrites, originalAgent, budgets: structuredClone(budgets), missing, billingPeriod: period }
 }
 
-export async function provisionCapabilities(config, client, apply = false, now = new Date()) {
+export async function provisionCapabilities(config, client, apply = false, now = new Date(), { requireExistingBindings = false } = {}) {
   validateManifest(config)
-  const inspection = await inspectCapabilities(config, client, now)
+  const inspection = await inspectCapabilities(config, client, now, requireExistingBindings)
   if (apply) {
     // Every structural prerequisite was checked before the first mutation.
     // An uncertain response stops immediately; check durable state before retry.
@@ -237,7 +239,7 @@ export async function provisionCapabilities(config, client, apply = false, now =
     }
     for (const price of inspection.priceWrites) await client.call('configure_ai_metered_price', [config.organizationId, config.agentId, price])
     for (const binding of inspection.bindingWrites) await client.call('upsert_ai_skill_config', [config.organizationId, binding])
-    const verified = await inspectCapabilities(config, client, now)
+    const verified = await inspectCapabilities(config, client, now, requireExistingBindings)
     check(verified.missing.length === 0, 'provisioned capability readback differs; inspect durable state before retry')
     check(JSON.stringify(budgetSnapshot(verified.budgets)) === JSON.stringify(budgetSnapshot(inspection.budgets)),
       'pool readback changed during provisioning; inspect durable state before retry')
@@ -247,16 +249,51 @@ export async function provisionCapabilities(config, client, apply = false, now =
     missing: apply ? [] : inspection.missing, billableCalls: 0, deploymentAcceptance: false }
 }
 
+export async function provisionChatRetrieval(input, client, apply = false, now = new Date()) {
+  fields(input, ['version', 'organizationId', 'companyId', 'agentId', 'currency', 'pricesReviewedAt', 'unitsPer1k'], 'chat retrieval manifest')
+  check(input.version === 1, 'unsupported manifest version')
+  const { organizationId, companyId, agentId, unitsPer1k, ...settings } = input
+  id(organizationId, 'organizationId')
+  id(companyId, 'companyId')
+  id(agentId, 'agentId')
+  const skillKey = 'rag_generation'
+  await client.verifyTarget(organizationId)
+  const catalog = scope => client.sql(`SELECT id, organization_id, skill_key, is_active FROM ai_skill WHERE organization_id = ${scope} AND skill_key = '${skillKey}' LIMIT 2`)
+  const scoped = await catalog(organizationId)
+  const scope = scoped.length ? organizationId : 0
+  const skill = one(scoped.length ? scoped : await catalog(scope), `${skillKey} catalog entry`)
+  check(Number(skill.organization_id) === scope && skill.skill_key === skillKey && skill.is_active === true, 'effective chat skill must be active')
+  const skillId = id(Number(skill.id), 'skillId')
+  const rows = await client.sql(`SELECT * FROM ai_skill_config WHERE organization_id = ${organizationId} AND skill_id = ${skillId}`)
+  const binding = one(rows.filter(row => Number(unwrap(row.company_id)) === companyId), 'company chat binding')
+  check(Number(binding.organization_id) === organizationId && Number(binding.skill_id) === skillId
+    && binding.is_enabled === true, 'company chat binding must be active and in scope')
+  const config = parsedObject(binding.config_json, 'chat binding settings')
+  check(config.defaultAgentId === agentId, 'company chat binding must use the requested agent')
+
+  return provisionCapabilities({
+    ...settings, organizationId, companyId, agentId, intelligencePolicyRef: config.intelligencePolicyRef,
+    surfaces: [{ skillKey, skillId }],
+    agentCapabilities: { addModels: ['mistral-embed'], addActions: ['embedding_query'] },
+    meters: [{ model: 'mistral-embed', unit: 'tokens', unitsPer1k }],
+  }, client, apply, now, { requireExistingBindings: true })
+}
+
 async function main() {
-  const [mode, filename, ...extra] = process.argv.slice(2)
-  check(['--plan', '--check', '--apply'].includes(mode) && filename && extra.length === 0,
-    'usage: node scripts/provision-mistral-capabilities.mjs --plan|--check|--apply manifest.json|--env')
-  const raw = filename === '--env' ? process.env.MISTRAL_CAPABILITIES_MANIFEST_JSON : await readFile(filename, 'utf8')
+  const [mode, target, manifestPath, ...extra] = process.argv.slice(2)
+  const chatRetrieval = target === '--chat-retrieval'
+  const filename = chatRetrieval ? manifestPath : target
+  check(['--plan', '--check', '--apply'].includes(mode) && filename && extra.length === 0
+    && (chatRetrieval ? mode !== '--plan' : !manifestPath),
+    'usage: node scripts/provision-mistral-capabilities.mjs --plan|--check|--apply manifest.json|--env, or --check|--apply --chat-retrieval manifest.json|--env')
+  const envKey = chatRetrieval ? 'MISTRAL_CHAT_RETRIEVAL_MANIFEST_JSON' : 'MISTRAL_CAPABILITIES_MANIFEST_JSON'
+  const raw = filename === '--env' ? process.env[envKey] : await readFile(filename, 'utf8')
   check(typeof raw === 'string' && raw.trim(), 'missing capability manifest')
   let config
   try { config = JSON.parse(raw) } catch { throw new Error('manifest contains invalid JSON') }
+  const provision = chatRetrieval ? provisionChatRetrieval : provisionCapabilities
   const result = mode === '--plan' ? planCapabilities(config)
-    : await provisionCapabilities(config, httpClient(process.env), mode === '--apply')
+    : await provision(config, httpClient(process.env), mode === '--apply')
   console.log(JSON.stringify(result, null, 2))
   if (mode === '--check' && !result.ready) process.exitCode = 1
 }

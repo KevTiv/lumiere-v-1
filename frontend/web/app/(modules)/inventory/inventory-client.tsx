@@ -2,6 +2,7 @@
 
 import { ModuleBackfillRecords, useCanReadModuleBackfill } from '../../../components/module-backfill-records';
 import { moduleBackfillTabs } from '@/lib/module-backfill-navigation';
+import { InventoryOpsPanel } from './inventory-ops-panel';
 
 import { isInventoryWorkspaceReadEnabled } from '@lumiere/stdb/subscriptions';
 import { useStockMoveTabActions } from './stock-move-tab-actions';
@@ -20,12 +21,15 @@ import {
   withDashboardSections,
 } from '@lumiere/ui/lib/dashboard-sections';
 import { withInlineEdits } from '@lumiere/ui/lib/with-inline-edits';
-import { formatTimestampLike, getRowField, humanizeEnumValue, unwrapEntityValue } from '@lumiere/ui/lib/entity-row-values';
+import { getRowField, unwrapEntityValue } from '@lumiere/ui/lib/entity-row-values';
 import type { EntityRow } from '@lumiere/ui/lib/entity-view-types';
 import { inlineNumberAtLeast, requiredInlineText } from '@/lib/inline-edit-params';
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { canUseModuleData, mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
+import { EmptyStateCard } from '@lumiere/ui/components/empty-state-card';
+import { Skeleton } from '@lumiere/ui/components/skeleton';
+import { workspaceStyles } from '@lumiere/ui/lib/workspace-styles';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { OwnerQueueScope } from '../../../components/owner-queue-scope';
@@ -33,7 +37,6 @@ import { buildWarehouse3DView } from '@lumiere/erp-shared/warehouse-3d-from-api'
 import { stockReorderQueue, scopedStockRows, inventoryQuantity } from '@lumiere/erp-shared/replenishment-stock';
 import { isOwnerQueue } from '@/lib/owner-queues';
 import { useTranslation } from '@lumiere/i18n';
-import type { TFunction } from 'i18next';
 import {
   ModuleView,
   useRBAC,
@@ -53,7 +56,6 @@ import {
   newQualityAlertForm,
   assignQualityAlertForm,
   solveQualityAlertForm,
-  blockSerialForm,
   serialDetailForm,
   lotDetailForm,
   newTraceabilityRecordForm,
@@ -115,7 +117,9 @@ import { prepareProductCreate } from './product-create';
 import { warehouseSetup, withWarehouseSetup } from './warehouse-setup';
 import { WarehouseSetupNotice } from './warehouse-setup-notice';
 import {
+  STOCK_LOCATION_FILTER_KEY,
   WAREHOUSE_TAB_IDS,
+  inventoryOperationalTable,
   warehouseDataStates,
   warehouseRows,
   warehouseTransferRows,
@@ -141,6 +145,7 @@ import { completedTransferCounts, inventoryCategoryCounts, inventoryStockValue, 
 import { groupBy } from '@/lib/utils';
 import { transferRecordHref } from './transfer-record';
 import { isStockMoveDestination, stockQuantMoveInput } from './stock-quant-move-model';
+import { SerialBlockRecordAction, trackingDetailConfig } from './tracking-record-sheet';
 
 import {
   useProducts,
@@ -273,44 +278,6 @@ function recordPickerFields(
   return picked.sections[0].fields;
 }
 
-function TrackingDetailValue({ value }: { value: unknown }) {
-  return (
-    <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm text-foreground">
-      {typeof value === 'string' && value ? value : '—'}
-    </p>
-  );
-}
-
-function withTrackingDetailValues(
-  config: FormConfig,
-  row: EntityRow,
-  warehouse: boolean,
-  t: TFunction,
-): FormConfig {
-  return {
-    ...config,
-    sections: config.sections.map((section) => ({
-      ...section,
-      fields: section.fields.map((field): FormField => {
-        const key = warehouse && field.name === 'productId'
-          ? 'warehouseProductName'
-          : warehouse && field.name === 'locationId'
-            ? 'warehouseLocationName'
-            : field.name;
-        const raw = unwrapEntityValue(getRowField(row, key));
-        const value = field.name === 'expirationDate'
-          ? formatTimestampLike(raw)?.toLocaleDateString()
-          : typeof raw === 'boolean'
-            ? t(raw ? 'common.yes' : 'common.no')
-            : typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'bigint'
-              ? field.name === 'state' ? humanizeEnumValue(String(raw)) : String(raw)
-              : undefined;
-        return { ...field, type: 'custom', component: TrackingDetailValue, defaultValue: value };
-      }),
-    })),
-  };
-}
-
 import { rowState } from './inventory-tab-actions';
 
 type InventoryCsvImportKind =
@@ -377,7 +344,7 @@ import { withDefaultsFromRow } from '@/lib/prefill-form-config';
 import {
   CycleCountWizard,
   LocationHierarchyPanel,
-  QualityAlertsPanel,
+  useQualityAlertTableConfig,
 } from './cycle-count-wizard';
 import { buildEntitySelection } from '@lumiere/query-hooks/ai-ui-context';
 import { useOpenErpAiChat } from '@/lib/erp-ai-context';
@@ -401,21 +368,39 @@ import type {
   CreateStockQuantParams,
   CreateWarehouse3DZoneParams,
 } from '@lumiere/stdb/types';
-import { scalarToU64 } from '@lumiere/erp-shared/u64';
+import { parseStrictU64, scalarToU64 } from '@lumiere/erp-shared/u64';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@lumiere/ui/components/select';
+
+function InventoryViewLoading() {
+  const { t } = useTranslation();
+  return (
+    <div role="status" className="space-y-3">
+      <span className="sr-only">{t('common.loading')}</span>
+      <Skeleton aria-hidden="true" className="h-6 w-48 max-w-full motion-reduce:animate-none" />
+      <Skeleton aria-hidden="true" className="h-40 w-full motion-reduce:animate-none" />
+    </div>
+  );
+}
 
 // WarehouseViewer uses Three.js — must be loaded client-side only, imported directly to avoid SSR barrel evaluation
 const WarehouseViewer = dynamic(
   () => import('@lumiere/ui/stock-3d/warehouse-viewer'),
   {
     ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
-        Loading 3D viewer…
-      </div>
-    ),
+    loading: InventoryViewLoading,
   },
 );
+
+const INVENTORY_OPERATIONAL_LISTS = new Set([
+  'stock',
+  'transfers',
+  'stock-moves',
+  'lots',
+  'serials',
+  'cycle-counts',
+  'quality',
+]);
+const NO_REFERENCE_ROWS: readonly EntityRow[] = [];
 
 interface InventoryClientProps {
   /** Bounded workspaces reuse Inventory's existing commands, forms and dialogs. */
@@ -518,15 +503,6 @@ function InventoryClientLoaded({
     useState<ScalarId | null>(null);
   const [solveQualityAlertId, setSolveQualityAlertId] =
     useState<ScalarId | null>(null);
-  const [selectedSerialRow, setSelectedSerialRow] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
-  const [selectedLotRow, setSelectedLotRow] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
-  const [blockSerialId, setBlockSerialId] = useState<ScalarId | null>(null);
   // Sync the active tab with `?tab=` so record links (e.g. a receipt's
   // `/inventory?tab=transfers&filter=id:…`) land on the right tab.
   const inventoryTabIds = useMemo(
@@ -539,7 +515,7 @@ function InventoryClientLoaded({
     ],
     [canReadBackfill, t, workspace],
   );
-  const { activeTab, setActiveTab } = useModuleTab(
+  const { activeTab, setActiveTab, navigateToTab } = useModuleTab(
     workspace === 'products' ? 'products' : workspace === 'warehouse' ? 'stock' : 'dashboard',
     inventoryTabIds,
   );
@@ -548,9 +524,6 @@ function InventoryClientLoaded({
   const lowStockQueue = workspace === 'warehouse' && isOwnerQueue('lowStockProducts', activeTab, searchParams.get('ownerQueue'));
   const [wizardCycleCountId, setWizardCycleCountId] = useState<ScalarId | ''>(
     '',
-  );
-  const [stockLocationFilter, setStockLocationFilter] = useState<string | null>(
-    null,
   );
   const [createQualityAlertOpen, setCreateQualityAlertOpen] = useState(false);
   const [supplierLineProductId, setSupplierLineProductId] =
@@ -584,6 +557,10 @@ function InventoryClientLoaded({
   const adjustments = adjustmentsRead.rows;
   const locationsRead = moduleCollection(useStockLocations(orgId, undefined, readEnabled('stock-locations'), operatingCompanyId));
   const locations = locationsRead.rows;
+  const referenceProducts = productsRead.state.status === 'ready' ? products : NO_REFERENCE_ROWS;
+  const referenceCategories = productCategoriesRead.state.status === 'ready' ? productCategories : NO_REFERENCE_ROWS;
+  const referenceLocations = locationsRead.state.status === 'ready' ? locations : NO_REFERENCE_ROWS;
+  const referenceUoms = uomsRead.state.status === 'ready' ? uoms : NO_REFERENCE_ROWS;
   const setup = warehouseSetup({
     organizationId: orgId,
     companyId: operatingCompanyId,
@@ -597,8 +574,9 @@ function InventoryClientLoaded({
   const serialsRead = moduleCollection(useStockProductionSerials(orgId, undefined, readEnabled('stock-production-serials'), operatingCompanyId));
   const serials = serialsRead.rows;
   const qualityChecksRead = moduleCollection(useQualityChecks(orgId, undefined, readEnabled('quality-checks'), operatingCompanyId));
-  const qualityAlertsRead = moduleCollection(useQualityAlerts(orgId, undefined, workspace === 'inventory' && activeTab === 'quality-alerts', operatingCompanyId));
   const qualityChecks = qualityChecksRead.rows;
+  const qualityAlertsRead = moduleCollection(useQualityAlerts(orgId, undefined, activeTab === 'quality-alerts' && readEnabled('quality-alerts'), operatingCompanyId));
+  const qualityAlerts = qualityAlertsRead.rows;
   const { data: qualityTeams = [] } = useQualityTeams(orgId, undefined, readEnabled('quality-teams'));
   const cycleCountsRead = moduleCollection(useStockCycleCounts(orgId, undefined, readEnabled('stock-cycle-counts'), operatingCompanyId));
   const cycleCounts = cycleCountsRead.rows;
@@ -1042,18 +1020,6 @@ function InventoryClientLoaded({
     [t, products, qualityTeamOptions, transfers],
   );
 
-  const serialDetailModalConfig = useMemo((): FormConfig => {
-    const base = serialDetailForm(t);
-    if (!selectedSerialRow) return base;
-    return withTrackingDetailValues(base, selectedSerialRow, workspace === 'warehouse', t);
-  }, [t, selectedSerialRow, workspace]);
-
-  const lotDetailModalConfig = useMemo((): FormConfig => {
-    const base = lotDetailForm(t);
-    if (!selectedLotRow) return base;
-    return withTrackingDetailValues(base, selectedLotRow, workspace === 'warehouse', t);
-  }, [t, selectedLotRow, workspace]);
-
   const editProductModalConfig = useMemo(() => {
     if (!editProductRow) return editProductForm(t);
     return withDefaultsFromRow(editProductForm(t), editProductRow);
@@ -1117,6 +1083,32 @@ function InventoryClientLoaded({
   );
 
   const blockSerial = useSerialBlockWorkflow(orgId, workflowSurface, operatingCompanyId);
+  const canBlockSerial = permissionsReady !== false && checkPermission('stock_production_serial', 'write').allowed;
+  const serialRecordSheet = useMemo((): EntityRecordSheetConfig => ({
+    titleKey: 'name',
+    statusKey: 'state',
+    detailConfig: trackingDetailConfig(serialDetailForm(t), t),
+    auditTableName: 'stock_production_serial',
+    actions: (record, closeRecord) => {
+      const locked = unwrapEntityValue(getRowField(record, 'isLocked'));
+      const serialId = parseStrictU64(getRowField(record, 'id'));
+      if (!canBlockSerial || locked === true || serialId == null || serialId === 0n) return null;
+      return (
+        <SerialBlockRecordAction
+          key={String(serialId)}
+          serialId={String(serialId)}
+          pending={blockSerial.isPending}
+          block={blockSerial.block}
+          closeRecord={closeRecord}
+        />
+      );
+    },
+  }), [t, canBlockSerial, blockSerial.block, blockSerial.isPending]);
+  const lotRecordSheet = useMemo((): EntityRecordSheetConfig => ({
+    titleKey: 'name',
+    detailConfig: trackingDetailConfig(lotDetailForm(t), t),
+    auditTableName: 'stock_production_lot',
+  }), [t]);
 
   const createTraceabilityRecord = useCreateTraceabilityRecord(
     orgId,
@@ -1457,7 +1449,7 @@ function InventoryClientLoaded({
       formatProductDisplayName: workspace === 'products' ? undefined : inventoryProductPrimaryLabel,
       onEmptyAction: openCreateProduct,
     });
-    const base = workspace === 'products' ? productCatalogTable(table, productCategories, t) : table;
+    const base = workspace === 'warehouse' ? table : productCatalogTable(table, referenceCategories, t);
     const view = base.view as EntityTableConfig;
     return withInlineEdits(
       {
@@ -1496,7 +1488,7 @@ function InventoryClientLoaded({
         },
       },
     );
-  }, [t, openCreateProduct, updateProduct, workspace, productCategories, checkPermission, permissionsReady]);
+  }, [t, openCreateProduct, updateProduct, workspace, referenceCategories, checkPermission, permissionsReady]);
 
   const stockEntityConfig = useMemo((): EntityViewConfig => {
     const base = stockQuantsTableConfig(t, {
@@ -1589,58 +1581,11 @@ function InventoryClientLoaded({
     };
   }, [t, orgId, vendorNameById, workspace]);
 
-  const stockQuantRecordSheet = useMemo((): EntityRecordSheetConfig => {
-    const baseDetail = workspace === 'warehouse' ? warehouseStockDetail(stockQuantDetailConfig(t), t) : stockQuantDetailConfig(t);
-    const detailConfig = {
-      ...baseDetail,
-      sections: baseDetail.sections.map((section) =>
-        section.id === 'stock'
-          ? {
-              ...section,
-              fields: section.fields.map((field) => {
-                if (field.key === 'productId') {
-                  return {
-                    ...field,
-                    render: (
-                      _value: unknown,
-                      record: Record<string, unknown>,
-                    ) => {
-                      const productId = record.productId ?? record.product_id;
-                      if (productId == null) return '—';
-                      return (
-                        productLabelById.get(String(productId)) ?? '(deleted)'
-                      );
-                    },
-                  };
-                }
-                if (field.key === 'locationId') {
-                  return {
-                    ...field,
-                    render: (
-                      _value: unknown,
-                      record: Record<string, unknown>,
-                    ) => {
-                      const locationId =
-                        record.locationId ?? record.location_id;
-                      if (locationId == null) return '—';
-                      return (
-                        locationLabelById.get(String(locationId)) ?? '(deleted)'
-                      );
-                    },
-                  };
-                }
-                return field;
-              }),
-            }
-          : section,
-      ),
-    };
-    return {
-      titleKey: 'sheetTitle',
-      detailConfig,
-      auditTableName: 'stock_quant',
-    };
-  }, [t, productLabelById, locationLabelById, workspace]);
+  const stockQuantRecordSheet = useMemo((): EntityRecordSheetConfig => ({
+    titleKey: 'sheetTitle',
+    detailConfig: warehouseStockDetail(stockQuantDetailConfig(t), t),
+    auditTableName: 'stock_quant',
+  }), [t]);
 
   const locationRecordSheet = useMemo((): EntityRecordSheetConfig => ({
     titleKey: 'name',
@@ -1924,136 +1869,132 @@ function InventoryClientLoaded({
   }, [selectedWarehouse, warehouseZonesRead.rows, locations, scopedQuants, products, categoryByProduct, stockQueue]);
   const zones = warehouseView?.zones ?? [];
   const canMoveQuant = permissionsReady !== false && checkPermission('stock_quant', 'write').allowed;
-  const canManageZones = permissionsReady !== false && checkPermission('warehouse', 'write').allowed;
+  const canEditWarehouseZone = permissionsReady !== false && checkPermission('warehouse', 'write').allowed;
+  const canDeleteWarehouseZone = permissionsReady !== false && checkPermission('warehouse', 'delete').allowed;
 
   const warehouse3DTab = useMemo(
     () => ({
       id: '3d-view',
       label: t('inventory.3dView'),
       type: 'custom' as const,
-      customContent: warehouseViewerState.status === 'loading' || !isMounted ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          {t('inventory.warehouse3d.loading', { defaultValue: 'Loading warehouse data…' })}
-        </p>
+      customContent: !isMounted || warehouseViewerState.status === 'loading' ? <InventoryViewLoading /> : activeWarehouses.length === 0 ? (
+        <EmptyStateCard compact title={t('inventory.warehouse3d.noWarehouses', { defaultValue: 'No active warehouses in this company.' })} />
       ) : (
-        <div className="flex flex-col gap-3">
-          {activeWarehouses.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
-              <label htmlFor="warehouse-3d-selection">{t('inventory.forms.newWarehouse3dZone.fields.warehouseId')}</label>
-              <Select
-                value={selectedWarehouse ? String(selectedWarehouse.id) : ''}
-                onValueChange={(warehouseId) => {
-                  setWarehouseSelection(warehouseId);
-                  setMoveQuantRow(null);
-                  setQuickActionForm(null);
-                  cancelForm();
+        <div className="min-w-0 space-y-4">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
+            <label htmlFor="warehouse-3d-selection">{t('inventory.forms.newWarehouse3dZone.fields.warehouseId')}</label>
+            <Select
+              value={selectedWarehouse ? String(selectedWarehouse.id) : ''}
+              onValueChange={(warehouseId) => {
+                setWarehouseSelection(warehouseId);
+                setMoveQuantRow(null);
+                setQuickActionForm(null);
+                cancelForm();
+              }}
+            >
+              <SelectTrigger id="warehouse-3d-selection">
+                <SelectValue placeholder={t('inventory.warehouse3d.selectWarehouse', { defaultValue: 'Select a warehouse' })} />
+              </SelectTrigger>
+              <SelectContent>
+                {activeWarehouses.map((warehouse) => (
+                  <SelectItem key={String(warehouse.id)} value={String(warehouse.id)}>{warehouse.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {warehouseView && (canEditWarehouseZone || canDeleteWarehouseZone) ? (
+            <div className={workspaceStyles.actions}>
+              {canEditWarehouseZone && <Button
+                type="button"
+                size="sm"
+                onClick={() =>
+                  setQuickActionForm({
+                    form: warehouse3dZoneFormConfig,
+                    action: 'createWarehouse3dZone',
+                  })
+                }
+              >
+                {t('inventory.z3dActions.addZone')}
+              </Button>}
+              {canEditWarehouseZone && <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={zones.length === 0}
+                onClick={async () => {
+                  const values = await askForm({
+                    title: t('inventory.z3dActions.editZone'),
+                    fields: [
+                      {
+                        id: 'zoneId',
+                        name: 'zoneId',
+                        label: t('inventory.byRecord.zone', { defaultValue: 'Zone' }),
+                        type: 'select',
+                        required: true,
+                        options: recordOptions(zones, (zone) => zone.name || `#${zone.id}`),
+                      },
+                      {
+                        id: 'color',
+                        name: 'color',
+                        label: t('inventory.byRecord.color', { defaultValue: 'Color (hex)' }),
+                        type: 'text',
+                        placeholder: '#3b82f6',
+                      },
+                    ],
+                  });
+                  if (!values) return;
+                  const color = formText(values.color);
+                  try {
+                    await updateWarehouse3dZone.mutateAsync({
+                      zoneId: Number(values.zoneId),
+                      params: color ? { color } : {},
+                    });
+                  } catch (error) {
+                    showWorkflowToast({
+                      kind: 'error',
+                      title: t('inventory.z3dActions.editZone'),
+                      description:
+                        error instanceof Error ? error.message : undefined,
+                    });
+                  }
                 }}
               >
-                <SelectTrigger id="warehouse-3d-selection">
-                  <SelectValue placeholder={t('inventory.warehouse3d.selectWarehouse', { defaultValue: 'Select a warehouse' })} />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeWarehouses.map((warehouse) => (
-                    <SelectItem key={String(warehouse.id)} value={String(warehouse.id)}>{warehouse.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : <p className="text-sm text-muted-foreground">{t('inventory.warehouse3d.noWarehouses', { defaultValue: 'No active warehouses in this company.' })}</p>}
-          {warehouseView && canManageZones ? (
-          <div className="flex flex-wrap gap-2 shrink-0 items-center">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() =>
-                setQuickActionForm({
-                  form: warehouse3dZoneFormConfig,
-                  action: 'createWarehouse3dZone',
-                })
-              }
-            >
-              {t('inventory.z3dActions.addZone')}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={zones.length === 0}
-              onClick={async () => {
-                const values = await askForm({
-                  title: t('inventory.z3dActions.editZone'),
-                  fields: [
-                    {
-                    id: 'zoneId',
-                    name: 'zoneId',
-                    label: t('inventory.byRecord.zone', { defaultValue: 'Zone' }),
-                    type: 'select',
-                    required: true,
-                    options: recordOptions(zones, (zone) => zone.name || `#${zone.id}`),
-                  },
-                    {
-                      id: 'color',
-                      name: 'color',
-                      label: t('inventory.byRecord.color', { defaultValue: 'Color (hex)' }),
-                      type: 'text',
-                      placeholder: '#3b82f6',
-                    },
-                  ],
-                });
-                if (!values) return;
-                const color = formText(values.color);
-                try {
-                  await updateWarehouse3dZone.mutateAsync({
-                    zoneId: Number(values.zoneId),
-                    params: color ? { color } : {},
-                  });
-                } catch (error) {
-                  showWorkflowToast({
-                    kind: 'error',
-                    title: t('inventory.z3dActions.editZone'),
-                    description:
-                      error instanceof Error ? error.message : undefined,
-                  });
-                }
-              }}
-            >
-              {t('inventory.z3dActions.editZone')}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              disabled={zones.length === 0}
-              onClick={async () => {
-                const values = await askForm({
-                  title: t('inventory.z3dActions.deleteZone'),
-                  submitLabel: t('inventory.byRecord.deactivate', { defaultValue: 'Deactivate' }),
-                  fields: [{
-                    id: 'zoneId',
-                    name: 'zoneId',
-                    label: t('inventory.byRecord.zone', { defaultValue: 'Zone' }),
-                    type: 'select',
-                    required: true,
-                    options: recordOptions(zones, (zone) => zone.name || `#${zone.id}`),
-                  }],
-                });
-                if (!values) return;
-                try {
-                  await deleteWarehouse3dZone.mutateAsync(Number(values.zoneId));
-                } catch (error) {
-                  showWorkflowToast({
-                    kind: 'error',
+                {t('inventory.z3dActions.editZone')}
+              </Button>}
+              {canDeleteWarehouseZone && <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={zones.length === 0}
+                onClick={async () => {
+                  const values = await askForm({
                     title: t('inventory.z3dActions.deleteZone'),
-                    description:
-                      error instanceof Error ? error.message : undefined,
+                    submitLabel: t('inventory.byRecord.deactivate', { defaultValue: 'Deactivate' }),
+                    fields: [{
+                      id: 'zoneId',
+                      name: 'zoneId',
+                      label: t('inventory.byRecord.zone', { defaultValue: 'Zone' }),
+                      type: 'select',
+                      required: true,
+                      options: recordOptions(zones, (zone) => zone.name || `#${zone.id}`),
+                    }],
                   });
-                }
-              }}
-            >
-              {t('inventory.z3dActions.deleteZone')}
-            </Button>
-          </div>
+                  if (!values) return;
+                  try {
+                    await deleteWarehouse3dZone.mutateAsync(Number(values.zoneId));
+                  } catch (error) {
+                    showWorkflowToast({
+                      kind: 'error',
+                      title: t('inventory.z3dActions.deleteZone'),
+                      description:
+                        error instanceof Error ? error.message : undefined,
+                    });
+                  }
+                }}
+              >
+                {t('inventory.z3dActions.deleteZone')}
+              </Button>}
+            </div>
           ) : null}
           {warehouseView && stockQueue.incomplete > 0 ? (
             <p role="status" className="text-sm text-muted-foreground">
@@ -2061,7 +2002,7 @@ function InventoryClientLoaded({
             </p>
           ) : null}
           {warehouseView && warehouseView.zones.length > 0 ? (
-            <div className="h-[calc(100vh-14rem)] min-h-80">
+            <div className="h-[60dvh] min-h-72 min-w-0">
               <WarehouseViewer
                 key={String(selectedWarehouse?.id)}
                 zones={warehouseView.zones}
@@ -2076,22 +2017,26 @@ function InventoryClientLoaded({
                 } : undefined}
               />
             </div>
-          ) : warehouseView ? <p className="text-sm text-muted-foreground">{t('inventory.warehouse3d.noZones', { defaultValue: 'No 3D zones are set up for this warehouse.' })}</p> : null}
+          ) : warehouseView ? <EmptyStateCard compact title={t('inventory.warehouse3d.noZones', { defaultValue: 'No 3D zones are set up for this warehouse.' })} /> : null}
         </div>
       ),
     }),
     [
       activeWarehouses, selectedWarehouse, warehouseView, warehouseViewerState.status, zones, scopedQuants, stockQueue.incomplete,
-      canMoveQuant, canManageZones, t, isMounted, warehouse3dZoneFormConfig, updateWarehouse3dZone, deleteWarehouse3dZone, askForm, cancelForm,
+      canMoveQuant, canEditWarehouseZone, canDeleteWarehouseZone, t, isMounted, warehouse3dZoneFormConfig, updateWarehouse3dZone, deleteWarehouse3dZone, askForm, cancelForm,
     ],
   );
 
+  const cycleCountState = mergeModuleStates([
+    locationsRead.state, cycleCountsRead.state, productsRead.state, uomsRead.state,
+  ]);
+  const cycleCountLoading = cycleCountState.status === 'loading';
   const cycleCountWizardTab = useMemo(
     () => ({
       id: 'cycle-wizard',
       label: t('inventory.cycleCountWizard.tabLabel'),
       type: 'custom' as const,
-      customContent: (
+      customContent: cycleCountLoading ? <InventoryViewLoading /> : (
         <CycleCountWizard
           key={`${organizationId}:${operatingCompanyId ?? ''}:${currentUser?.id ?? ''}`}
           organizationId={organizationId}
@@ -2114,46 +2059,46 @@ function InventoryClientLoaded({
       products,
       uoms,
       wizardCycleCountId,
+      cycleCountLoading,
     ],
   );
 
+  const locationsLoading = locationsRead.state.status === 'loading';
+  const locationQuants = stockQuantsRead.state.status === 'ready' ? stockQuants : undefined;
   const locationHierarchyTab = useMemo(
     () => ({
       id: 'location-tree',
       label: t('inventory.locationTree.tabLabel'),
       type: 'custom' as const,
-      customContent: (
+      customContent: locationsLoading ? <InventoryViewLoading /> : (
         <LocationHierarchyPanel
           locations={locations}
-          quants={stockQuants}
-          onViewQuants={(locationId) => {
-            setStockLocationFilter(locationId);
-            setActiveTab('stock');
-          }}
+          quants={locationQuants}
+          onViewQuants={(locationId) => navigateToTab('stock', {
+            key: STOCK_LOCATION_FILTER_KEY,
+            value: locationId,
+          })}
         />
       ),
     }),
-    [t, locations, stockQuants],
+    [t, locations, locationsLoading, locationQuants, navigateToTab],
   );
 
+  const qualityAlertTableConfig = useQualityAlertTableConfig({
+    organizationId,
+    operatingCompanyId,
+    selectedCompanyId: operatingCompanyId,
+    onAssignAlert: setAssignQualityAlertId,
+    onSolveAlert: setSolveQualityAlertId,
+  });
   const qualityAlertsTab = useMemo(
     () => ({
       id: 'quality-alerts',
       label: t('inventory.qualityAlerts.tabLabel'),
-      type: 'custom' as const,
-      customContent: (
-        <QualityAlertsPanel
-          organizationId={organizationId}
-          operatingCompanyId={operatingCompanyId}
-          selectedCompanyId={operatingCompanyId}
-          alerts={qualityAlertsRead.rows}
-          isLoading={qualityAlertsRead.state.status === 'loading'}
-          onAssignAlert={(id) => setAssignQualityAlertId(id)}
-          onSolveAlert={(id) => setSolveQualityAlertId(id)}
-        />
-      ),
+      type: 'entity' as const,
+      entityConfig: inventoryOperationalTable(qualityAlertTableConfig, 'quality-alerts', [], t),
     }),
-    [organizationId, operatingCompanyId, qualityAlertsRead.rows, qualityAlertsRead.state.status, t],
+    [t, qualityAlertTableConfig],
   );
 
   const stockMoveTabActions = useStockMoveTabActions({
@@ -3160,6 +3105,18 @@ function InventoryClientLoaded({
       ...moduleConfig,
       tabs: [
         ...withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+          if (tab.id === 'ops' && workspace === 'inventory') {
+            return {
+              ...tab,
+              customContent: (
+                <InventoryOpsPanel
+                  organizationId={orgId}
+                  companyId={activeCompanyReady ? operatingCompanyId : undefined}
+                  productNames={productLabelById}
+                />
+              ),
+            };
+          }
           if (tab.id === 'products') {
             return withTransferActions({
               ...tab,
@@ -3183,8 +3140,8 @@ function InventoryClientLoaded({
               recordSheet: stockQuantRecordSheet,
             });
           }
-          if (tab.id === 'lots') return withTransferActions(tab);
-          if (tab.id === 'serials') return withTransferActions(tab);
+          if (tab.id === 'lots') return withTransferActions({ ...tab, recordSheet: lotRecordSheet });
+          if (tab.id === 'serials') return withTransferActions({ ...tab, recordSheet: serialRecordSheet });
           if (tab.id === 'adjustments') return withTransferActions(tab);
           if (tab.id === 'locations') return withTransferActions({ ...tab, recordSheet: locationRecordSheet });
           if (tab.id === 'cycle-counts') return withTransferActions(tab);
@@ -3220,11 +3177,21 @@ function InventoryClientLoaded({
     };
     if (workspace === 'products') return productCatalogWorkspace(configured, t);
     if (workspace === 'warehouse') return withWarehouseSetup(warehouseWorkspace(configured, t, locations), setup.status === 'ready');
-    return configured;
+    return {
+      ...configured,
+      tabs: configured.tabs.map((tab) => tab.entityConfig && INVENTORY_OPERATIONAL_LISTS.has(tab.id)
+        ? {
+            ...tab,
+            entityConfig: inventoryOperationalTable(tab.entityConfig, tab.id, referenceLocations, t),
+          }
+        : tab),
+    };
   }, [
     workspace,
     canReadBackfill,
     organizationId,
+    orgId,
+    activeCompanyReady,
     setup.status,
     stockMoveTabActions,
     inventoryCountTabActions,
@@ -3243,6 +3210,8 @@ function InventoryClientLoaded({
     locationHierarchyTab,
     qualityAlertsTab,
     warehouse3DTab,
+    lotRecordSheet,
+    serialRecordSheet,
     productFormConfig,
     warehouseFormConfig,
     transferFormConfig,
@@ -3312,6 +3281,7 @@ function InventoryClientLoaded({
     qualityTeamOptions,
     warehouses,
     locations,
+    referenceLocations,
     productCategories,
     pricelists,
     uomFieldOptions,
@@ -3320,57 +3290,41 @@ function InventoryClientLoaded({
     transfers,
   ]);
 
-  const filteredStockQuants = useMemo(() => {
-    const rows = lowStockQueue ? stockQueue.entries.flatMap((entry) => entry.rows) : stockQuants;
-    if (!stockLocationFilter) return rows;
-    return rows.filter((quant) => String(quant.locationId ?? '') === stockLocationFilter);
-  }, [lowStockQueue, stockLocationFilter, stockQueue, stockQuants]);
+  const scopedStockQuants = useMemo(
+    () => lowStockQueue ? stockQueue.entries.flatMap((entry) => entry.rows) : stockQuants,
+    [lowStockQueue, stockQueue, stockQuants],
+  );
 
   const data = useMemo(
     () => ({
-      products: (workspace === 'products' ? productCatalogRows(products, productCategories, uoms) : products).map((row) => ({
+      products: (workspace === 'warehouse' ? products : productCatalogRows(products, referenceCategories, referenceUoms)).map((row) => ({
         ...row,
         sheetTitle:
           inventoryProductPrimaryLabel(row) || String(row.name ?? row.id ?? ''),
       })),
-      stock: (workspace === 'warehouse' ? warehouseRows(filteredStockQuants, products, locations, uoms) : filteredStockQuants).map((row) => {
-        const record = row as Record<string, unknown>;
-        const productId = record.productId ?? record.product_id;
-        const locationId = record.locationId ?? record.location_id;
-        const productLabel =
-          productId != null
-            ? (productLabelById.get(String(productId)) ?? '(deleted)')
-            : undefined;
-        const locationLabel =
-          locationId != null
-            ? (locationLabelById.get(String(locationId)) ?? '(deleted)')
-            : undefined;
-        return {
-          ...record,
-          sheetTitle:
-            (workspace === 'warehouse'
-              ? [record.warehouseProductName, record.warehouseLocationName]
-              : [productLabel, locationLabel]).filter(Boolean).join(' · ') ||
-            String(record.id ?? ''),
-        };
-      }) as unknown as Record<string, unknown>[],
-      transfers: (workspace === 'warehouse' ? warehouseTransferRows(transfers, locations, locationsRead.state.status) : transfers as Record<string, unknown>[]).map((row) => ({
+      stock: warehouseRows(scopedStockQuants, referenceProducts, referenceLocations, referenceUoms).map((row) => ({
+        ...row,
+        sheetTitle: [row.warehouseProductName, row.warehouseLocationName].filter(Boolean).join(' · ') ||
+          String(row.id ?? ''),
+      })),
+      transfers: warehouseTransferRows(transfers, referenceLocations).map((row) => ({
         ...row,
         sheetTitle: String(row.name ?? row.origin ?? row.id ?? ''),
       })),
       warehouses: warehouses as unknown as Record<string, unknown>[],
       adjustments: adjustments as unknown as Record<string, unknown>[],
       locations: locations as unknown as Record<string, unknown>[],
-      lots: workspace === 'warehouse' ? warehouseRows(lots, products, []) : lots as unknown as Record<string, unknown>[],
-      serials: workspace === 'warehouse' ? warehouseRows(serials, products, locations) : serials as unknown as Record<string, unknown>[],
-      quality: qualityChecks as unknown as Record<string, unknown>[],
-      'cycle-counts': workspace === 'warehouse' ? warehouseRows(cycleCounts, [], locations) : cycleCounts as unknown as Record<string, unknown>[],
+      lots: warehouseRows(lots, referenceProducts, []),
+      serials: warehouseRows(serials, referenceProducts, referenceLocations),
+      quality: warehouseRows(qualityChecks, referenceProducts, []),
+      'quality-alerts': warehouseRows(qualityAlerts, referenceProducts, []),
+      'cycle-counts': warehouseRows(cycleCounts, [], referenceLocations),
       'picking-waves': pickingWaves as unknown as Record<string, unknown>[],
       'stock-packages': stockPackages as unknown as Record<string, unknown>[],
       'warehouse-tasks': warehouseTasks as unknown as Record<string, unknown>[],
       routes: stockRoutes as unknown as Record<string, unknown>[],
       rules: stockRules as unknown as Record<string, unknown>[],
-      'stock-moves': workspace === 'warehouse' ? warehouseRows(stockMoves, products, locations, uoms) : stockMoves as unknown as Record<string, unknown>[],
+      'stock-moves': warehouseRows(stockMoves, referenceProducts, referenceLocations, referenceUoms),
       valuations: inventoryValuations as unknown as Record<string, unknown>[],
       replenishment: replenishmentRulesList as unknown as Record<
         string,
@@ -3400,21 +3354,20 @@ function InventoryClientLoaded({
     }),
     [
       workspace,
-      uoms,
       products,
-      productLabelById,
-      locationLabelById,
-      stockQuants,
-      filteredStockQuants,
-      stockLocationFilter,
+      scopedStockQuants,
+      referenceProducts,
+      referenceCategories,
+      referenceLocations,
+      referenceUoms,
       transfers,
       warehouses,
       adjustments,
       locations,
-      locationsRead.state.status,
       lots,
       serials,
       qualityChecks,
+      qualityAlerts,
       cycleCounts,
       pickingWaves,
       stockPackages,
@@ -3480,7 +3433,7 @@ function InventoryClientLoaded({
     'adjustment-reasons': adjustmentReasonsRead.state,
     'traceability-records': serialLotTraceabilityRead.state,
     'traceability-reports': stockTraceabilityReportsRead.state,
-    'cycle-wizard': mergeModuleStates([locationsRead.state, cycleCountsRead.state, productsRead.state]),
+    'cycle-wizard': cycleCountState,
     'location-tree': locationsRead.state,
     'quality-alerts': qualityAlertsRead.state,
     '3d-view': warehouseViewerState,
@@ -3512,8 +3465,7 @@ function InventoryClientLoaded({
   const warehousesUsable = tabUsable('warehouses');
   const stockUsable = tabUsable('stock');
   const transfersUsable = tabUsable('transfers');
-  const serialsUsable = tabUsable('serials');
-  const lotsUsable = tabUsable('lots');
+  const qualityUsable = tabUsable('quality');
   const qualityAlertsUsable = tabUsable('quality-alerts');
   // Prompted row commands act on the active tab's rows.
   const activeTabUsable = tabUsable(activeTab);
@@ -3532,20 +3484,17 @@ function InventoryClientLoaded({
       setPartialTransferPicking(null);
       setAssignPickingId(null);
     }
-    if (!serialsUsable) {
-      setSelectedSerialRow(null);
-      setBlockSerialId(null);
-    }
-    if (!lotsUsable) setSelectedLotRow(null);
-    if (!qualityAlertsUsable) {
+    if (!qualityUsable || !qualityAlertsUsable) {
       setCreateQualityAlertOpen(false);
+    }
+    if (!qualityAlertsUsable) {
       setAssignQualityAlertId(null);
       setSolveQualityAlertId(null);
     }
     if (!activeTabUsable) cancelForm();
   }, [
     quickActionUsable, productsUsable, warehousesUsable, stockUsable, transfersUsable,
-    serialsUsable, lotsUsable, qualityAlertsUsable, activeTabUsable, cancelForm,
+    qualityUsable, qualityAlertsUsable, activeTabUsable, cancelForm,
   ]);
 
   const handleFormSubmit = async (
@@ -3873,89 +3822,10 @@ function InventoryClientLoaded({
         activeTab={activeTab}
         dashboardTimeRange={dashboardTimeRange}
         onDashboardTimeRangeChange={setDashboardTimeRange}
-        onActiveTabChange={(tab) => {
-          setActiveTab(tab);
-          if (tab !== 'stock') setStockLocationFilter(null);
-        }}
-        onRowClick={(tabId, row) => {
-          if (tabId === 'serials') setSelectedSerialRow(row);
-          if (tabId === 'lots') setSelectedLotRow(row);
-        }}
-      />
-      {stockLocationFilter ? (
-        <div className="mx-4 mb-2 flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
-          <span>
-            {t('inventory.locationTree.filteredStock', {
-              locationId: stockLocationFilter,
-            })}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setStockLocationFilter(null)}
-          >
-            {t('common.close')}
-          </Button>
-        </div>
-      ) : null}
-      <FormModal
-        open={selectedSerialRow !== null && serialsUsable}
-        onOpenChange={(open) => !open && setSelectedSerialRow(null)}
-        config={serialDetailModalConfig}
-        showSubmitSuccessToast={false}
-        isPending={isFormMutationPending}
-        onSubmit={() => setSelectedSerialRow(null)}
-        formLeadingActions={
-          selectedSerialRow && !selectedSerialRow.isLocked ? (
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              data-testid="serial-detail-block-button"
-              onClick={() => {
-                const id = selectedSerialRow.id as ScalarId;
-                setBlockSerialId(id);
-              }}
-            >
-              {t('inventory.serialActions.block')}
-            </Button>
-          ) : null
-        }
+        onActiveTabChange={setActiveTab}
       />
       <FormModal
-        open={selectedLotRow !== null && lotsUsable}
-        onOpenChange={(open) => !open && setSelectedLotRow(null)}
-        config={lotDetailModalConfig}
-        showSubmitSuccessToast={false}
-        isPending={isFormMutationPending}
-        onSubmit={() => setSelectedLotRow(null)}
-      />
-      <FormModal
-        key={
-          blockSerialId != null
-            ? `block-serial-${String(blockSerialId)}`
-            : 'block-serial-closed'
-        }
-        open={blockSerialId !== null && serialsUsable}
-        onOpenChange={(open) => !open && setBlockSerialId(null)}
-        config={blockSerialForm(t)}
-        isPending={isFormMutationPending}
-        onSubmit={async (fd) => {
-          if (blockSerialId == null) return;
-          await blockSerial.block({
-            serialId: String(blockSerialId),
-            reason:
-              fd.reason != null && String(fd.reason).trim() !== ''
-                ? String(fd.reason).trim()
-                : undefined,
-          });
-          setBlockSerialId(null);
-          setSelectedSerialRow(null);
-        }}
-      />
-      <FormModal
-        open={createQualityAlertOpen && qualityAlertsUsable}
+        open={createQualityAlertOpen && qualityUsable && qualityAlertsUsable}
         onOpenChange={setCreateQualityAlertOpen}
         config={qualityAlertCreateFormConfig}
         isPending={isFormMutationPending}

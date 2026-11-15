@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { planCapabilities, provisionCapabilities, validateManifest } from '../provision-mistral-capabilities.mjs'
+import { planCapabilities, provisionCapabilities, provisionChatRetrieval, validateManifest } from '../provision-mistral-capabilities.mjs'
 import { httpClient } from '../provision-ai-harness.mjs'
 
 const now = new Date('2026-11-04T12:00:00Z')
@@ -102,6 +102,77 @@ function reviewedRepair() {
   }
   return f
 }
+
+function chatRetrievalFixture() {
+  const f = reviewedRepair()
+  const globalSkill = { id: 5, organization_id: 0, skill_key: 'rag_generation', is_active: true }
+  f.state.chatCatalog = [globalSkill]
+  f.state.bindings = [{
+    organization_id: 9, company_id: { some: 3 }, skill_id: 5, is_enabled: true,
+    config_json: JSON.stringify({ defaultAgentId: 12, intelligencePolicyRef: 'fixture-policy@1' }),
+  }]
+  const sql = f.client.sql.bind(f.client)
+  f.client.sql = async (statement, role) => {
+    if (statement.includes("skill_key = 'rag_generation'")) {
+      return f.state.chatCatalog.filter(row => statement.includes(`organization_id = ${row.organization_id} AND`))
+    }
+    if (statement.startsWith('SELECT * FROM ai_skill WHERE id = ')) {
+      return f.state.chatCatalog.filter(row => statement.endsWith(`= ${row.id}`))
+    }
+    return sql(statement, role)
+  }
+  f.input = { version: 1, organizationId: 9, companyId: 3, agentId: 12, currency: 'USD', pricesReviewedAt: '2026-11-01', unitsPer1k: 123 }
+  return f
+}
+
+test('chat retrieval adds only the missing embedding allowlist entries and meter', async () => {
+  for (const scope of [0, 9]) {
+    const f = chatRetrievalFixture()
+    if (scope === 9) {
+      f.state.chatCatalog.push({ ...f.state.chatCatalog[0], organization_id: 9, id: 15 })
+      f.state.bindings[0].skill_id = 15
+    }
+    const before = structuredClone(f.state)
+    const check = await provisionChatRetrieval(f.input, f.client, false, now)
+    assert.deepEqual(check.missing, ['set_ai_agent_model:mistral-embed', 'set_ai_agent_action:embedding_query', 'meter:mistral-embed:tokens'])
+    assert.deepEqual(f.writes, [])
+    const result = await provisionChatRetrieval(f.input, f.client, true, now)
+    assert.equal(result.ready, true)
+    assert.deepEqual(f.writes.map(write => write.name), ['set_ai_agent_model', 'set_ai_agent_action', 'configure_ai_metered_price'])
+    assert.deepEqual(f.state.agent.allowed_actions, [...before.agent.allowed_actions, 'embedding_query'])
+    assert.deepEqual(f.state.agent.allowed_models, [...before.agent.allowed_models, 'mistral-embed'])
+    assert.deepEqual(f.state.budgets, before.budgets)
+    assert.deepEqual(f.state.bindings, before.bindings)
+    await provisionChatRetrieval(f.input, f.client, true, now)
+    assert.equal(f.writes.length, 3)
+  }
+})
+
+test('chat retrieval honors disabled or mismatched tenant bindings', async () => {
+  for (const [modify, expected] of [
+    [f => f.state.chatCatalog.push({ ...f.state.chatCatalog[0], organization_id: 9, id: 15, is_active: false }), /effective chat skill must be active/],
+    [f => { f.state.bindings[0].is_enabled = false }, /company chat binding must be active/],
+    [f => { f.input.agentId = 13 }, /company chat binding must use the requested agent/],
+    [f => { f.state.bindings = [] }, /company chat binding must resolve exactly once/],
+  ]) {
+    const f = chatRetrievalFixture()
+    modify(f)
+    await assert.rejects(provisionChatRetrieval(f.input, f.client, true, now), expected)
+    assert.deepEqual(f.writes, [])
+  }
+})
+
+test('chat retrieval rechecks pricing authority when recovering a partial apply', async () => {
+  const f = chatRetrievalFixture()
+  f.state.agent.allowed_models.push('mistral-embed')
+  f.state.agent.allowed_actions.push('embedding_query')
+  f.client.verifyActivationAuthority = async (_org, _agent, configureMeter) => {
+    assert.equal(configureMeter, true)
+    throw new Error('pricing authority denied')
+  }
+  await assert.rejects(provisionChatRetrieval(f.input, f.client, true, now), /pricing authority denied/)
+  assert.deepEqual(f.writes, [])
+})
 
 test('reviewed missing-only toggles preserve agent and pool; replay is empty', async () => {
   const f = reviewedRepair(), before = structuredClone(f.state)

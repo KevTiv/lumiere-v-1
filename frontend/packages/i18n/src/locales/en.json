@@ -6029,6 +6029,13 @@
     }
   },
   "inventory": {
+    "ops": {
+      "shortAtp": "Stock shortages",
+      "expiredLots": "Expired lots",
+      "openQc": "Open quality failures",
+      "summary": "Summary",
+      "empty": "No open exceptions in this queue."
+    },
     "warehouseSetup": {
       "title": "Warehouse setup",
       "company-required": "Select an operating company before setting up a warehouse.",

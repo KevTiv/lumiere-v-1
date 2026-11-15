@@ -14,6 +14,17 @@ test("changing workspace clears record filters and preserves unrelated context",
   assert.equal(moduleTabDestination({ ...base, query: "tab=invoices&filter=id:12&filter=state:Posted&highlight=12&company=7", tab: "bills" }), "/accounting?tab=bills&company=7")
 })
 
+test("opening stock from the location hierarchy applies the location filter to its destination", () => {
+  assert.equal(moduleTabDestination({
+    pathname: "/inventory",
+    query: "tab=location-tree&filter=id:12&highlight=12&company=7",
+    tab: "stock",
+    defaultTab: "dashboard",
+    validTabs: ["dashboard", "location-tree", "stock"],
+    filter: { key: "warehouseLocationId", value: "90071992547409931" },
+  }), "/inventory?tab=stock&company=7&filter=warehouseLocationId%3A90071992547409931")
+})
+
 test("returning to the overview preserves its canonical URL", () => {
   assert.equal(moduleTabDestination({ ...base, query: "tab=bills&filter=id:12", tab: "dashboard" }), "/accounting")
 })
