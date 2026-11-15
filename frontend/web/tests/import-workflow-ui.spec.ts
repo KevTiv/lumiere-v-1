@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises"
 import { expect, test, type Page } from "@playwright/test"
 import type { ImportProposal } from "../lib/import-workflow"
 
@@ -372,16 +373,27 @@ test("opens an older import by exact company and job and continues its row diagn
   await page.goto("/import-job-readback")
   await expect(page.getByRole("button", { name: "Show original filename: older-import.csv" })).toBeVisible()
   const retry = page.getByRole("button", { name: /retry/i })
+  const downloadErrors = page.getByRole("button", { name: "Download error report (CSV)", exact: true })
   await expect(retry).toBeVisible()
-  await expect(page.getByRole("button", { name: /download.*errors/i })).toHaveCount(0)
+  await expect(downloadErrors).toHaveCount(0)
   errorsAvailable = true
   await retry.click()
 
   await expect(page.getByText("Row 8: Unknown unit")).toBeVisible()
-  await expect(page.getByRole("button", { name: /download.*errors/i })).toHaveCount(0)
+  await expect(downloadErrors).toHaveCount(0)
   await page.getByRole("button", { name: "Load more row errors" }).click()
   await expect(page.getByText("Row 7: Invalid count")).toBeVisible()
-  await expect(page.getByRole("button", { name: /download.*errors/i })).toBeVisible()
+  await expect(downloadErrors).toBeVisible()
+  const downloadEvent = page.waitForEvent("download")
+  await downloadErrors.click()
+  const download = await downloadEvent
+  expect(download.suggestedFilename()).toBe("older-import-errors.csv")
+  const csv = await readFile(await download.path(), "utf8")
+  expect(csv.split("\n")).toEqual([
+    "row_number,field_name,raw_value,error_message",
+    '"8","","","Unknown unit"',
+    '"7","","","Invalid count"',
+  ])
   expect(jobReads).toEqual([jobId])
   expect(cursors).toEqual([null, null, "710"])
 })

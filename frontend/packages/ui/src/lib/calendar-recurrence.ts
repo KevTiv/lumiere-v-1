@@ -6,7 +6,8 @@ import * as recurrence from "rrule"
 import type { CalendarEvent } from "./calendar-types"
 
 // Node uses the package's CommonJS build, while bundlers can select its ESM build.
-const { RRule } = "default" in recurrence ? recurrence.default as typeof recurrence : recurrence
+const commonJsExports = Reflect.get(recurrence, "default") as typeof recurrence | undefined
+const { RRule } = commonJsExports ?? recurrence
 
 const MAX_OCCURRENCES_PER_EVENT = 500
 const DAY_MS = 86_400_000
