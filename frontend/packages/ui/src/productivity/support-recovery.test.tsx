@@ -6,7 +6,8 @@ const hooks = vi.hoisted(() => {
   const read = () => ({ data: [] as object[], isLoading: false, isPending: false, isFetching: false, isError: false, error: undefined as unknown, refetch: vi.fn() })
   const mutation = () => ({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false })
   return {
-    conversations: read(), messages: read(), phones: read(), templates: read(), batches: read(), evidence: read(), exclusions: read(), jobs: read(), errors: read(),
+    conversations: read(), messages: read(), phones: read(), templates: read(), batches: read(), evidence: read(), exclusions: read(), jobs: read(),
+    exactJob: vi.fn(), exactJobErrors: vi.fn(),
     open: mutation(), append: mutation(), update: mutation(), createBatch: mutation(), createReminder: mutation(), createTemplate: mutation(), review: mutation(), rollback: mutation(),
   }
 })
@@ -43,7 +44,9 @@ vi.mock("@lumiere/query-hooks/hooks/messages", () => ({
 }))
 vi.mock("@lumiere/query-hooks/hooks/import-jobs", async (original) => ({
   ...await original<typeof import("@lumiere/query-hooks/hooks/import-jobs")>(),
-  useImportJobs: () => hooks.jobs, useImportJobErrors: () => hooks.errors, useRollbackImportJob: () => hooks.rollback,
+  useExactImportJob: hooks.exactJob,
+  useExactImportJobErrors: hooks.exactJobErrors,
+  useRollbackImportJob: () => hooks.rollback,
 }))
 import { CrmInboxPanel } from "../../../../web/app/(modules)/crm/crm-inbox-panel"
 import { MessageBatchesPanel } from "../../../../web/app/(modules)/messages/message-batches-panel"
@@ -55,10 +58,15 @@ beforeAll(() => {
 })
 beforeEach(() => {
   vi.clearAllMocks()
-  for (const query of [hooks.conversations, hooks.messages, hooks.phones, hooks.templates, hooks.batches, hooks.evidence, hooks.exclusions, hooks.jobs, hooks.errors]) {
+  for (const query of [hooks.conversations, hooks.messages, hooks.phones, hooks.templates, hooks.batches, hooks.evidence, hooks.exclusions, hooks.jobs]) {
     query.data = []; query.isLoading = false; query.isPending = false; query.isFetching = false; query.isError = false; query.error = undefined
     query.refetch.mockResolvedValue({ data: [], isError: false })
   }
+  hooks.exactJob.mockReturnValue(hooks.jobs)
+  hooks.exactJobErrors.mockReturnValue({
+    data: { pages: [{ data: [], nextCursor: null }], pageParams: [undefined] },
+    hasNextPage: false,
+  })
   for (const mutation of [hooks.open, hooks.append, hooks.update, hooks.createBatch, hooks.createReminder, hooks.createTemplate, hooks.review, hooks.rollback]) {
     mutation.isPending = false; mutation.mutateAsync.mockResolvedValue(undefined)
   }
@@ -184,6 +192,7 @@ describe("Supporting workspace source and recovery states", () => {
     hooks.jobs.isError = true; hooks.jobs.error = { status: 500 }
     render(<ImportJobPageClient organizationId={1} jobId="42" />)
     expect(screen.getByRole("alert").textContent).toContain("could not be loaded")
+    expect(hooks.exactJobErrors).toHaveBeenCalledWith(1n, 2, "42", false)
     expect(screen.queryByText("common.importAssistant.jobNotFound")).toBeNull()
     expect(hooks.rollback.mutateAsync).not.toHaveBeenCalled()
   })
@@ -203,6 +212,8 @@ describe("Supporting workspace source and recovery states", () => {
     const job = { id: "9007199254740993", tableName: "contact", fileName: "customers.csv", status: "success", importedRows: 3 }
     hooks.jobs.data = [job]; hooks.jobs.refetch.mockResolvedValue({ data: [job], isError: false })
     render(<ImportJobPageClient organizationId={1} jobId={job.id} />)
+    expect(hooks.exactJob).toHaveBeenCalledWith(1n, 2, job.id)
+    expect(hooks.exactJobErrors).toHaveBeenCalledWith(1n, 2, job.id, true)
     fireEvent.click(screen.getByRole("button", { name: "common.importAssistant.rollbackImport" }))
     const dialog = await screen.findByRole("alertdialog")
     expect(dialog.textContent).toContain("customers.csv (contact)")
