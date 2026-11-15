@@ -1,5 +1,8 @@
 {
   "moduleRecords": {
+    "shopSales": "Mauzo ya dukani",
+    "shop": "Duka",
+    "emptyShopSales": "Hakuna mauzo ya dukani yaliyohifadhiwa.",
     "sales": "Muhtasari wa mauzo kwa wateja",
     "warehouse": "Hesabu zilizorekodiwa",
     "period": "Kipindi cha mauzo",

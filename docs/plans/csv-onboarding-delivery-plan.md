@@ -10,7 +10,7 @@ It builds on the
 ## Alpha operation register
 
 Baseline checked on 15 November 2026 at
-[main `c621c916`](https://github.com/KevTiv/lumiere-v-1/commit/c621c916030fc727c0069e3086b711cc964e51c3).
+[main `4e37059c`](https://github.com/KevTiv/lumiere-v-1/commit/4e37059c0b6b7841b0b9129a736a7896770f68bf).
 The Alpha profile at this revision has 18 surfaces. Track merged code, hosted
 checks, and verification on the served build for each operation.
 
@@ -19,8 +19,8 @@ checks, and verification on the served build for each operation.
 | Assistant CSV/XLSX intake, Settings resume | Existing company-scoped saved tasks, immutable originals, preparation and grouped review. This increment saves explicit chat intent or starts inspection on drop, then uses the same task to prepare. | Reopen in a second chat and device. Exercise the deployed gateway and a provider outage. |
 | Accounting historical expense journals | Existing task-scoped proposals, draft header and line receipts, and verification in the Accounting workflow. | Run the approved isolated electricity replay and lost-response check. |
 | Sales customer summaries and Warehouse/Inventory recorded counts | [#422](https://github.com/KevTiv/lumiere-v-1/pull/422) adds views in the normal modules. The onboarding handoff records pilot readback. This increment discovers these operations in the server catalog and retains verified matches in the task that requested them. | Capture served revision and exact native record links for this increment. Recorded counts are historical observations. Movements and openings need their own native effects. |
-| Sales daily shop lines | [#427](https://github.com/KevTiv/lumiere-v-1/pull/427) owns Shop Sales validation, native persistence and readback. Follow its [hosted CI](https://github.com/KevTiv/lumiere-v-1/actions/runs/43707330312). | Verify the release and exercise the task against the 907 prepared lines. |
-| Exact Activity and source revision links | [#424](https://github.com/KevTiv/lumiere-v-1/pull/424) adds scoped exact-record URLs and the saved history drawer. Follow its [hosted CI](https://github.com/KevTiv/lumiere-v-1/actions/runs/43707613029). | Preserve the Shop Sales route, observation kind and exact record ID when integrating #424 and #427. Verify the authenticated route matrix. |
+| Sales daily shop lines | [#427](https://github.com/KevTiv/lumiere-v-1/pull/427) merged with [green CI](https://github.com/KevTiv/lumiere-v-1/actions/runs/43707330312) and [E2E](https://github.com/KevTiv/lumiere-v-1/actions/runs/43707330083). [#429](https://github.com/KevTiv/lumiere-v-1/pull/429) registers its native owner in the saved import workspace. | Verify the release and exercise the task against the 907 prepared lines. |
+| Exact Activity and source revision links | [#424](https://github.com/KevTiv/lumiere-v-1/pull/424) adds scoped exact-record URLs and the saved history drawer. Follow its [hosted CI](https://github.com/KevTiv/lumiere-v-1/actions/runs/43707613029). | [#430](https://github.com/KevTiv/lumiere-v-1/pull/430) preserves the Shop Sales route, observation kind and record ID. Verify the authenticated route matrix. |
 | Assistant built-in skill availability | [#425](https://github.com/KevTiv/lumiere-v-1/pull/425) merged. Its [hosted CI](https://github.com/KevTiv/lumiere-v-1/actions/runs/43699798473) passed. | Verify against the served gateway and refreshed company roles. |
 | Documents originals and managed versions | [#426](https://github.com/KevTiv/lumiere-v-1/pull/426) merged with [hosted CI](https://github.com/KevTiv/lumiere-v-1/actions/runs/43702073289). Listed documents open in their owning company. | Add explicit version selection at import intake and authorize the same version on readback. |
 | Products, CRM contacts, Warehouse locations | Existing native previews with saved import job receipts. | Match exact saved rows and prove native duplicate and permission handling. CRM leads/opportunities and product prices require separate operations. |
@@ -38,7 +38,7 @@ checks, and verification on the served build for each operation.
 | Zinia | 436 |
 | Total | 907 |
 
-Expected line total is **RWF 71,406,345.45**. Verify product, sale day,
+A disposable PostgreSQL run saved 907 synthetic lines totaling RWF 29,477,500. It matched all 907 on replay and returned the exact scoped Sales records. The authorized pilot target is **RWF 71,406,345.45**. Verify product, sale day,
 quantity, unit price, exact decimal amount, and original row on the served
 Sales view. Reconcile saved and matched results exactly once, replay the import,
 and verify zero additional ledger and stock effects. Record the actual release,
