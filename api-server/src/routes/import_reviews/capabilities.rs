@@ -372,19 +372,29 @@ mod tests {
     }
 
     #[test]
-    fn does_not_offer_shop_sales_without_its_owning_operation() {
-        let items = [row(
-            "8",
-            &[
-                ("shop", "Boutique"),
-                ("sale_date", "Date"),
-                ("product_label", "Produit"),
-                ("sold_quantity", "Quantité"),
-                ("sale_unit_price", "Prix"),
-                ("sale_amount", "Total"),
-                ("currency_code", "Devise"),
-            ],
-        )];
-        assert!(review_operations("source_observation", &items).is_empty());
+    fn discovers_shop_sales_only_for_complete_source_observations() {
+        let fields = [
+            ("shop", "Boutique"),
+            ("sale_date", "Date"),
+            ("product_label", "Produit"),
+            ("sold_quantity", "Quantité"),
+            ("sale_unit_price", "Prix"),
+            ("sale_amount", "Total"),
+            ("currency_code", "Devise"),
+        ];
+        let items = [row("8", &fields), row("9", &fields[..6])];
+
+        assert!(review_operations("product", &items).is_empty());
+        let operations = review_operations("source_observation", &items);
+        let [operation] = operations.as_slice() else {
+            panic!("expected one Shop Sales operation");
+        };
+        assert_eq!(operation.key, "shop_sales_backfill");
+        assert_eq!(operation.item_ids, ["8"]);
+        assert_eq!(operation.destination, "/sales?tab=shop-sales");
+
+        let projected = serde_json::to_value(operation).unwrap();
+        assert_eq!(projected["reviewedRecord"]["dispatch"], "shop_sales");
+        assert_eq!(projected["reviewedRecord"]["inputs"], json!([]));
     }
 }
