@@ -60,7 +60,11 @@ export function EntityRecordSheet({
   const historyRecordId = record ? record.id ?? record.Id : undefined
   const showDiscussion = Boolean(discussionModel && organizationId && /^\d+$/.test(recordId))
   const openHref = record ? config.openHref?.(record) : undefined
-  const actions = record ? (typeof config.actions === "function" ? config.actions(record) : config.actions) : null
+  const actions = record
+    ? typeof config.actions === "function"
+      ? config.actions(record, () => onOpenChange(false))
+      : config.actions
+    : null
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

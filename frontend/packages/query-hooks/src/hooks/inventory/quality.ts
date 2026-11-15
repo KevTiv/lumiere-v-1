@@ -130,8 +130,10 @@ export function useQualityChecks(
 export function useQualityAlerts(
   organizationId: bigint,
   initialData?: QualityAlert[],
+  enabled = true,
 ) {
   return useQuery<QualityAlert[]>({
+    enabled,
     queryKey: ['quality-alerts', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList(

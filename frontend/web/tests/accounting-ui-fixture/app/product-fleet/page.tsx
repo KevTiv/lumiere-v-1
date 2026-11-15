@@ -13,6 +13,7 @@ import { fleetVehiclesTableConfig } from "@lumiere/ui/lib/fleet-entity-configs";
 import { productsTableConfig } from "@lumiere/ui/lib/inventory-entity-configs";
 import type { EntityRow } from "@lumiere/ui/lib/entity-view-types";
 import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state";
+import { useModuleTab } from "../../../../hooks/use-module-tab";
 import {
   fleetModuleConfig,
   inventoryModuleConfig,
@@ -24,6 +25,7 @@ import {
   productCatalogWorkspace,
 } from "../../../../app/(modules)/inventory/product-catalog";
 import {
+  inventoryOperationalTable,
   warehouseRows,
   warehouseDataStates,
   warehouseTransferRows,
@@ -234,17 +236,38 @@ function Preview() {
         }
       : module === "warehouse"
         ? warehouseWorkspace(inventory, t, locations)
-        : {
-            ...catalog,
-            tabs: catalog.tabs.map((tab) =>
-              tab.id === "products"
-                ? {
-                    ...tab,
-                    entityConfig: productTable,
-                  }
-                : tab,
-            ),
-          };
+        : module === "inventory"
+          ? {
+              ...inventory,
+              tabs: inventory.tabs.map((tab) =>
+                tab.entityConfig
+                  ? {
+                      ...tab,
+                      entityConfig: inventoryOperationalTable(
+                        tab.entityConfig,
+                        tab.id,
+                        locations,
+                        t,
+                      ),
+                    }
+                  : tab,
+              ),
+            }
+          : {
+              ...catalog,
+              tabs: catalog.tabs.map((tab) =>
+                tab.id === "products"
+                  ? {
+                      ...tab,
+                      entityConfig: productTable,
+                    }
+                  : tab,
+              ),
+            };
+  const { activeTab, setActiveTab } = useModuleTab(
+    config.defaultTab ?? config.tabs[0]?.id ?? "",
+    config.tabs.map((tab) => tab.id),
+  );
   const history = fleetHistoryRows(services, {
     vehicles: rows,
     serviceTypes: [{ id: "91", name: "Scheduled maintenance" }],
@@ -325,8 +348,8 @@ function Preview() {
         className="text-sm text-muted-foreground"
         data-testid="preview-disclosure"
       >
-        Synthetic Products, Fleet and Warehouse preview. Production components;
-        no ERP operations.
+        Synthetic Products, Fleet, Warehouse and Inventory preview. Production
+        components; no ERP operations.
       </p>
       <nav
         aria-label="Preview workspaces"
@@ -335,10 +358,13 @@ function Preview() {
         <Link href="/product-fleet?module=products&tab=products">Products</Link>
         <Link href="/product-fleet?module=fleet">Fleet</Link>
         <Link href="/product-fleet?module=warehouse">Warehouse</Link>
+        <Link href="/product-fleet?module=inventory">Inventory</Link>
       </nav>
       <ModuleView
         key={module}
         config={config}
+        activeTab={module === "inventory" ? activeTab : undefined}
+        onActiveTabChange={module === "inventory" ? setActiveTab : undefined}
         data={tabData}
         dataState={module === "warehouse" ? warehouseDataStates(sourceStates) : sourceStates}
         onFormSubmit={async () => {

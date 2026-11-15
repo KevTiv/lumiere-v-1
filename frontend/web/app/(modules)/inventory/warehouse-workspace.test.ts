@@ -5,7 +5,7 @@ import type { EntityViewConfig } from "@lumiere/ui/lib/entity-view-types";
 import { moduleCollection, type ModuleDataState } from "@lumiere/ui/lib/module-data-state";
 import type { ModuleConfig } from "@lumiere/ui/lib/module-types";
 import { moduleTabDestination } from "@/lib/module-tab-navigation";
-import { WAREHOUSE_TAB_IDS, warehouseDataStates, warehouseRows, warehouseStockDetail, warehouseTable, warehouseTransferRows, warehouseWorkspace } from "./warehouse-workspace";
+import { inventoryOperationalTable, STOCK_LOCATION_FILTER_KEY, WAREHOUSE_TAB_IDS, warehouseDataStates, warehouseRows, warehouseStockDetail, warehouseTable, warehouseTransferRows, warehouseWorkspace } from "./warehouse-workspace";
 
 const t = ((key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key) as TFunction;
 const ready: ModuleDataState = { status: "ready" };
@@ -92,6 +92,39 @@ test("stock view leads with named identity and filters by exact location without
   assert.deepEqual(result.view.actions?.[0]?.permission, { resource: "stock_quant", action: "write" });
   assert.equal(result.view.columns[0]?.render?.(null, {}), "Unavailable");
   assert.equal(table.view.mode === "table" && table.view.columns[0]?.key, "productId");
+});
+
+test("Inventory stock adopts the shared presentation while keeping its stock actions", () => {
+  const openCreate = () => undefined;
+  const actions = [{ id: "csv-stock-quant", label: "Import stock", onClick: openCreate }];
+  const source: EntityViewConfig = {
+    id: "stock-quants-table",
+    title: "Stock",
+    description: "Stock levels",
+    view: {
+      mode: "table",
+      columns: [
+        { key: "productId", label: "Product" },
+        { key: "locationId", label: "Location" },
+        { key: "inventoryQuantity", label: "On hand", type: "number" },
+      ],
+      actions,
+      emptyState: { actionLabel: "Create", onAction: openCreate },
+    },
+  };
+  const locations = [{ id: "90071992547409931", name: "Receiving" }];
+  const inventory = inventoryOperationalTable(source, "stock", locations, t);
+  const warehouse = warehouseTable(source, "stock", locations, t);
+  if (inventory.view.mode !== "table" || warehouse.view.mode !== "table") assert.fail("Expected stock tables");
+
+  assert.deepEqual(inventory.view.columns.map(({ key }) => key), warehouse.view.columns.map(({ key }) => key));
+  assert.equal(inventory.view.filters?.[0]?.key, STOCK_LOCATION_FILTER_KEY);
+  assert.equal(inventory.view.filters?.[0]?.options?.[0]?.value, locations[0]?.id);
+  assert.equal(inventory.view.actions, actions);
+  assert.equal(inventory.view.emptyState?.onAction, openCreate);
+  assert.equal(inventory.description, source.description);
+  assert.deepEqual(warehouse.view.actions, []);
+  assert.equal(warehouse.view.emptyState?.onAction, undefined);
 });
 
 test("warehouse projection keeps existing operation and record owners, and its groups cannot resurrect excluded tabs", () => {
