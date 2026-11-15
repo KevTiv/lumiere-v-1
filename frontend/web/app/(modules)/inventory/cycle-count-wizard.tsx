@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from '@lumiere/i18n';
-import { Button, EntityView, cn, useRBAC } from '@lumiere/ui';
+import { Button, cn, useRBAC } from '@lumiere/ui';
+import type { EntitySurfacePermission } from '@lumiere/ui';
+import { EmptyStateCard } from '@lumiere/ui/components/empty-state-card';
+import { workspaceStyles } from '@lumiere/ui/lib/workspace-styles';
 import { parseStrictU64 } from '@lumiere/erp-shared/u64';
 import { getRowField } from '@lumiere/ui/lib/entity-row-values';
 import { CYCLE_COUNT_PERMISSIONS, assertCycleCountScope, cycleCountId as requireCountId, cycleCountQuantity, prepareCycleCountLine, type CycleCountAction } from './cycle-count-input';
@@ -22,8 +25,6 @@ import {
   useRecordCycleCountLine,
   useValidateCycleCount,
   useOpenQualityAlert,
-  useQualityAlerts,
-  useSolveQualityAlert,
   useCancelQualityAlert,
 } from '@lumiere/query-hooks/hooks/inventory';
 import { useCycleCountAdjustmentWorkflow } from '@lumiere/query-hooks/hooks/cycle-count-adjustment-workflow';
@@ -31,9 +32,10 @@ import { variantTag } from '@lumiere/erp-workflows';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import type { QueryRows } from '@/lib/query-fetch';
-import { ChevronRight, MapPin, Package } from 'lucide-react';
+import { ChevronRight, MapPin } from 'lucide-react';
 
 type ScalarId = bigint | number | string;
+const qualityAlertWrite: EntitySurfacePermission = { resource: 'quality_alert', action: 'write' };
 
 function strId(v: unknown): string {
   return v == null ? '' : String(v);
@@ -222,12 +224,12 @@ export function CycleCountWizard({
   }, []);
 
   return (
-    <div className="space-y-6 max-w-[800px] text-sm">
+    <div className="min-w-0 max-w-3xl space-y-6 text-sm">
       <div>
-        <h2 className="text-lg font-semibold">
+        <h2 className={workspaceStyles.sectionTitle}>
           {t('inventory.cycleCountWizard.title')}
         </h2>
-        <p className="text-muted-foreground">
+        <p className={workspaceStyles.sectionDescription}>
           {t('inventory.cycleCountWizard.subtitle')}
         </p>
       </div>
@@ -235,20 +237,15 @@ export function CycleCountWizard({
       <ol className="flex flex-wrap gap-2">
         {WIZARD_STEPS.map((s) => (
           <li key={s}>
-            <button
+            <Button
               type="button"
-              className={cn(
-                'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                step === s
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : step > s
-                    ? 'border-primary/40 text-primary'
-                    : 'border-border text-muted-foreground',
-              )}
+              size="sm"
+              variant={step === s ? 'default' : 'outline'}
+              aria-current={step === s ? 'step' : undefined}
               onClick={() => setStep(s)}
             >
               {stepLabels[s]}
-            </button>
+            </Button>
           </li>
         ))}
       </ol>
@@ -566,12 +563,12 @@ type LocationTreeNode = {
   id: string;
   row: Record<string, unknown>;
   children: LocationTreeNode[];
-  quantCount: number;
+  quantCount?: number;
 };
 
 function buildLocationTree(
   locations: QueryRows,
-  quants: QueryRows,
+  quants?: QueryRows,
 ): LocationTreeNode[] {
   const byParent = new Map<string, LocationTreeNode[]>();
   const nodes = new Map<string, LocationTreeNode>();
@@ -579,7 +576,7 @@ function buildLocationTree(
   for (const loc of locations) {
     const id = strId(loc.id);
     if (!id) continue;
-    const quantCount = quants.filter((q) => strId(q.locationId) === id).length;
+    const quantCount = quants?.filter((q) => strId(q.locationId) === id).length;
     nodes.set(id, {
       id,
       row: loc as Record<string, unknown>,
@@ -635,14 +632,17 @@ function LocationTreeRow({
   return (
     <li>
       <div
-        className="flex items-center gap-2 rounded-md py-1.5 pr-2 hover:bg-muted/50"
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+        className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-md py-1.5 pe-2 hover:bg-muted/50"
+        style={{ paddingInlineStart: `${Math.min(depth, 4) * 16 + 8}px` }}
       >
         {node.children.length > 0 ? (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             className="text-muted-foreground"
-            aria-label={open ? 'Collapse' : 'Expand'}
+            aria-label={label}
+            aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
           >
             <ChevronRight
@@ -651,20 +651,22 @@ function LocationTreeRow({
                 open && 'rotate-90',
               )}
             />
-          </button>
+          </Button>
         ) : (
-          <span className="w-4" />
+          <span className="w-8 shrink-0" />
         )}
         <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">{label}</span>
+        <span className="min-w-24 flex-1 font-medium [overflow-wrap:anywhere]">{label}</span>
         {usage ? (
           <span className="text-xs text-muted-foreground capitalize">
             {usage}
           </span>
         ) : null}
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {t('inventory.locationTree.quantCount', { count: node.quantCount })}
-        </span>
+        {node.quantCount != null && (
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {t('inventory.locationTree.quantCount', { count: node.quantCount })}
+          </span>
+        )}
         <Button
           type="button"
           variant="ghost"
@@ -697,7 +699,7 @@ export function LocationHierarchyPanel({
   onViewQuants,
 }: {
   locations: QueryRows;
-  quants: QueryRows;
+  quants?: QueryRows;
   onViewQuants: (locationId: string) => void;
 }) {
   const { t } = useTranslation();
@@ -707,19 +709,17 @@ export function LocationHierarchyPanel({
   );
 
   return (
-    <div className="space-y-4 p-1">
+    <div className="min-w-0 space-y-4">
       <div>
-        <h2 className="text-lg font-semibold">
+        <h2 className={workspaceStyles.sectionTitle}>
           {t('inventory.locationTree.title')}
         </h2>
-        <p className="text-sm text-muted-foreground">
+        <p className={workspaceStyles.sectionDescription}>
           {t('inventory.locationTree.description')}
         </p>
       </div>
       {tree.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {t('inventory.stockLocations.emptyMessage')}
-        </p>
+        <EmptyStateCard compact title={t('inventory.stockLocations.emptyMessage')} />
       ) : (
         <ul className="rounded-lg border border-border p-2">
           {tree.map((node) => (
@@ -737,7 +737,7 @@ export function LocationHierarchyPanel({
   );
 }
 
-export function QualityAlertsPanel({
+export function useQualityAlertTableConfig({
   organizationId,
   operatingCompanyId,
   selectedCompanyId,
@@ -753,22 +753,24 @@ export function QualityAlertsPanel({
   const { t } = useTranslation();
   const orgId = BigInt(organizationId);
   const openAlert = useOpenQualityAlert(orgId, selectedCompanyId);
-  const solveAlert = useSolveQualityAlert(orgId, selectedCompanyId);
   const cancelAlert = useCancelQualityAlert(orgId, operatingCompanyId);
 
-  const { data: alerts = [], isLoading } = useQualityAlerts(orgId);
-
-  const tableConfig = useMemo(() => {
+  return useMemo(() => {
     const base = qualityAlertsTableConfig(t);
     if (base.view.mode !== 'table') return base;
     return {
       ...base,
       view: {
         ...base.view,
+        emptyState: {
+          title: base.view.emptyMessage,
+          description: t('inventory.qualityAlerts.emptyHint'),
+        },
         actions: [
           {
             id: 'open-alert',
             label: t('inventory.qualityAlerts.actions.open'),
+            permission: qualityAlertWrite,
             requiresSelection: true,
             isApplicable: (rows) =>
               rows.every((row) => ['draft'].includes(rowState(row, 'state'))),
@@ -783,6 +785,7 @@ export function QualityAlertsPanel({
           {
             id: 'assign-alert',
             label: t('inventory.qualityAlerts.actions.assign'),
+            permission: qualityAlertWrite,
             requiresSelection: true,
             onClick: (rows: Record<string, unknown>[]) => {
               const id = rows[0]?.id as ScalarId | undefined;
@@ -792,6 +795,7 @@ export function QualityAlertsPanel({
           {
             id: 'solve-alert',
             label: t('inventory.qualityAlerts.actions.solve'),
+            permission: qualityAlertWrite,
             requiresSelection: true,
             isApplicable: (rows) =>
               rows.every(
@@ -806,6 +810,7 @@ export function QualityAlertsPanel({
           {
             id: 'cancel-alert',
             label: t('inventory.qualityAlerts.actions.cancel'),
+            permission: qualityAlertWrite,
             variant: 'destructive' as const,
             requiresSelection: true,
             isApplicable: (rows) =>
@@ -825,29 +830,4 @@ export function QualityAlertsPanel({
       },
     };
   }, [t, openAlert, cancelAlert, onAssignAlert, onSolveAlert]);
-
-  return (
-    <div className="space-y-4 p-1 min-h-[320px]">
-      <div className="flex items-start gap-3">
-        <Package className="h-5 w-5 text-muted-foreground mt-0.5" />
-        <div>
-          <h2 className="text-lg font-semibold">
-            {t('inventory.qualityAlerts.title')}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {t('inventory.qualityAlerts.description')}
-          </p>
-        </div>
-      </div>
-      {alerts.length === 0 && !isLoading ? (
-        <p className="text-sm text-muted-foreground rounded-md border border-dashed p-4">
-          {t('inventory.qualityAlerts.emptyHint')}
-        </p>
-      ) : null}
-      <EntityView
-        config={tableConfig}
-        data={alerts as Record<string, unknown>[]}
-      />
-    </div>
-  );
 }

@@ -132,7 +132,7 @@ export function useWarehouse3D(
   enabled = true,
 ) {
   const orgKey = rqBigIntKey(organizationId);
-  const { data: zones3D = [] } = useQuery<Warehouse3DZone[]>({
+  const zonesQuery = useQuery<Warehouse3DZone[]>({
     enabled,
     queryKey: ['warehouse-3d-zones', orgKey],
     queryFn: () =>
@@ -142,7 +142,7 @@ export function useWarehouse3D(
       ),
     staleTime: 30_000,
   });
-  const { data: allLocations = [] } = useQuery<StockLocation[]>({
+  const locationsQuery = useQuery<StockLocation[]>({
     enabled,
     queryKey: ['stock-locations', orgKey],
     queryFn: () =>
@@ -152,14 +152,14 @@ export function useWarehouse3D(
       ),
     staleTime: 30_000,
   });
-  const { data: allQuants = [] } = useQuery<StockQuant[]>({
+  const quantsQuery = useQuery<StockQuant[]>({
     enabled,
     queryKey: ['stock-quants', orgKey],
     queryFn: () =>
       fetchQueryList('/api/query/stock-quants', 'Failed to fetch stock quants'),
     staleTime: 30_000,
   });
-  const { data: products = [] } = useQuery<Product[]>({
+  const productsQuery = useQuery<Product[]>({
     enabled,
     queryKey: ['products', orgKey],
     queryFn: () =>
@@ -167,12 +167,16 @@ export function useWarehouse3D(
     staleTime: 30_000,
   });
 
-  return useMemo(() => {
+  const { data: zones3D } = zonesQuery;
+  const { data: allLocations } = locationsQuery;
+  const { data: allQuants } = quantsQuery;
+  const { data: products } = productsQuery;
+  const view = useMemo(() => {
     if (!enabled || warehouseId === 0n) {
       return { zones: [], slots: [], items: [] };
     }
     const productById = new Map<string, { name: string; sku: string }>();
-    for (const p of products) {
+    for (const p of products ?? []) {
       const id = String(p.id ?? '');
       productById.set(id, {
         name: String(p.name ?? ''),
@@ -181,12 +185,13 @@ export function useWarehouse3D(
     }
     return buildWarehouse3DView(
       warehouseId,
-      zones3D,
-      allLocations,
-      allQuants,
+      zones3D ?? [],
+      allLocations ?? [],
+      allQuants ?? [],
       productById,
     );
   }, [enabled, warehouseId, zones3D, allLocations, allQuants, products]);
+  return { ...view, queries: [zonesQuery, locationsQuery, quantsQuery, productsQuery] };
 }
 
 export function useCreateWarehouse(organizationId: bigint, companyId?: bigint) {

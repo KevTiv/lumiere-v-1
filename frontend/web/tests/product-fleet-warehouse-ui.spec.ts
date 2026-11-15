@@ -147,6 +147,99 @@ test("dense tables keep aligned headings, full amounts, and keyboard disclosure"
 });
 
 for (const width of [390, 1440]) {
+  test(`Inventory stock and transfer workspaces share the responsive table layout at ${width}px`, async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize({ width, height: 900 });
+    await openWorkspace(page, "inventory");
+
+    const workspace = page.getByTestId("module-view-inventory");
+    const overview = workspace.getByTestId(
+      "module-workspace-inventory-overview",
+    );
+    const stock = workspace.getByTestId("module-workspace-inventory-stock");
+    const movements = workspace.getByTestId(
+      "module-workspace-inventory-movements",
+    );
+    await expect(overview).toHaveAttribute("aria-current", "page");
+    await expect(
+      workspace.getByTestId("module-panel-inventory-dashboard"),
+    ).toBeVisible();
+    await stock.press("Enter");
+    await expect(stock).toHaveAttribute("aria-current", "page");
+    const stockPanel = workspace.getByTestId("module-panel-inventory-stock");
+    const stockTable = stockPanel.getByRole("table");
+    await expect(stockTable).toContainText("Arabica coffee beans");
+    for (const heading of ["On Hand", "Reserved", "Available", "Counted"]) {
+      await expect(
+        stockTable.getByRole("columnheader", { name: heading, exact: true }),
+      ).toBeVisible();
+    }
+    const stockLayout = await stockPanel.evaluate((panel) => {
+      const nav = panel
+        .closest('[data-testid="module-view-inventory"]')!
+        .querySelector('[data-ui="workspace-nav"]')!;
+      const toolbar = panel.querySelector('[data-testid="entity-table-toolbar"]')!;
+      const viewport = panel.querySelector('[data-slot="table-container"]')!;
+      return {
+        navBottom: nav.getBoundingClientRect().bottom,
+        toolbarTop: toolbar.getBoundingClientRect().top,
+        panelWidth: panel.getBoundingClientRect().width,
+        viewportWidth: viewport.getBoundingClientRect().width,
+        tableOverflow: viewport.scrollWidth - viewport.clientWidth,
+        documentOverflow: document.documentElement.scrollWidth - innerWidth,
+      };
+    });
+    expect(stockLayout.toolbarTop).toBeGreaterThanOrEqual(stockLayout.navBottom);
+    expect(
+      Math.abs(stockLayout.panelWidth - stockLayout.viewportWidth),
+    ).toBeLessThanOrEqual(2);
+    expect(stockLayout.documentOverflow).toBeLessThanOrEqual(1);
+    if (width === 390) expect(stockLayout.tableOverflow).toBeGreaterThan(0);
+
+    await chooseFacet(page, "Location", "Musanze / Stock");
+    await expect(stockTable.getByRole("row")).toHaveCount(2);
+    await expect(stockTable).toContainText("Reusable delivery crate");
+    await movements.press("Enter");
+    await expect(movements).toHaveAttribute("aria-current", "page");
+    const transfers = workspace.getByTestId("module-panel-inventory-transfers");
+    await expect(
+      transfers.getByRole("columnheader", { name: "Task", exact: true }),
+    ).toBeVisible();
+    await expect(transfers).toContainText("IN-00052");
+    await page.goBack();
+    await expect(stockPanel).toBeVisible();
+
+    await openWorkspace(
+      page,
+      "inventory",
+      "&tab=stock&filter=warehouseLocationId:22",
+    );
+    const location = stockPanel
+      .getByTestId("entity-table-toolbar")
+      .getByRole("button", { name: "Location", exact: true });
+    await expect(location).toContainText("Musanze / Stock");
+    await expect(stockTable.getByRole("row")).toHaveCount(2);
+    await location.click();
+    await page.getByRole("button", { name: "Clear filter", exact: true }).click();
+    await page.keyboard.press("Escape");
+    await expect(stockTable.getByRole("row")).toHaveCount(4);
+    await expect(page).toHaveURL((url) => !url.searchParams.has("filter"));
+
+    await openWorkspace(page, "inventory", "&tab=transfers&filter=id:52");
+    await expect(movements).toHaveAttribute("aria-current", "page");
+    const focusedTransfer = transfers.getByTestId("entity-row-52");
+    await expect(focusedTransfer).toContainText("IN-00052");
+    await expect(transfers.getByTestId("entity-active-filter-id")).toContainText(
+      "id: 52",
+    );
+    await expect(transfers.locator('[data-testid^="entity-row-"]')).toHaveCount(1);
+    await page.reload();
+    await expect(focusedTransfer).toBeVisible();
+    await expect(transfers.locator('[data-testid^="entity-row-"]')).toHaveCount(1);
+  });
+
   test(`product catalog filters and scope at ${width}px`, async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width, height: 900 });

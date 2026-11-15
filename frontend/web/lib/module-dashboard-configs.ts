@@ -1249,13 +1249,73 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
   title: "Inventory",
   description: "Stock levels, movements, valuations, and reorder alerts",
   defaultTab: "dashboard",
-  tabGroups: [
-    { label: t("modules.tabGroups.stock", { defaultValue: "Stock" }), tabIds: ["products", "product-categories", "stock", "valuations", "lots", "serials"] },
-    { label: t("modules.tabGroups.movements", { defaultValue: "Movements" }), tabIds: ["transfers", "stock-moves", "adjustments", "picking-waves", "stock-packages", "warehouse-tasks", "replenishment"] },
-    { label: t("modules.tabGroups.warehouse", { defaultValue: "Warehouse" }), tabIds: ["warehouses", "locations", "location-tree", "3d-view", "routes", "rules"] },
-    { label: t("modules.tabGroups.quality", { defaultValue: "Quality" }), tabIds: ["quality", "quality-alerts", "cycle-counts", "cycle-wizard", "traceability-records", "traceability-reports"] },
-    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["barcode-rules", "barcode-nomenclatures", "adjustment-reasons"] },
-  ],
+  workspaceNav: {
+    label: t("modules.workspaces.label"),
+    overflowLabel: t("modules.workspaces.more"),
+    workspaces: [
+      {
+        id: "overview",
+        label: t("modules.workspaces.overview"),
+        tabIds: ["dashboard", "ops"],
+      },
+      {
+        id: "stock",
+        label: t("modules.tabGroups.stock"),
+        tabIds: [
+          "stock",
+          "lots",
+          "serials",
+          "valuations",
+          "products",
+          "product-categories",
+        ],
+      },
+      {
+        id: "movements",
+        label: t("modules.tabGroups.movements"),
+        tabIds: [
+          "transfers",
+          "stock-moves",
+          "adjustments",
+          "picking-waves",
+          "stock-packages",
+          "warehouse-tasks",
+          "replenishment",
+        ],
+      },
+    ],
+    overflow: [
+      {
+        id: "quality",
+        label: t("modules.tabGroups.quality"),
+        tabIds: [
+          "quality",
+          "quality-alerts",
+          "cycle-counts",
+          "cycle-wizard",
+          "traceability-records",
+          "traceability-reports",
+        ],
+      },
+      {
+        id: "warehouse",
+        label: t("modules.tabGroups.warehouse"),
+        tabIds: [
+          "warehouses",
+          "locations",
+          "location-tree",
+          "3d-view",
+          "routes",
+          "rules",
+        ],
+      },
+      {
+        id: "setup",
+        label: t("modules.tabGroups.setup"),
+        tabIds: ["barcode-rules", "barcode-nomenclatures", "adjustment-reasons"],
+      },
+    ],
+  },
   tabs: [
     {
       id: "dashboard",
