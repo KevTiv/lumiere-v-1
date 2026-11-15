@@ -1,5 +1,8 @@
 {
   "moduleRecords": {
+    "shopSales": "Shop sales",
+    "shop": "Shop",
+    "emptyShopSales": "No shop sales have been saved.",
     "sales": "Customer sales summaries",
     "warehouse": "Recorded counts",
     "period": "Sales period",

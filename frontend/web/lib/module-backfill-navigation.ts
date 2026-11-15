@@ -1,5 +1,6 @@
 export const moduleBackfillTabs = {
   sales: 'customer-sales',
+  shop_sales: 'shop-sales',
   warehouse: 'recorded-counts',
 } as const
 
@@ -14,5 +15,6 @@ export function moduleBackfillHref(
     params.set('backfillTask', task.id)
     params.set('backfillCompany', String(task.companyId))
   }
-  return `/${module}?${params}`
+  const workspace = module === 'shop_sales' ? 'sales' : module
+  return `/${workspace}?${params}`
 }
