@@ -73,6 +73,7 @@ struct Selection {
 pub(super) struct ReadQuery {
     company_id: u64,
     before_id: Option<i64>,
+    record_id: Option<i64>,
     task_id: Option<String>,
     from: Option<String>,
     through: Option<String>,
@@ -80,6 +81,16 @@ pub(super) struct ReadQuery {
 
 impl ReadQuery {
     fn validate(&self) -> Result<(), ApiError> {
+        if let Some(record_id) = self.record_id {
+            if record_id <= 0 {
+                return Err(ApiError::BadRequest("Invalid saved record ID".into()));
+            }
+            if self.before_id.is_some() || self.from.is_some() || self.through.is_some() {
+                return Err(ApiError::BadRequest(
+                    "Saved record lookup cannot use date or pagination filters".into(),
+                ));
+            }
+        }
         if self
             .task_id
             .as_deref()
@@ -631,12 +642,14 @@ pub(super) async fn read(
     let rows = client
         .query(
             "SELECT record.id, record.batch_id, record.source_file, record.source_row,
-                    record.period_start::text, record.period_end::text, record.facts,
-                    record.item_id, record.source_revision
+                    record.period_start::text AS period_start, record.period_end::text AS period_end,
+                    record.facts, record.item_id, record.source_revision,
+                    to_char(record.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS saved_at
              FROM lumiere_platform.module_backfill_record record
              WHERE record.organization_id = $1::text::numeric
                AND record.company_id = $2::text::numeric
                AND record.module = $3 AND record.facts->>'kind' = $9
+               AND ($10::bigint IS NULL OR record.id = $10)
                AND ($5::text IS NULL OR EXISTS (
                    SELECT 1 FROM lumiere_platform.import_task_review link
                    WHERE link.organization_id = record.organization_id AND link.company_id = record.company_id
@@ -663,6 +676,7 @@ pub(super) async fn read(
                 &query.through,
                 &ctx.actor_identity(),
                 &module.record_kind(),
+                &query.record_id,
             ],
         )
         .await
@@ -671,7 +685,8 @@ pub(super) async fn read(
     let data = rows.iter().take(100).map(|row| json!({
         "id":row.get::<_,i64>("id").to_string(),"batchId":row.get::<_,i64>("batch_id").to_string(),
         "sourceFile":row.get::<_,String>("source_file"),"sourceRow":row.get::<_,i64>("source_row"),
-        "periodStart":row.get::<_,String>(4),"periodEnd":row.get::<_,String>(5),"facts":row.get::<_,Value>("facts"),
+        "periodStart":row.get::<_,String>("period_start"),"periodEnd":row.get::<_,String>("period_end"),"facts":row.get::<_,Value>("facts"),
+        "savedAt":row.get::<_,String>("saved_at"),
         "itemId":row.get::<_,i64>("item_id").to_string(),"sourceRevision":row.get::<_,i32>("source_revision"),
     })).collect::<Vec<_>>();
     Ok(Json(json!({"data":data,"nextBeforeId":next})))
@@ -686,6 +701,7 @@ mod tests {
         let mut query = ReadQuery {
             company_id: 4097,
             before_id: None,
+            record_id: None,
             task_id: Some("a".repeat(32)),
             from: Some("2022-06-13".into()),
             through: Some("2022-06-13".into()),
@@ -698,6 +714,30 @@ mod tests {
         query.through = None;
         assert!(query.validate().is_ok());
         query.task_id = Some("invalid".into());
+        assert!(query.validate().is_err());
+    }
+
+    #[test]
+    fn exact_record_reads_keep_task_scope_without_date_or_cursor_filters() {
+        let mut query = ReadQuery {
+            company_id: 4097,
+            before_id: None,
+            record_id: Some(i64::MAX),
+            task_id: Some("a".repeat(32)),
+            from: None,
+            through: None,
+        };
+        assert!(query.validate().is_ok());
+        query.before_id = Some(1);
+        assert!(query.validate().is_err());
+        query.before_id = None;
+        query.from = Some("2022-06-13".into());
+        assert!(query.validate().is_err());
+        query.from = None;
+        query.through = Some("2022-06-13".into());
+        assert!(query.validate().is_err());
+        query.through = None;
+        query.record_id = Some(0);
         assert!(query.validate().is_err());
     }
 

@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import json
+import re
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -17,6 +18,13 @@ spec.loader.exec_module(inventory)
 
 
 class ScopeTests(unittest.TestCase):
+    def test_activity_covers_the_current_alpha_profile(self):
+        scope = inventory.profile_surfaces((ROOT / inventory.PROFILE).read_text())
+        navigation = (ROOT / "frontend/web/lib/history-activity-navigation.ts").read_text()
+        declaration = re.search(r"ALPHA_HISTORY_MODULES = \[([^]]*)\] as const", navigation, re.S)
+        self.assertIsNotNone(declaration)
+        self.assertCountEqual(scope, re.findall(r'"([^"]+)"', declaration[1]))
+
     def test_unknown_alpha_surface_cannot_silently_omit_history(self):
         source = (ROOT / inventory.PROFILE).read_text()
         with self.assertRaisesRegex(ValueError, "unclassified alpha surfaces: payroll"):

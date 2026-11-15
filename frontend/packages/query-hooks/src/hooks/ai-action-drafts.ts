@@ -5,6 +5,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import type { JsonObject } from "@lumiere/api-client/json-object"
 import { resolveActionDraftRecordHref } from "@lumiere/erp-shared/action-draft-links"
 import { toCamelCase } from "@lumiere/erp-shared/row-values"
+import { stbTimestampToExactIso } from "@lumiere/erp-shared/stb-timestamp"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -46,8 +47,10 @@ export type AiActionDraftRow = {
   sourceQuery?: string | null
   executionError?: string | null
   executionRecordId?: number | string | null
-  expiresAt?: number | string | null
-  createDate?: number | string | null
+  expiresAt?: unknown
+  createDate?: unknown
+  reviewedAt?: unknown
+  executedAt?: unknown
   rejectReason?: string | null
   metadata?: string | null
 }
@@ -65,6 +68,9 @@ export type AiActionDraftPayload = {
   executionRecordId?: number | string | null
   executionRecordHref?: string
   expiresAt?: string | null
+  proposedAt?: string | null
+  reviewedAt?: string | null
+  executedAt?: string | null
   sourceQuery?: string | null
   companyId?: number
   workflowInstanceId?: number | string
@@ -155,8 +161,10 @@ function parseParamsJson(raw?: string | null): Record<string, unknown> {
   return {}
 }
 
-function timestampToIso(raw?: number | string | null): string | null {
-  if (raw == null || raw === "") return null
+function expiryToIso(raw: unknown): string | null {
+  const timestamp = stbTimestampToExactIso(raw)
+  if (timestamp) return timestamp
+  if ((typeof raw !== "number" && typeof raw !== "string") || raw === "") return null
   const numeric = Number(raw)
   if (!Number.isFinite(numeric)) return null
   const ms = numeric > 10_000_000_000 ? numeric / 1000 : numeric
@@ -206,7 +214,10 @@ export function aiActionDraftRowToPayload(row: AiActionDraftRow): AiActionDraftP
     executionError: row.executionError ?? null,
     executionRecordId,
     executionRecordHref: status === "approved" ? resolveActionDraftRecordHref(reducerName, executionRecordId) : undefined,
-    expiresAt: timestampToIso(row.expiresAt),
+    expiresAt: expiryToIso(row.expiresAt),
+    proposedAt: stbTimestampToExactIso(row.createDate),
+    reviewedAt: stbTimestampToExactIso(row.reviewedAt),
+    executedAt: stbTimestampToExactIso(row.executedAt),
     sourceQuery: row.sourceQuery ?? null,
     companyId: row.companyId != null ? safeDraftId(row.companyId) : undefined,
     workflowInstanceId,

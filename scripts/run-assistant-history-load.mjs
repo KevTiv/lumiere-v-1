@@ -581,6 +581,11 @@ try {
 } catch (error) {
   report.failure = String(error?.message ?? error)
   console.error(report.failure)
+  const apiLog = await readFile(join(logs, "api.log"), "utf8").catch(() => "")
+  const providerErrors = apiLog.split("\n")
+    .filter((line) => line.includes("business history provider read failed"))
+    .slice(-5)
+  for (const line of providerErrors) console.error(line)
   process.exitCode = 1
 } finally {
   if (groups.size) {

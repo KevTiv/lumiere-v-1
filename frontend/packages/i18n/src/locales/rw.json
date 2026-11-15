@@ -1,8 +1,20 @@
 {
+  "aiChat": {
+    "draft": {
+      "applied": "Byashyizwe mu bikorwa",
+      "proposedValue": "Agaciro kasabwe",
+      "beforeProposal": "Mbere y’icyifuzo",
+      "proposedAt": "Byasabwe",
+      "reviewedAt": "Byasuzumwe",
+      "appliedAt": "Byashyizwe mu bikorwa"
+    }
+  },
   "moduleRecords": {
     "shopSales": "Ibyagurishijwe mu maduka",
     "shop": "Iduka",
     "emptyShopSales": "Nta byagurishijwe mu maduka byabitswe.",
+    "saleDate": "Itariki y’igurisha",
+    "savedShopSale": "Igurisha ryo mu iduka ryabitswe",
     "sales": "Incamake y’ibyagurishijwe ku bakiriya",
     "warehouse": "Ibarura ryanditswe",
     "period": "Igihe cy’igurisha",
@@ -24,7 +36,17 @@
     "emptyCounts": "Nta barura ryabitswe.",
     "emptyFiltered": "Nta nyandiko zihuye n’amatariki cyangwa ibyinjijwe byatoranyijwe.",
     "otherCompany": "Hitamo sosiyete yakoreshejwe muri iri yinjiza kugira ngo urebe inyandiko zayo.",
-    "loadError": "Ntibishobotse kwerekana inyandiko."
+    "loadError": "Ntibishobotse kwerekana inyandiko.",
+    "recordHistory": "Reba amateka",
+    "recordHistoryLabel": "Reba amateka y’umurongo {{row}} wo muri {{file}}",
+    "savedSale": "Incamake y’ibyagurishijwe ku mukiriya yabitswe",
+    "savedCount": "Ibarura ryakozwe ryabitswe",
+    "recordUnavailable": "Iyi nyandiko yabitswe ntiboneka mu mwanya w’akazi urimo.",
+    "sourceCustomer": "Izina ry’umukiriya riri mu nkomoko",
+    "unit": "Igipimo kiri mu nkomoko",
+    "currency": "Ifaranga",
+    "savedAt": "Yabitswe ku wa",
+    "sourceRevision": "Ivugurura {{revision}}"
   },
   "aiHarness": {
     "platformProfile": {
@@ -120,6 +142,10 @@
     }
   },
   "recordChanges": {
+    "valueAbsent": "Umwanya udahari",
+    "valueRestricted": "Uburenganzira bugarukira",
+    "valueUnavailable": "Agaciro ntikanditswe",
+    "savedChange": "Impinduka yabitswe",
     "fields": {
       "name": "Ibisobanuro",
       "debit": "Debi",
@@ -4377,6 +4403,14 @@
     }
   },
   "settings": {
+    "importReview": {
+      "grouped": {
+        "rowStatus": "Imiterere y’umurongo",
+        "fieldConfirmation": "Kwemeza {{field}}",
+        "noDecisionChanges": "Nta gaciro kanditswe cyangwa imiterere y’isuzuma byahindutse.",
+        "proposedAfter": "Nyuma y’iki cyemezo"
+      }
+    },
     "page": {
       "title": "Igenamiterere",
       "description": "Gena konti yawe n’imikorere ya sisitemu"
@@ -5143,6 +5177,9 @@
     }
   },
   "businessHistory": {
+    "allActivity": "Ibikorwa byose",
+    "openChange": "Fungura impinduka",
+    "eventUnavailable": "Iyi mpinduka ntiboneka mu kigo kiri gukoreshwa cyangwa ku burenganzira bwawe.",
     "title": "Amateka n’inkomoko",
     "changes": "Impinduka",
     "activity": "Ibikorwa",

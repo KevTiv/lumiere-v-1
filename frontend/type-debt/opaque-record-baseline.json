@@ -118,7 +118,7 @@
   "packages/ui/src/accounting-components/partner-credit-control-panel.tsx": 3,
   "packages/ui/src/accounting-components/period-close-checklist.tsx": 7,
   "packages/ui/src/ai-chat/ai-action-draft-card.tsx": 2,
-  "packages/ui/src/ai-chat/ai-action-draft-diff-panel.tsx": 2,
+  "packages/ui/src/ai-chat/ai-action-draft-diff-panel.tsx": 1,
   "packages/ui/src/entity-views/entity-board-card.tsx": 2,
   "packages/ui/src/entity-views/entity-board.tsx": 7,
   "packages/ui/src/entity-views/entity-detail.tsx": 1,
