@@ -170,6 +170,29 @@ conflicting configuration block writes. Keep credentials in the existing server
 environment. An uncertain write stops; inspect exact state before another apply.
 Provision the current UTC monthly period without resetting previous use or holds.
 
+### Restore retrieval for an existing chat agent
+
+Use the private operator environment when the company already has an enabled
+`rag_generation` binding and its agent lacks query embedding admission. Supply
+`version: 1`, `organizationId`, `companyId`, `agentId`, `currency`,
+`pricesReviewedAt` and `unitsPer1k` in the private JSON manifest. The rate is the
+reviewed `mistral-embed` price in currency microunits per 1,000 tokens.
+
+```sh
+node scripts/provision-mistral-capabilities.mjs --check --chat-retrieval /private/chat-retrieval.json
+node scripts/provision-mistral-capabilities.mjs --apply --chat-retrieval /private/chat-retrieval.json
+node scripts/provision-mistral-capabilities.mjs --check --chat-retrieval /private/chat-retrieval.json
+```
+
+The first check reports missing entries with exit status 1. Review the result
+before applying. This mode resolves the existing company binding and its
+policy, preserves that binding, and adds only missing `embedding_query`,
+`mistral-embed` and the corresponding token meter. If a meter already exists at
+a different price, it stops for review. After readback, use a signed-in company
+session to ask about an authorized indexed source and verify the reply and
+its citation. On a retrieval failure, filter AI gateway logs for
+`Chat query embedding unavailable` and inspect the `stage` field.
+
 ## Document and activity flows
 
 Document ingestion resolves the current DMS document, version and stored blob,
