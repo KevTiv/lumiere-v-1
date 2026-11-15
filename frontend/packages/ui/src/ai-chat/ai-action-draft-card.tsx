@@ -1,8 +1,12 @@
 "use client"
 
 import { useEffect, useId, useRef, useState } from "react"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { useTranslation } from "@lumiere/i18n"
-import { isAiActionDraftOutcomeUnknown } from "@lumiere/query-hooks/hooks/ai-action-draft-result"
+import {
+  AiActionDraftOutcomeUnknown,
+  isAiActionDraftOutcomeUnknown,
+} from "@lumiere/query-hooks/hooks/ai-action-draft-result"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -24,9 +28,16 @@ import { AssistantActionCard } from "./assistant-action-card"
 interface AiActionDraftCardProps {
   draft: ChatActionDraftPayload
   scopeKey?: string
-  onApprove?: (draft: ChatActionDraftPayload) => Promise<void>
-  onReject?: (draft: ChatActionDraftPayload, reason?: string) => Promise<void>
-  onUpdateDraft?: (draft: ChatActionDraftPayload) => Promise<void>
+  onApprove?: (
+    draft: ChatActionDraftPayload,
+  ) => Promise<ChatActionDraftPayload | void>
+  onReject?: (
+    draft: ChatActionDraftPayload,
+    reason?: string,
+  ) => Promise<ChatActionDraftPayload | void>
+  onUpdateDraft?: (
+    draft: ChatActionDraftPayload,
+  ) => Promise<ChatActionDraftPayload | void>
   onRefresh?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload>
 }
 
@@ -84,14 +95,14 @@ const draftIntents = {
 } as const
 
 export function AiActionDraftCard({
-  draft,
+  draft: initialDraft,
   scopeKey,
   onApprove,
   onReject,
   onUpdateDraft,
   onRefresh,
 }: AiActionDraftCardProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const parametersId = useId()
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -104,9 +115,20 @@ export function AiActionDraftCard({
   >(null)
   const [error, setError] = useState<string | null>(null)
 
-  const attemptKey = attemptStorageKey(scopeKey, draft)
-  const currentAttempt = useRef(attemptKey)
-  currentAttempt.current = attemptKey
+  const draftKey = JSON.stringify([
+    scopeKey,
+    initialDraft.companyId,
+    initialDraft.draftId,
+  ])
+  const [readback, setReadback] = useState<{
+    key: string
+    draft: ChatActionDraftPayload
+  }>()
+  const observedDraft = readback?.key === draftKey ? readback.draft : undefined
+  const draft = observedDraft ?? initialDraft
+  const attemptKey = attemptStorageKey(scopeKey, initialDraft)
+  const currentDraftKey = useRef(draftKey)
+  currentDraftKey.current = draftKey
   const inFlight = useRef(false)
   const [outcomeUnknown, setOutcomeUnknown] = useState(() =>
     hasAttempt(attemptKey),
@@ -115,21 +137,34 @@ export function AiActionDraftCard({
   const refreshRef = useRef(onRefresh)
   refreshRef.current = onRefresh
 
+  const receiveReadback = (observed: ChatActionDraftPayload) => {
+    if (
+      observed.draftId !== initialDraft.draftId ||
+      (initialDraft.companyId != null &&
+        observed.companyId !== initialDraft.companyId)
+    ) {
+      throw new AiActionDraftOutcomeUnknown()
+    }
+    setReadback({ key: draftKey, draft: observed })
+  }
+
   // A restored chat card is presentation history; read the current row before review.
   useEffect(() => {
     let current = true
     const unresolved = hasAttempt(attemptKey)
     setOutcomeUnknown(unresolved)
     setError(null)
+    setReadback(undefined)
     setReadbackRequired(Boolean(refreshRef.current))
     inFlight.current = Boolean(refreshRef.current)
     if (refreshRef.current) {
       setBusy("refresh")
       void refreshRef
-        .current(draft)
+        .current(initialDraft)
         .then((observed) => {
+          if (!current || currentDraftKey.current !== draftKey) return
+          receiveReadback(observed)
           if (isTerminalDraft(observed)) clearAttempt(attemptKey)
-          if (!current) return
           setReadbackRequired(false)
           setOutcomeUnknown(unresolved && !isTerminalDraft(observed))
           if (unresolved && !isTerminalDraft(observed))
@@ -153,7 +188,7 @@ export function AiActionDraftCard({
     return () => {
       current = false
     }
-  }, [draft.draftId, draft.companyId, attemptKey])
+  }, [draftKey, attemptKey])
 
   const handleRefresh = async () => {
     if (!onRefresh || inFlight.current) return
@@ -163,8 +198,9 @@ export function AiActionDraftCard({
     setError(null)
     try {
       const observed = await onRefresh(draft)
+      if (currentDraftKey.current !== draftKey) return
+      receiveReadback(observed)
       if (isTerminalDraft(observed)) clearAttempt(key)
-      if (currentAttempt.current !== key) return
       if ((outcomeUnknown || hasAttempt(key)) && !isTerminalDraft(observed)) {
         setError(
           "The outcome is still unconfirmed. No action has been retried.",
@@ -176,13 +212,13 @@ export function AiActionDraftCard({
       setConfirmedReview(false)
       setConfirmedElevated(false)
     } catch {
-      if (currentAttempt.current !== key) return
+      if (currentDraftKey.current !== draftKey) return
       setReadbackRequired(true)
       setError(
         "The saved draft could not be checked. No action has been retried.",
       )
     } finally {
-      if (currentAttempt.current === key) {
+      if (currentDraftKey.current === draftKey) {
         inFlight.current = false
         setBusy(null)
       }
@@ -191,7 +227,7 @@ export function AiActionDraftCard({
 
   const performMutation = async (
     kind: "approve" | "reject" | "save",
-    action: () => Promise<void>,
+    action: () => Promise<ChatActionDraftPayload | void>,
   ) => {
     if (
       inFlight.current ||
@@ -213,17 +249,22 @@ export function AiActionDraftCard({
     setBusy(kind)
     setError(null)
     try {
-      await action()
+      const observed = await action()
+      if (currentDraftKey.current !== draftKey) {
+        clearAttempt(key)
+        return
+      }
+      if (observed) receiveReadback(observed)
       clearAttempt(key)
-      if (currentAttempt.current === key && kind === "save") setEditing(false)
+      if (kind === "save") setEditing(false)
     } catch (err) {
       const uncertain = isAiActionDraftOutcomeUnknown(err)
       if (!uncertain) clearAttempt(key)
-      if (currentAttempt.current !== key) return
+      if (currentDraftKey.current !== draftKey) return
       setOutcomeUnknown(uncertain)
       setError(err instanceof Error ? err.message : String(err))
     } finally {
-      if (currentAttempt.current === key) {
+      if (currentDraftKey.current === draftKey) {
         inFlight.current = false
         setBusy(null)
       }
@@ -232,6 +273,24 @@ export function AiActionDraftCard({
 
   const status = draft.status ?? "pending"
   const isPending = status === "pending"
+  const reducerName = draft.reducerName.trim()
+  const intent = Object.hasOwn(draftIntents, reducerName)
+    ? draftIntents[reducerName as keyof typeof draftIntents]
+    : undefined
+  const needsReadback = readbackRequired || (!!onRefresh && !observedDraft)
+  const confirmed = !outcomeUnknown && !needsReadback && busy == null
+  const rawRecordId = draft.executionRecordId
+  const executionId =
+    typeof rawRecordId === "string" && !/^[1-9]\d*$/.test(rawRecordId)
+      ? undefined
+      : parseStrictU64(rawRecordId)
+  const savedEffect =
+    confirmed &&
+    !!intent &&
+    status === "approved" &&
+    !draft.executionError &&
+    executionId != null &&
+    executionId > 0n
   const statusLabel =
     busy === "refresh"
       ? t("aiChat.draft.checking", { defaultValue: "Checking saved draft…" })
@@ -239,7 +298,7 @@ export function AiActionDraftCard({
         ? t("aiChat.draft.outcomeUnconfirmed", {
             defaultValue: "Outcome unconfirmed",
           })
-        : readbackRequired
+        : needsReadback
           ? t("aiChat.draft.checkRequired", {
               defaultValue: "Saved status needs checking",
             })
@@ -253,9 +312,9 @@ export function AiActionDraftCard({
                   pending: t("aiChat.draft.awaitingReview", {
                     defaultValue: "Awaiting review",
                   }),
-                  approved: t("aiChat.draft.approved", {
-                    defaultValue: "Approved",
-                  }),
+                  approved: savedEffect
+                    ? t("aiChat.draft.applied", { defaultValue: "Applied" })
+                    : t("aiChat.draft.approved", { defaultValue: "Approved" }),
                   rejected: t("aiChat.draft.rejected", {
                     defaultValue: "Rejected",
                   }),
@@ -266,27 +325,25 @@ export function AiActionDraftCard({
                 }[status]
   const statusTone = busy
     ? "working"
-    : outcomeUnknown || readbackRequired
+    : outcomeUnknown || needsReadback
       ? "warning"
       : status === "failed"
         ? "error"
-        : status === "approved"
+        : savedEffect
           ? "success"
           : "neutral"
-  const reducerName = draft.reducerName.trim()
-  const intent = Object.hasOwn(draftIntents, reducerName)
-    ? draftIntents[reducerName as keyof typeof draftIntents]
-    : undefined
   const title = intent
     ? t(`aiChat.draft.intent.${intent.key}`, { defaultValue: intent.label })
     : t("aiChat.draft.title", { defaultValue: "ERP action draft" })
-  const savedEffect =
-    draft.executionRecordId != null &&
-    status === "approved" &&
-    !readbackRequired &&
-    !outcomeUnknown
   const isReversal = reducerName === "reverse_payment_transaction"
   const paramsPreview = JSON.stringify(draft.paramsJson, null, 2)
+  const dates = confirmed
+    ? ([
+        [t("aiChat.draft.proposedAt"), draft.proposedAt],
+        [t("aiChat.draft.reviewedAt"), draft.reviewedAt],
+        [t("aiChat.draft.appliedAt"), savedEffect ? draft.executedAt : null],
+      ] as const)
+    : []
 
   useEffect(() => {
     setEditJson(paramsPreview)
@@ -305,7 +362,7 @@ export function AiActionDraftCard({
   const canApprove =
     isPending &&
     !outcomeUnknown &&
-    !readbackRequired &&
+    !needsReadback &&
     confirmedReview &&
     (!draft.elevated || confirmedElevated) &&
     (!editing || editJson === paramsPreview)
@@ -315,7 +372,7 @@ export function AiActionDraftCard({
       !onUpdateDraft ||
       !isPending ||
       outcomeUnknown ||
-      readbackRequired ||
+      needsReadback ||
       busy != null
     )
       return
@@ -391,7 +448,7 @@ export function AiActionDraftCard({
               <Button
                 size="sm"
                 variant={
-                  outcomeUnknown || readbackRequired ? "outline" : "default"
+                  outcomeUnknown || needsReadback ? "outline" : "default"
                 }
                 data-testid="ai-action-draft-approve"
                 disabled={busy != null || !canApprove}
@@ -413,7 +470,7 @@ export function AiActionDraftCard({
                 size="sm"
                 variant="ghost"
                 data-testid="ai-action-draft-reject"
-                disabled={busy != null || outcomeUnknown || readbackRequired}
+                disabled={busy != null || outcomeUnknown || needsReadback}
                 onClick={() => void handleReject()}
               >
                 {busy === "reject" ? (
@@ -434,6 +491,25 @@ export function AiActionDraftCard({
         )
       }
     >
+      {dates.some(([, date]) => date) ? (
+        <dl className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
+          {dates.map(([label, date]) =>
+            date ? (
+              <div key={label} className="space-y-0.5">
+                <dt className="text-muted-foreground">{label}</dt>
+                <dd>
+                  <time dateTime={date}>
+                    {new Date(date).toLocaleString(i18n.resolvedLanguage, {
+                      timeZoneName: "short",
+                    })}
+                  </time>
+                </dd>
+              </div>
+            ) : null,
+          )}
+        </dl>
+      ) : null}
+
       {(draft.expiresAt && isPending) ||
       draft.elevated ||
       draft.warnings.length > 0 ||
@@ -495,7 +571,7 @@ export function AiActionDraftCard({
                   defaultValue: isReversal
                     ? "Saved payment reversal #{{id}}"
                     : "Created record #{{id}}",
-                  id: draft.executionRecordId,
+                  id: String(executionId),
                 },
               )}
             </p>
@@ -513,14 +589,12 @@ export function AiActionDraftCard({
         </div>
       ) : null}
 
-      {isPending ? (
-        <AiActionDraftDiffPanel
-          draft={draft}
-          reviewed={confirmedReview}
-          onReviewedChange={setConfirmedReview}
-          nested
-        />
-      ) : null}
+      <AiActionDraftDiffPanel
+        draft={draft}
+        reviewed={confirmedReview}
+        onReviewedChange={setConfirmedReview}
+        nested
+      />
 
       <div className="border-t border-border/60 pt-1">
         <div className="flex items-center justify-between gap-2">
@@ -544,7 +618,7 @@ export function AiActionDraftCard({
               size="sm"
               variant="ghost"
               className="h-6 px-2 text-xs gap-1"
-              disabled={busy != null || outcomeUnknown || readbackRequired}
+              disabled={busy != null || outcomeUnknown || needsReadback}
               onClick={() => {
                 setExpanded(true)
                 setEditing((v) => !v)
@@ -578,7 +652,7 @@ export function AiActionDraftCard({
                   type="button"
                   size="sm"
                   className="min-h-8 text-xs"
-                  disabled={busy != null || outcomeUnknown || readbackRequired}
+                  disabled={busy != null || outcomeUnknown || needsReadback}
                   onClick={() => void handleSaveParams()}
                 >
                   {busy === "save" ? (

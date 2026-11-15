@@ -440,10 +440,37 @@ async fn save_bulk(
     Ok(Json(json!({"results":items})))
 }
 
-const HISTORY_SELECT: &str = "SELECT decision.item_id::text,decision.revision,decision.proposed_json,decision.confirmed_fields,decision.state,decision.reason,decision.actor_identity,decision.created_at::text,coalesce(previous.proposed_json,item.source_json->'proposed') AS previous_values,coalesce(previous.confirmed_fields,'[]'::jsonb) AS previous_confirmed_fields,coalesce(previous.state,'needs_review') AS previous_state FROM lumiere_platform.import_review_decision decision JOIN lumiere_platform.import_review_item item ON item.id=decision.item_id AND item.organization_id=decision.organization_id AND item.company_id=decision.company_id LEFT JOIN lumiere_platform.import_review_decision previous ON previous.item_id=decision.item_id AND previous.organization_id=decision.organization_id AND previous.company_id=decision.company_id AND previous.revision=decision.revision-1";
+// The initial proposal is revision 1 and precedes the first saved decision.
+const HISTORY_SELECT: &str = "SELECT decision.item_id::text, decision.revision, decision.proposed_json,
+    decision.confirmed_fields, decision.state, decision.reason, decision.actor_identity,
+    decision.created_at::text,
+    CASE WHEN previous.revision IS NULL AND decision.revision = 2
+         THEN item.source_json->'proposed' ELSE previous.proposed_json END AS previous_values,
+    CASE WHEN previous.revision IS NULL AND decision.revision = 2
+         THEN '[]'::jsonb ELSE previous.confirmed_fields END AS previous_confirmed_fields,
+    CASE WHEN previous.revision IS NULL AND decision.revision = 2
+         THEN 'needs_review' ELSE previous.state END AS previous_state
+    FROM lumiere_platform.import_review_decision decision
+    JOIN lumiere_platform.import_review_item item ON item.id = decision.item_id
+        AND item.organization_id = decision.organization_id AND item.company_id = decision.company_id
+    LEFT JOIN lumiere_platform.import_review_decision previous ON previous.item_id = decision.item_id
+        AND previous.organization_id = decision.organization_id AND previous.company_id = decision.company_id
+        AND previous.revision = decision.revision - 1";
 
 fn history_json(row: &Row) -> Value {
-    json!({"itemId":row.get::<_,String>("item_id"),"revision":row.get::<_,i32>("revision"),"values":row.get::<_,Value>("proposed_json"),"confirmedFields":row.get::<_,Value>("confirmed_fields"),"state":row.get::<_,String>("state"),"reason":row.get::<_,String>("reason"),"actor":row.get::<_,String>("actor_identity"),"createdAt":row.get::<_,String>("created_at"),"previousValues":row.get::<_,Value>("previous_values"),"previousConfirmedFields":row.get::<_,Value>("previous_confirmed_fields"),"previousState":row.get::<_,String>("previous_state")})
+    json!({
+        "itemId": row.get::<_, String>("item_id"),
+        "revision": row.get::<_, i32>("revision"),
+        "values": row.get::<_, Value>("proposed_json"),
+        "confirmedFields": row.get::<_, Value>("confirmed_fields"),
+        "state": row.get::<_, String>("state"),
+        "reason": row.get::<_, String>("reason"),
+        "actor": row.get::<_, String>("actor_identity"),
+        "createdAt": row.get::<_, String>("created_at"),
+        "previousValues": row.get::<_, Option<Value>>("previous_values"),
+        "previousConfirmedFields": row.get::<_, Option<Value>>("previous_confirmed_fields"),
+        "previousState": row.get::<_, Option<String>>("previous_state"),
+    })
 }
 
 async fn history(

@@ -222,5 +222,34 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
     ensure!(entry["previousValues"]["quantity"].is_null());
     ensure!(entry["previousConfirmedFields"] == json!(["unit_price"]));
     ensure!(entry["previousState"] == "needs_review");
+
+    let client = pool.get().await?;
+    let initial = client
+        .query_one(
+            &format!("{HISTORY_SELECT} WHERE decision.item_id=$1 AND decision.revision=2"),
+            &[&id],
+        )
+        .await?;
+    let initial = history_json(&initial);
+    ensure!(initial["previousValues"] == serde_json::to_value(&dataset.items[0].proposed)?);
+    ensure!(initial["previousConfirmedFields"] == json!([]));
+    ensure!(initial["previousState"] == "needs_review");
+
+    client
+        .execute(
+            "DELETE FROM lumiere_platform.import_review_decision WHERE item_id=$1 AND revision=4",
+            &[&id],
+        )
+        .await?;
+    let gap = client
+        .query_one(
+            &format!("{HISTORY_SELECT} WHERE decision.item_id=$1 AND decision.revision=5"),
+            &[&id],
+        )
+        .await?;
+    let gap = history_json(&gap);
+    ensure!(gap["previousValues"].is_null());
+    ensure!(gap["previousConfirmedFields"].is_null());
+    ensure!(gap["previousState"].is_null());
     Ok(())
 }

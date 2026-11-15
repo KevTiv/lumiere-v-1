@@ -1,8 +1,25 @@
 {
+  "aiChat": {
+    "draft": {
+      "applied": "Imetekelezwa",
+      "proposedValue": "Thamani iliyopendekezwa",
+      "beforeProposal": "Kabla ya pendekezo",
+      "proposedAt": "Ilipendekezwa",
+      "reviewedAt": "Ilikaguliwa",
+      "appliedAt": "Ilitekelezwa"
+    }
+  },
+  "businessHistory": {
+    "allActivity": "Shughuli zote",
+    "openChange": "Fungua badiliko",
+    "eventUnavailable": "Badiliko hili halipatikani kwa kampuni ya sasa au ruhusa zako."
+  },
   "moduleRecords": {
     "shopSales": "Mauzo ya dukani",
     "shop": "Duka",
     "emptyShopSales": "Hakuna mauzo ya dukani yaliyohifadhiwa.",
+    "saleDate": "Tarehe ya mauzo",
+    "savedShopSale": "Mauzo ya dukani yaliyohifadhiwa",
     "sales": "Muhtasari wa mauzo kwa wateja",
     "warehouse": "Hesabu zilizorekodiwa",
     "period": "Kipindi cha mauzo",
@@ -24,7 +41,17 @@
     "emptyCounts": "Hakuna hesabu iliyohifadhiwa.",
     "emptyFiltered": "Hakuna rekodi zinazolingana na tarehe au uingizaji uliochaguliwa.",
     "otherCompany": "Chagua kampuni iliyotumika kuingiza data hii ili kuona rekodi zake.",
-    "loadError": "Imeshindwa kupakia rekodi."
+    "loadError": "Imeshindwa kupakia rekodi.",
+    "recordHistory": "Tazama historia",
+    "recordHistoryLabel": "Tazama historia ya safu mlalo ya {{row}} katika {{file}}",
+    "savedSale": "Muhtasari wa mauzo ya mteja uliohifadhiwa",
+    "savedCount": "Hesabu halisi iliyohifadhiwa",
+    "recordUnavailable": "Rekodi hii iliyohifadhiwa haipatikani katika eneo lako la kazi la sasa.",
+    "sourceCustomer": "Jina la mteja kwenye chanzo",
+    "unit": "Kipimo cha chanzo",
+    "currency": "Sarafu",
+    "savedAt": "Ilihifadhiwa",
+    "sourceRevision": "Toleo la {{revision}}"
   },
   "aiHarness": {
     "platformProfile": {
@@ -120,6 +147,10 @@
     }
   },
   "recordChanges": {
+    "valueAbsent": "Sehemu haipo",
+    "valueRestricted": "Imezuiliwa",
+    "valueUnavailable": "Thamani haikurekodiwa",
+    "savedChange": "Badiliko limehifadhiwa",
     "fields": {
       "name": "Maelezo",
       "debit": "Debiti",
@@ -4378,6 +4409,14 @@
     }
   },
   "settings": {
+    "importReview": {
+      "grouped": {
+        "rowStatus": "Hali ya safu mlalo",
+        "fieldConfirmation": "Uthibitisho wa {{field}}",
+        "noDecisionChanges": "Hakuna thamani iliyorekodiwa au hali ya ukaguzi iliyobadilika.",
+        "proposedAfter": "Baada ya uamuzi huu"
+      }
+    },
     "page": {
       "title": "Mipangilio",
       "description": "Dhibiti akaunti yako na mipangilio ya mfumo"

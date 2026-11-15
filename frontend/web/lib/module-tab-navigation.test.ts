@@ -1,6 +1,11 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { moduleBackfillHref } from "./module-backfill-navigation"
+import {
+  isModuleBackfillRecordId,
+  moduleBackfillHref,
+  moduleBackfillRecordHref,
+} from "./module-backfill-navigation"
+import { moduleBackfillSavedFields } from "./module-backfill-record"
 import { moduleTabDestination } from "./module-tab-navigation"
 
 const base = { pathname: "/accounting", defaultTab: "dashboard", validTabs: ["dashboard", "invoices", "bills"] }
@@ -42,4 +47,105 @@ test("import results open their owning list and keep the task filter on that tab
       pathname, query: search, tab: defaultTab, defaultTab, validTabs: [tab, defaultTab],
     }), `/${workspace}`)
   }
+})
+
+test("exact saved record links retain company scope and clear on tab changes", () => {
+  const id = "9223372036854775807"
+  assert.equal(isModuleBackfillRecordId(id), true)
+  for (const invalid of [null, 1, "0", "001", "-1", "9223372036854775808"]) {
+    assert.equal(isModuleBackfillRecordId(invalid), false)
+  }
+  const taskId = "a".repeat(32)
+  const href = moduleBackfillRecordHref(
+    "warehouse",
+    { companyId: 7, recordId: id, taskId },
+    "tab=recorded-counts&company=7&backfillCompany=3&backfillRecord=12",
+  )
+  const { pathname, search, searchParams } = new URL(href, "https://example.test")
+  assert.deepEqual(
+    [searchParams.get("backfillCompany"), searchParams.get("backfillRecord"), searchParams.get("backfillTask")],
+    ["7", id, taskId],
+  )
+  assert.equal(moduleTabDestination({
+    pathname, query: search, tab: "stock", defaultTab: "stock", validTabs: ["recorded-counts", "stock"],
+  }), "/warehouse?company=7")
+
+  const matchedHref = moduleBackfillRecordHref(
+    "sales",
+    { companyId: 7, recordId: id },
+    `backfillTask=${taskId}`,
+  )
+  assert.equal(matchedHref, `/sales?tab=customer-sales&backfillCompany=7&backfillRecord=${id}`)
+})
+
+test("recorded count details show stored observations with exact measurement strings", () => {
+  const fields = moduleBackfillSavedFields(
+    {
+      kind: "warehouse",
+      product: "Whole chicken",
+      pieces: "0",
+      kilograms: "0.000",
+      location: null,
+    },
+    (key) => key,
+  )
+  assert.deepEqual(
+    fields.map(({ id, before, after }) => [id, before.kind, after]),
+    [
+      ["product", "absent", { kind: "value", value: "Whole chicken" }],
+      ["pieces", "absent", { kind: "value", value: "0" }],
+      ["kilograms", "absent", { kind: "value", value: "0.000" }],
+      ["location", "absent", { kind: "value", value: null }],
+    ],
+  )
+})
+
+test("sales summary details preserve currency, exact decimals and incomplete source facts", () => {
+  const fields = moduleBackfillSavedFields(
+    {
+      kind: "sales",
+      customer: "Lemigo Hotel",
+      product: "Whole chicken",
+      quantity: "12.00",
+      unit: null,
+      unitPrice: "5000.000",
+      amount: "60000.00",
+      currency: "RWF",
+      reportedPayment: "",
+    },
+    (key) => key,
+  )
+  assert.deepEqual(
+    Object.fromEntries(fields.map(({ id, after }) => [id, after])),
+    {
+      customer: { kind: "value", value: "Lemigo Hotel" },
+      sourceCustomer: { kind: "unavailable" },
+      product: { kind: "value", value: "Whole chicken" },
+      quantity: { kind: "value", value: "12.00" },
+      unit: { kind: "value", value: null },
+      unitPrice: { kind: "value", value: "5000.000" },
+      amount: { kind: "value", value: "60000.00" },
+      currency: { kind: "value", value: "RWF" },
+      reportedPayment: { kind: "value", value: "" },
+    },
+  )
+})
+
+test("shop sale receipts open an exact Sales record with its stored shop and prices", () => {
+  assert.equal(
+    moduleBackfillRecordHref("shop_sales", { companyId: 7, recordId: "51" }),
+    "/sales?tab=shop-sales&backfillCompany=7&backfillRecord=51",
+  )
+  const fields = moduleBackfillSavedFields({
+    kind: "shop_sale",
+    shop: "Kicukiro",
+    product: "Whole chicken",
+    quantity: "12.00",
+    unit: null,
+    unitPrice: "5000.000",
+    amount: "60000.00",
+    currency: "RWF",
+  }, (key) => key)
+  assert.deepEqual(fields.map(({ id }) => id), ["shop", "product", "quantity", "unit", "unitPrice", "amount", "currency"])
+  assert.deepEqual(fields.find(({ id }) => id === "unitPrice")?.after, { kind: "value", value: "5000.000" })
 })

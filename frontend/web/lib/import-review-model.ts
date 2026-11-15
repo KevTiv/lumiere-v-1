@@ -63,13 +63,13 @@ export type ReviewHistory = {
   revision: number
   values: Record<string, string | null>
   confirmedFields?: string[]
-  state: string
+  state: ReviewRow["state"]
   reason: string
   actor: string
   createdAt: string
-  previousValues?: Record<string, string | null>
-  previousConfirmedFields?: string[]
-  previousState?: ReviewRow["state"]
+  previousValues?: Record<string, string | null> | null
+  previousConfirmedFields?: string[] | null
+  previousState?: ReviewRow["state"] | null
 }
 export type ReviewDetail = {
   id: string
