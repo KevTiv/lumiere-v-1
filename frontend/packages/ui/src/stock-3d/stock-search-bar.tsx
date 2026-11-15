@@ -9,7 +9,7 @@ import { Badge } from '../components/badge'
 import { ScrollArea } from '../components/scroll-area'
 import { Search, X, MapPin, Package } from 'lucide-react'
 import { useWarehouse3DContext } from './warehouse-3d-context'
-import { CATEGORY_COLORS } from './types'
+import { stockCategoryColor, isLowStockItem } from './types'
 
 interface StockSearchBarProps {
   className?: string
@@ -98,7 +98,7 @@ export function StockSearchBar({ className, onNavigateToItem }: StockSearchBarPr
               {searchResults.map((result) => {
                 if (!result) return null
                 const { item, slot, zone } = result
-                const isLowStock = item.minStock !== undefined && item.quantity <= item.minStock
+                const isLowStock = isLowStockItem(item)
 
                 return (
                   <button
@@ -108,11 +108,11 @@ export function StockSearchBar({ className, onNavigateToItem }: StockSearchBarPr
                   >
                     <div
                       className="w-8 h-8 rounded-md flex items-center justify-center mt-0.5"
-                      style={{ backgroundColor: CATEGORY_COLORS[item.category] + '20' }}
+                      style={{ backgroundColor: stockCategoryColor(item.category) + '20' }}
                     >
                       <Package
                         className="h-4 w-4"
-                        style={{ color: CATEGORY_COLORS[item.category] }}
+                        style={{ color: stockCategoryColor(item.category) }}
                       />
                     </div>
                     <div className="flex-1 min-w-0">

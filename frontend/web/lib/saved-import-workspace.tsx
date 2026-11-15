@@ -37,12 +37,14 @@ import type { ReviewedImportSource } from "./import-review-model"
 import { canPrepareInspectedImport, type ChatImportTask } from "./chat-import-task"
 import { DocumentViewerDialog } from "../components/document-viewer-dialog"
 import { ImportPreparationPanel } from "./import-preparation-panel"
+import type { ImportPreparationSection } from "./import-preparation"
 
 export function SavedImportWorkspace({
   scope,
   taskId,
   view,
   initialReviewId,
+  preparationTarget,
   inspectionOnly = false,
   onNavigate,
   onBack,
@@ -53,6 +55,7 @@ export function SavedImportWorkspace({
   taskId: string
   view: ImportTaskView
   initialReviewId?: string
+  preparationTarget?: ImportPreparationSection["targetEntity"]
   inspectionOnly?: boolean
   onNavigate: (view: ImportTaskView, reviewId?: string) => void
   onBack: () => void
@@ -585,6 +588,7 @@ export function SavedImportWorkspace({
           {allowImport && !managedSelection ? (
             <ImportPreparationPanel
               task={task}
+              defaultDestination={preparationTarget}
               organizationId={scope.organizationId}
               companyId={scope.companyId}
               onPrepared={onTaskChange}

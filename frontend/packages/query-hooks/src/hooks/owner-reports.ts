@@ -21,6 +21,7 @@ import type {
   MarginSupplyScenario,
 } from "@lumiere/erp-shared/report-schemas"
 
+import { httpResponseError } from "@lumiere/api-client/response-error"
 import { apiFetch, rqBigIntKey } from "../http"
 
 export type { ReportCatalogV1, ReportKey, ReportPreview, ReportPreviewRequest }
@@ -44,7 +45,7 @@ export function useReportCatalog(organizationId: bigint) {
     queryFn: async () => {
       const response = await apiFetch("/api/reports/catalog")
       if (!response.ok) {
-        throw new Error("Failed to fetch report catalog")
+        throw await httpResponseError(response, "Failed to fetch report catalog")
       }
       return response.json() as Promise<ReportCatalogV1>
     },
@@ -102,17 +103,38 @@ export function useGeneratedOwnerReportHistory(organizationId: bigint, companyId
   })
 }
 
-export interface OwnerReportScheduleInput {
-  name: string
-  companyId: number
-  reportKey: ReportKey
+type OwnerReportScheduleTiming = {
   frequency: "daily" | "weekly" | "monthly"
   hour: number
   minute: number
   timezone: string
+}
+
+export interface OwnerReportScheduleInput extends OwnerReportScheduleTiming {
+  name: string
+  companyId: number
+  reportKey: ReportKey
   recipientIdentities: string[]
-  nextRun: string
   isActive?: boolean
+}
+
+export function useOwnerReportSchedulePreview(organizationId: bigint, timing: OwnerReportScheduleTiming, enabled: boolean) {
+  return useQuery<{ nextRun: string }>({
+    queryKey: [OWNER_REPORTS_QUERY_KEY, "schedule-preview", rqBigIntKey(organizationId), timing],
+    enabled,
+    refetchInterval: 30_000,
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams({
+        frequency: timing.frequency,
+        hour: String(timing.hour),
+        minute: String(timing.minute),
+        timezone: timing.timezone,
+      })
+      const response = await apiFetch(`/api/reports/schedules/preview?${params}`, { signal })
+      if (!response.ok) throw new Error("Failed to preview the next delivery")
+      return response.json() as Promise<{ nextRun: string }>
+    },
+  })
 }
 
 export function useOwnerReportSchedules(organizationId: bigint, companyId?: number) {
@@ -149,7 +171,7 @@ export function useRunOwnerReportSchedule() {
 }
 
 export function useUpdateOwnerReportSchedule() {
-  return useMutation<void, Error, { scheduleId: number; input: Partial<OwnerReportScheduleInput> }>({
+  return useMutation<void, Error, { scheduleId: number; input: Partial<OwnerReportScheduleInput> & { nextRun?: string } }>({
     mutationFn: async ({ scheduleId, input }) => {
       const response = await apiFetch(`/api/reports/schedules/${scheduleId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),

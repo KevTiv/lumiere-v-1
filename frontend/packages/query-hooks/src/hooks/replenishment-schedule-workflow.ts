@@ -37,10 +37,10 @@ export function useReplenishmentScheduleWorkflow(
   const fetchRows = useMemo(
     () => async () =>
       (await qc.fetchQuery({
-        ...replenishmentRulesQueryOptions(organizationId),
+        ...replenishmentRulesQueryOptions(organizationId, companyId),
         staleTime: 0,
       })) as unknown as RowValueMap[],
-    [organizationId, qc],
+    [companyId, organizationId, qc],
   )
 
   const scheduleSpec = useMemo<TransitionSpec<ScheduleRunInput>>(

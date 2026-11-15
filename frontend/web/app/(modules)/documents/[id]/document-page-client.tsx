@@ -245,7 +245,6 @@ function DocumentPageLoaded({
   const { data: folders = [] } = useDocumentFolders(orgId);
   const versionsQuery = useDocumentVersions(orgId, initialVersions as never);
   const { data: versions = [] } = versionsQuery;
-  const holdsQuery = useDocumentLegalHolds(orgId);
   const signaturesQuery = useDocumentSignatureRequests(orgId);
   const externalRefsQuery = useDocumentExternalRefs(orgId);
 
@@ -298,10 +297,18 @@ function DocumentPageLoaded({
     setPreview(null);
   }, [orgId, operatingCompanyId, documentId, session.identity, uploads.canVersion]);
 
-  const activeHold = useMemo(
-    () => activeLegalHold((holdsQuery.data ?? []) as unknown as Row[], documentId),
-    [holdsQuery.data, documentId],
-  );
+  const holdCompanyId = documentViewerCompanyId(document) ?? (operatingCompanyId > 0n ? operatingCompanyId : undefined);
+  const holdsQuery = useDocumentLegalHolds(orgId, holdCompanyId, session.identity, Boolean(document && document.isDeleted !== true));
+  const holdState = moduleQueryState(holdsQuery);
+  const holdVerified = holdState.status === 'ready' && holdsQuery.isSuccess;
+  const activeHold = holdVerified ? activeLegalHold(holdsQuery.data ?? [], documentId) : undefined;
+  const holdActionReady = holdVerified && !holdsQuery.isFetching && !applyLegalHold.isPending && !releaseLegalHold.isPending;
+  const canManageHold = permissionsReady === true && checkPermission('document', 'admin').allowed;
+  const releasableHold = holdActionReady && canManageHold && activeHold
+    ? `${orgId}:${session.identity}:${holdCompanyId}:${documentId}:${String(activeHold.id)}`
+    : null;
+  const currentReleasableHold = useRef(releasableHold);
+  currentReleasableHold.current = releasableHold;
   const signatures = useMemo(
     () => signatureRequestRows(rowsForDocument((signaturesQuery.data ?? []) as unknown as Row[], documentId)),
     [signaturesQuery.data, documentId],
@@ -405,7 +412,7 @@ function DocumentPageLoaded({
   const holdDate = activeHold?.heldAt ?? activeHold?.held_at;
 
   const releaseHold = async () => {
-    if (!activeHold) return;
+    if (!activeHold || !releasableHold) return;
     const ok = await confirm({
       title: t('documents.page.releaseHoldTitle', { defaultValue: 'Release legal hold?' }),
       description: (
@@ -429,6 +436,9 @@ function DocumentPageLoaded({
     const note = releaseNoteRef.current?.value.trim();
     if (!ok) return;
     await run('Release legal hold', async () => {
+      if (currentReleasableHold.current !== releasableHold) {
+        throw new Error(t('documents.page.holdStatusChanged', { defaultValue: 'Legal hold status changed or is unavailable. Check the current status and try again.' }));
+      }
       await releaseLegalHold.mutateAsync({ holdId: activeHold.id as bigint | number | string, metadata: note || undefined });
       showWorkflowToast({ kind: 'success', title: 'Legal hold released', description: label });
     });
@@ -480,6 +490,9 @@ function DocumentPageLoaded({
         if (params.folderId !== null && !folders.some((folder) => String(folder.id) === params.folderId)) throw new Error('Select an available folder');
         await moveDocument.mutateAsync({ kind: 'moveDocument', id, folderId: params.folderId });
       } else if (formAction === 'legalHold') {
+        if (!holdActionReady || !canManageHold || activeHold) {
+          throw new Error(t('documents.page.holdStatusChanged', { defaultValue: 'Legal hold status changed or is unavailable. Check the current status and try again.' }));
+        }
         const reason = legalHoldReason(formData.reason);
         if (!reason) throw new Error('A reason is required');
         await applyLegalHold.mutateAsync({ documentId: id, reason });
@@ -634,19 +647,25 @@ function DocumentPageLoaded({
                     <DropdownMenuItem data-testid="document-action-retention" onSelect={() => setFormAction('setRetention')}>
                       {t('documents.page.setRetention', { defaultValue: 'Set retention' })}
                     </DropdownMenuItem>
-                    {isHeld ? (
-                      <DropdownMenuItem
-                        disabled={releaseLegalHold.isPending}
-                        data-testid="document-action-release-hold"
-                        onSelect={() => void releaseHold()}
-                      >
-                        {t('documents.page.releaseHold', { defaultValue: 'Release hold' })}
-                      </DropdownMenuItem>
-                    ) : (
-                      <DropdownMenuItem data-testid="document-action-legal-hold" onSelect={() => setFormAction('legalHold')}>
-                        {t('documents.page.legalHold', { defaultValue: 'Legal hold' })}
-                      </DropdownMenuItem>
-                    )}
+                    {canManageHold && holdVerified ? (
+                      isHeld ? (
+                        <DropdownMenuItem
+                          disabled={!holdActionReady}
+                          data-testid="document-action-release-hold"
+                          onSelect={() => void releaseHold()}
+                        >
+                          {t('documents.page.releaseHold', { defaultValue: 'Release hold' })}
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem
+                          disabled={!holdActionReady}
+                          data-testid="document-action-legal-hold"
+                          onSelect={() => setFormAction('legalHold')}
+                        >
+                          {t('documents.page.legalHold', { defaultValue: 'Legal hold' })}
+                        </DropdownMenuItem>
+                      )
+                    ) : null}
                     {canRequestSignature(document) && checkPermission('document', 'write').allowed ? (
                       <DropdownMenuItem data-testid="document-action-request-signature" onSelect={() => setFormAction('requestSignature')}>
                         {t('documents.page.requestSignature', { defaultValue: 'Request signature' })}
@@ -655,7 +674,7 @@ function DocumentPageLoaded({
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"
-                      disabled={busy || isHeld}
+                      disabled={busy || !holdActionReady || isHeld}
                       data-testid="document-action-delete"
                       onSelect={() => setConfirmDelete(true)}
                     >
@@ -675,6 +694,18 @@ function DocumentPageLoaded({
             label: t('common.overview', { defaultValue: 'Overview' }),
             content: (
               <div className="space-y-4">
+                {!isDeleted && !holdVerified ? (
+                  <div data-testid="document-legal-hold-status" className="text-sm">
+                    {holdState.status === 'loading' || holdState.status === 'ready' ? (
+                      <p role="status">{t('documents.page.loadingHold', { defaultValue: 'Checking legal hold status…' })}</p>
+                    ) : (
+                      <ModuleDataNotice state={{
+                        ...holdState,
+                        message: t('documents.page.holdUnavailable', { defaultValue: 'Legal hold status is unavailable.' }),
+                      }} />
+                    )}
+                  </div>
+                ) : null}
                 {isHeld ? (
                   <div className="rounded-md border p-3 text-sm" data-testid="document-legal-hold-row">
                     <p className="font-medium">{t('documents.page.legalHoldActive', { defaultValue: 'Legal hold' })}</p>
@@ -814,7 +845,9 @@ function DocumentPageLoaded({
           <AlertDialogFooter>
             <AlertDialogCancel>{t('erpWorkflow.confirm.dismiss')}</AlertDialogCancel>
             <AlertDialogAction
+              disabled={!holdActionReady || isHeld}
               onClick={() => {
+                if (!holdActionReady || isHeld) return;
                 setConfirmDelete(false);
                 void run('Delete', () => deleteDocument.mutateAsync(id));
               }}

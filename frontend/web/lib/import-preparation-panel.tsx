@@ -49,6 +49,7 @@ import {
 } from "./import-preparation-editor"
 
 interface Props {
+  defaultDestination?: ImportPreparationSection["targetEntity"]
   task: ChatImportTask
   organizationId: number
   companyId: number
@@ -68,6 +69,7 @@ export function ImportPreparationPanel(props: Props) {
 
 function PreparationEditor({
   task,
+  defaultDestination = "source_observation",
   organizationId,
   companyId,
   onPrepared,
@@ -521,7 +523,7 @@ function PreparationEditor({
                       2,
                       currentCoverage[0]?.recordCount ?? 2,
                     ),
-                    targetEntity: "source_observation",
+                    targetEntity: defaultDestination,
                     expectedHeaders: [""],
                   },
                 ],

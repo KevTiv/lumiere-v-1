@@ -1,23 +1,21 @@
 import { getStdbSession } from "@/lib/api-session";
 import { serverPrefetchQueryLists } from "@/lib/server-query";
-import { InventoryClient } from "../inventory/inventory-client";
+import { ProductsClient } from "./products-client";
 
-const CATALOG_RESOURCES = ["products", "product-categories", "uoms"] as const;
+const CATALOG_RESOURCES = ["products", "uoms"] as const;
 
 /** Product masters keep the same command owners as their Inventory entry point. */
 export default async function ProductsPage() {
   const session = await getStdbSession();
-  if (!session?.organizationId) return <InventoryClient workspace="products" />;
+  if (!session?.organizationId) return <ProductsClient />;
 
-  const [products, productCategories, uoms] = await serverPrefetchQueryLists(
+  const [products, uoms] = await serverPrefetchQueryLists(
     session,
     CATALOG_RESOURCES,
   );
   return (
-    <InventoryClient
-      workspace="products"
+    <ProductsClient
       initialProducts={products}
-      initialProductCategories={productCategories}
       initialUoms={uoms}
       organizationId={session.organizationId}
     />

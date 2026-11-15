@@ -3,8 +3,11 @@
  * (same layout as packages/stdb useWarehouse3D + queryWarehouse3DZones).
  */
 
-import type { Zone, StorageSlot, StockItem, ZoneType, StockCategory } from "@lumiere/stdb/warehouse-3d"
+import type { Zone, StorageSlot, StockItem, ZoneType } from "@lumiere/stdb/warehouse-3d"
 import type { QueryRows } from "@lumiere/api-client"
+import { getRowField } from "./row-values"
+import { inventoryQuantity, type StockReorderEntry } from "./replenishment-stock"
+import { stbTimestampMicros } from "./stb-timestamp"
 
 function toZoneType(displayType: unknown): ZoneType {
   const tag =
@@ -54,91 +57,73 @@ function buildSlots(zone: Zone, childLocations: QueryRows): StorageSlot[] {
   const slotHeight = height / zone.levels
   const slotDepth = depth / zone.rows
 
-  if (
-    childLocations.length > 0 &&
-    childLocations.some((l) => Number(l.posx ?? 0) || Number(l.posy ?? 0) || Number(l.posz ?? 0))
-  ) {
-    for (const loc of childLocations) {
-      const px = Number(loc.posx ?? 0)
-      const py = Number(loc.posy ?? 0)
-      const pz = Number(loc.posz ?? 0)
-      const col = Math.max(
-        0,
-        Math.min(zone.columns - 1, Math.round((px - zone.position.x) / slotWidth)),
-      )
-      const level = Math.max(
-        0,
-        Math.min(zone.levels - 1, Math.round((py - zone.position.y) / slotHeight)),
-      )
-      const row = Math.max(
-        0,
-        Math.min(zone.rows - 1, Math.round((pz - zone.position.z) / slotDepth)),
-      )
+  if (childLocations.length > 0) {
+    for (const [index, location] of childLocations.entries()) {
+      const px = Number(location.posx ?? 0)
+      const py = Number(location.posy ?? 0)
+      const pz = Number(location.posz ?? 0)
+      const hasPosition = Boolean(px || py || pz)
+      const column = hasPosition ? Math.max(0, Math.min(zone.columns - 1, Math.round((px - zone.position.x) / slotWidth))) : index % zone.columns
+      const level = hasPosition ? Math.max(0, Math.min(zone.levels - 1, Math.round((py - zone.position.y) / slotHeight))) : Math.floor(index / zone.columns) % zone.levels
+      const row = hasPosition ? Math.max(0, Math.min(zone.rows - 1, Math.round((pz - zone.position.z) / slotDepth))) : Math.floor(index / (zone.columns * zone.levels))
       slots.push({
-        id: String(loc.id),
+        id: String(location.id),
         zoneId: zone.id,
+        locationId: String(location.id),
         row,
-        column: col,
+        column,
         level,
-        position: { x: px, y: py, z: pz },
+        position: hasPosition ? { x: px, y: py, z: pz } : {
+          x: zone.position.x + (column + 0.5) * slotWidth,
+          y: zone.position.y + (level + 0.5) * slotHeight,
+          z: zone.position.z + (row + 0.5) * slotDepth,
+        },
         occupied: false,
-        itemId: undefined,
       })
-    }
-  } else {
-    for (let row = 0; row < zone.rows; row++) {
-      for (let col = 0; col < zone.columns; col++) {
-        for (let level = 0; level < zone.levels; level++) {
-          const slotId = `${zone.id}-${row}-${col}-${level}`
-          slots.push({
-            id: slotId,
-            zoneId: zone.id,
-            row,
-            column: col,
-            level,
-            position: {
-              x: zone.position.x + col * slotWidth + slotWidth / 2,
-              y: zone.position.y + level * slotHeight + slotHeight / 2,
-              z: zone.position.z + row * slotDepth + slotDepth / 2,
-            },
-            occupied: false,
-            itemId: undefined,
-          })
-        }
-      }
     }
   }
 
   return slots
 }
 
+function stockDate(value: unknown): Date | undefined {
+  const raw = value && typeof value === "object" && "some" in value ? value.some : value
+  const micros = stbTimestampMicros(raw)
+    ?? (typeof raw === "bigint" || typeof raw === "number" || (typeof raw === "string" && /^\d+$/.test(raw)) ? Number(raw) : undefined)
+  if (micros == null || Number(micros) <= 0) return undefined
+  const timestamp = new Date(Number(micros) / 1000)
+  return Number.isFinite(timestamp.getTime()) ? timestamp : undefined
+}
+
 function buildItems(
   quants: QueryRows,
   slotsByLocationId: Map<string, StorageSlot>,
-  zoneByLocationId: Map<string, string>,
-  productNames: Map<string, string>,
-  productSkus: Map<string, string>,
+  productById: ReadonlyMap<string, { name: string; sku: string; category?: string }>,
+  reorderEntries: readonly Pick<StockReorderEntry<object>, "key" | "minimum">[],
 ): StockItem[] {
-  return quants
-    .filter((q) => Number(q.quantity ?? 0) > 0)
-    .map((q) => {
-      const locId = String(q.locationId ?? "")
-      const slot = slotsByLocationId.get(locId)
-      const zoneId = slot?.zoneId ?? zoneByLocationId.get(locId) ?? "unknown"
-      const pid = String(q.productId ?? "")
-      return {
-        id: String(q.id),
-        sku: productSkus.get(pid) ?? `SKU-${q.productId}`,
-        name: productNames.get(pid) ?? `Product ${q.productId}`,
-        category: "finished-goods" as StockCategory,
-        quantity: Number(q.quantity ?? 0),
-        slotId: slot?.id ?? locId,
-        zoneId,
-        lastUpdated: q.inDate ? new Date(Number(q.inDate) / 1000) : new Date(),
-        minStock: undefined,
-        maxStock: undefined,
-      }
-    })
+  const reorderByKey = new Map(reorderEntries.map((entry) => [entry.key, entry]))
+  return quants.flatMap((quant) => {
+    const quantity = inventoryQuantity(getRowField(quant, "quantity"))
+    const locationId = String(getRowField(quant, "locationId"))
+    const slot = slotsByLocationId.get(locationId)
+    if (quantity == null || quantity <= 0 || !slot) return []
+    const productId = String(getRowField(quant, "productId"))
+    const product = productById.get(productId)
+    const reorder = reorderByKey.get(`${productId}:${locationId}`)
+    return [{
+      id: String(quant.id),
+      sku: product?.sku || `SKU-${productId}`,
+      name: product?.name || `Product ${productId}`,
+      category: product?.category ?? "",
+      quantity,
+      availableQuantity: inventoryQuantity(getRowField(quant, "availableQuantity")),
+      slotId: slot.id,
+      zoneId: slot.zoneId,
+      lastUpdated: stockDate(getRowField(quant, "inDate")),
+      lowStock: reorder != null,
+      minStock: reorder?.minimum,
+    }]
+  })
 }
 
 export function buildWarehouse3DView(
@@ -146,7 +131,8 @@ export function buildWarehouse3DView(
   zones3D: QueryRows,
   allLocations: QueryRows,
   allQuants: QueryRows,
-  productById: Map<string, { name: string; sku: string }>,
+  productById: ReadonlyMap<string, { name: string; sku: string; category?: string }>,
+  reorderEntries: readonly Pick<StockReorderEntry<object>, "key" | "minimum">[] = [],
 ): { zones: Zone[]; slots: StorageSlot[]; items: StockItem[] } {
   const wid = String(warehouseId)
   const filteredZones = zones3D.filter(
@@ -154,48 +140,40 @@ export function buildWarehouse3DView(
   )
 
   const locationById = new Map(allLocations.map((l) => [String(l.id), l]))
-  const productNames = new Map<string, string>()
-  const productSkus = new Map<string, string>()
-  for (const [id, p] of productById) {
-    productNames.set(id, p.name)
-    productSkus.set(id, p.sku)
-  }
-
   const zones: Zone[] = []
   const slotsByLocationId = new Map<string, StorageSlot>()
-  const zoneByLocationId = new Map<string, string>()
   const allSlots: StorageSlot[] = []
 
   for (const zone3D of filteredZones) {
-    const rootLocation = locationById.get(String(zone3D.locationId))
+    const rootLocation = locationById.get(String(getRowField(zone3D, "locationId")))
     if (!rootLocation) continue
 
     const zone = buildZone(zone3D, rootLocation)
     zones.push(zone)
 
     const children = allLocations.filter(
-      (l) => l.locationId != null && String(l.locationId) === String(rootLocation.id),
+      (location) => location.active !== false && String(getRowField(location, "locationId")) === String(rootLocation.id),
     )
+    const rootHasStock = allQuants.some((quant) => String(getRowField(quant, "locationId")) === String(rootLocation.id))
 
-    const slots = buildSlots(zone, children)
+    const slots = buildSlots(zone, rootHasStock || children.length === 0 ? [rootLocation, ...children] : children)
     for (const slot of slots) {
       allSlots.push(slot)
       slotsByLocationId.set(slot.id, slot)
-      zoneByLocationId.set(slot.id, zone.id)
     }
   }
 
-  const relevantQuants = allQuants.filter((q) => slotsByLocationId.has(String(q.locationId)))
+  const relevantQuants = allQuants.filter((q) => slotsByLocationId.has(String(getRowField(q, "locationId"))))
 
   for (const q of relevantQuants) {
-    const slot = slotsByLocationId.get(String(q.locationId))
+    const slot = slotsByLocationId.get(String(getRowField(q, "locationId")))
     if (slot && Number(q.quantity ?? 0) > 0) {
       slot.occupied = true
       slot.itemId = String(q.id)
     }
   }
 
-  const items = buildItems(relevantQuants, slotsByLocationId, zoneByLocationId, productNames, productSkus)
+  const items = buildItems(relevantQuants, slotsByLocationId, productById, reorderEntries)
 
   return { zones, slots: allSlots, items }
 }

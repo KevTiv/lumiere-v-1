@@ -3,8 +3,30 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { INVENTORY_QUERY_RESOURCES, PICKING_ORDER_RESOURCES } from "@lumiere/erp-workflows"
-import { rqBigIntKey } from "../../http"
+import type { QueryResourceKey } from "@lumiere/stdb/generated/query-registry"
+import { coalesceQueryInitialData, fetchQueryList, rqBigIntKey, type QueryRows } from "../../http"
 import { invalidateQueryResources } from "../workflow"
+
+export function inventoryListQueryOptions<Resource extends QueryResourceKey>(
+  resource: Resource,
+  organizationId: bigint,
+  errorMessage: string,
+  companyId?: bigint,
+) {
+  const key = [resource, rqBigIntKey(organizationId)] as const
+  return {
+    queryKey: companyId == null ? key : [...key, "company", companyId.toString()] as const,
+    queryFn: () => companyId == null
+      ? fetchQueryList<Resource>(`/api/query/${resource}`, errorMessage)
+      : fetchQueryList<Resource>(`/api/query/${resource}?companyId=${companyId}`, errorMessage),
+    staleTime: 30_000,
+  }
+}
+
+/** An unscoped server response can only seed the legacy unscoped query. */
+export function inventoryInitialData<Rows extends QueryRows>(rows: Rows | undefined, companyId?: bigint) {
+  return companyId == null ? coalesceQueryInitialData(rows) : undefined
+}
 
 export function companyScopeParams(companyId: bigint): Record<string, unknown> {
   return stdbParamsToJson({ companyId }, 'CompanyScopeParams')

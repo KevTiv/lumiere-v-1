@@ -8,6 +8,7 @@ on:
       - crates/presentation-core/**
       - crates/policy-core/**
       - crates/file-inspection/**
+      - crates/report-schedule/**
       - lumiere-codegen/storage-policy-manifest.json
       - crates/stdb-auth/assets/resource_registry.json
       - scripts/railway-publish-spacetimedb.sh
@@ -23,6 +24,7 @@ on:
       - crates/presentation-core/**
       - crates/policy-core/**
       - crates/file-inspection/**
+      - crates/report-schedule/**
       - lumiere-codegen/storage-policy-manifest.json
       - crates/stdb-auth/assets/resource_registry.json
       - scripts/railway-publish-spacetimedb.sh

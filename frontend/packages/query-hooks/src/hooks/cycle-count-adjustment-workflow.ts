@@ -44,7 +44,7 @@ export function useCycleCountAdjustmentWorkflow(
           input,
           input.snapshot,
           (await qc.fetchQuery({
-            ...stockQuantsQueryOptions(organizationId),
+            ...stockQuantsQueryOptions(organizationId, companyId),
             staleTime: 0,
           })) as unknown as RowValueMap[],
         ),
@@ -60,7 +60,7 @@ export function useCycleCountAdjustmentWorkflow(
       ) => {
         context?.assertScope?.()
         const rows = (await qc.fetchQuery({
-          ...stockQuantsQueryOptions(organizationId),
+          ...stockQuantsQueryOptions(organizationId, companyId),
           staleTime: 0,
         })) as unknown as RowValueMap[]
         context?.assertScope?.()
@@ -80,7 +80,7 @@ export function useCycleCountAdjustmentWorkflow(
           { navigateToNext: context?.navigateToNext },
         )
       },
-    [organizationId, qc, runner, spec],
+    [companyId, organizationId, qc, runner, spec],
   )
 
   return {

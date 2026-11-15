@@ -54,6 +54,7 @@ import { useRBAC } from "@/lib/rbac-context"
 import { useWorkspaceProfile } from "../lib/workspace-profile-context"
 import { isWorkspaceSurfaceVisible } from "../lib/workspace-profile"
 import { cn } from "@/lib/utils"
+import { mergeModuleStates, moduleQueryState } from "../lib/module-data-state"
 import { CountryPackReadinessPanel } from "./country-pack-readiness-panel"
 import { InvoicePersonalizationSettings, type UploadInvoiceLogo } from "./invoice-personalization-settings"
 import {
@@ -736,7 +737,7 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
           definitions={countryPackCatalog.data ?? []}
           activations={companyCountryPacks.data ?? []}
           companyCountryCode={strVal(selectedCompany?.addressCountryCode)}
-          isLoading={countryPackCatalog.isLoading || companyCountryPacks.isLoading}
+          dataState={mergeModuleStates([moduleQueryState(countryPackCatalog), moduleQueryState(companyCountryPacks)])}
           isPending={setCompanyCountryPack.isPending}
           onEnabledChange={async (packKey, enabled) => {
             try {

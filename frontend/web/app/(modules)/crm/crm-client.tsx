@@ -8,6 +8,7 @@ import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ForecastSnapshotReadback } from "./forecast-snapshot-readback"
 import { CompanyModuleInsights, type InsightPeriodRange } from "../../../components/module-insights"
 import { withDetailInlineEdits, withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
@@ -122,7 +123,6 @@ import {
   useUpdateOpportunity,
   useCrmCsvImportMutations,
   useCreateForecastSnapshot,
-  useCrmForecastSnapshots,
   type Lead,
   type Opportunity,
   type Contact,
@@ -693,7 +693,14 @@ function CrmClientLoaded({
   const clearContactCategories = useClearContactCategories(orgId)
   const { askForm, cancelForm, formDialog } = useFormDialog()
   const csvImports = useCrmCsvImportMutations(orgId)
-  const { data: forecastSnapshots = [] } = useCrmForecastSnapshots(orgId)
+  const forecastSnapshotsQuery = useQuery({
+    queryKey: ["crm-forecast-snapshots", orgId.toString(), "company", operatingCompanyId.toString()],
+    queryFn: () => fetchQueryList<"crm-forecast-snapshots">(
+      `/api/query/crm-forecast-snapshots?companyId=${operatingCompanyId}`,
+      "Failed to load forecast snapshots",
+    ),
+    enabled: operatingCompanyId > 0n,
+  })
   const createForecastSnapshot = useCreateForecastSnapshot(orgId)
 
   const csvImportTitle = useMemo(() => {
@@ -2065,11 +2072,6 @@ function CrmClientLoaded({
       const probability = Number(o.probability ?? 0)
       return s + revenue * (probability / 100)
     }, 0)
-    const latestSnapshot = (forecastSnapshots as Record<string, unknown>[])[0]
-    const latestSnapshotWeighted = latestSnapshot
-      ? Number(latestSnapshot.weightedPipeline ?? latestSnapshot.weighted_pipeline ?? 0)
-      : null
-
     const wonWithCampaign = opportunities.filter((o) => {
       const row = o as Record<string, unknown>
       return (
@@ -2119,14 +2121,6 @@ function CrmClientLoaded({
                   icon: "Target",
                 },
                 {
-                  label: t("crm.dashboard.forecastSnapshot", "Last forecast"),
-                  value:
-                    latestSnapshotWeighted == null
-                      ? "—"
-                      : `$${Math.round(latestSnapshotWeighted).toLocaleString()}`,
-                  icon: "BookUser",
-                },
-                {
                   label: t("crm.dashboard.openOpportunities"),
                   value: String(openOpportunities.length),
                   change: previousRange ? percentChange(currentOpenOpportunities.length, previousOpenOpportunities.length) : undefined,
@@ -2147,24 +2141,26 @@ function CrmClientLoaded({
             create_contact: () => setQuickActionForm({ form: newContactForm(t), action: "createContact" }),
             log_activity: () => setQuickActionForm({ form: newActivityForm(t), action: "createActivity" }),
             create_forecast_snapshot: () => {
-              if (!operatingCompanyId || operatingCompanyId === 0n) return
-              const now = Date.now()
+              if (!operatingCompanyId || operatingCompanyId === 0n || createForecastSnapshot.isPending) return
               const snapshotStart = insightPeriodRange?.startMs ?? startMs
               const snapshotEnd = insightPeriodRange?.endMs ?? endMs
-              if (!Number.isFinite(snapshotStart) || !Number.isFinite(snapshotEnd)) {
+              if (!Number.isFinite(snapshotStart) || !Number.isFinite(snapshotEnd) || snapshotEnd <= snapshotStart) {
                 showWorkflowToast({ kind: "error", title: t("common.error.title"), description: t("moduleInsights.forecastFinitePeriod", { defaultValue: "Choose a custom date range or a calendar preset before creating a forecast snapshot." }) })
                 return
               }
-              const endMsSafe = snapshotEnd > snapshotStart ? snapshotEnd : now
               createForecastSnapshot
                 .mutateAsync({
                   companyId: operatingCompanyId,
                   params: {
                     periodStart: stbTimestampFromDate(new Date(snapshotStart)),
-                    periodEnd: stbTimestampFromDate(new Date(endMsSafe)),
+                    periodEnd: stbTimestampFromDate(new Date(snapshotEnd)),
                     ownerId: undefined,
                     metadata: undefined,
                   } satisfies CreateCrmForecastSnapshotParams,
+                })
+                .then(() => {
+                  showWorkflowToast({ kind: "success", title: t("crm.dashboard.forecastSaved", { defaultValue: "Forecast snapshot saved" }) })
+                  return forecastSnapshotsQuery.refetch()
                 })
                 .catch((error: unknown) => {
                   showWorkflowToast({
@@ -2283,7 +2279,7 @@ function CrmClientLoaded({
         }
         return w
           })
-  }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, stageById, dashboardTimeRange, insightPeriodRange, t, navigateToLeadsByState, opportunityStages, forecastSnapshots, createForecastSnapshot, operatingCompanyId])
+  }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, stageById, dashboardTimeRange, insightPeriodRange, t, navigateToLeadsByState, opportunityStages, forecastSnapshotsQuery.refetch, createForecastSnapshot, operatingCompanyId])
 
   const config = useMemo(
     () =>
@@ -2729,7 +2725,15 @@ function CrmClientLoaded({
         assistantFormBlocked={quickActionForm !== null || workflowModal !== null || focusedRecord !== null}
         config={config}
         dashboardCompositionOwned
-        dashboardContent={<CompanyModuleInsights input={{ module: "crm", organizationId, companyId: operatingCompanyId, records: { rows: opportunities, state: opportunitiesRead.state }, currencies: { rows: kpiCurrencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} onPeriodRangeChange={setInsightPeriodRange} />}
+        dashboardContent={<CompanyModuleInsights input={{ module: "crm", organizationId, companyId: operatingCompanyId, records: { rows: opportunities, state: opportunitiesRead.state }, currencies: { rows: kpiCurrencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} onPeriodRangeChange={setInsightPeriodRange}
+          actionReadback={operatingCompanyId > 0n ? (
+            <ForecastSnapshotReadback
+              companyId={operatingCompanyId}
+              rows={forecastSnapshotsQuery.data ?? []}
+              state={moduleQueryState(forecastSnapshotsQuery)}
+              saving={createForecastSnapshot.isPending}
+            />
+          ) : undefined} />}
         data={data}
         dataLoading={dataLoading}
         dataState={dataState}

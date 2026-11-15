@@ -155,6 +155,7 @@ interface AIChatPanelProps {
   turnProjection?: ChatTurnProjection
   onStopReply?: () => void
   turnProgress?: "answering" | "preparing_draft" | "saving_reply"
+  canOpenSkillSetup?: boolean
   renderMessageActions?: (message: ChatMessage) => React.ReactNode
   renderCitation?: (source: ChatMessageSourceRef) => React.ReactNode
   composerContext?: React.ReactNode
@@ -269,6 +270,7 @@ function AIChatConversation({
   turnProjection,
   onStopReply,
   turnProgress,
+  canOpenSkillSetup = false,
   renderMessageActions,
   renderCitation,
   composerContext,
@@ -1159,9 +1161,13 @@ function AIChatConversation({
                         ) : null}
                       </div>
                       {message.role === "assistant" && !provisional && message.recoveryPath === "/ai-skills" && (
-                        <a className="text-sm font-medium text-primary underline underline-offset-4" href={message.recoveryPath}>
-                          {t("aiSkills.title")}
-                        </a>
+                        canOpenSkillSetup ? (
+                          <a className="text-sm font-medium text-primary underline underline-offset-4" href={message.recoveryPath}>
+                            {t("aiSkills.title")}
+                          </a>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">{t("aiChat.skillSetupUnavailable", { defaultValue: "Ask your Lumière administrator to check AI setup for this company." })}</p>
+                        )
                       )}
                       {message.role === "assistant" && !provisional ? (
                         message.importTaskIds?.length && renderImportTask

@@ -10,6 +10,8 @@ import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
 import {
+  inventoryInitialData,
+  inventoryListQueryOptions,
   companyScopeParams,
   mergeReducerParams,
   CREATE_PRODUCT_DEFAULTS,
@@ -113,17 +115,12 @@ export function useProductionLots(
   organizationId: bigint,
   initialData?: StockProductionLot[],
   enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<StockProductionLot[]>({
     enabled,
-    queryKey: ['stock-production-lots', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList(
-        '/api/query/stock-production-lots',
-        'Failed to fetch production lots',
-      ),
-    staleTime: 30_000,
-    initialData: coalesceQueryInitialData(initialData),
+    ...inventoryListQueryOptions('stock-production-lots', organizationId, 'Failed to fetch production lots', companyId),
+    initialData: inventoryInitialData(initialData, companyId),
   });
 }
 
@@ -150,40 +147,29 @@ export function useStockTraceabilityReports(
   organizationId: bigint,
   initialData?: StockTraceabilityReport[],
   enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<StockTraceabilityReport[]>({
     enabled,
-    queryKey: ['stock-traceability-reports', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList(
-        '/api/query/stock-traceability-reports',
-        'Failed to fetch traceability reports',
-      ),
-    staleTime: 30_000,
-    initialData: coalesceQueryInitialData(initialData),
+    ...inventoryListQueryOptions('stock-traceability-reports', organizationId, 'Failed to fetch traceability reports', companyId),
+    initialData: inventoryInitialData(initialData, companyId),
   });
 }
 
 
-export const stockProductionSerialsQueryOptions = (organizationId: bigint) => ({
-  queryKey: ['stock-production-serials', rqBigIntKey(organizationId)] as const,
-  queryFn: () =>
-    fetchQueryList(
-      '/api/query/stock-production-serials',
-      'Failed to fetch serial numbers',
-    ),
-  staleTime: 30_000,
-});
+export const stockProductionSerialsQueryOptions = (organizationId: bigint, companyId?: bigint) =>
+  inventoryListQueryOptions('stock-production-serials', organizationId, 'Failed to fetch serial numbers', companyId);
 
 export function useStockProductionSerials(
   organizationId: bigint,
   initialData?: StockProductionSerial[],
   enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<StockProductionSerial[]>({
     enabled,
-    ...stockProductionSerialsQueryOptions(organizationId),
-    initialData: coalesceQueryInitialData(initialData),
+    ...stockProductionSerialsQueryOptions(organizationId, companyId),
+    initialData: inventoryInitialData(initialData, companyId),
   });
 }
 

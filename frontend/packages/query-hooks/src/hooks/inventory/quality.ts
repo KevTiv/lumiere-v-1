@@ -17,6 +17,8 @@ import {
   CREATE_STOCK_PICKING_DEFAULTS,
   CREATE_STOCK_LOCATION_DEFAULTS,
   invalidateInventoryQueries,
+  inventoryInitialData,
+  inventoryListQueryOptions,
 } from "./shared"
 
 
@@ -113,33 +115,25 @@ export function useQualityChecks(
   organizationId: bigint,
   initialData?: QualityCheck[],
   enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<QualityCheck[]>({
     enabled,
-    queryKey: ['quality-checks', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList(
-        '/api/query/quality-checks',
-        'Failed to fetch quality checks',
-      ),
-    staleTime: 30_000,
-    initialData: coalesceQueryInitialData(initialData),
+    ...inventoryListQueryOptions('quality-checks', organizationId, 'Failed to fetch quality checks', companyId),
+    initialData: inventoryInitialData(initialData, companyId),
   });
 }
 
 export function useQualityAlerts(
   organizationId: bigint,
   initialData?: QualityAlert[],
+  enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<QualityAlert[]>({
-    queryKey: ['quality-alerts', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList(
-        '/api/query/quality-alerts',
-        'Failed to fetch quality alerts',
-      ),
-    staleTime: 30_000,
-    initialData: coalesceQueryInitialData(initialData),
+    enabled,
+    ...inventoryListQueryOptions('quality-alerts', organizationId, 'Failed to fetch quality alerts', companyId),
+    initialData: inventoryInitialData(initialData, companyId),
   });
 }
 

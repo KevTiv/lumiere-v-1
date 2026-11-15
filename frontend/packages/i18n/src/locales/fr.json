@@ -2046,6 +2046,56 @@
     }
   },
   "crm": {
+    "dashboard": {
+      "forecastSnapshot": "Dernière prévision",
+      "forecastCaptured": "Date de capture",
+      "forecastEmpty": "Aucune prévision enregistrée pour cette société.",
+      "forecastPeriod": "Période de la prévision",
+      "forecastSaved": "Prévision enregistrée",
+      "forecastSaving": "Enregistrement de la prévision…",
+      "forecastStoredWeight": "Portefeuille pondéré (devise non précisée)"
+    },
+    "segments": {
+      "rulesTitle": "Règles des segments dynamiques",
+      "rulesDescription": "Les contacts doivent respecter toutes les règles. Lancez une évaluation pour actualiser les membres.",
+      "select": "Segment dynamique",
+      "selectPlaceholder": "Choisissez un segment",
+      "noRules": "Aucune règle pour le moment.",
+      "evaluate": "Évaluer",
+      "addRule": "Ajouter une règle",
+      "evaluated": "Membres actualisés.",
+      "existingMembers": "Nombre actuel de membres : {{count}}",
+      "removeAllImpact": "Toutes les règles seront supprimées. Les membres actuels seront conservés et une nouvelle évaluation nécessitera au moins une règle.",
+      "removeRule": "Retirer la règle",
+      "replacementImpact": "Ces règles remplacent les règles actuelles. Les membres du segment sont mis à jour lors de la prochaine évaluation.",
+      "replacementTitle": "Règles après enregistrement",
+      "resetRules": "Recharger les règles enregistrées",
+      "reviewRules": "Vérifier les modifications",
+      "ruleField": "Champ de la règle {{number}}",
+      "ruleOperator": "Opérateur de la règle {{number}}",
+      "rulesCannotEdit": "Ces règles contiennent des paramètres que cet éditeur ne peut pas conserver.",
+      "rulesChanged": "Les règles enregistrées ont changé pendant la modification.",
+      "rulesRefreshConflict": "Impossible de vérifier les règles enregistrées. Rechargez-les avant de les remplacer.",
+      "rulesSaved": "Règles enregistrées. Lancez une évaluation pour actualiser les membres.",
+      "ruleValue": "Valeur de la règle {{number}}",
+      "saveRules": "Enregistrer les nouvelles règles",
+      "fields": {
+        "CountryCode": "Code du pays",
+        "City": "Ville",
+        "Industry": "Secteur",
+        "IsCustomer": "Client",
+        "IsProspect": "Prospect",
+        "IsVendor": "Fournisseur",
+        "TagId": "Étiquette de contact"
+      },
+      "operators": {
+        "Eq": "Est égal à",
+        "Neq": "Est différent de",
+        "Contains": "Contient",
+        "IsTrue": "Oui",
+        "IsFalse": "Non"
+      }
+    },
     "attribution": {
       "title": "Attribution UTM",
       "nameLabel": "Nom"
@@ -2859,6 +2909,8 @@
     "order": {
       "attachments": "Pièces jointes",
       "bills": "Factures fournisseurs",
+      "relatedAccessRestricted": "Accès restreint",
+      "relatedUnavailable": "Indisponible",
       "discussion": "Discussion",
       "receipts": "Reçus",
       "status": {

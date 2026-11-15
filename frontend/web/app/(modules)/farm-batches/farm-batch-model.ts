@@ -1,7 +1,32 @@
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
+import { sourceReviewHistoryHref } from "@lumiere/query-hooks/hooks/source-review-navigation"
 
 export const farmBatchPath = "/farm-batches"
-export const farmImportPath = "/settings?section=imports&target=farm_event"
+export const farmImportPath = "/farm-batches/import"
+
+export function farmImportHref(companyId: string): string {
+  if (!farmRecordId(companyId)) throw new Error("Invalid farm company")
+  return `${farmImportPath}?companyId=${companyId}#start-import`
+}
+
+export function farmSourceReviewHref(companyId: string, source: FarmEvent["source"]): string | undefined {
+  const revision = source?.revision
+  if (
+    !farmRecordId(companyId) ||
+    !farmRecordId(source?.reviewBatchId) ||
+    !farmRecordId(source?.reviewItemId) ||
+    revision === undefined ||
+    !Number.isInteger(revision) ||
+    revision < 1 ||
+    revision > 2_147_483_647
+  ) return undefined
+
+  return sourceReviewHistoryHref(companyId, {
+    batchId: source.reviewBatchId,
+    itemId: source.reviewItemId,
+    revision,
+  }, farmImportPath)
+}
 
 export function farmRecordId(value: unknown): value is string {
   return (
@@ -38,6 +63,7 @@ export type FarmEvent = FarmEventInput & {
   source?: {
     reviewBatchId?: string
     reviewItemId?: string
+    revision?: number
     row?: number
     file?: string
     sheet?: string

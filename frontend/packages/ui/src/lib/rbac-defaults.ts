@@ -667,8 +667,8 @@ export interface SettingsSectionExposurePolicy {
  */
 export const SETTINGS_SECTION_EXPOSURE: readonly SettingsSectionExposurePolicy[] = [
   { id: "profile", exposure: "enabled", owner: "COV-23", minimumEvidence: "authenticated profile settings", hiddenReason: null },
-  { id: "notifications", exposure: "enabled", owner: "COV-23", minimumEvidence: "authenticated notification settings", hiddenReason: null },
-  { id: "appearance", exposure: "enabled", owner: "UX-02", minimumEvidence: "theme and density persistence", hiddenReason: null },
+  { id: "notifications", exposure: "hidden", owner: "COV-23", minimumEvidence: "saved notification settings applied to delivery", hiddenReason: "notification preferences have no delivery integration" },
+  { id: "appearance", exposure: "enabled", owner: "UX-02", minimumEvidence: "theme, palette, and shell persistence", hiddenReason: null },
   { id: "custom-fields", exposure: "enabled", owner: "COV-23", minimumEvidence: "user-owned custom fields", hiddenReason: null },
   { id: "users", exposure: "admin-only", owner: "COV-23", minimumEvidence: "membership assign and revoke", hiddenReason: "organization administrators only" },
   { id: "roles", exposure: "admin-only", owner: "COV-23", minimumEvidence: "role and permission lifecycle", hiddenReason: "organization administrators only" },

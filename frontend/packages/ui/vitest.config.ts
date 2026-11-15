@@ -16,7 +16,7 @@ export default defineConfig({
       { find: /^@\/lib\/api-fetch$/, replacement: fileURLToPath(new URL("../../web/lib/api-fetch.ts", import.meta.url)) },
       // Guide host regressions mount the production modal and dedicated-page owners.
       { find: /^@\/lib\/assistant-guide-context$/, replacement: fileURLToPath(new URL("../../web/lib/assistant-guide-context.tsx", import.meta.url)) },
-      { find: /^@\/lib\/(assistant-guides|ai-workspace-scope|record-page-href)$/, replacement: fileURLToPath(new URL("../../web/lib/$1.ts", import.meta.url)) },
+      { find: /^@\/lib\/(assistant-guides|use-assistant-guide-revisions|ai-workspace-scope|record-page-href)$/, replacement: fileURLToPath(new URL("../../web/lib/$1.ts", import.meta.url)) },
       // Mounted feature tests use the production web form adapters, not UI helpers.
       { find: /^@\/lib\/(inventory-ext-params|form-lookup|stb-timestamp|id-list|org-scoped)$/, replacement: fileURLToPath(new URL("../../web/lib/$1.ts", import.meta.url)) },
       { find: /^@\/components\/ui\/(.*)$/, replacement: src("components/$1") },

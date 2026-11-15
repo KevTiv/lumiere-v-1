@@ -293,7 +293,9 @@ export function useBankStatementImports(organizationId: bigint, companyId: bigin
     enabled: enabled && organizationId > 0n && companyId > 0n,
     queryFn: async () => {
       const response = await apiFetch(`/api/accounting/bank-statement-imports/${companyId}`)
-      if (!response.ok) throw new Error(await parseCallError(response))
+      if (!response.ok) {
+        throw Object.assign(new Error(await parseCallError(response)), { status: response.status })
+      }
       const body = (await response.json()) as Partial<BankStatementImportWorkspace>
       return { imports: body.imports ?? [], lines: body.lines ?? [] }
     },

@@ -27,9 +27,11 @@ import { inlineNumberAtLeast, requiredInlineText } from '@/lib/inline-edit-param
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { canUseModuleData, mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
 import dynamic from 'next/dynamic';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { OwnerQueueScope } from '../../../components/owner-queue-scope';
-import { isOwnerQueue, lowStockQuants } from '@/lib/owner-queues';
+import { buildWarehouse3DView } from '@lumiere/erp-shared/warehouse-3d-from-api';
+import { stockReorderQueue, scopedStockRows, inventoryQuantity } from '@lumiere/erp-shared/replenishment-stock';
+import { isOwnerQueue } from '@/lib/owner-queues';
 import { useTranslation } from '@lumiere/i18n';
 import type { TFunction } from 'i18next';
 import {
@@ -79,11 +81,9 @@ import {
   stockMovesTableConfig,
   EntityView,
   type TimeRangeValue,
-  isTimestampInRange,
-  percentChange,
-  previousPeriodMs,
   timeRangeToMs,
 } from '@lumiere/ui';
+import { ModuleDataNotice } from '@lumiere/ui/pages/module-data-notice';
 import { useErpSession } from '@lumiere/erp-session';
 import { formNumber, formText, recordOptions, useFormDialog } from '@lumiere/ui';
 import type {
@@ -130,13 +130,17 @@ import { useStockQuantWorkflow } from '@lumiere/query-hooks/hooks/stock-quant-wo
 
 import { useSerialBlockWorkflow } from '@lumiere/query-hooks/hooks/serial-block-workflow';
 import {
+  normalizedTag,
   planPartialDelivery,
 } from '@lumiere/erp-workflows';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
-import type { KpiTileDef } from '@lumiere/ui/lib/kpi-tiles';
-import { transferKpis } from './transfer-kpis';
+import { moduleHistoryTimestampMs } from '@lumiere/ui/lib/module-history-filter';
+import { currencyCodeMap, type KpiTileDef } from '@lumiere/ui/lib/kpi-tiles';
+import { isReadyTransfer, isWaitingTransfer, transferKpis } from './transfer-kpis';
+import { completedTransferCounts, inventoryCategoryCounts, inventoryStockValue, stockCategoriesByProduct } from './inventory-dashboard-data';
 import { groupBy } from '@/lib/utils';
 import { transferRecordHref } from './transfer-record';
+import { isStockMoveDestination, stockQuantMoveInput } from './stock-quant-move-model';
 
 import {
   useProducts,
@@ -149,6 +153,7 @@ import {
   useStockLocations,
   useProductionLots,
   useQualityChecks,
+  useQualityAlerts,
   useQualityTeams,
   useStockCycleCounts,
   usePickingWaves,
@@ -183,7 +188,7 @@ import {
   useAssignUserToPicking,
   useReserveStockQuant,
   useUnreserveStockQuant,
-  useWarehouse3D,
+  useWarehouse3DZones,
   useOrgUsers,
   useCreateQualityCheck,
   useCreateQualityAlert,
@@ -243,6 +248,9 @@ import {
   useImportLotCsv,
   useStockInventories,
 } from '@lumiere/query-hooks/hooks/inventory';
+import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
+import { useCompanies } from '@lumiere/query-hooks/hooks/organization-company';
+import { operatingCompanyCurrencyCode } from '@/lib/operating-company-currency';
 import { useIotDevices } from '@lumiere/query-hooks/hooks/iot';
 import { usePricelists, type ProductPricelist } from '@lumiere/query-hooks/hooks/sales';
 import { useContacts } from '@lumiere/query-hooks/hooks/crm';
@@ -316,17 +324,9 @@ type InventoryCsvImportKind =
   | 'stockQuant'
   | 'lot';
 
-function recordTimestampMs(row: Record<string, unknown>): number {
-  const raw =
-    row.writeDate ?? row.write_date ?? row.createDate ?? row.create_date;
-  if (raw == null) return 0;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return 0;
-  return n > 1e15 ? n / 1000 : n;
-}
-
 import {
   pricelistRowsToSelectOptions,
+  currencyOptionsFromRows,
   pickingTypeOptionsFromTransfers,
   locationOptionsFromQuantsAndTransfers,
   productRowsToSelectOptions,
@@ -386,16 +386,7 @@ import type {
   StockQuant,
   StockPicking,
   Warehouse,
-  InventoryAdjustment,
-  ProductCategory,
   Uom,
-  StockLocation,
-  StockCycleCount,
-  StockMove,
-  Warehouse3DZone,
-  InventoryValuation,
-  ReplenishmentRule,
-  StockProductionSerial,
   CreateProductParams,
   CreateStockPickingParams,
   CreateInventoryAdjustmentParams,
@@ -411,6 +402,7 @@ import type {
   CreateWarehouse3DZoneParams,
 } from '@lumiere/stdb/types';
 import { scalarToU64 } from '@lumiere/erp-shared/u64';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@lumiere/ui/components/select';
 
 // WarehouseViewer uses Three.js — must be loaded client-side only, imported directly to avoid SSR barrel evaluation
 const WarehouseViewer = dynamic(
@@ -429,20 +421,8 @@ interface InventoryClientProps {
   /** Bounded workspaces reuse Inventory's existing commands, forms and dialogs. */
   workspace?: 'inventory' | 'products' | 'warehouse';
   initialProducts?: Product[];
-  initialStockQuants?: StockQuant[];
-  initialTransfers?: StockPicking[];
-  initialWarehouses?: Warehouse[];
-  initialAdjustments?: InventoryAdjustment[];
   initialPricelists?: ProductPricelist[];
-  initialProductCategories?: ProductCategory[];
   initialUoms?: Uom[];
-  initialStockLocations?: StockLocation[];
-  initialStockCycleCounts?: StockCycleCount[];
-  initialStockMoves?: StockMove[];
-  initialWarehouse3dZones?: Warehouse3DZone[];
-  initialInventoryValuations?: InventoryValuation[];
-  initialReplenishmentRules?: ReplenishmentRule[];
-  initialStockProductionSerials?: StockProductionSerial[];
   organizationId?: number;
 }
 
@@ -451,14 +431,27 @@ type InventoryClientLoadedProps = Omit<
   'organizationId'
 > & {
   organizationId: number;
+  operatingCompanyId: bigint;
 };
 
 export function InventoryClient(props: InventoryClientProps) {
-  if (!hasValidOrganizationId(props.organizationId)) {
-    return <MissingOrganization />;
+  const { t } = useTranslation();
+  const { identity, organizationId: sessionOrganizationId, activeCompanyReady } = useErpSession();
+  const companyId = useDefaultOperatingCompanyBigInt(props.organizationId);
+  if (!hasValidOrganizationId(props.organizationId)) return <MissingOrganization />;
+  if (!activeCompanyReady || sessionOrganizationId !== props.organizationId) {
+    return <p role="status" className="p-4 text-sm text-muted-foreground">{t('common.loading')}</p>;
+  }
+  if (!companyId) {
+    return <p role="status" className="p-4 text-sm text-muted-foreground">{t('financeReview.selectCompany', { defaultValue: 'Select a company' })}</p>;
   }
   return (
-    <InventoryClientLoaded {...props} organizationId={props.organizationId} />
+    <InventoryClientLoaded
+      {...props}
+      key={`${identity ?? 'anonymous'}:${props.organizationId}:${companyId}`}
+      organizationId={props.organizationId}
+      operatingCompanyId={companyId}
+    />
   );
 }
 
@@ -483,35 +476,19 @@ function runPickingWorkflowActionForRows(
 function InventoryClientLoaded({
   workspace = 'inventory',
   initialProducts,
-  initialStockQuants,
-  initialTransfers,
-  initialWarehouses,
-  initialAdjustments,
   initialPricelists,
-  initialProductCategories,
   initialUoms,
-  initialStockLocations,
-  initialStockCycleCounts,
-  initialStockMoves,
-  initialWarehouse3dZones: _initialWarehouse3dZones,
-  initialInventoryValuations,
-  initialReplenishmentRules,
-  initialStockProductionSerials,
   organizationId,
+  operatingCompanyId,
 }: InventoryClientLoadedProps) {
   useInventoryModuleSubscription(workspace);
   const canReadBackfill = useCanReadModuleBackfill(organizationId);
   const readEnabled = (resource: string) => isInventoryWorkspaceReadEnabled(workspace, resource);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { checkPermission, permissionsReady, currentUser } = useRBAC();
-  const { identity, organizationId: sessionOrganizationId, activeCompanyReady } = useErpSession();
+  const { identity, organizationId: sessionOrganizationId } = useErpSession();
   const { askForm, cancelForm, formDialog } = useFormDialog();
   const { orgId } = orgBigInts(organizationId);
-  const selectedOperatingCompanyId =
-    useDefaultOperatingCompanyBigInt(organizationId);
-  const operatingCompanyId = selectedOperatingCompanyId ?? 0n;
-  const warehouseCompanyId = workspace === 'warehouse' && activeCompanyReady ? selectedOperatingCompanyId : undefined;
-  const warehouseReady = workspace !== 'warehouse' || warehouseCompanyId !== undefined;
   const [quickActionForm, setQuickActionForm] = useState<{
     form: FormConfig;
     action: string;
@@ -567,6 +544,7 @@ function InventoryClientLoaded({
     inventoryTabIds,
   );
   const searchParams = useSearchParams();
+  const router = useRouter();
   const lowStockQueue = workspace === 'warehouse' && isOwnerQueue('lowStockProducts', activeTab, searchParams.get('ownerQueue'));
   const [wizardCycleCountId, setWizardCycleCountId] = useState<ScalarId | ''>(
     '',
@@ -588,56 +566,57 @@ function InventoryClientLoaded({
   const productsRead = moduleCollection(useProducts(orgId, initialProducts, readEnabled('products')));
   const products = productsRead.rows;
   const productsLoading = productsRead.state.status === 'loading';
-  const productCategoriesRead = moduleCollection(useProductCategories(orgId, initialProductCategories, readEnabled('product-categories')));
+  const productCategoriesRead = moduleCollection(useProductCategories(orgId, undefined, readEnabled('product-categories'), operatingCompanyId));
   const productCategories = productCategoriesRead.rows;
   const uomsRead = moduleCollection(useUoms(orgId, initialUoms, readEnabled('uoms')));
   const uoms = uomsRead.rows;
-  const { data: stockInventories = [] } = useStockInventories(orgId, undefined, readEnabled('stock-inventories'));
+  const { data: stockInventories = [] } = useStockInventories(orgId, undefined, readEnabled('stock-inventories'), operatingCompanyId);
   const { data: iotDevices = [] } = useIotDevices(orgId);
-  const stockQuantsRead = moduleCollection(useStockQuants(orgId, initialStockQuants, readEnabled('stock-quants')));
+  const stockQuantsRead = moduleCollection(useStockQuants(orgId, undefined, readEnabled('stock-quants'), operatingCompanyId));
   const stockQuants = stockQuantsRead.rows;
   const stockQuantsLoading = stockQuantsRead.state.status === 'loading';
-  const transfersRead = moduleCollection(useStockPickings(orgId, warehouseReady ? initialTransfers : undefined, warehouseReady && readEnabled('stock-pickings'), warehouseCompanyId));
+  const transfersRead = moduleCollection(useStockPickings(orgId, undefined, readEnabled('stock-pickings'), operatingCompanyId));
   const transfers = transfersRead.rows;
   const transfersLoading = transfersRead.state.status === 'loading';
-  const warehousesRead = moduleCollection(useWarehouses(orgId, initialWarehouses, readEnabled('warehouses')));
+  const warehousesRead = moduleCollection(useWarehouses(orgId, undefined, readEnabled('warehouses'), operatingCompanyId));
   const warehouses = warehousesRead.rows;
-  const adjustmentsRead = moduleCollection(useInventoryAdjustments(orgId, initialAdjustments, readEnabled('inventory-adjustments')));
+  const adjustmentsRead = moduleCollection(useInventoryAdjustments(orgId, undefined, readEnabled('inventory-adjustments'), operatingCompanyId));
   const adjustments = adjustmentsRead.rows;
-  const locationsRead = moduleCollection(useStockLocations(orgId, initialStockLocations, readEnabled('stock-locations')));
+  const locationsRead = moduleCollection(useStockLocations(orgId, undefined, readEnabled('stock-locations'), operatingCompanyId));
   const locations = locationsRead.rows;
   const setup = warehouseSetup({
     organizationId: orgId,
-    companyId: selectedOperatingCompanyId,
+    companyId: operatingCompanyId,
     warehouses,
     locations,
     warehouseState: warehousesRead.state,
     locationState: locationsRead.state,
   });
-  const lotsRead = moduleCollection(useProductionLots(orgId, undefined, readEnabled('stock-production-lots')));
+  const lotsRead = moduleCollection(useProductionLots(orgId, undefined, readEnabled('stock-production-lots'), operatingCompanyId));
   const lots = lotsRead.rows;
-  const serialsRead = moduleCollection(useStockProductionSerials(orgId, initialStockProductionSerials, readEnabled('stock-production-serials')));
+  const serialsRead = moduleCollection(useStockProductionSerials(orgId, undefined, readEnabled('stock-production-serials'), operatingCompanyId));
   const serials = serialsRead.rows;
-  const qualityChecksRead = moduleCollection(useQualityChecks(orgId, undefined, readEnabled('quality-checks')));
+  const qualityChecksRead = moduleCollection(useQualityChecks(orgId, undefined, readEnabled('quality-checks'), operatingCompanyId));
+  const qualityAlertsRead = moduleCollection(useQualityAlerts(orgId, undefined, workspace === 'inventory' && activeTab === 'quality-alerts', operatingCompanyId));
   const qualityChecks = qualityChecksRead.rows;
   const { data: qualityTeams = [] } = useQualityTeams(orgId, undefined, readEnabled('quality-teams'));
-  const cycleCountsRead = moduleCollection(useStockCycleCounts(orgId, initialStockCycleCounts, readEnabled('stock-cycle-counts')));
+  const cycleCountsRead = moduleCollection(useStockCycleCounts(orgId, undefined, readEnabled('stock-cycle-counts'), operatingCompanyId));
   const cycleCounts = cycleCountsRead.rows;
-  const pickingWavesRead = moduleCollection(usePickingWaves(orgId, undefined, readEnabled('picking-waves')));
+  const pickingWavesRead = moduleCollection(usePickingWaves(orgId, undefined, readEnabled('picking-waves'), operatingCompanyId));
   const pickingWaves = pickingWavesRead.rows;
-  const stockPackagesRead = moduleCollection(useStockPackages(orgId, undefined, readEnabled('stock-packages')));
+  const stockPackagesRead = moduleCollection(useStockPackages(orgId, undefined, readEnabled('stock-packages'), operatingCompanyId));
   const stockPackages = stockPackagesRead.rows;
-  const warehouseTasksRead = moduleCollection(useWarehouseTasks(orgId, undefined, readEnabled('warehouse-tasks')));
+  const warehouseTasksRead = moduleCollection(useWarehouseTasks(orgId, undefined, readEnabled('warehouse-tasks'), operatingCompanyId));
   const warehouseTasks = warehouseTasksRead.rows;
-  const stockRoutesRead = moduleCollection(useStockRoutes(orgId, undefined, readEnabled('stock-routes')));
+  const stockRoutesRead = moduleCollection(useStockRoutes(orgId, undefined, readEnabled('stock-routes'), operatingCompanyId));
   const stockRoutes = stockRoutesRead.rows;
-  const stockRulesRead = moduleCollection(useStockRules(orgId, undefined, readEnabled('stock-rules')));
+  const stockRulesRead = moduleCollection(useStockRules(orgId, undefined, readEnabled('stock-rules'), operatingCompanyId));
   const stockRules = stockRulesRead.rows;
-  const stockMovesRead = moduleCollection(useStockMoves(orgId, warehouseReady ? initialStockMoves : undefined, warehouseReady && readEnabled('stock-moves'), warehouseCompanyId));
+  const stockMovesRead = moduleCollection(useStockMoves(orgId, undefined, readEnabled('stock-moves'), operatingCompanyId));
   const stockMoves = stockMovesRead.rows;
-  const inventoryValuationsRead = moduleCollection(useInventoryValuations(orgId, initialInventoryValuations, readEnabled('inventory-valuations')));
+  const inventoryValuationsRead = moduleCollection(useInventoryValuations(orgId, undefined, readEnabled('inventory-valuations'), operatingCompanyId));
   const inventoryValuations = inventoryValuationsRead.rows;
-  const replenishmentRulesListRead = moduleCollection(useReplenishmentRules(orgId, initialReplenishmentRules, readEnabled('replenishment-rules')));
+  const replenishmentRulesListRead = moduleCollection(useReplenishmentRules(orgId, undefined, readEnabled('replenishment-rules'), operatingCompanyId));
   const replenishmentRulesList = replenishmentRulesListRead.rows;
   const barcodeRulesRead = moduleCollection(useBarcodeRules(orgId, undefined, readEnabled('barcode-rules')));
   const barcodeRules = barcodeRulesRead.rows;
@@ -647,17 +626,21 @@ function InventoryClientLoaded({
   const barcodeNomenclatures = barcodeNomenclaturesRead.rows;
   const serialLotTraceabilityRead = moduleCollection(useSerialLotTraceability(orgId, undefined, readEnabled('serial-lot-traceability')));
   const serialLotTraceability = serialLotTraceabilityRead.rows;
-  const stockTraceabilityReportsRead = moduleCollection(useStockTraceabilityReports(orgId, undefined, readEnabled('stock-traceability-reports')));
+  const stockTraceabilityReportsRead = moduleCollection(useStockTraceabilityReports(orgId, undefined, readEnabled('stock-traceability-reports'), operatingCompanyId));
   const stockTraceabilityReports = stockTraceabilityReportsRead.rows;
-  const shortAtpExceptionsRead = moduleCollection(useInventoryExceptionsShortAtp(orgId, undefined, readEnabled('inventory-exceptions-short-atp')));
+  const shortAtpExceptionsRead = moduleCollection(useInventoryExceptionsShortAtp(orgId, undefined, readEnabled('inventory-exceptions-short-atp'), operatingCompanyId));
   const shortAtpExceptions = shortAtpExceptionsRead.rows;
-  const expiredLotExceptionsRead = moduleCollection(useInventoryExceptionsExpiredLots(orgId, undefined, readEnabled('inventory-exceptions-expired-lots')));
+  const expiredLotExceptionsRead = moduleCollection(useInventoryExceptionsExpiredLots(orgId, undefined, readEnabled('inventory-exceptions-expired-lots'), operatingCompanyId));
   const expiredLotExceptions = expiredLotExceptionsRead.rows;
-  const openQcExceptionsRead = moduleCollection(useInventoryExceptionsOpenQc(orgId, undefined, readEnabled('inventory-exceptions-open-qc')));
+  const openQcExceptionsRead = moduleCollection(useInventoryExceptionsOpenQc(orgId, undefined, readEnabled('inventory-exceptions-open-qc'), operatingCompanyId));
   const openQcExceptions = openQcExceptionsRead.rows;
   const { data: orgUsers = [] } = useOrgUsers();
   const pricelistsRead = moduleCollection(usePricelists(orgId, initialPricelists));
   const pricelists = pricelistsRead.rows;
+  const currenciesRead = moduleCollection(useCurrencies());
+  const currencyRows = currenciesRead.rows;
+  const companiesRead = moduleCollection(useCompanies(organizationId, workspace === 'inventory'));
+  const companyCurrency = operatingCompanyCurrencyCode(currencyRows, companiesRead.rows, operatingCompanyId);
   const { data: contacts = [] } = useContacts(orgId);
   const { data: productSupplierInfos = [] } = useProductSupplierInfos(orgId, readEnabled('product-supplier-infos'));
   const { data: productPackagings = [] } = useProductPackagings(orgId, readEnabled('product-packagings'));
@@ -920,9 +903,9 @@ function InventoryClientLoaded({
 
   const createStockLocation = useCreateStockLocation(orgId);
   const updateStockLocation = useUpdateStockLocation(orgId);
-  const createWarehouse = useCreateWarehouse(orgId, selectedOperatingCompanyId);
-  const updateWarehouse = useUpdateWarehouse(orgId, selectedOperatingCompanyId);
-  const deleteWarehouse = useDeleteWarehouse(orgId, selectedOperatingCompanyId);
+  const createWarehouse = useCreateWarehouse(orgId, operatingCompanyId);
+  const updateWarehouse = useUpdateWarehouse(orgId, operatingCompanyId);
+  const deleteWarehouse = useDeleteWarehouse(orgId, operatingCompanyId);
   const updateProduct = useUpdateProduct(orgId);
   const deleteProduct = useDeleteProduct(orgId);
   const createProductVariant = useCreateProductVariant(orgId);
@@ -1095,15 +1078,19 @@ function InventoryClientLoaded({
     return withDefaultsFromRow(base, editWarehouseRow);
   }, [t, editWarehouseRow, qcLocationOptions]);
 
-  // 3D viewer — use first warehouse found (or 0n as a no-op before warehouses load)
-  const firstWarehouseId = warehouses[0]?.id
-    ? BigInt(String(warehouses[0].id))
-    : 0n;
-  const {
-    zones,
-    slots,
-    items: warehouseItems,
-  } = useWarehouse3D(orgId, operatingCompanyId, firstWarehouseId, workspace === 'inventory');
+  const [warehouseSelection, setWarehouseSelection] = useState('');
+  const activeWarehouses = useMemo(
+    () => scopedStockRows(warehouses, { organizationId: orgId, companyId: operatingCompanyId }).filter(
+      (warehouse) => warehouse.active !== false && warehouse.isActive !== false,
+    ), [warehouses, orgId, operatingCompanyId],
+  );
+  const selectedWarehouse = activeWarehouses.find((warehouse) => String(warehouse.id) === warehouseSelection)
+    ?? (activeWarehouses.length === 1 ? activeWarehouses[0] : undefined);
+  const warehouseZonesRead = moduleCollection(useWarehouse3DZones(orgId, operatingCompanyId, workspace === 'inventory' && activeTab === '3d-view'));
+  const warehouseViewerState = mergeModuleStates([
+    warehousesRead.state, warehouseZonesRead.state, locationsRead.state,
+    stockQuantsRead.state, productsRead.state, productCategoriesRead.state, replenishmentRulesListRead.state,
+  ]);
 
   // Quality management hooks
   const createQualityCheck = useCreateQualityCheck(orgId, operatingCompanyId);
@@ -1129,7 +1116,7 @@ function InventoryClientLoaded({
     operatingCompanyId,
   );
 
-  const blockSerial = useSerialBlockWorkflow(orgId, workflowSurface);
+  const blockSerial = useSerialBlockWorkflow(orgId, workflowSurface, operatingCompanyId);
 
   const createTraceabilityRecord = useCreateTraceabilityRecord(
     orgId,
@@ -1179,11 +1166,11 @@ function InventoryClientLoaded({
 
   const openQualityAlert = useOpenQualityAlert(
     orgId,
-    selectedOperatingCompanyId,
+    operatingCompanyId,
   );
   const solveQualityAlert = useSolveQualityAlert(
     orgId,
-    selectedOperatingCompanyId,
+    operatingCompanyId,
   );
 
   const createStockQuant = useCreateStockQuant(orgId, {
@@ -1413,12 +1400,8 @@ function InventoryClientLoaded({
 
   const moveQuantFormConfig = useMemo((): FormConfig | null => {
     if (!moveQuantRow) return null;
-    const sourceLocationId = String(moveQuantRow.locationId);
     const targetOptions = locations
-      .filter(
-        (location) =>
-          location.active !== false && String(location.id) !== sourceLocationId,
-      )
+      .filter((location) => isStockMoveDestination(location, moveQuantRow.locationId))
       .map((location) => ({
         value: String(location.id),
         label: String(location.completeName ?? location.name ?? location.id),
@@ -1461,7 +1444,7 @@ function InventoryClientLoaded({
               label: t('inventory.stockOnHand.columns.availableQuantity'),
               required: true,
               width: '1/2',
-              defaultValue: Math.min(1, Math.max(available, 0)),
+              max: available,
             },
           ],
         },
@@ -1757,46 +1740,29 @@ function InventoryClientLoaded({
   const warehouse3dZoneFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(newWarehouse3dZoneForm(t), {
-        warehouseId: warehouses.map((w) => ({
-          value: String(w.id),
-          label: String(w.name ?? w.id),
-        })),
+        warehouseId: selectedWarehouse ? [{
+          value: String(selectedWarehouse.id),
+          label: String(selectedWarehouse.name ?? selectedWarehouse.id),
+        }] : [],
         locationId: stockOnHandLocationOptions,
       }),
-    [t, warehouses, stockOnHandLocationOptions],
+    [t, selectedWarehouse, stockOnHandLocationOptions],
   );
 
-  const currencyIdFromPricelistsOptions = useMemo(() => {
-    const seen = new Set<number>();
-    const opts: { value: string; label: string }[] = [];
-    for (const p of pricelists) {
-      const cid = p.currencyId;
-      if (cid == null) continue;
-      const n = Number(cid);
-      if (seen.has(n)) continue;
-      seen.add(n);
-      opts.push({
-        value: String(n),
-        label: `${String(p.name ?? 'Pricelist')} (${n})`,
-      });
-    }
-    return opts.length > 0
-      ? opts
-      : [{ value: '', label: t('common.lookup.noPricelists'), disabled: true }];
-  }, [pricelists, t]);
+  const supplierCurrencyOptions = useMemo(() => currencyOptionsFromRows(currencyRows), [currencyRows]);
 
   const productSupplierLineFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(newProductSupplierLineForm(t), {
         productTmplId: productTemplateSelectOptions,
         partnerId: vendorSelectOptions,
-        currencyId: currencyIdFromPricelistsOptions,
+        currencyId: supplierCurrencyOptions,
       }),
     [
       t,
       productTemplateSelectOptions,
       vendorSelectOptions,
-      currencyIdFromPricelistsOptions,
+      supplierCurrencyOptions,
     ],
   );
 
@@ -1814,271 +1780,187 @@ function InventoryClientLoaded({
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
 
+  const stockScope = useMemo(() => ({ organizationId: orgId, companyId: operatingCompanyId }), [orgId, operatingCompanyId]);
+  const scopedQuants = useMemo(() => scopedStockRows(stockQuants, stockScope), [stockQuants, stockScope]);
+  const stockQueue = useMemo(
+    () => stockReorderQueue(scopedQuants, replenishmentRulesList, stockScope),
+    [scopedQuants, replenishmentRulesList, stockScope],
+  );
+  const categoryByProduct = useMemo(
+    () => stockCategoriesByProduct(products, productCategories),
+    [products, productCategories],
+  );
   const liveSections = useMemo(() => {
-    const { startMs, endMs } = timeRangeToMs(dashboardTimeRange);
-    const previousRange = previousPeriodMs(dashboardTimeRange);
-    const inCurrentRange = (row: Record<string, unknown>) =>
-      isTimestampInRange(recordTimestampMs(row), startMs, endMs);
-    const inPreviousRange = (row: Record<string, unknown>) =>
-      previousRange != null && isTimestampInRange(
-        recordTimestampMs(row),
-        previousRange.startMs,
-        previousRange.endMs,
-      );
+    const range = timeRangeToMs(dashboardTimeRange);
+    const zeroStock = scopedQuants.filter(
+      (quant) => (inventoryQuantity(quant.availableQuantity) ?? Infinity) <= 0,
+    ).length;
+    const pendingTransfers = transfers.filter((transfer) => isReadyTransfer(transfer) || isWaitingTransfer(transfer)).length;
+    const count = (rows: readonly unknown[], status: string) => status === 'ready' ? String(rows.length) : '—';
+    const stockQueueReady = stockQuantsRead.state.status === 'ready' && replenishmentRulesListRead.state.status === 'ready';
 
-    const totalSkus = products.length;
-    const stockValue = stockQuants.reduce(
-      (s, q) => s + Number(q.value ?? 0),
-      0,
-    );
-    const zeroStock = stockQuants.filter(
-      (q) => Number(q.availableQuantity ?? 0) <= 0,
-    ).length;
-    const pendingTransfers = transfers.filter(
-      (transfer) =>
-        String(transfer.state) === 'confirmed' ||
-        String(transfer.state) === 'assigned',
-    ).length;
-    const currentTransfers = transfers.filter((transfer) =>
-      inCurrentRange(transfer as Record<string, unknown>),
-    ).length;
-    const previousTransfers = transfers.filter((transfer) =>
-      inPreviousRange(transfer as Record<string, unknown>),
-    ).length;
-    const currentAdjustments = adjustments.filter((a) =>
-      inCurrentRange(a as Record<string, unknown>),
-    ).length;
-    const previousAdjustments = adjustments.filter((a) =>
-      inPreviousRange(a as Record<string, unknown>),
-    ).length;
-
-    return mapDashboardWidgets(moduleConfig, (w) => {
-      if (w.type === 'stat-cards') {
+    return mapDashboardWidgets(moduleConfig, (widget) => {
+      if (widget.id === 'inventory-exception-queue-cards' && widget.type === 'stat-cards') {
+        const values = [
+          count(shortAtpExceptions, shortAtpExceptionsRead.state.status),
+          count(expiredLotExceptions, expiredLotExceptionsRead.state.status),
+          count(openQcExceptions, openQcExceptionsRead.state.status),
+        ];
+        return { ...widget, data: { stats: widget.data.stats.map((stat, index) => ({ ...stat, value: values[index] ?? '—' })) } };
+      }
+      if (widget.id === 'inv-stat-cards' && widget.type === 'stat-cards') {
         return {
-          ...w,
+          ...widget,
           data: {
             stats: [
               {
                 label: t('inventory.dashboard.totalSKUs'),
-                value: totalSkus.toString(),
+                value: count(products, productsRead.state.status),
                 icon: 'Package',
               },
               {
                 label: t('inventory.dashboard.stockValue'),
-                value: `$${stockValue.toLocaleString()}`,
+                value: stockQuantsRead.state.status === 'ready' && currenciesRead.state.status === 'ready'
+                  ? inventoryStockValue(scopedQuants, currencyCodeMap(currencyRows), companyCurrency, i18n.resolvedLanguage)
+                  : '—',
                 icon: 'DollarSign',
               },
               {
                 label: t('inventory.dashboard.zeroStockAlerts'),
-                value: zeroStock.toString(),
-                change: previousRange ? percentChange(currentAdjustments, previousAdjustments) : undefined,
+                value: stockQuantsRead.state.status === 'ready'
+                  && scopedQuants.every((row) => inventoryQuantity(row.availableQuantity) != null) ? String(zeroStock) : '—',
                 icon: 'AlertTriangle',
               },
               {
                 label: t('inventory.dashboard.pendingTransfers'),
-                value: pendingTransfers.toString(),
-                change: previousRange ? percentChange(currentTransfers, previousTransfers) : undefined,
+                value: transfersRead.state.status === 'ready' ? String(pendingTransfers) : '—',
                 icon: 'Truck',
               },
             ],
           },
         };
       }
-      if (w.type === 'quick-actions') {
+      if (widget.type === 'quick-actions') {
         const handlers: Record<string, () => void> = {
-          create_product: () =>
-            setQuickActionForm({
-              form: productFormConfig,
-              action: 'createProduct',
-            }),
-          create_transfer: () =>
-            setQuickActionForm({
-              form: transferFormConfig,
-              action: 'createStockPicking',
-            }),
-          create_adjustment: () =>
-            setQuickActionForm({
-              form: adjustmentFormConfig,
-              action: 'createInventoryAdjustment',
-            }),
+          create_product: () => setQuickActionForm({ form: productFormConfig, action: 'createProduct' }),
+          create_transfer: () => setQuickActionForm({ form: transferFormConfig, action: 'createStockPicking' }),
+          create_adjustment: () => setQuickActionForm({ form: adjustmentFormConfig, action: 'createInventoryAdjustment' }),
+          view_warehouses: () => router.push('/warehouse?tab=warehouses'),
         };
         return {
-          ...w,
-          data: {
-            ...w.data,
-            actions: w.data.actions.map((a) => ({
-              ...a,
-              onClick: handlers[a.id],
-            })),
-          },
+          ...widget,
+          data: { ...widget.data, actions: widget.data.actions.map((action) => ({ ...action, onClick: handlers[action.id] })) },
         };
       }
-      if (w.id === 'inv-by-category') {
-        // Group by costMethod as a proxy for category
-        const byType = groupBy(stockQuants, (q) =>
-          String(q.costMethod ?? 'Standard'),
-        );
+      if (widget.id === 'inv-by-category' && widget.type === 'metrics') {
         const colors = ['#6366f1', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444'];
-        const allQty = stockQuants.reduce(
-          (s, q) => s + Number(q.availableQuantity ?? 0),
-          0,
-        );
-        const metrics = Object.entries(byType)
-          .map(([label, quants]) => ({
-            label,
-            value: Math.round(
-              quants.reduce((s, q) => s + Number(q.availableQuantity ?? 0), 0),
-            ),
-            max: Math.max(1, Math.round(allQty)),
-            color: '#6366f1',
-          }))
-          .sort((a, b) => b.value - a.value)
-          .slice(0, 5)
-          .map((m, i) => ({ ...m, color: colors[i] ?? '#6366f1' }));
-        return { ...w, data: { metrics } };
-      }
-      if (w.id === 'inv-movements') {
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const nowMs = Date.now();
-        const sevenDaysAgo = nowMs - 7 * 86400000;
-        const dayIn: Record<string, number> = {};
-        const dayOut: Record<string, number> = {};
-        const orderedDays: string[] = [];
-        for (let i = 6; i >= 0; i--) {
-          const d = new Date(nowMs - i * 86400000);
-          const label = days[d.getDay()];
-          if (!orderedDays.includes(label)) orderedDays.push(label);
-          dayIn[label] = 0;
-          dayOut[label] = 0;
-        }
-        for (const t of transfers) {
-          const ms = Number(t.scheduledDate ?? 0) / 1000;
-          if (ms < sevenDaysAgo || ms > nowMs) continue;
-          const label = days[new Date(ms).getDay()];
-          if (
-            String(t.pickingCode ?? '')
-              .toLowerCase()
-              .includes('in')
-          ) {
-            dayIn[label] = (dayIn[label] ?? 0) + 1;
-          } else {
-            dayOut[label] = (dayOut[label] ?? 0) + 1;
-          }
-        }
-        const values = orderedDays.map((day) => ({
-          day,
-          In: dayIn[day] ?? 0,
-          Out: dayOut[day] ?? 0,
+        const counts = inventoryCategoryCounts(scopedQuants, categoryByProduct, t('inventory.dashboard.categoryUnavailable', { defaultValue: 'Category unavailable' }));
+        const metrics = counts.slice(0, 5).map((row, index) => ({
+          ...row, max: Math.max(1, scopedQuants.length), color: colors[index] ?? '#6366f1',
         }));
-        return {
-          ...w,
-          data: { ...(w.data as Record<string, unknown>), values },
-        };
+        return { ...widget, data: { metrics } };
       }
-      if (w.id === 'inventory-stock-turnover') {
-        const movesByProduct = groupBy(
-          stockMoves as Record<string, unknown>[],
-          (m) => {
-            const pid = String(m.productId ?? m.product_id ?? '');
-            const product = products.find((p) => String(p.id) === pid);
-            return String(
-              product?.name ??
-                t('inventory.dashboard.productFallback', { id: pid.slice(-4) }),
-            );
-          },
-        );
+      if (widget.id === 'inv-movements' && widget.type === 'bar-chart') {
+        return { ...widget, data: { ...widget.data, values: completedTransferCounts(transfers, range) } };
+      }
+      if (widget.id === 'inventory-stock-turnover' && widget.type === 'bar-chart') {
+        const productNames = new Map(products.map((product) => [String(product.id), product.name]));
+        const completedMoves = stockMoves.filter((move) => {
+          const date = moduleHistoryTimestampMs(move.date, 'UTC', 'microseconds');
+          return normalizedTag(move.state) === 'done' && date != null && date >= range.startMs && date < range.endMs;
+        });
+        const movesByProduct = groupBy(completedMoves, (move) => String(move.productId ?? ''));
         const values = Object.entries(movesByProduct)
-          .map(([product, moves]) => ({ product, Moves: moves.length }))
-          .sort((a, b) => b.Moves - a.Moves)
-          .slice(0, 6);
+          .map(([id, moves]) => ({
+            product: productNames.get(id) ?? t('inventory.dashboard.productFallback', { id }),
+            Moves: moves.length,
+          }))
+          .sort((left, right) => right.Moves - left.Moves).slice(0, 6);
+        return { ...widget, title: t('inventory.dashboard.stockTurnover'), data: { ...widget.data, values } };
+      }
+      if (widget.id === 'inv-low-stock-table' && widget.type === 'table') {
+        const productById = new Map(products.map((product) => [String(product.id), product]));
+        const rows = stockQueueReady ? stockQueue.entries.slice(0, 5).map((entry) => {
+          const product = productById.get(entry.productId);
+          return {
+            sku: product?.defaultCode ?? '—',
+            name: product?.name ?? t('inventory.dashboard.productFallback', { id: entry.productId }),
+            location: locationLabelById.get(entry.locationId) ?? `#${entry.locationId}`,
+            qty: entry.available,
+            reorder: entry.minimum ?? '—',
+            status: entry.reason === 'zero-stock'
+              ? t('inventory.dashboard.zeroAvailable', { defaultValue: 'Zero available' })
+              : t('inventory.dashboard.belowMinimum', { defaultValue: 'Below minimum' }),
+          };
+        }) : [];
         return {
-          ...w,
-          title: t('inventory.dashboard.stockTurnover'),
-          data: { ...(w.data as Record<string, unknown>), values },
+          ...widget,
+          title: stockQueue.incomplete > 0
+            ? t('inventory.dashboard.incompleteLowStock', { defaultValue: 'Low Stock Items · incomplete data' })
+            : widget.title,
+          data: { ...widget.data, rows },
         };
       }
-      if (w.id === 'inv-low-stock-table') {
-        const lowStock = stockQuants
-          .filter((q) => Number(q.availableQuantity ?? 0) <= 0)
-          .slice(0, 5)
-          .map((q) => {
-            const product = products.find((p) => p.id === q.productId);
-            return {
-              sku: String(
-                product?.defaultCode ??
-                  t('inventory.dashboard.skuFallback', {
-                    id: String(q.productId).slice(-4),
-                  }),
-              ),
-              name: String(
-                product?.name ??
-                  t('inventory.dashboard.productFallback', {
-                    id: String(q.productId).slice(-4),
-                  }),
-              ),
-              qty: Math.round(Number(q.availableQuantity ?? 0)),
-              reorder: '—',
-              status: 'Critical',
-            };
-          });
-        return {
-          ...w,
-          data: { ...(w.data as Record<string, unknown>), rows: lowStock },
-        };
-      }
-      if (w.id === 'inventory-exception-queue-cards') {
-        return {
-          ...w,
-          data: {
-            stats: [
-              {
-                label: 'Short ATP',
-                value: String(shortAtpExceptions.length),
-                icon: 'AlertTriangle',
-                testId: 'inventory-queue-short-atp',
-              },
-              {
-                label: 'Expired lots',
-                value: String(expiredLotExceptions.length),
-                icon: 'AlertCircle',
-                testId: 'inventory-queue-expired-lots',
-              },
-              {
-                label: 'Open QC fails',
-                value: String(openQcExceptions.length),
-                icon: 'ShieldAlert',
-                testId: 'inventory-queue-open-qc',
-              },
-            ],
-          },
-        };
-      }
-      return w;
+      return widget;
     });
   }, [
-    products,
-    stockQuants,
-    transfers,
-    adjustments,
-    stockMoves,
-    shortAtpExceptions,
-    expiredLotExceptions,
-    openQcExceptions,
-    dashboardTimeRange,
-    t,
-    moduleConfig,
-    productFormConfig,
-    transferFormConfig,
-    adjustmentFormConfig,
+    dashboardTimeRange, moduleConfig, scopedQuants, categoryByProduct, stockQueue, products, stockMoves, transfers,
+    shortAtpExceptions, expiredLotExceptions, openQcExceptions, productFormConfig, transferFormConfig, adjustmentFormConfig,
+    stockQuantsRead.state.status, replenishmentRulesListRead.state.status, productsRead.state.status, transfersRead.state.status,
+    shortAtpExceptionsRead.state.status, expiredLotExceptionsRead.state.status, openQcExceptionsRead.state.status,
+    currenciesRead.state.status, companyCurrency, currencyRows, locationLabelById, router, t, i18n.resolvedLanguage,
   ]);
+
+  const warehouseView = useMemo(() => {
+    if (!selectedWarehouse) return undefined;
+    const productLookup = new Map(products.map((product) => [String(product.id), {
+      name: product.name,
+      sku: product.defaultCode ?? '',
+      category: categoryByProduct.get(String(product.id)),
+    }]));
+    return buildWarehouse3DView(
+      BigInt(String(selectedWarehouse.id)), warehouseZonesRead.rows, locations, scopedQuants, productLookup, stockQueue.entries,
+    );
+  }, [selectedWarehouse, warehouseZonesRead.rows, locations, scopedQuants, products, categoryByProduct, stockQueue]);
+  const zones = warehouseView?.zones ?? [];
+  const canMoveQuant = permissionsReady !== false && checkPermission('stock_quant', 'write').allowed;
+  const canManageZones = permissionsReady !== false && checkPermission('warehouse', 'write').allowed;
 
   const warehouse3DTab = useMemo(
     () => ({
       id: '3d-view',
       label: t('inventory.3dView'),
       type: 'custom' as const,
-      customContent: isMounted ? (
-        <div className="flex flex-col gap-2 h-[calc(100vh-12rem)]">
+      customContent: warehouseViewerState.status === 'loading' || !isMounted ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {t('inventory.warehouse3d.loading', { defaultValue: 'Loading warehouse data…' })}
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {activeWarehouses.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
+              <label htmlFor="warehouse-3d-selection">{t('inventory.forms.newWarehouse3dZone.fields.warehouseId')}</label>
+              <Select
+                value={selectedWarehouse ? String(selectedWarehouse.id) : ''}
+                onValueChange={(warehouseId) => {
+                  setWarehouseSelection(warehouseId);
+                  setMoveQuantRow(null);
+                  setQuickActionForm(null);
+                  cancelForm();
+                }}
+              >
+                <SelectTrigger id="warehouse-3d-selection">
+                  <SelectValue placeholder={t('inventory.warehouse3d.selectWarehouse', { defaultValue: 'Select a warehouse' })} />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeWarehouses.map((warehouse) => (
+                    <SelectItem key={String(warehouse.id)} value={String(warehouse.id)}>{warehouse.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : <p className="text-sm text-muted-foreground">{t('inventory.warehouse3d.noWarehouses', { defaultValue: 'No active warehouses in this company.' })}</p>}
+          {warehouseView && canManageZones ? (
           <div className="flex flex-wrap gap-2 shrink-0 items-center">
             <Button
               type="button"
@@ -2097,6 +1979,7 @@ function InventoryClientLoaded({
               type="button"
               variant="outline"
               size="sm"
+              disabled={zones.length === 0}
               onClick={async () => {
                 const values = await askForm({
                   title: t('inventory.z3dActions.editZone'),
@@ -2141,6 +2024,7 @@ function InventoryClientLoaded({
               type="button"
               variant="destructive"
               size="sm"
+              disabled={zones.length === 0}
               onClick={async () => {
                 const values = await askForm({
                   title: t('inventory.z3dActions.deleteZone'),
@@ -2170,39 +2054,35 @@ function InventoryClientLoaded({
               {t('inventory.z3dActions.deleteZone')}
             </Button>
           </div>
-          <div className="flex-1 min-h-0">
-            <WarehouseViewer
-              zones={zones}
-              slots={slots}
-              items={warehouseItems}
-              warehouseName={
-                warehouses[0]?.name ? String(warehouses[0].name) : undefined
-              }
-              onMoveItem={(itemId, targetSlotId) => {
-                void stockQuantWorkflow
-                  .move({
-                    quantId: String(itemId),
-                    targetLocationId: String(targetSlotId),
-                    quantity: 1,
-                  })
-                  .catch(() => undefined);
-              }}
-            />
-          </div>
+          ) : null}
+          {warehouseView && stockQueue.incomplete > 0 ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              {t('inventory.stockReadIncomplete', { defaultValue: 'Stock data incomplete' })}
+            </p>
+          ) : null}
+          {warehouseView && warehouseView.zones.length > 0 ? (
+            <div className="h-[calc(100vh-14rem)] min-h-80">
+              <WarehouseViewer
+                key={String(selectedWarehouse?.id)}
+                zones={warehouseView.zones}
+                slots={warehouseView.slots}
+                items={warehouseView.items}
+                warehouseName={selectedWarehouse?.name}
+                onMoveItem={canMoveQuant ? (itemId) => {
+                  const quant = scopedQuants.find((row) => String(row.id) === itemId);
+                  if (!quant || (inventoryQuantity(quant.availableQuantity) ?? 0) <= 0) return;
+                  setMoveQuantError(null);
+                  setMoveQuantRow(quant);
+                } : undefined}
+              />
+            </div>
+          ) : warehouseView ? <p className="text-sm text-muted-foreground">{t('inventory.warehouse3d.noZones', { defaultValue: 'No 3D zones are set up for this warehouse.' })}</p> : null}
         </div>
-      ) : null,
+      ),
     }),
     [
-      zones,
-      slots,
-      warehouseItems,
-      warehouses,
-      stockQuantWorkflow,
-      t,
-      isMounted,
-      warehouse3dZoneFormConfig,
-      updateWarehouse3dZone,
-      deleteWarehouse3dZone,
+      activeWarehouses, selectedWarehouse, warehouseView, warehouseViewerState.status, zones, scopedQuants, stockQueue.incomplete,
+      canMoveQuant, canManageZones, t, isMounted, warehouse3dZoneFormConfig, updateWarehouse3dZone, deleteWarehouse3dZone, askForm, cancelForm,
     ],
   );
 
@@ -2213,9 +2093,9 @@ function InventoryClientLoaded({
       type: 'custom' as const,
       customContent: (
         <CycleCountWizard
-          key={`${organizationId}:${selectedOperatingCompanyId ?? ''}:${currentUser?.id ?? ''}`}
+          key={`${organizationId}:${operatingCompanyId ?? ''}:${currentUser?.id ?? ''}`}
           organizationId={organizationId}
-          operatingCompanyId={selectedOperatingCompanyId}
+          operatingCompanyId={operatingCompanyId}
           locations={locations}
           cycleCounts={cycleCounts}
           products={products}
@@ -2227,7 +2107,7 @@ function InventoryClientLoaded({
     [
       t,
       organizationId,
-      selectedOperatingCompanyId,
+      operatingCompanyId,
       currentUser?.id,
       locations,
       cycleCounts,
@@ -2265,13 +2145,15 @@ function InventoryClientLoaded({
         <QualityAlertsPanel
           organizationId={organizationId}
           operatingCompanyId={operatingCompanyId}
-          selectedCompanyId={selectedOperatingCompanyId}
+          selectedCompanyId={operatingCompanyId}
+          alerts={qualityAlertsRead.rows}
+          isLoading={qualityAlertsRead.state.status === 'loading'}
           onAssignAlert={(id) => setAssignQualityAlertId(id)}
           onSolveAlert={(id) => setSolveQualityAlertId(id)}
         />
       ),
     }),
-    [organizationId, operatingCompanyId, selectedOperatingCompanyId],
+    [organizationId, operatingCompanyId, qualityAlertsRead.rows, qualityAlertsRead.state.status, t],
   );
 
   const stockMoveTabActions = useStockMoveTabActions({
@@ -2310,7 +2192,7 @@ function InventoryClientLoaded({
   const qualityCheckTabActions = useQualityCheckTabActions({
     orgId,
     operatingCompanyId,
-    selectedOperatingCompanyId,
+    selectedOperatingCompanyId: operatingCompanyId,
     askForm,
     workflowSurface,
     products,
@@ -2351,7 +2233,7 @@ function InventoryClientLoaded({
   });
   const warehouseTaskTabActions = useWarehouseTaskTabActions({
     orgId,
-    selectedOperatingCompanyId,
+    selectedOperatingCompanyId: operatingCompanyId,
     askForm,
     warehouseTaskStatusOptions,
   });
@@ -3439,14 +3321,10 @@ function InventoryClientLoaded({
   ]);
 
   const filteredStockQuants = useMemo(() => {
-    const rows = lowStockQueue
-      ? (stockQuantsRead.state.status === 'ready' && productsRead.state.status === 'ready'
-        ? lowStockQuants(stockQuants, products, { organizationId: orgId, companyId: operatingCompanyId })
-        : [])
-      : stockQuants;
+    const rows = lowStockQueue ? stockQueue.entries.flatMap((entry) => entry.rows) : stockQuants;
     if (!stockLocationFilter) return rows;
-    return rows.filter((q) => String(q.locationId ?? '') === stockLocationFilter);
-  }, [lowStockQueue, operatingCompanyId, orgId, products, productsRead.state.status, stockLocationFilter, stockQuants, stockQuantsRead.state.status]);
+    return rows.filter((quant) => String(quant.locationId ?? '') === stockLocationFilter);
+  }, [lowStockQueue, stockLocationFilter, stockQueue, stockQuants]);
 
   const data = useMemo(
     () => ({
@@ -3569,14 +3447,17 @@ function InventoryClientLoaded({
     dashboard: mergeModuleStates([
       productsRead.state, stockQuantsRead.state, transfersRead.state, adjustmentsRead.state, stockMovesRead.state,
       shortAtpExceptionsRead.state, expiredLotExceptionsRead.state, openQcExceptionsRead.state,
+      replenishmentRulesListRead.state, productCategoriesRead.state,
     ]),
     products: workspace === 'products'
       ? mergeModuleStates([productsRead.state, productCategoriesRead.state, uomsRead.state])
       : productsRead.state,
     'product-categories': productCategoriesRead.state,
     uoms: uomsRead.state,
-    stock: lowStockQueue && selectedOperatingCompanyId == null
-      ? { status: 'error' as const, message: t('financeReview.selectCompany', { defaultValue: 'Select a company' }) }
+    stock: lowStockQueue
+      ? stockQueue.incomplete > 0
+        ? { status: 'partial' as const, message: t('inventory.stockReadIncomplete', { defaultValue: 'Stock data incomplete' }) }
+        : mergeModuleStates([stockQuantsRead.state, replenishmentRulesListRead.state])
       : stockQuantsRead.state,
     transfers: transfersRead.state,
     'stock-moves': stockMovesRead.state,
@@ -3601,7 +3482,8 @@ function InventoryClientLoaded({
     'traceability-reports': stockTraceabilityReportsRead.state,
     'cycle-wizard': mergeModuleStates([locationsRead.state, cycleCountsRead.state, productsRead.state]),
     'location-tree': locationsRead.state,
-    'quality-alerts': qualityChecksRead.state,
+    'quality-alerts': qualityAlertsRead.state,
+    '3d-view': warehouseViewerState,
   };
   const dataState = workspace === 'warehouse' ? warehouseDataStates(sourceDataState) : sourceDataState;
   type InventoryTab = keyof typeof dataState;
@@ -3615,7 +3497,7 @@ function InventoryClientLoaded({
     createPickingWave: 'picking-waves', createProductCategory: 'product-categories',
     createBarcodeRule: 'barcode-rules', createAdjustmentReason: 'adjustment-reasons',
     createTraceabilityRecord: 'traceability-records', createTraceabilityReport: 'traceability-reports',
-    createStockQuant: 'stock',
+    createStockQuant: 'stock', createWarehouse3dZone: '3d-view',
   };
   const csvTabs: Partial<Record<InventoryCsvImportKind, InventoryTab>> = {
     productCategory: 'product-categories', product: 'products', productVariant: 'products',
@@ -3632,7 +3514,7 @@ function InventoryClientLoaded({
   const transfersUsable = tabUsable('transfers');
   const serialsUsable = tabUsable('serials');
   const lotsUsable = tabUsable('lots');
-  const qualityUsable = tabUsable('quality');
+  const qualityAlertsUsable = tabUsable('quality-alerts');
   // Prompted row commands act on the active tab's rows.
   const activeTabUsable = tabUsable(activeTab);
   useEffect(() => {
@@ -3655,7 +3537,7 @@ function InventoryClientLoaded({
       setBlockSerialId(null);
     }
     if (!lotsUsable) setSelectedLotRow(null);
-    if (!qualityUsable) {
+    if (!qualityAlertsUsable) {
       setCreateQualityAlertOpen(false);
       setAssignQualityAlertId(null);
       setSolveQualityAlertId(null);
@@ -3663,7 +3545,7 @@ function InventoryClientLoaded({
     if (!activeTabUsable) cancelForm();
   }, [
     quickActionUsable, productsUsable, warehousesUsable, stockUsable, transfersUsable,
-    serialsUsable, lotsUsable, qualityUsable, activeTabUsable, cancelForm,
+    serialsUsable, lotsUsable, qualityAlertsUsable, activeTabUsable, cancelForm,
   ]);
 
   const handleFormSubmit = async (
@@ -3961,7 +3843,17 @@ function InventoryClientLoaded({
         } : undefined}
       />}
       {lowStockQueue && (
-        <div className="mb-3"><OwnerQueueScope queue="lowStockProducts" /></div>
+        <div className="mb-3 space-y-2">
+          <OwnerQueueScope queue="lowStockProducts" />
+          {stockQueue.entries.some((entry) => entry.rows.length === 0) ? (
+            <p className="text-sm text-muted-foreground">
+              {t('inventory.dashboard.rulesWithoutStock', {
+                defaultValue: '{{count}} reorder positions have no stock record. Open Replenishment to review those rules.',
+                count: stockQueue.entries.filter((entry) => entry.rows.length === 0).length,
+              })}
+            </p>
+          ) : null}
+        </div>
       )}
       {/* A record selection must not outlive its actor, organization, or company. */}
       <ModuleView
@@ -4063,7 +3955,7 @@ function InventoryClientLoaded({
         }}
       />
       <FormModal
-        open={createQualityAlertOpen && qualityUsable}
+        open={createQualityAlertOpen && qualityAlertsUsable}
         onOpenChange={setCreateQualityAlertOpen}
         config={qualityAlertCreateFormConfig}
         isPending={isFormMutationPending}
@@ -4079,7 +3971,7 @@ function InventoryClientLoaded({
             ? `assign-alert-${String(assignQualityAlertId)}`
             : 'assign-alert-closed'
         }
-        open={assignQualityAlertId !== null && qualityUsable}
+        open={assignQualityAlertId !== null && qualityAlertsUsable}
         onOpenChange={(open) => !open && setAssignQualityAlertId(null)}
         config={assignQualityAlertFormConfig}
         isPending={isFormMutationPending}
@@ -4103,7 +3995,7 @@ function InventoryClientLoaded({
             ? `solve-alert-${String(solveQualityAlertId)}`
             : 'solve-alert-closed'
         }
-        open={solveQualityAlertId !== null && qualityUsable}
+        open={solveQualityAlertId !== null && qualityAlertsUsable}
         onOpenChange={(open) => !open && setSolveQualityAlertId(null)}
         config={solveQualityAlertForm(t)}
         isPending={isFormMutationPending}
@@ -4321,25 +4213,17 @@ function InventoryClientLoaded({
             setMoveQuantError(null);
             const quantId = moveQuantRow.id;
             const targetLocationId = formData.targetLocationId;
-            const quantity = Number(formData.quantity);
-            if (
-              quantId == null ||
-              targetLocationId == null ||
-              targetLocationId === '' ||
-              !Number.isFinite(quantity)
-            ) {
-              setMoveQuantError(t('common.validation.required'));
+            const quant = scopedQuants.find((row) => String(row.id) === String(quantId));
+            const target = locations.find((location) => String(location.id) === String(targetLocationId));
+            const command = stockQuantMoveInput(quant, target, formData.quantity);
+            if (!canMoveQuant || !command) {
+              setMoveQuantError(t('inventory.warehouse3d.invalidMove', {
+                defaultValue: 'Choose a different active internal location and enter a quantity within available stock.',
+              }));
               return;
             }
             try {
-              await stockQuantWorkflow.move(
-                {
-                  quantId: String(quantId),
-                  targetLocationId: String(targetLocationId),
-                  quantity,
-                },
-                { navigateToNext: true },
-              );
+              await stockQuantWorkflow.move(command, { navigateToNext: activeTab !== '3d-view' });
               setMoveQuantRow(null);
             } catch (error) {
               setMoveQuantError(
@@ -4436,6 +4320,12 @@ function InventoryClientLoaded({
         open={supplierLineProductId !== null && productsUsable}
         onOpenChange={(open) => !open && setSupplierLineProductId(null)}
         config={productSupplierLineFormConfig}
+        submissionDisabled={currenciesRead.state.status !== 'ready' || supplierCurrencyOptions.length === 0}
+        formLeadingActions={currenciesRead.state.status === 'loading'
+          ? <p role="status" className="text-sm text-muted-foreground">{t('inventory.currencyLoading', { defaultValue: 'Loading currencies…' })}</p>
+          : currenciesRead.state.status === 'ready' && supplierCurrencyOptions.length === 0
+            ? <p role="status" className="text-sm text-muted-foreground">{t('inventory.currencyEmpty', { defaultValue: 'No active currencies are available.' })}</p>
+            : <ModuleDataNotice state={currenciesRead.state} />}
         isPending={isFormMutationPending}
         onSubmit={async (fd) => {
           if (supplierLineProductId == null) return;

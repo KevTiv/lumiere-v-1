@@ -2,6 +2,7 @@
 
 import { WorkspaceProfileProvider, useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
 import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
+import { getProductSurface, isFirstOrgRouteAdmitted } from "@lumiere/ui/lib/product-surface-catalog"
 import { Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@lumiere/ui/components/button"
@@ -225,7 +226,12 @@ function ErpAiChatPanel({
   const operatingCompanyId = useOperatingCompanyId(organizationId)
   const router = useRouter()
   const workspaceProfile = useWorkspaceProfile()
-  const { checkPermission, permissionsReady } = useRBAC()
+  const { checkPermission, permissionsReady, isAdmin } = useRBAC()
+  const skillSetupCapability = getProductSurface("ai-skills").requiredCapability
+  const canOpenSkillSetup = permissionsReady === true
+    && (!firstOrgProfile || isFirstOrgRouteAdmitted("ai-skills", isAdmin()))
+    && skillSetupCapability !== null
+    && checkPermission(skillSetupCapability, "read").allowed
   const navigationGuard = useContext(NavigationEditorContext)
   const nativeForms = useAssistantNativeForms()
   const pageComposition = useModulePageComposition()
@@ -1058,6 +1064,7 @@ function ErpAiChatPanel({
       sendPending={Boolean(pendingTurn)}
       turnProjection={pendingTurn?.projection ?? recentTurns.current.get(historyScope)}
       turnProgress={pendingTurn?.progress}
+      canOpenSkillSetup={canOpenSkillSetup}
       onStopReply={pendingTurn?.canStop ? stopReply : undefined}
       renderMessageActions={renderMessageActions}
       renderImportTask={importTasks.renderReceipt}
@@ -1198,7 +1205,8 @@ function ModulesContent({
   }, [nativeForms.outcome])
   const approvalInboxCountQuery = useApprovalInboxCount(
     orgId,
-    orgReady && operatingCompanyId != null && operatingCompanyId > 0,
+    operatingCompanyId,
+    orgReady,
   )
   const currentUserProfile = useCurrentUserProfile()
 

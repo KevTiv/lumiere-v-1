@@ -22,32 +22,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@lumiere/ui/components/select"
-import type { EntityTableConfig } from "@lumiere/ui"
+import type { EntityRow, EntityTableConfig } from "@lumiere/ui"
+import { moduleCollection, type ModuleDataState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
+import { buildPivotTable, pivotMeasureOp } from "./pivot-table-model"
 import { FileSpreadsheet, Save, Trash2 } from "lucide-react"
 
 type PivotExplorerProps = {
   organizationId: bigint
   companyId?: bigint
-  financialReports: Record<string, unknown>[]
-  trialBalances: Record<string, unknown>[]
-}
-
-function rowField(row: Record<string, unknown>, key: string): string {
-  const snake = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)
-  const raw = row[key] ?? row[snake]
-  return raw == null ? "" : String(raw)
-}
-
-function rowMeasure(row: Record<string, unknown>, field: string): number {
-  const snake = field.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)
-  const raw = row[field] ?? row[snake]
-  const n = Number(raw)
-  return Number.isFinite(n) ? n : 0
-}
-
-function columnKey(label: string, index: number): string {
-  const slug = label.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_|_$/g, "").toLowerCase()
-  return slug ? `col_${slug}` : `col_${index}`
+  financialReports: EntityRow[]
+  trialBalances: EntityRow[]
+  reportsState: ModuleDataState
+  balancesState: ModuleDataState
 }
 
 export function PivotExplorer({
@@ -55,9 +42,13 @@ export function PivotExplorer({
   companyId,
   financialReports,
   trialBalances,
+  reportsState,
+  balancesState,
 }: PivotExplorerProps) {
   const { t } = useTranslation()
-  const { data: savedReports = [] } = useSavedReports(organizationId)
+  const companyAvailable = companyId != null && companyId > 0n
+  const saved = moduleCollection(useSavedReports(organizationId, undefined, { companyId, enabled: companyAvailable }))
+  const savedReports = saved.state.status === "ready" ? saved.rows : []
   const createSavedReport = useCreateSavedReport(organizationId, companyId)
   const updateSavedReport = useUpdateSavedReport(organizationId, companyId)
   const deleteSavedReport = useDeleteSavedReport(organizationId, companyId)
@@ -77,15 +68,15 @@ export function PivotExplorer({
 
   const generatedReports = useMemo(
     () =>
-      financialReports.filter(
+      reportsState.status === "ready" ? financialReports.filter(
         (r) =>
           (String(r.state ?? "").toLowerCase() === "generated" ||
             String(r.state ?? "").toLowerCase() === "exported") &&
           (companyId == null ||
             companyId <= 0n ||
             String(r.companyId ?? r.company_id ?? "") === companyId.toString()),
-      ),
-    [financialReports, companyId],
+      ) : [],
+    [financialReports, companyId, reportsState.status],
   )
 
   const [reportId, setReportId] = useState<string>("")
@@ -94,83 +85,30 @@ export function PivotExplorer({
   const [rowDimension, setRowDimension] = useState("accountCode")
   const [columnDimension, setColumnDimension] = useState("")
   const [measureField, setMeasureField] = useState("closingDebit")
-  const [measureOp, setMeasureOp] = useState("sum")
+  const [measureOp, setMeasureOp] = useState(() => pivotMeasureOp("sum"))
+  const [exportError, setExportError] = useState(false)
 
   const activeSaved = useMemo(
     () => scopedSavedReports.find((r) => String(r.id) === savedReportId),
     [scopedSavedReports, savedReportId],
   )
 
+  const selectedReport = generatedReports.some((report) => String(report.id) === reportId)
   const sourceRows = useMemo(() => {
-    if (!reportId) return []
+    if (!selectedReport || balancesState.status !== "ready") return []
     return trialBalances.filter((row) => String(row.reportId ?? row.report_id) === reportId)
-  }, [reportId, trialBalances])
+  }, [selectedReport, balancesState.status, reportId, trialBalances])
 
-  const pivot = useMemo(() => {
-    const tableHeaders = [rowDimension]
-    if (columnDimension.trim()) tableHeaders.push(columnDimension)
-    tableHeaders.push(`${measureOp}(${measureField})`)
-
-    const grid = new Map<string, Map<string, number>>()
-    for (const row of sourceRows) {
-      const rowKey = rowField(row as Record<string, unknown>, rowDimension) || "(blank)"
-      const colKey = columnDimension.trim()
-        ? rowField(row as Record<string, unknown>, columnDimension) || "(blank)"
-        : "total"
-      const value = rowMeasure(row as Record<string, unknown>, measureField)
-      if (!grid.has(rowKey)) grid.set(rowKey, new Map())
-      const cols = grid.get(rowKey)!
-      cols.set(colKey, (cols.get(colKey) ?? 0) + value)
-    }
-
-    const columnKeys = columnDimension.trim()
-      ? Array.from(
-          new Set(
-            sourceRows.map(
-              (r) => rowField(r as Record<string, unknown>, columnDimension) || "(blank)",
-            ),
-          ),
-        ).sort()
-      : ["total"]
-
-    const tableRows: Record<string, unknown>[] = []
-    const exportRows: (string | number)[][] = []
-    let rowIndex = 0
-    for (const [rowKey, cols] of Array.from(grid.entries()).sort(([a], [b]) => a.localeCompare(b))) {
-      const record: Record<string, unknown> = { id: rowIndex, [columnKey(tableHeaders[0], 0)]: rowKey }
-      const exportLine: (string | number)[] = [rowKey]
-      if (columnDimension.trim()) {
-        for (let i = 0; i < columnKeys.length; i++) {
-          const col = columnKeys[i]
-          const value = Number((cols.get(col) ?? 0).toFixed(2))
-          const key = columnKey(col, i + 1)
-          record[key] = value
-          exportLine.push(value)
-        }
-      } else {
-        const value = Number((cols.get("total") ?? 0).toFixed(2))
-        const key = columnKey(measureField, 1)
-        record[key] = value
-        exportLine.push(value)
-      }
-      tableRows.push(record)
-      exportRows.push(exportLine)
-      rowIndex += 1
-    }
-
-    const exportHeaders = [
-      rowDimension,
-      ...columnKeys.map((c) => (columnDimension.trim() ? c : measureField)),
-    ]
-
-    return { exportHeaders, exportRows, tableHeaders, tableRows }
-  }, [sourceRows, rowDimension, columnDimension, measureField, measureOp])
+  const pivot = useMemo(
+    () => buildPivotTable(sourceRows, { rowDimension, columnDimension, measureField, measureOp }),
+    [sourceRows, rowDimension, columnDimension, measureField, measureOp],
+  )
 
   const tableConfig = useMemo((): EntityTableConfig => {
-    const columns = pivot.tableHeaders.map((header, index) => ({
-      key: columnKey(header, index),
-      label: header,
-      type: index === 0 ? ("text" as const) : ("currency" as const),
+    const columns = pivot.columns.map(({ key, label }, index) => ({
+      key,
+      label,
+      type: index === 0 ? ("text" as const) : ("number" as const),
       align: index === 0 ? ("left" as const) : ("right" as const),
       width: index === 0 ? "min-w-48" : "min-w-28",
     }))
@@ -182,9 +120,9 @@ export function PivotExplorer({
       searchPlaceholder: t("reports.pivot.searchPlaceholder"),
       searchKeys: columns.map((c) => c.key),
       columns,
-      emptyMessage: t("reports.pivot.empty"),
+      emptyMessage: t("common.noData"),
     }
-  }, [pivot.tableHeaders, pivot.tableRows.length, t])
+  }, [pivot.columns, pivot.tableRows.length, t])
 
   const loadSaved = (id: string) => {
     const row = scopedSavedReports.find((r) => String(r.id) === id)
@@ -194,7 +132,7 @@ export function PivotExplorer({
     setRowDimension(String(row.rowDimension ?? row.row_dimension ?? "accountCode"))
     setColumnDimension(String(row.columnDimension ?? row.column_dimension ?? ""))
     setMeasureField(String(row.measureField ?? row.measure_field ?? "closingDebit"))
-    setMeasureOp(String(row.measureOp ?? row.measure_op ?? "sum"))
+    setMeasureOp(pivotMeasureOp(row.measureOp ?? row.measure_op))
   }
 
   return (
@@ -207,8 +145,8 @@ export function PivotExplorer({
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <div className="space-y-2">
           <Label>{t("reports.pivot.sourceReport")}</Label>
-          <Select value={reportId} onValueChange={setReportId}>
-            <SelectTrigger>
+          <Select value={selectedReport ? reportId : ""} onValueChange={setReportId} disabled={reportsState.status !== "ready"}>
+            <SelectTrigger aria-label={t("reports.pivot.sourceReport")}>
               <SelectValue placeholder={t("reports.pivot.sourceReportPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
@@ -219,12 +157,14 @@ export function PivotExplorer({
               ))}
             </SelectContent>
           </Select>
+          {reportsState.status === "loading" ? <p role="status">{t("common.loading")}</p> : <ModuleDataNotice state={reportsState} />}
         </div>
 
         <div className="space-y-2">
           <Label>{t("reports.pivot.savedDefinition")}</Label>
           <Select
-            value={savedReportId || undefined}
+            value={activeSaved ? savedReportId : ""}
+            disabled={!companyAvailable || saved.state.status !== "ready"}
             onValueChange={(v: string) => {
               setSavedReportId(v)
               loadSaved(v)
@@ -241,6 +181,7 @@ export function PivotExplorer({
               ))}
             </SelectContent>
           </Select>
+          {saved.state.status === "loading" ? <p role="status">{t("common.loading")}</p> : <ModuleDataNotice state={saved.state} />}
         </div>
 
         <div className="space-y-2">
@@ -274,7 +215,7 @@ export function PivotExplorer({
         <div className="space-y-2">
           <Label>{t("reports.pivot.columnDimension")}</Label>
           <Select value={columnDimension || "__none__"} onValueChange={(v: string) => setColumnDimension(v === "__none__" ? "" : v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger aria-label={t("reports.pivot.columnDimension")}><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">{t("reports.pivot.none")}</SelectItem>
               {["accountType", "accountCode"].filter((opt) => opt !== rowDimension).map((opt) => (
@@ -300,7 +241,7 @@ export function PivotExplorer({
       <div className="flex flex-wrap gap-2">
         <Button
           variant="outline"
-          disabled={!name.trim() || createSavedReport.isPending}
+          disabled={!companyAvailable || !name.trim() || createSavedReport.isPending || saved.state.status !== "ready"}
           data-testid="pivot-save-report"
           onClick={() =>
             void createSavedReport.mutateAsync({
@@ -350,28 +291,40 @@ export function PivotExplorer({
           </>
         ) : null}
         <Button
-          disabled={!reportId || pivot.exportRows.length === 0}
-          onClick={() =>
+          disabled={!selectedReport || balancesState.status !== "ready" || pivot.exportRows.length === 0}
+          onClick={() => {
+            setExportError(false)
             void downloadPivotTableXlsx(
               name || "pivot",
               pivot.exportHeaders,
               pivot.exportRows,
               `report-${reportId}-definition-${savedReportId || "unsaved"}.xlsx`,
-            ).catch(() => undefined)
-          }
+            ).catch(() => setExportError(true))
+          }}
         >
           <FileSpreadsheet className="mr-2 h-4 w-4" />
           {t("reports.pivot.exportXlsx")}
         </Button>
       </div>
 
-      {reportId ? (
+      {exportError ? <p role="alert">{t("reports.pivot.exportFailed", { defaultValue: "Could not export the pivot table. Try again." })}</p> : null}
+
+      {selectedReport ? (
         <p className="text-xs text-muted-foreground" data-testid="pivot-provenance">
           {`Source report #${reportId} · definition ${savedReportId ? `#${savedReportId}` : "unsaved"} · company ${companyId?.toString() ?? "all permitted"}`}
         </p>
       ) : null}
 
-      <EntityTable config={tableConfig} data={pivot.tableRows} />
+      {reportsState.status === "ready" && !selectedReport ? (
+        <p className="text-sm text-muted-foreground">
+          {generatedReports.length ? t("reports.pivot.empty") : t("reports.pivot.noSourceReports")}
+        </p>
+      ) : null}
+      {selectedReport && (balancesState.status === "ready"
+        ? <EntityTable config={tableConfig} data={pivot.tableRows} />
+        : balancesState.status === "loading"
+          ? <p role="status">{t("common.loading")}</p>
+          : <ModuleDataNotice state={balancesState} />)}
     </div>
   )
 }

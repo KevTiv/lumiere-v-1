@@ -77,3 +77,55 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 
     })
   })
 }
+
+
+test("pivot amounts render in both modes and disappear when balances cannot be verified", async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.route("**/api/query/saved-reports?**", (route) => route.fulfill({ status: 503, json: { error: "Synthetic definitions unavailable" } }))
+  await page.goto("/reports-workspace?tab=pivot-explorer")
+  await expect(page.getByTestId("pivot-saved-select")).toBeDisabled()
+  await expect(page.getByRole("alert").filter({ hasText: "Records could not be loaded" })).toBeVisible()
+  await page.getByRole("combobox", { name: "Source financial report" }).click()
+  await page.getByRole("option", { name: "October trial balance" }).click()
+  await expect(page.getByRole("cell", { name: "125", exact: true })).toBeVisible()
+  await page.getByRole("combobox", { name: "Column dimension" }).click()
+  await page.getByRole("option", { name: "accountType", exact: true }).click()
+  await expect(page.getByRole("columnheader", { name: "Expense", exact: true })).toBeVisible()
+  await expect(page.getByRole("cell", { name: "125", exact: true })).toBeVisible()
+  const exportButton = page.getByRole("button", { name: "Export XLSX", exact: true })
+  await expect(exportButton).toBeEnabled()
+  await page.getByRole("button", { name: "Fail pivot balances", exact: true }).click()
+  await expect(page.getByRole("cell", { name: "125", exact: true })).toHaveCount(0)
+  await expect(exportButton).toBeDisabled()
+})
+
+test("owner report scheduling previews the server-calculated delivery and submits its timing", async ({ page }) => {
+  test.setTimeout(120_000)
+  const firstDelivery = "2026-11-16T08:00:00Z"
+  let previewOK = false
+  await page.route("**/api/reports/catalog", (route) => route.fulfill({ json: { catalogSchemaVersion: 1, reports: [{
+    key: "daily_business_summary_v1", schemaVersion: 1, title: "Daily summary", description: "Synthetic",
+    mandatorySections: [], authoritativeSources: [], availability: "preview", maxWindowDays: 1,
+  }] } }))
+  await page.route("**/api/reports/history?**", (route) => route.fulfill({ json: [] }))
+  await page.route("**/api/reports/schedules/recipients", (route) => route.fulfill({ json: [{ userIdentity: "test-recipient" }] }))
+  await page.route("**/api/reports/schedules?**", (route) => route.fulfill({ json: { schedules: [], runs: [] } }))
+  await page.route("**/api/reports/schedules/preview?**", (route) => route.fulfill({
+    status: previewOK ? 200 : 503,
+    json: previewOK ? { nextRun: firstDelivery } : { error: "Synthetic preview failure" },
+  }))
+  await page.route("**/api/reports/schedules", (route) => route.fulfill({ status: 201 }))
+  await page.goto("/reports-workspace?tab=owner-reports")
+  const create = page.getByRole("button", { name: "Create schedule", exact: true })
+  await expect(create).toBeDisabled()
+  await expect(page.getByRole("alert").filter({ hasText: "Could not preview the first delivery" })).toBeVisible()
+  previewOK = true
+  await page.getByRole("button", { name: "Retry", exact: true }).click()
+  await expect(page.locator(`time[datetime="${firstDelivery}"]`)).toBeVisible()
+  await page.getByRole("spinbutton", { name: "Hour", exact: true }).fill("14")
+  const requestPromise = page.waitForRequest((request) => request.method() === "POST" && request.url().endsWith("/api/reports/schedules"))
+  await create.click()
+  const request = await requestPromise
+  expect(request.postDataJSON()).toMatchObject({ hour: 14, minute: 0, frequency: "daily", companyId: 1 })
+  expect(request.postDataJSON()).not.toHaveProperty("nextRun")
+})

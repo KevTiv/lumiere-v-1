@@ -11,7 +11,7 @@ vi.mock("../../../query-hooks/src/http", () => ({
   coalesceQueryInitialData: (rows: unknown) => rows,
 }));
 import { useProducts } from "../../../query-hooks/src/hooks/inventory/products";
-import { useQualityChecks } from "../../../query-hooks/src/hooks/inventory/quality";
+import { useQualityAlerts, useQualityChecks } from "../../../query-hooks/src/hooks/inventory/quality";
 import { usePickingWaves, useStockLocations, useStockQuants } from "../../../query-hooks/src/hooks/inventory/stock-operations";
 import { useWarehouse3D } from "../../../query-hooks/src/hooks/inventory/warehouses";
 
@@ -58,5 +58,35 @@ it("preserves a denied required read as an error rather than inventing empty sto
   const hook = renderHook(() => useStockQuants(7n, undefined, isInventoryWorkspaceReadEnabled("warehouse", "stock-quants")), { wrapper });
   await waitFor(() => expect(hook.result.current.isError).toBe(true));
   expect(hook.result.current.data).toBeUndefined();
+  client.clear();
+});
+
+it("keeps quality alerts independent from quality checks and caches them per company", async () => {
+  state.rows.mockImplementation(async (path: string) => {
+    if (path.startsWith("/api/query/quality-checks")) {
+      throw Object.assign(new Error("Checks denied"), { status: 403 });
+    }
+    if (path === "/api/query/quality-alerts?companyId=41") return [{ id: "501" }];
+    if (path === "/api/query/quality-alerts?companyId=42") {
+      throw Object.assign(new Error("Alerts failed"), { status: 500 });
+    }
+    return [];
+  });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client }, children);
+  const hook = renderHook(({ companyId }: { companyId: bigint }) => ({
+    checks: useQualityChecks(7n, undefined, true, companyId),
+    alerts: useQualityAlerts(7n, undefined, true, companyId),
+  }), { initialProps: { companyId: 41n }, wrapper });
+
+  await waitFor(() => expect(hook.result.current.checks.isError).toBe(true));
+  expect(hook.result.current.alerts.data).toEqual([{ id: "501" }]);
+  hook.rerender({ companyId: 42n });
+  await waitFor(() => expect(hook.result.current.alerts.isError).toBe(true));
+  expect(hook.result.current.alerts.data).toBeUndefined();
+
+  hook.rerender({ companyId: 43n });
+  await waitFor(() => expect(hook.result.current.alerts.isSuccess).toBe(true));
+  expect(hook.result.current.alerts.data).toEqual([]);
   client.clear();
 });

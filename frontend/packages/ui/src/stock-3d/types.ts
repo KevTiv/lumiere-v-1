@@ -27,7 +27,7 @@ export interface Warehouse {
   updatedAt: Date
 }
 
-export const CATEGORY_COLORS: Record<StockCategory, string> = {
+const CATEGORY_COLORS: Record<StockCategory, string> = {
   electronics: "#3b82f6",
   clothing: "#8b5cf6",
   food: "#22c55e",
@@ -42,4 +42,12 @@ export interface SearchResult {
   item: StockItem
   slot: StorageSlot
   zone: Zone
+}
+
+export function stockCategoryColor(category: StockCategory): string {
+  return Object.hasOwn(CATEGORY_COLORS, category) ? CATEGORY_COLORS[category]! : "#64748b"
+}
+
+export function isLowStockItem(item: StockItem): boolean {
+  return item.lowStock ?? (item.minStock != null && item.quantity <= item.minStock)
 }

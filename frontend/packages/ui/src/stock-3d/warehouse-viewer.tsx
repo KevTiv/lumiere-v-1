@@ -20,7 +20,7 @@ interface WarehouseViewerProps {
   items: StockItem[]
   warehouseName?: string
   warehouseDimensions?: { width: number; height: number; depth: number }
-  onMoveItem?: (itemId: string, targetSlotId: string) => void
+  onMoveItem?: (itemId: string) => void
   onUpdateQuantity?: (itemId: string, quantity: number) => void
   onRemoveItem?: (itemId: string) => void
 }

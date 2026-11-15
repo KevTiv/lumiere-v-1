@@ -56,6 +56,7 @@ import {
   type PageWidgetPlacement,
   type PageWidgetWidth,
 } from "../lib/page-composition"
+import type { ModuleDataState } from "../lib/module-data-state"
 import { PageCompositionGallery } from "./page-composition-gallery"
 import {
   PageCompositionSortableWidget,
@@ -66,6 +67,7 @@ export interface PageCompositionProps {
   value: PageCompositionValue
   defaultValue: readonly PageWidgetPlacement[]
   catalog: readonly PageWidgetCatalogItem[]
+  savedCatalogState?: ModuleDataState
   revision?: string | null
   onSave: (
     value: PageCompositionValue,
@@ -98,6 +100,7 @@ export function PageComposition({
   value,
   defaultValue,
   catalog,
+  savedCatalogState,
   revision = null,
   onSave,
   onCreateWidget,
@@ -871,6 +874,7 @@ export function PageComposition({
       {gallery ? (
         <PageCompositionGallery
           catalog={items}
+          savedCatalogState={savedCatalogState}
           placements={widgets}
           prompt={gallery.prompt}
           disabled={controlsDisabled || atCapacity}

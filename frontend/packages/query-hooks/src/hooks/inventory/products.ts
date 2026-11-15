@@ -23,6 +23,7 @@ import {
   CREATE_STOCK_PICKING_DEFAULTS,
   CREATE_STOCK_LOCATION_DEFAULTS,
   invalidateInventoryQueries,
+  inventoryListQueryOptions,
 } from "./shared"
 
 
@@ -187,19 +188,14 @@ export function useProductCategories(
   organizationId: bigint,
   initialData?: ProductCategory[],
   enabled = true,
+  companyId?: bigint,
 ) {
+  const options = inventoryListQueryOptions('product-categories', organizationId, 'Failed to fetch product categories', companyId);
   return useQuery<ProductCategory[]>({
     enabled,
-    queryKey: ['product-categories', rqBigIntKey(organizationId)],
-    queryFn: async () => {
-      const rows = await fetchQueryList(
-        '/api/query/product-categories',
-        'Failed to fetch product categories',
-      );
-      return rows.filter((r) => r.deletedAt == null);
-    },
-    staleTime: 30_000,
-    initialData: initialData?.filter((r) => r.deletedAt == null),
+    ...options,
+    queryFn: async () => (await options.queryFn()).filter((row) => row.deletedAt == null),
+    initialData: companyId == null ? initialData?.filter((row) => row.deletedAt == null) : undefined,
   });
 }
 

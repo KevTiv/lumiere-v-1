@@ -231,6 +231,8 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
             allday: event.allday,
             state: event.state,
             privacy: event.privacy,
+            recurrency: "recurrency" in event ? event.recurrency : undefined,
+            rrule: "rrule" in event ? event.rrule : undefined,
             partnerIds: "partnerIds" in event ? event.partnerIds : undefined,
             partner_ids: "partner_ids" in event ? event.partner_ids : undefined,
           }, contacts)).filter((event): event is UICalendarEvent => event != null)

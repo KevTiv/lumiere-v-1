@@ -10,12 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 
 import {
-  Bell,
   Moon,
   Sun,
   Monitor,
@@ -29,7 +27,7 @@ import { useTheme } from "../components/theme-provider"
 import { cn } from "../lib/utils"
 
 interface ProfileSettingsProps {
-  section: "profile" | "notifications" | "appearance"
+  section: "profile" | "appearance"
 }
 
 function ProfileLanguageFields({ value }: { value?: string }) {
@@ -123,60 +121,6 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">{t("settings.profile.securityProviderHint")}</p>
             <a href="/forgot-password" className={buttonVariants({ variant: "outline" })}>{t("settings.profile.manageSecurity")}</a>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  if (section === "notifications") {
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              {t("settings.profile.emailNotifications")}
-            </CardTitle>
-            <CardDescription>{t("settings.profile.emailNotificationsDesc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {[
-              { id: "orders", label: t("settings.profile.emailItems.orders.label"), description: t("settings.profile.emailItems.orders.description") },
-              { id: "inventory", label: t("settings.profile.emailItems.inventory.label"), description: t("settings.profile.emailItems.inventory.description") },
-              { id: "reports", label: t("settings.profile.emailItems.reports.label"), description: t("settings.profile.emailItems.reports.description") },
-              { id: "security", label: t("settings.profile.emailItems.security.label"), description: t("settings.profile.emailItems.security.description") },
-            ].map(item => (
-              <div key={item.id} className="flex items-center justify-between py-2">
-                <div>
-                  <p className="font-medium text-sm">{item.label}</p>
-                  <p className="text-sm text-muted-foreground">{item.description}</p>
-                </div>
-                <Switch defaultChecked={item.id === "security"} />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("settings.profile.inAppNotifications")}</CardTitle>
-            <CardDescription>{t("settings.profile.inAppNotificationsDesc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {[
-              { id: "push", label: t("settings.profile.inAppItems.push.label"), description: t("settings.profile.inAppItems.push.description") },
-              { id: "sound", label: t("settings.profile.inAppItems.sound.label"), description: t("settings.profile.inAppItems.sound.description") },
-              { id: "badge", label: t("settings.profile.inAppItems.badge.label"), description: t("settings.profile.inAppItems.badge.description") },
-            ].map(item => (
-              <div key={item.id} className="flex items-center justify-between py-2">
-                <div>
-                  <p className="font-medium text-sm">{item.label}</p>
-                  <p className="text-sm text-muted-foreground">{item.description}</p>
-                </div>
-                <Switch defaultChecked={item.id === "badge"} />
-              </div>
-            ))}
           </CardContent>
         </Card>
       </div>
@@ -285,59 +229,6 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
                   </button>
                 )
               })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("settings.profile.dashboardLayout")}</CardTitle>
-            <CardDescription>{t("settings.profile.dashboardLayoutDesc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="font-medium text-sm">{t("settings.profile.layout.compactMode.label")}</p>
-                <p className="text-sm text-muted-foreground">{t("settings.profile.layout.compactMode.description")}</p>
-              </div>
-              <Switch />
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="font-medium text-sm">{t("settings.profile.layout.sidebarCollapsed.label")}</p>
-                <p className="text-sm text-muted-foreground">{t("settings.profile.layout.sidebarCollapsed.description")}</p>
-              </div>
-              <Switch />
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="font-medium text-sm">{t("settings.profile.layout.showQuickActions.label")}</p>
-                <p className="text-sm text-muted-foreground">{t("settings.profile.layout.showQuickActions.description")}</p>
-              </div>
-              <Switch defaultChecked />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("settings.profile.accessibility")}</CardTitle>
-            <CardDescription>{t("settings.profile.accessibilityDesc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="font-medium text-sm">{t("settings.profile.a11y.reduceMotion.label")}</p>
-                <p className="text-sm text-muted-foreground">{t("settings.profile.a11y.reduceMotion.description")}</p>
-              </div>
-              <Switch />
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="font-medium text-sm">{t("settings.profile.a11y.highContrast.label")}</p>
-                <p className="text-sm text-muted-foreground">{t("settings.profile.a11y.highContrast.description")}</p>
-              </div>
-              <Switch />
             </div>
           </CardContent>
         </Card>

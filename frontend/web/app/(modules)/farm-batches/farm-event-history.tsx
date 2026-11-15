@@ -19,7 +19,7 @@ import {
   farmApiPath,
   farmDateLabel,
   farmEventLabels,
-  farmRecordId,
+  farmSourceReviewHref,
   farmRequest,
   type FarmEvent,
 } from "./farm-batch-model"
@@ -38,17 +38,18 @@ interface Revision {
   recordedAt: string
 }
 
-function Source({ source }: { source: FarmEvent["source"] }) {
+function Source({ source, companyId }: { source: FarmEvent["source"]; companyId: string }) {
   if (!source) return "Manual entry"
   const coordinates = [
     source.file,
     source.sheet,
     source.row == null ? null : `row ${source.row}`,
   ].filter(Boolean)
-  return farmRecordId(source.reviewBatchId) ? (
+  const href = farmSourceReviewHref(companyId, source)
+  return href ? (
     <Link
       className="font-medium text-primary underline-offset-4 hover:underline"
-      href={`/settings?section=imports&review=${source.reviewBatchId}`}
+      href={href}
     >
       {coordinates.join(" · ") || "Open source review"}
     </Link>
@@ -81,7 +82,7 @@ export function FarmEventHistory({ events, ...scope }: Scope & { events: FarmEve
                 <TableCell>{farmDateLabel(event.businessDate, scope.locale)}</TableCell>
                 <TableCell>{farmEventLabels[event.kind]}</TableCell>
                 <TableCell className="max-w-64 whitespace-normal wrap-anywhere">
-                  <Source source={event.source} />
+                  <Source source={event.source} companyId={scope.companyId} />
                 </TableCell>
                 <TableCell className="text-right">
                   <Button
@@ -134,7 +135,7 @@ function Revisions({ scopeKey, companyId, batchId, eventId, locale }: Scope & { 
             <p>{eventSummary(event, locale)}</p>
             {reason && <p>{reason}</p>}
             <p className="text-xs text-muted-foreground">
-              <Source source={event.source} /> · {recordedAt}
+              <Source source={event.source} companyId={companyId} /> · {recordedAt}
             </p>
           </li>
         ))}

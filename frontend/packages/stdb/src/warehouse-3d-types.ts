@@ -39,17 +39,11 @@ export interface StorageSlot {
   position: Position3D
   occupied: boolean
   itemId?: string
+  locationId?: string
 }
 
-export type StockCategory =
-  | "electronics"
-  | "clothing"
-  | "food"
-  | "furniture"
-  | "tools"
-  | "packaging"
-  | "raw-materials"
-  | "finished-goods"
+/** Category name from the product catalog. */
+export type StockCategory = string
 
 export interface StockItem {
   id: string
@@ -59,7 +53,9 @@ export interface StockItem {
   quantity: number
   slotId: string
   zoneId: string
-  lastUpdated: Date
+  lastUpdated?: Date
+  lowStock?: boolean
+  availableQuantity?: number
   minStock?: number
   maxStock?: number
 }

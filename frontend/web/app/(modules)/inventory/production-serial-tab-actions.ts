@@ -36,8 +36,8 @@ export function useProductionSerialTabActions({
   );
   const updateStockProductionSerial = useUpdateStockProductionSerial(orgId);
   const deleteStockProductionSerial = useDeleteStockProductionSerial(orgId);
-  const reserveSerial = useSerialReserveWorkflow(orgId, workflowSurface);
-  const useSerial = useSerialUseWorkflow(orgId, workflowSurface);
+  const reserveSerial = useSerialReserveWorkflow(orgId, workflowSurface, operatingCompanyId);
+  const useSerial = useSerialUseWorkflow(orgId, workflowSurface, operatingCompanyId);
   function configureTab(tab: InventoryTab): InventoryTab {
     if (
       tab.type !== 'entity' ||

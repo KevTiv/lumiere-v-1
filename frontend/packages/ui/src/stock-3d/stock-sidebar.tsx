@@ -7,7 +7,7 @@ import { Button } from '../components/button'
 import { Separator } from '../components/separator'
 import { Package, AlertTriangle, Grid3X3, ChevronRight } from 'lucide-react'
 import { useWarehouse3DContext } from './warehouse-3d-context'
-import { CATEGORY_COLORS, type StockCategory, type ZoneType } from './types'
+import { stockCategoryColor, isLowStockItem, type StockCategory, type ZoneType } from './types'
 
 export function StockSidebar() {
   const { t } = useTranslation()
@@ -33,20 +33,17 @@ export function StockSidebar() {
 
   const totalItems = items.length
   const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0)
-  const lowStockItems = items.filter((i) => i.minStock !== undefined && i.quantity <= i.minStock)
+  const lowStockItems = items.filter(isLowStockItem)
   const emptySlots = slots.filter((s) => !s.occupied)
   const utilizationPercent =
     slots.length > 0 ? Math.round(((slots.length - emptySlots.length) / slots.length) * 100) : 0
 
-  const categoryStats = Object.entries(
-    items.reduce(
-      (acc, item) => {
-        acc[item.category] = (acc[item.category] || 0) + 1
-        return acc
-      },
-      {} as Record<string, number>,
-    ),
-  ).sort((a, b) => b[1] - a[1])
+  const categories = new Map<string, number>()
+  for (const { category } of items) categories.set(category, (categories.get(category) ?? 0) + 1)
+  const categoryStats = [...categories].sort((a, b) => b[1] - a[1])
+  const categoryLabel = (category: string) =>
+    (Object.hasOwn(categoryLabels, category) ? categoryLabels[category] : category)
+    || t('ui.stock3d.categories.unavailable', { defaultValue: 'Category unavailable' })
 
   return (
     <div className="space-y-6">
@@ -143,7 +140,7 @@ export function StockSidebar() {
               onClick={() => {
                 setViewMode('category')
                 setFilterCategory(
-                  filterCategory === category ? null : (category as StockCategory),
+                  filterCategory === category ? null : category,
                 )
               }}
               className={cn(
@@ -155,10 +152,10 @@ export function StockSidebar() {
             >
               <div
                 className="w-3 h-3 rounded-sm"
-                style={{ backgroundColor: CATEGORY_COLORS[category as StockCategory] }}
+                style={{ backgroundColor: stockCategoryColor(category as StockCategory) }}
               />
               <span className="flex-1 text-left">
-                {categoryLabels[category as StockCategory]}
+                {categoryLabel(category)}
               </span>
               <Badge variant="secondary" className="h-5 text-xs">
                 {count}
@@ -204,11 +201,11 @@ export function StockSidebar() {
       <div>
         <h3 className="text-sm font-medium text-foreground mb-3">{t('ui.stock3d.sidebar.colorLegend')}</h3>
         <div className="grid grid-cols-2 gap-2">
-          {Object.entries(CATEGORY_COLORS).map(([category, color]) => (
+          {categoryStats.map(([category]) => (
             <div key={category} className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
+              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: stockCategoryColor(category) }} />
               <span className="text-xs text-muted-foreground truncate">
-                {categoryLabels[category as StockCategory]}
+                {categoryLabel(category)}
               </span>
             </div>
           ))}

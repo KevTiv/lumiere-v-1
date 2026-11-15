@@ -27,7 +27,7 @@ describe("calendar working views", () => {
     fireEvent.click(screen.getByTestId("calendar-agenda-event-7"))
     expect(input.onSelectEvent).toHaveBeenCalledWith("7")
     expect(screen.queryByRole("button", { name: "calendar.view.newEvent" })).toBeNull()
-    fireEvent.click(screen.getByRole("button", { name: "Day", exact: true }))
+    fireEvent.click(screen.getByRole("button", { name: /^Day$/ }))
     expect(input.onViewModeChange).toHaveBeenCalledWith("day")
   })
 
@@ -39,6 +39,34 @@ describe("calendar working views", () => {
     expect(screen.getByTestId("calendar-event-open").getAttribute("href")).toBe("/calendar/events/7?returnTo=%2Fcalendar%3Ftab%3Devents")
     fireEvent.click(screen.getByRole("button", { name: "Close" }))
     expect(input.onSelectEvent).toHaveBeenCalledWith(null)
+  })
+
+  it("opens a generated occurrence through the original record without editing the series implicitly", () => {
+    const currentDate = new Date("2026-11-03T00:00:00Z")
+    const recurring = {
+      ...event,
+      allDay: false,
+      startTime: new Date("2026-11-02T09:00:00Z"),
+      endTime: new Date("2026-11-02T10:00:00Z"),
+      isRecurring: true,
+      recurrenceRule: "FREQ=DAILY;COUNT=2",
+    }
+    const input = {
+      ...props(),
+      currentDate,
+      events: [recurring],
+      timeZone: "UTC",
+      eventHref: (id: string) => `/calendar/events/${id}`,
+      onEditEvent: vi.fn(),
+      onDeleteEvent: vi.fn(),
+    }
+    const view = render(<CalendarView {...input} />)
+    const occurrenceId = `7@${new Date("2026-11-03T09:00:00Z").getTime()}`
+    fireEvent.click(screen.getByTestId(`calendar-agenda-event-${occurrenceId}`))
+    expect(input.onSelectEvent).toHaveBeenCalledWith(occurrenceId)
+    view.rerender(<CalendarView {...input} selectedEventId={occurrenceId} />)
+    expect(screen.getByTestId("calendar-event-open").getAttribute("href")).toBe("/calendar/events/7")
+    expect(screen.queryByRole("button", { name: "calendar.view.edit" })).toBeNull()
   })
 
   it("keeps month date and event controls independent and ignores missing selected rows", () => {

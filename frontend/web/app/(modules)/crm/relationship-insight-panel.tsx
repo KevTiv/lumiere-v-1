@@ -4,6 +4,8 @@ import { useMemo } from "react"
 import { NetworkIcon, RefreshCwIcon } from "lucide-react"
 
 import { useTranslation } from "@lumiere/i18n"
+import { moduleCollection } from "@lumiere/ui/lib/module-data-state"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
 import {
   useContactRelationshipInsights,
   useRecomputeRelationshipInsights,
@@ -45,7 +47,7 @@ export function RelationshipInsightPanel({
 }: RelationshipInsightPanelProps) {
   const { t } = useTranslation()
   const organization = BigInt(organizationId)
-  const { data: insights = [] } = useContactRelationshipInsights(organization)
+  const { rows: insights, state } = moduleCollection(useContactRelationshipInsights(organization))
   const recompute = useRecomputeRelationshipInsights(organization)
 
   const insight = useMemo(() => {
@@ -69,7 +71,7 @@ export function RelationshipInsightPanel({
           <Button
             size="sm"
             variant="outline"
-            disabled={recompute.isPending}
+            disabled={recompute.isPending || state.status !== "ready"}
             onClick={() => recompute.mutate(contactId)}
           >
             <RefreshCwIcon className="size-4" />
@@ -78,7 +80,12 @@ export function RelationshipInsightPanel({
         </CardAction>
       </CardHeader>
       <CardContent>
-        {!insight ? (
+        {recompute.isError ? <p role="alert" className="text-sm text-destructive">{recompute.error.message}</p> : null}
+        {state.status === "loading" ? (
+          <p role="status" className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        ) : state.status !== "ready" ? (
+          <ModuleDataNotice state={state} />
+        ) : !insight ? (
           <p className="text-muted-foreground flex items-center gap-2 text-sm">
             <NetworkIcon className="size-4" />
             {t("crm.relIntel.empty", "No insight yet — recompute to generate.")}
@@ -86,19 +93,19 @@ export function RelationshipInsightPanel({
         ) : (
           <div className="space-y-2 text-sm">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge>{String(insight.strengthScore ?? insight.strength_score ?? 0)}</Badge>
+              <Badge>{String(insight.strengthScore ?? insight.strength_score ?? "—")}</Badge>
               {Boolean(insight.isStale ?? insight.is_stale) ? (
                 <Badge variant="destructive">{t("crm.relIntel.stale", "Stale")}</Badge>
               ) : null}
               <span>
                 {t("crm.relIntel.relationships", "Relationships")}:{" "}
                 {String(
-                  insight.activeRelationshipCount ?? insight.active_relationship_count ?? 0,
+                  insight.activeRelationshipCount ?? insight.active_relationship_count ?? "—",
                 )}
               </span>
               <span>
                 {t("crm.relIntel.depth", "Depth")}:{" "}
-                {String(insight.hierarchyDepth ?? insight.hierarchy_depth ?? 0)}
+                {String(insight.hierarchyDepth ?? insight.hierarchy_depth ?? "—")}
               </span>
             </div>
             <p className="text-muted-foreground">{String(insight.summary ?? "")}</p>

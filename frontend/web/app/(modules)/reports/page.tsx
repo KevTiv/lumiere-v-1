@@ -1,16 +1,13 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverPrefetchQueryLists } from "@/lib/server-query"
+import { serverFetchQueryListState, serverPrefetchQueryLists } from "@/lib/server-query"
 import { ReportsClient } from "./reports-client"
 
 const SSR_RESOURCES = [
-  "financial-reports",
-  "trial-balances",
   "report-templates",
   "scheduled-reports",
   "analytics-metrics",
   "dashboards",
   "dashboard-widgets",
-  "saved-reports",
 ] as const
 
 export default async function ReportsPage() {
@@ -19,13 +16,16 @@ export default async function ReportsPage() {
     return <ReportsClient />
   }
 
-  const [reports, balances, templates, scheduled, metrics, dashboards, widgets] =
-    await serverPrefetchQueryLists(session, SSR_RESOURCES)
+  const [reports, balances, [templates, scheduled, metrics, dashboards, widgets]] = await Promise.all([
+    serverFetchQueryListState(session, "financial-reports"),
+    serverFetchQueryListState(session, "trial-balances"),
+    serverPrefetchQueryLists(session, SSR_RESOURCES),
+  ])
 
   return (
     <ReportsClient
-      initialReports={reports}
-      initialBalances={balances}
+      initialReports={reports.status === "ready" || reports.status === "empty" ? reports.rows : undefined}
+      initialBalances={balances.status === "ready" || balances.status === "empty" ? balances.rows : undefined}
       initialReportTemplates={templates}
       initialScheduledReports={scheduled}
       initialAnalyticsMetrics={metrics}

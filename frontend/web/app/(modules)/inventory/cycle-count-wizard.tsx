@@ -22,8 +22,6 @@ import {
   useRecordCycleCountLine,
   useValidateCycleCount,
   useOpenQualityAlert,
-  useQualityAlerts,
-  useSolveQualityAlert,
   useCancelQualityAlert,
 } from '@lumiere/query-hooks/hooks/inventory';
 import { useCycleCountAdjustmentWorkflow } from '@lumiere/query-hooks/hooks/cycle-count-adjustment-workflow';
@@ -741,22 +739,23 @@ export function QualityAlertsPanel({
   organizationId,
   operatingCompanyId,
   selectedCompanyId,
+  alerts,
+  isLoading,
   onAssignAlert,
   onSolveAlert,
 }: {
   organizationId: number;
   operatingCompanyId: bigint;
   selectedCompanyId?: bigint;
+  alerts: Record<string, unknown>[];
+  isLoading: boolean;
   onAssignAlert: (alertId: ScalarId) => void;
   onSolveAlert: (alertId: ScalarId) => void;
 }) {
   const { t } = useTranslation();
   const orgId = BigInt(organizationId);
   const openAlert = useOpenQualityAlert(orgId, selectedCompanyId);
-  const solveAlert = useSolveQualityAlert(orgId, selectedCompanyId);
   const cancelAlert = useCancelQualityAlert(orgId, operatingCompanyId);
-
-  const { data: alerts = [], isLoading } = useQualityAlerts(orgId);
 
   const tableConfig = useMemo(() => {
     const base = qualityAlertsTableConfig(t);
@@ -846,7 +845,8 @@ export function QualityAlertsPanel({
       ) : null}
       <EntityView
         config={tableConfig}
-        data={alerts as Record<string, unknown>[]}
+        data={alerts}
+        isLoading={isLoading}
       />
     </div>
   );
