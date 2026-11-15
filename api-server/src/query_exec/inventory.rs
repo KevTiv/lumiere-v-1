@@ -208,9 +208,12 @@ mod tests {
             json!({"id": 4, "warehouse_id": null}),
         ];
         retain_warehouse_zone_rows(&mut rows, &HashSet::from([6, 7]));
-        assert_eq!(rows, vec![
-            json!({"id": 1, "warehouse_id": 6}),
-            json!({"id": 2, "warehouseId": "7"}),
-        ]);
+        assert_eq!(
+            rows,
+            vec![
+                json!({"id": 1, "warehouse_id": 6}),
+                json!({"id": 2, "warehouseId": "7"}),
+            ]
+        );
     }
 }
