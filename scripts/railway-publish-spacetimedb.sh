@@ -7,6 +7,7 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 catalog_file="${script_dir}/../spacetimedb/assets/ai-builtin-skills.json"
+infrastructure_file="${script_dir}/../spacetimedb/assets/ai-infrastructure-skills.json"
 
 umask 077
 config_file="$(mktemp)"
@@ -64,8 +65,8 @@ missing_builtin_skills() {
   spacetime --config-path "${config_file}" sql "${STDB_MODULE}" \
     'SELECT skill_key, is_system FROM ai_skill WHERE organization_id = 0' \
     --server "${STDB_HOST}" --format json -y --no-config |
-    jq -er --slurpfile catalog "${catalog_file}" '
-      ($catalog[0] | map(.skill_key)) as $keys
+    jq -er --slurpfile catalog "${catalog_file}" --slurpfile infrastructure "${infrastructure_file}" '
+      (($catalog[0] + $infrastructure[0]) | map(.skill_key)) as $keys
       | ([.. | objects | select(has("rows")) | .rows]
          | if length == 1 and (.[0] | type) == "array" then .[0]
            else error("expected one built-in AI catalog query result") end) as $rows

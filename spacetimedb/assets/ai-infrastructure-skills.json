@@ -1,0 +1,5 @@
+[
+  { "skill_key": "activity_indexing", "name": "Activity indexing" },
+  { "skill_key": "document_embeddings", "name": "Document indexing" },
+  { "skill_key": "embedding_query", "name": "Semantic query" }
+]
