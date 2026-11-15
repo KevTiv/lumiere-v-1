@@ -30,15 +30,16 @@ test("changing tabs leaves the owner queue on the previous history entry", () =>
 
 test("import results open their owning list and keep the task filter on that tab", () => {
   const task = "a".repeat(32)
-  for (const [module, tab, defaultTab] of [
-    ["sales", "customer-sales", "orders"],
-    ["warehouse", "recorded-counts", "stock"],
+  for (const [module, workspace, tab, defaultTab] of [
+    ["sales", "sales", "customer-sales", "orders"],
+    ["shop_sales", "sales", "shop-sales", "orders"],
+    ["warehouse", "warehouse", "recorded-counts", "stock"],
   ] as const) {
     const href = moduleBackfillHref(module, { id: task, companyId: 7 })
-    assert.equal(href, `/${module}?tab=${tab}&backfillTask=${task}&backfillCompany=7`)
+    assert.equal(href, `/${workspace}?tab=${tab}&backfillTask=${task}&backfillCompany=7`)
     const { pathname, search } = new URL(href, "https://example.test")
     assert.equal(moduleTabDestination({
       pathname, query: search, tab: defaultTab, defaultTab, validTabs: [tab, defaultTab],
-    }), `/${module}`)
+    }), `/${workspace}`)
   }
 })

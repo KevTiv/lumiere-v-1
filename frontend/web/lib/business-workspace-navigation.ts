@@ -11,7 +11,7 @@ const definitions: Record<BusinessWorkspaceModule, { workspaces: readonly Group[
   sales: {
     workspaces: [
       ["overview", ["dashboard", "ops"]],
-      ["orders", ["orders", "order-lines", moduleBackfillTabs.sales, "returns", "invoices"]],
+      ["orders", ["orders", "order-lines", moduleBackfillTabs.sales, moduleBackfillTabs.shop_sales, "returns", "invoices"]],
       ["fulfillment", ["deliveries", "fulfillment"]],
       ["pricing", ["pricelists", "pricelist-items", "loyalty-programs", "loyalty-cards"]],
     ],

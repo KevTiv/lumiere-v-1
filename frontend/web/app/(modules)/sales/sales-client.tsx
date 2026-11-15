@@ -844,6 +844,11 @@ function SalesClientLoaded({
         label: t('moduleRecords.sales'),
         type: 'custom',
         customContent: <ModuleBackfillRecords organizationId={organizationId} module="sales" />,
+      }, {
+        id: moduleBackfillTabs.shop_sales,
+        label: t('moduleRecords.shopSales'),
+        type: 'custom',
+        customContent: <ModuleBackfillRecords organizationId={organizationId} module="shop_sales" />,
       }],
     };
   }, [canReadBackfill, organizationId, t]);
