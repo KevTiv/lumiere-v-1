@@ -138,6 +138,16 @@ function id(value: unknown): string | null {
     : null
 }
 
+/** Read the company from a listed document. An omitted field is not organization-wide. */
+export function documentViewerCompanyId(
+  row: unknown,
+): bigint | null | undefined {
+  const company = field(row, "companyId", "company_id")
+  if (company === null) return null
+  const companyId = id(company)
+  return companyId ? BigInt(companyId) : undefined
+}
+
 function number(value: unknown): number | undefined {
   const parsed = id(value)
   return parsed !== null && BigInt(parsed) <= BigInt(Number.MAX_SAFE_INTEGER)
@@ -199,12 +209,13 @@ export function resolveDocumentViewerManifest(options: {
   const matches = documents.filter((row) => id(field(row, "id")) === documentId)
   if (matches.length !== 1) throw new DocumentViewerError("unavailable")
   const document = matches[0]
-  const company = field(document, "companyId", "company_id")
+  const companyId = documentViewerCompanyId(document)
   if (
     id(field(document, "organizationId", "organization_id")) !==
       String(scope.organizationId) ||
     field(document, "isDeleted", "is_deleted") !== false ||
-    (company !== null && id(company) !== scope.companyId?.toString())
+    (companyId !== null &&
+      (companyId === undefined || companyId !== scope.companyId))
   ) {
     throw new DocumentViewerError("unavailable")
   }

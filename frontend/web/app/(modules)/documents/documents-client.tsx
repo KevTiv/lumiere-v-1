@@ -9,6 +9,7 @@ import { guideLibraryHref } from "@/lib/assistant-guides"
 import { DocumentUploadReceipts } from "../../../components/document-upload-receipts"
 import { useManagedDocumentUpload } from "@/lib/use-managed-document-upload"
 import { DocumentViewerDialog } from "../../../components/document-viewer-dialog"
+import { documentViewerCompanyId } from "@/lib/document-viewer"
 import { useDeletedDocumentFolders, useDocumentLocationMutation } from "@lumiere/query-hooks/hooks/document-locations"
 import { documentFolderDestinations } from "./document-folder-gates"
 import { documentRegistrationFromParams } from "@/lib/document-upload-receipts"
@@ -267,6 +268,9 @@ function DocumentsClientLoaded({
 
   const documentsRead = moduleCollection(useDocuments(orgId, initialDocuments))
   const documents = documentsRead.rows
+  const viewerDocument = viewer?.scopeKey === templateScopeKey
+    ? documents.find((document) => String(document.id) === viewer.documentId)
+    : undefined
   const deletedDocumentsRead = moduleCollection(useDeletedDocuments(orgId, initialDeletedDocuments))
   const deletedDocuments = deletedDocumentsRead.rows
   const articlesQuery = useKnowledgeArticles(orgId, initialArticles)
@@ -1640,6 +1644,7 @@ function DocumentsClientLoaded({
       <DocumentViewerDialog
         organizationId={orgId}
         documentId={viewer?.scopeKey === templateScopeKey ? viewer.documentId : null}
+        documentCompanyId={documentViewerCompanyId(viewerDocument)}
         recordHref={viewer?.scopeKey === templateScopeKey ? documentBrowserRecordHref(viewer.documentId, browserViewState, browserQuery) : undefined}
         onOpenChange={(open) => { if (!open) setViewer(null) }}
       />
