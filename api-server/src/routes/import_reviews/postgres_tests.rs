@@ -251,6 +251,7 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
     ensure!(gap["previousValues"].is_null());
     ensure!(gap["previousConfirmedFields"].is_null());
     ensure!(gap["previousState"].is_null());
+
     drop(client);
     verify_replayed_backfill_receipt(pool, scoped, dataset, batch, id).await?;
     Ok(())

@@ -16,6 +16,8 @@ export interface AssistantNativeFormRequest {
   scopeKey: string
   moduleId: string
   tabId: string
+  /** Exact existing record when the native form is scoped to one record. */
+  targetRecordId?: string
   /** User-authored input for the existing advisory form assistant. */
   prompt?: string
   /** Report whether the destination opened the form, independently of any later save. */

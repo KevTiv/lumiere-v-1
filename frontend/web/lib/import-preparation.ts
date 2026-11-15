@@ -76,6 +76,7 @@ export const importPreparationSectionSchema = z
       "contact",
       "stock_location",
       "source_observation",
+      "farm_event",
     ]),
     expectedHeaders: z.array(bytes(2000)).min(1).max(200),
     headerMap: z.record(z.string(), fieldKey).optional(),
@@ -85,6 +86,7 @@ export const importPreparationSectionSchema = z
     lastColumn: columnNumber.optional(),
     identityNamespace: text(200).optional(),
     identityFields: z.array(fieldKey).max(8).optional(),
+    worksheetName: text(255).optional(),
   })
   .strict()
   .superRefine((section, context) => {
@@ -145,6 +147,7 @@ const fileRuleShape = {
   groupingSeparator: z.enum([".", ",", " ", "none"]).optional(),
   dateOrder: z.enum(["iso", "dmy", "mdy"]).optional(),
   sections: z.array(importPreparationSectionSchema).max(50).optional(),
+  worksheetNames: z.array(text(255)).min(1).max(20).optional(),
 }
 
 function validateFileRules(
@@ -163,12 +166,26 @@ function validateFileRules(
     )
   }
   const sections = options.sections ?? []
+  const worksheets = options.worksheetNames ?? []
+  if (new Set(worksheets).size !== worksheets.length)
+    issue("Choose distinct worksheets.")
   if (new Set(sections.map((section) => section.key)).size !== sections.length)
     issue("Use distinct section names.")
   sections.forEach((section, index) => {
+    if (
+      (section.worksheetName !== undefined &&
+        !worksheets.includes(section.worksheetName)) ||
+      (worksheets.length > 1 && section.worksheetName === undefined)
+    )
+      issue("Bind each source section to a selected worksheet.")
     const start = section.firstColumn ?? 1
     const end = section.lastColumn ?? start + section.expectedHeaders.length - 1
     for (const previous of sections.slice(0, index)) {
+      if (
+        worksheets.length > 1 &&
+        section.worksheetName !== previous.worksheetName
+      )
+        continue
       const previousStart = previous.firstColumn ?? 1
       const previousEnd =
         previous.lastColumn ??
@@ -230,6 +247,16 @@ export const importPreparationFileSchema = z
         code: z.ZodIssueCode.custom,
         message: "Use the original document selection for preparation.",
       })
+    if (
+      options.worksheetNames &&
+      (!options.fileName.toLowerCase().endsWith(".xlsx") ||
+        options.delimiter !== undefined ||
+        options.managedSelection !== undefined)
+    )
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Choose workbook sheets only for original XLSX uploads.",
+      })
   })
 
 export const importRecipeReferenceSchema = z
@@ -274,6 +301,7 @@ const coverageSource = z.object({
   rowEnd: z.number().int().positive(),
   sectionKey: z.string(),
   itemKey: z.string(),
+  worksheet: text(255).optional(),
 })
 export const importCoverageSchema = z.object({
   version: z.literal(1),
@@ -318,10 +346,12 @@ export const importCoverageSchema = z.object({
           )
           .max(100),
         layoutSha256: sha256.nullable(),
+        availableWorksheets: z.array(text(255)).min(1).max(20).optional(),
+        workbookLayoutSha256: sha256.optional(),
         error: z.string().nullable(),
       }),
     )
-    .max(20),
+    .max(400),
   reconciliation: z
     .array(
       z.object({

@@ -9,6 +9,7 @@ import sys
 import unittest
 
 from test_import_task_prepare import SCRIPT, csv_source, module, source, workbook
+from test_workbook_extract import NS, two_sheets
 
 
 def config(file, **options):
@@ -30,6 +31,57 @@ def prepare(files, options=None, *, mode="prepare_import"):
 
 
 class PreparationRecipeTests(unittest.TestCase):
+    def test_saved_workbook_lists_then_prepares_selected_worksheets(self):
+        second = f'<worksheet xmlns="{NS}"><sheetData><row r="3"><c r="A3" t="inlineStr"><is><t>Name</t></is></c></row><row r="4"/><row r="9"><c r="A9" t="inlineStr"><is><t>Bird batch</t></is></c></row></sheetData></worksheet>'
+        file = source("records.xlsx", two_sheets(second=second))
+        initial = prepare([file])
+        self.assertEqual(initial["datasets"], [])
+        pending, = initial["coverage"]["files"]
+        self.assertEqual(pending["availableWorksheets"], ["Dépenses", "Totals"])
+        self.assertEqual(pending["status"], "held")
+        expected = config(file, worksheetNames=["Totals", "Dépenses"], sections=[
+            section("expenses", ["Name"], worksheetName="Dépenses"),
+            section("totals", ["Name"], first=3, last=3, worksheetName="Totals"),
+        ])
+        result = prepare([file], [expected])
+        self.assertTrue(result["coverage"]["complete"])
+        self.assertEqual([(entry["worksheet"], entry["recordCount"]) for entry in result["coverage"]["files"]],
+                         [("Dépenses", 2), ("Totals", 3)])
+        items = [item for dataset in result["datasets"] for item in dataset["items"]]
+        self.assertEqual([(item["source"]["sheet"], item["source"]["row"]) for item in items],
+                         [("Dépenses", 2), ("Totals", 9)])
+        self.assertTrue(all(item["source"]["sha256"] == expected["sourceSha256"] for item in items))
+        layout = result["coverage"]["files"][0]["workbookLayoutSha256"]
+        same = prepare([file], [{**expected, "expectedLayoutSha256": layout}])
+        self.assertEqual(same["datasets"], result["datasets"])
+        changed = prepare([file], [{**expected, "expectedLayoutSha256": "a" * 64}])
+        self.assertFalse(changed["coverage"]["complete"])
+        self.assertEqual(changed["datasets"], [])
+
+    def test_missing_selection_is_held_with_fresh_worksheet_choices(self):
+        file = source("records.xlsx", two_sheets())
+        result = prepare([file], [config(file, worksheetNames=["Dépenses", "Former sheet"])])
+        self.assertEqual(result["datasets"], [])
+        pending, = result["coverage"]["files"]
+        self.assertIn("missing", pending["error"])
+        self.assertEqual(pending["availableWorksheets"], ["Dépenses", "Totals"])
+
+    def test_worksheet_selection_preserves_values_only_policy(self):
+        formula = f'<worksheet xmlns="{NS}"><sheetData><row r="4"><c r="B4"><f>1+1</f><v>2</v></c></row></sheetData></worksheet>'
+        file = source("records.xlsx", two_sheets(second=formula))
+        with self.assertRaises(module.PreparationError):
+            prepare([file], [config(file, worksheetNames=["Dépenses", "Totals"])])
+
+    def test_hidden_worksheet_is_never_available_for_selection(self):
+        file = source("records.xlsx", two_sheets(state="hidden"))
+        result = prepare([file], [config(file, worksheetNames=["Dépenses", "Totals"])])
+        self.assertEqual(result["datasets"], [])
+        held, = result["coverage"]["files"]
+        self.assertEqual(held["availableWorksheets"], ["Dépenses"])
+        result = prepare([file], [config(file, worksheetNames=["Dépenses"])])
+        item = result["datasets"][0]["items"][0]
+        self.assertTrue(item["source"]["multiWorksheet"])
+
     def test_coverage_accounts_for_blank_headers_multiline_and_sparse_worksheet_records(self):
         file = source("contacts.csv", '\nname,email\n"Alice\nExample",alice@example.test\nname,email\nBob,bob@example.test\n')
         result = prepare([file])

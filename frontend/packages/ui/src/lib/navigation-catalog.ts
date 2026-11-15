@@ -27,6 +27,7 @@ import {
   Package,
   Receipt,
   RefreshCw,
+  Sprout,
   Settings,
   ShoppingCart,
   Sparkles,
@@ -59,6 +60,7 @@ export interface NavigationCatalogOptions {
   workspaceProfile?: WorkspaceProfile
   firstOrgProfile?: boolean
   isAdmin?: boolean
+  farmOperationsEnabled?: boolean
 }
 
 /**
@@ -104,6 +106,7 @@ export function buildNavGroups(
       items: [
         { surfaceId: "products", label: t("inventory.products.title"), href: "/products", icon: Package, resource: "module:inventory" },
         { surfaceId: "warehouse", label: t("modules.tabGroups.warehouse"), href: "/warehouse", icon: Warehouse, resource: "module:inventory" },
+        ...(options.farmOperationsEnabled ? [{ surfaceId: "farm-batches", label: t("nav.farmBatches"), href: "/farm-batches", icon: Sprout, resource: "farm_batch" }] : []),
         { surfaceId: "inventory", label: t("nav.inventory"), href: "/inventory", icon: Package, resource: "module:inventory" },
         { surfaceId: "distributor", label: t("nav.distributor"), href: "/distributor", icon: Store, resource: "module:inventory" },
         { surfaceId: "pos", label: t("nav.pos"), href: "/pos", icon: ShoppingCart, resource: "module:pos" },

@@ -40,6 +40,7 @@ import {
 } from '@/lib/module-backfill-navigation'
 import {
   moduleBackfillSavedFields,
+  moduleBackfillRecordKind,
   type ModuleBackfillRecord,
 } from '@/lib/module-backfill-record'
 
@@ -161,7 +162,7 @@ function Records({
       const { data } = await loadRecords(module, params, signal)
       return data.length === 1 &&
         data[0]?.id === validRecordId &&
-        data[0].facts.kind === (module === 'shop_sales' ? 'shop_sale' : module)
+        data[0].facts.kind === moduleBackfillRecordKind[module]
         ? data[0]
         : null
     },
@@ -252,11 +253,11 @@ function Records({
               <TableRow>
                 <TableHead scope="col">
                   {t(
-                    module === 'warehouse'
-                      ? 'moduleRecords.countDate'
-                      : module === 'shop_sales'
-                        ? 'moduleRecords.saleDate'
-                        : 'moduleRecords.period',
+                    {
+                      sales: 'moduleRecords.period',
+                      shop_sales: 'moduleRecords.saleDate',
+                      warehouse: 'moduleRecords.countDate',
+                    }[module],
                   )}
                 </TableHead>
                 {module !== 'warehouse' && (

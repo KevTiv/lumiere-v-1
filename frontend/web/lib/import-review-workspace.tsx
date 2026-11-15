@@ -66,6 +66,7 @@ import {
 import { ImportReviewEditor, ReviewRequestError } from "./import-review-editor"
 import { ImportReviewBulk } from "./import-review-bulk"
 import { ModuleBackfillAction } from "./module-backfill-action"
+import { FarmImportAction } from "./farm-import-action"
 import { reviewDecisionDiff, reviewSourceDate, reviewSourceLabel } from "./import-review-decision-diff"
 import { ImportReviewDecisionSummary } from "./import-review-decision-summary"
 import { resetHistoryQueries } from "./history-data"
@@ -655,7 +656,7 @@ function ReviewWorkspace({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-medium">{detail.data.title}</h3>
             <div className="flex flex-wrap gap-2">
-              {allowImport ? <Button
+              {allowImport && detail.data.targetEntity !== "farm_event" ? <Button
                 variant="outline"
                 disabled={
                   !confirmed ||
@@ -694,14 +695,18 @@ function ReviewWorkspace({
             <ModuleBackfillAction detail={detail.data} taskId={historySource?.taskId} companyId={companyId}
               organizationId={organizationId} actor={actor} disabled={unavailable || !!selected || !!continuationBlock} />
           ) : null}
-          <ImportReviewDecisionSummary
+          {allowImport && detail.data.targetEntity === "farm_event" ? (
+            <FarmImportAction key={detail.data.id} detail={detail.data} companyId={companyId}
+              disabled={unavailable || !!selected || !!continuationBlock} />
+          ) : null}
+          {detail.data.targetEntity !== "farm_event" ? <ImportReviewDecisionSummary
             detail={detail.data}
             organizationId={organizationId}
             companyId={companyId}
             canPrepareImport={canPrepareImport}
             allowImport={allowImport}
-          />
-          {allowImport && !canPrepareImport && !selected && !unavailable ? (
+          /> : null}
+          {allowImport && detail.data.targetEntity !== "farm_event" && !canPrepareImport && !selected && !unavailable ? (
             <a
               className="text-sm font-medium underline underline-offset-4"
               href={sourceHistoryLink(companyId, detail.data.id)}

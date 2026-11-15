@@ -81,6 +81,29 @@ export function readChatImportPointer(storage: ReceiptStorage, scope: ChatImport
   return raw ? pointerSchema.parse(JSON.parse(raw)) : null
 }
 
+function coverageMatchesFiles(task: ChatImportTask): boolean {
+  if (!task.coverage) return true
+  const sources = new Map(task.files.map((file) => [file.fileName, file]))
+  const worksheetsByFile = new Map<string, Set<string | null>>()
+  for (const entry of task.coverage.files) {
+    const source = sources.get(entry.fileName)
+    if (!source || source.sha256 !== entry.sourceSha256 || source.size !== entry.byteCount)
+      return false
+    const seen = worksheetsByFile.get(entry.fileName) ?? new Set<string | null>()
+    if (
+      seen.has(entry.worksheet) ||
+      (seen.size > 0 && (seen.has(null) || entry.worksheet === null)) ||
+      (entry.worksheet !== null &&
+        entry.availableWorksheets !== undefined &&
+        !entry.availableWorksheets.includes(entry.worksheet))
+    )
+      return false
+    seen.add(entry.worksheet)
+    worksheetsByFile.set(entry.fileName, seen)
+  }
+  return sources.size === task.files.length && worksheetsByFile.size === sources.size
+}
+
 /** Saved tasks may be reopened outside their original conversation, in the same authorized company. */
 export function parseSavedImportTask(value: unknown, companyId: number, expectedRequest?: string): ChatImportTask {
   const task = taskSchema.parse(value)
@@ -92,7 +115,7 @@ export function parseSavedImportTask(value: unknown, companyId: number, expected
     || (task.status === "awaiting_decision") !== (task.decision.status === "pending")
     || (task.decision.status === "pending" && task.reviews.length > 0)) throw new Error("The saved file decision is inconsistent. Check the original task before continuing.")
   if (task.preparation?.files.some(rule => task.files.filter(file => file.fileName === rule.fileName && file.sha256 === rule.sourceSha256).length !== 1)
-    || (task.coverage && (task.coverage.files.length !== task.files.length || task.coverage.files.some((file, index) => file.fileName !== task.files[index]?.fileName || file.sourceSha256 !== task.files[index]?.sha256)))) {
+    || !coverageMatchesFiles(task)) {
     throw new Error("The preparation rules or coverage do not match the saved source files.")
   }
   return task

@@ -113,6 +113,7 @@ export const ALPHA_ASSISTANT_MODULES = [
   "subscriptions",
   "products",
   "warehouse",
+  "farm-batches",
   "fleet",
 ] as const
 export const ASSISTANT_SUPPORT_SURFACES = [
@@ -148,6 +149,7 @@ function surfaceReadResource(
 ): string {
   if (["products", "warehouse", "distributor"].includes(module))
     return "module:inventory"
+  if (module === "farm-batches") return "farm_batch"
   if (module === "trackers") return "dashboard:analytics"
   if (["overview", "tasks", "settings"].includes(module))
     return `dashboard:${module}`
@@ -394,6 +396,15 @@ const ENTITIES: readonly EntityBinding[] = [
     create: true,
   },
   {
+    key: "farm.batch",
+    module: "farm-batches",
+    tab: "batches",
+    entityType: "farm_batch",
+    label: "farm batch",
+    aliases: ["farm batch", "farm batches", "flock", "flocks"],
+    create: true,
+  },
+  {
     key: "fleet.vehicle",
     module: "fleet",
     tab: "fleet-vehicles",
@@ -470,13 +481,27 @@ export interface AssistantCapability {
   tab?: string
   entityType?: string
   label: string
-  permission: { resource: string; action: "read" | "create" }
+  permission: { resource: string; action: "read" | "create" | "write" }
 }
 
 const SURFACES: readonly AssistantSurface[] = [
   ...ALPHA_ASSISTANT_MODULES,
   ...ASSISTANT_SUPPORT_SURFACES,
 ]
+export const assistantSurfaceNavigationKey = (module: string) =>
+  `${module.replaceAll("-", "_")}.navigate`
+
+const FARM_ACTIONS = [
+  { suffix: "intake", label: "Record intake", formKind: "intake", aliases: ["intake"] },
+  { suffix: "weigh_in", label: "Record weigh-in", formKind: "weighIn", aliases: ["weigh-in", "weigh in", "weight"] },
+  { suffix: "mortality", label: "Record mortality", formKind: "mortality", aliases: ["mortality", "deaths", "death"] },
+  { suffix: "feed_usage", label: "Record feed usage", formKind: "feedUsage", aliases: ["feed usage", "feed consumption"] },
+  { suffix: "processing", label: "Record processing", formKind: "processing", aliases: ["processing", "processing run"] },
+  { suffix: "costs", label: "Open flock costs", view: "costs", aliases: ["costs", "expenses"] },
+  { suffix: "metrics", label: "Open flock metrics", view: "metrics", aliases: ["metrics", "farm metrics"] },
+] as const
+
+const farmActionKey = (suffix: string) => `farm.batch.${suffix}`
 const OWNER_QUEUE_ACTIONS = [
   { key: "accounting.overdue_invoices.navigate", queue: "overdueInvoices", aliases: ["overdue invoices", "overdue customer balances"], label: "Open overdue invoices", module: "accounting", resource: "account_move" },
   { key: "accounting.draft_bills.navigate", queue: "draftBills", aliases: ["draft bills", "draft vendor bills"], label: "Open draft vendor bills", module: "accounting", resource: "account_move" },
@@ -484,10 +509,10 @@ const OWNER_QUEUE_ACTIONS = [
 ] as const satisfies readonly { key: string; queue: OwnerQueue; aliases: readonly string[]; label: string; module: AssistantSurface; resource: string }[]
 
 const capabilities: AssistantCapability[] = SURFACES.map((module) => ({
-  key: `${module}.navigate`,
+  key: assistantSurfaceNavigationKey(module),
   kind: "navigate",
   module,
-  label: `Open ${module}`,
+  label: module === "farm-batches" ? "Open Farm Batches" : `Open ${module}`,
   permission: {
     resource: surfaceReadResource(module),
     action: "read",
@@ -549,6 +574,17 @@ for (const entity of ENTITIES) {
       })
     }
   }
+}
+for (const farm of FARM_ACTIONS) {
+  capabilities.push({
+    key: farmActionKey(farm.suffix),
+    kind: "formKind" in farm ? "prepare_workflow" : "open_record",
+    module: "farm-batches",
+    ...("formKind" in farm ? { tab: "event" } : {}),
+    entityType: "farm_batch",
+    label: farm.label,
+    permission: { resource: "farm_batch", action: "formKind" in farm ? "write" : "read" },
+  })
 }
 
 export const ALPHA_ASSISTANT_CAPABILITIES: readonly AssistantCapability[] =
@@ -787,6 +823,14 @@ export function assistantActionHref(
   if (!decodeAssistantAction(action, action.scope)) return undefined
   const capability = getAssistantCapability(action.capabilityKey)!
   if (capability.key === "settings.imports.navigate") return "/settings?section=imports"
+  if (capability.module === "farm-batches") {
+    if (action.kind === "open_form") return "/farm-batches?form=new-batch"
+    if (!action.recordId) return "/farm-batches"
+    const href = `/farm-batches/${action.recordId}`
+    const farm = FARM_ACTIONS.find(({ suffix }) => farmActionKey(suffix) === capability.key)
+    if (farm && "formKind" in farm) return `${href}?form=new-event&eventKind=${farm.formKind}`
+    return farm && "view" in farm ? `${href}?view=${farm.view}` : href
+  }
   const ownerQueue = OWNER_QUEUE_ACTIONS.find(({ key }) => key === capability.key)
   if (ownerQueue) return ownerQueueHref(ownerQueue.queue)
   if (capability.module === "tasks" && capability.entityType === "project_task") {
@@ -955,7 +999,7 @@ export function resolveAssistantActionRequest(
   const pageAction = resolvePageActionRequest(command, text.trim(), context)
   if (pageAction) return pageAction
   const match =
-    /^(?:(open|show(?: me)?|view|find|go to|take me to|navigate to)|(create|add|new|draft|prepare|generate|@create)|(submit|approve|confirm|post|pay|renew|amend|close|cancel|receive|validate|service|maintain|inspect|qualify|convert|review|reimburse|reject|edit|assign|reschedule))\s+(?:(?:a|an|the|new|existing)\s+)?(.+)$/i.exec(
+    /^(?:(open|show(?: me)?|view|find|go to|take me to|navigate to)|(create|add|new|draft|prepare|generate|@create)|(submit|approve|confirm|post|pay|renew|amend|close|cancel|receive|validate|service|maintain|inspect|qualify|convert|review|reimburse|reject|edit|assign|reschedule|record|log))\s+(?:(?:a|an|the|new|existing)\s+)?(.+)$/i.exec(
       command,
     )
   if (!match) return { kind: "none" }
@@ -999,7 +1043,27 @@ export function resolveAssistantActionRequest(
       ? { kind: "action", action }
       : { kind: "clarify", reason: "unavailable", candidates: [] }
   }
-  if (surface && mode === "open") return finish(`${surface}.navigate`)
+  const farmCommand = command.split(/:\s+/, 1)[0]!.replace(/\s+on\s+\d{4}-\d{2}-\d{2}[.!?]?$/i, "")
+  const farmRequest = /^(record|log|add|prepare|show(?: me)?|open|view)\s+(?:a\s+|the\s+)?(.+?)(?:\s+(?:for|on)\s+(?:(?:the|this)\s+)?(?:flock|farm batch)(?:\s+#?([1-9][0-9]*))?)?[.!?]*$/i.exec(farmCommand)
+  if (farmRequest) {
+    const [, requestVerb, requestedEvent, recordId] = farmRequest
+    const selectedBatch = context.selection?.entityType === "farm_batch"
+      ? context.selection.entityId
+      : undefined
+    const identifiesBatch = Boolean(recordId || selectedBatch || context.module === "farm-batches")
+    const writes = /^(record|log|add|prepare)$/i.test(requestVerb ?? "")
+    const operation = FARM_ACTIONS.find((entry) =>
+      ("formKind" in entry) === writes &&
+      entry.aliases.some((alias) => alias === requestedEvent?.toLowerCase()),
+    )
+    if (operation && identifiesBatch) {
+      const id = parseAssistantActionId(recordId ?? selectedBatch)
+      return id
+        ? finish(farmActionKey(operation.suffix), id)
+        : { kind: "clarify", reason: "record_required", candidates: ["farm.batch.open"] }
+    }
+  }
+  if (surface && mode === "open") return finish(assistantSurfaceNavigationKey(surface))
   if (mode === "open" && target === "my work") return finish("tasks.navigate")
   if (mode === "open" || verb === "review") {
     const ownerQueue = OWNER_QUEUE_ACTIONS.find(({ aliases }) => aliases.some((alias) => target === alias))

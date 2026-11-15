@@ -655,6 +655,16 @@ function ExecutionPanel({
           </a>
         </p>
       ))}
+      {view === "results" && workflow.data?.farmResults?.map(({ batchId, count }) => (
+        <p key={batchId}>
+          <a className="underline underline-offset-4" href={`/farm-batches/${batchId}?view=history`}>
+            {count} verified farm records
+          </a>
+        </p>
+      ))}
+      {view === "results" && workflow.data?.farmResultsMore ? (
+        <a className="underline underline-offset-4" href="/farm-batches">View more flocks in Farm Batches</a>
+      ) : null}
       {view === "results" && nativeResults.length > 0 && (
         <section
           className="space-y-3"

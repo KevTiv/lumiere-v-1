@@ -56,6 +56,49 @@ class PreparationTests(unittest.TestCase):
     def prepare(self, *files):
         return module.prepare({"mode": "prepare_import", "files": list(files)})
 
+    def test_farm_event_import_preserves_identity_coordinates_and_locale(self):
+        contents = ("Référence du lot;Référence de l’événement;Type d’événement;Date;Nombre;Espèce;Emplacement;Poids total kg;Nombre pesé\n"
+                    "LOT-05;E-100;arrivée;08/11/2026;100;Poule;Maison A;;\n"
+                    "LOT-05;E-101;gupima;10/11/2026;;;;6,75;10\n"
+                    "LOT-05;E-102;impfu;11/11/2026;;;;;\n")
+        result = module.prepare({
+            "mode": "prepare_import",
+            "files": [source("flock.csv", contents)],
+            "preparation": {"version": 1, "files": [{
+                "fileName": "flock.csv", "sourceSha256": hashlib.sha256(contents.encode()).hexdigest(),
+                "delimiter": ";", "decimalSeparator": ",", "dateOrder": "dmy",
+            }]},
+        })
+        batch = result["datasets"][0]
+        self.assertEqual(batch["targetEntity"], "farm_event")
+        intake, weight, mortality = batch["items"]
+        self.assertEqual(intake["proposed"]["event_kind"], "intake")
+        self.assertEqual(intake["source"]["row"], 2)
+        self.assertEqual(intake["proposed"]["business_date"], "2026-11-08")
+        self.assertEqual(intake["proposed"]["event_reference"], "E-100")
+        self.assertEqual(weight["proposed"]["event_kind"], "weighIn")
+        self.assertEqual(weight["proposed"]["total_weight_kg"], "6.75")
+        self.assertEqual(weight["fields"][7]["sourceColumn"], 8)
+        self.assertEqual(weight["fields"][7]["sourceValue"], "6,75")
+        self.assertEqual(mortality["proposed"]["event_kind"], "mortality")
+        self.assertIn("count", mortality["issue"])
+
+    def test_farm_inspection_held_rows_are_evidence_only(self):
+        upload = source("flock.csv", "flock_reference,event_reference,event_kind,business_date,count\nLOT-05,E-102,mortality,2026-11-11,4\n")
+        result = module.prepare({"mode": "inspect_only", "files": [upload]})
+        self.assertTrue(result["datasets"])
+        self.assertTrue(all(batch["targetEntity"] == "source_observation" for batch in result["datasets"]))
+
+    def test_farm_cost_import_keeps_exact_posted_ids_and_allocation_basis(self):
+        upload = source("costs.csv", "flock_reference,event_reference,event_kind,business_date,journal_line_id,cost_kind,expense_report_id,allocation_basis\nLOT-05,GL-41,costLink,2026-11-11,9007199254740993,note de frais,4001,Feed for this flock only\n")
+        batch = self.prepare(upload)["datasets"][0]
+        self.assertEqual(batch["targetEntity"], "farm_event")
+        result = batch["items"][0]["proposed"]
+        self.assertEqual(result["journal_line_id"], "9007199254740993")
+        self.assertEqual(result["cost_kind"], "expense_report")
+        self.assertEqual(result["expense_report_id"], "4001")
+        self.assertEqual(result["allocation_basis"], "Feed for this flock only")
+
     def test_inspection_mode_never_emits_business_import_proposals(self):
         contents = "name,sale_price,cost_price\nSausage,4800,3000\n"
         result = module.prepare({"mode": "inspect_only", "files": [source("products.csv", contents)]})

@@ -18,12 +18,13 @@ spec.loader.exec_module(inventory)
 
 
 class ScopeTests(unittest.TestCase):
-    def test_activity_covers_the_current_alpha_profile(self):
+    def test_activity_covers_alpha_surfaces_using_general_history(self):
         scope = inventory.profile_surfaces((ROOT / inventory.PROFILE).read_text())
         navigation = (ROOT / "frontend/web/lib/history-activity-navigation.ts").read_text()
         declaration = re.search(r"ALPHA_HISTORY_MODULES = \[([^]]*)\] as const", navigation, re.S)
         self.assertIsNotNone(declaration)
-        self.assertCountEqual(scope, re.findall(r'"([^"]+)"', declaration[1]))
+        # Farm Batches reads its revisions through the dedicated farm history endpoint.
+        self.assertCountEqual(set(scope) - {"farm-batches"}, re.findall(r'"([^"]+)"', declaration[1]))
 
     def test_unknown_alpha_surface_cannot_silently_omit_history(self):
         source = (ROOT / inventory.PROFILE).read_text()
@@ -174,9 +175,10 @@ class RepositoryTests(unittest.TestCase):
 
     def test_every_current_alpha_surface_has_an_owner(self):
         self.assertEqual(set(self.payload["scope"]["surfaces"]), set(inventory.MODULES))
+        service_surfaces = {path["surface"] for path in self.payload["service_paths"]}
         for row in self.payload["surfaces"]:
             if row["surface"] != "overview":
-                self.assertGreater(row["operation_candidates"], 0, row)
+                self.assertTrue(row["operation_candidates"] > 0 or row["surface"] in service_surfaces, row)
         self.assertEqual(self.payload["summary"]["runtime_certified"], 0)
 
     def test_canonical_ids_and_native_locations_are_unique(self):
@@ -194,6 +196,7 @@ class RepositoryTests(unittest.TestCase):
     def test_service_paths_cover_non_native_onboarding_decisions(self):
         paths = {row["path_id"] for row in self.payload["service_paths"]}
         self.assertTrue({"source-review-decision", "source-review-bulk-decision", "source-admission", "native-import-recovery"} <= paths)
+        self.assertIn("farm-event-history-read", paths)
         self.assertTrue(all(not row["runtime_evidence"] for row in self.payload["service_paths"]))
 
     def test_boundaries_and_capture_gaps_are_explicit(self):

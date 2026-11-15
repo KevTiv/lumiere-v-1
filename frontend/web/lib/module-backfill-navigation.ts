@@ -6,8 +6,8 @@ export const moduleBackfillTabs = {
 
 export type BackfillModule = keyof typeof moduleBackfillTabs
 
-function workspacePath(module: BackfillModule) {
-  return module === 'shop_sales' ? '/sales' : `/${module}`
+function moduleBackfillWorkspace(module: BackfillModule) {
+  return module === 'shop_sales' ? 'sales' : module
 }
 
 export function moduleBackfillHref(
@@ -19,7 +19,7 @@ export function moduleBackfillHref(
     params.set('backfillTask', task.id)
     params.set('backfillCompany', String(task.companyId))
   }
-  return `${workspacePath(module)}?${params}`
+  return `/${moduleBackfillWorkspace(module)}?${params}`
 }
 
 /** Saved IDs are Postgres BIGINTs and must remain exact across URLs. */
@@ -46,5 +46,5 @@ export function moduleBackfillRecordHref(
   params.set('backfillRecord', recordId)
   if (taskId) params.set('backfillTask', taskId)
   else params.delete('backfillTask')
-  return `${workspacePath(module)}?${params}`
+  return `/${moduleBackfillWorkspace(module)}?${params}`
 }

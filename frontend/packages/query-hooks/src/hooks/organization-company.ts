@@ -268,7 +268,7 @@ export function useSetCompanyCountryPack() {
 export function useSetCompanyVerticalPack() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { companyId: bigint; organizationId: number; packKey: "distributor_wholesaler"; enabled: boolean; configuration?: string }) => {
+    mutationFn: async (args: { companyId: bigint; organizationId: number; packKey: "distributor_wholesaler" | "farm_operations"; enabled: boolean; configuration?: string }) => {
       const { urlPath, init } = stdbBffCommandPost("set_company_vertical_pack", { companyId: args.companyId, params: stdbParamsToJson({ packKey: args.packKey, enabled: args.enabled, configuration: encodeOptionalString(args.configuration) }, "SetCompanyVerticalPackParams") })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await parseCallError(response))

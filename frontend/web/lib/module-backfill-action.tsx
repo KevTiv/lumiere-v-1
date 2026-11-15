@@ -3,7 +3,13 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
-import { isModuleBackfillRecordId } from "./module-backfill-navigation"
+import { useTranslation } from "@lumiere/i18n"
+import {
+  isModuleBackfillRecordId,
+  moduleBackfillTabs,
+  moduleBackfillRecordHref,
+  type BackfillModule,
+} from "./module-backfill-navigation"
 import { apiFetch } from "./api-fetch"
 import type {
   ReviewDetail,
@@ -34,13 +40,11 @@ function destinationHref(
   destination: string,
   taskId: string | undefined,
   companyId: number,
-  recordId?: string,
 ) {
-  if (!taskId && !recordId) return destination
+  if (!taskId) return destination
   const [path, query] = destination.split("?", 2)
   const params = new URLSearchParams(query)
-  if (taskId) params.set("backfillTask", taskId)
-  if (recordId) params.set("backfillRecord", recordId)
+  params.set("backfillTask", taskId)
   params.set("backfillCompany", String(companyId))
   return `${path}?${params}`
 }
@@ -100,6 +104,7 @@ function BackfillAction({
   operation: ReviewedRecordOperation
   disabled: boolean
 }) {
+  const { t } = useTranslation()
   const cache = useQueryClient()
   const [overrides, setOverrides] = useState<Record<string, string>>({})
   const [showMatches, setShowMatches] = useState(false)
@@ -196,19 +201,29 @@ function BackfillAction({
     )?.results.filter(
       (row) => row.status === "held" || row.status === "conflict",
     ) ?? []
-  const results = write.variables === false ? (write.data?.results ?? []) : []
+  const results = write.variables === false ? write.data?.results ?? [] : []
   const matched = results.filter((row) => row.status === "matched").length
   const saved = results.filter((row) => row.status === "saved").length
-  const links = results.flatMap((row) => {
+  const dispatch = operation.reviewedRecord.dispatch
+  const recordLinks = results.flatMap((row) => {
     if (
+      (row.status !== "saved" && row.status !== "matched") ||
       !isModuleBackfillRecordId(row.recordId) ||
-      (row.status !== "saved" && row.status !== "matched")
-    ) return []
-    return [{
-      key: row.itemId,
-      label: items.find((item) => item.id === row.itemId)?.source.label,
-      href: destinationHref(operation.destination, taskId, companyId, row.recordId),
-    }]
+      !Object.hasOwn(moduleBackfillTabs, dispatch)
+    )
+      return []
+    return [
+      {
+        itemId: row.itemId,
+        label: items.find((item) => item.id === row.itemId)?.source.label,
+        // A matched record may have been stored by an earlier import.
+        href: moduleBackfillRecordHref(dispatch as BackfillModule, {
+          companyId,
+          recordId: row.recordId,
+          taskId: row.status === "saved" ? taskId : undefined,
+        }),
+      },
+    ]
   })
   return (
     <div className="space-y-2 rounded-lg border p-3 text-sm">
@@ -305,17 +320,17 @@ function BackfillAction({
           need attention
         </p>
       ) : null}
-      {links.length > 0 && (
-        <ul className="max-h-60 list-disc overflow-y-auto pl-5">
-          {links.map(({ key, href, label }) => (
-            <li key={key}>
+      {recordLinks.length ? (
+        <ul className="max-h-60 list-disc space-y-1 overflow-y-auto pl-5">
+          {recordLinks.map(({ itemId, label, href }) => (
+            <li key={itemId}>
               <a className="underline underline-offset-4" href={href}>
-                {label ?? operation.label}
+                {label ?? t("moduleRecords.recordHistory")}
               </a>
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
       {held.length ? (
         <ul className="list-disc pl-5">
           {held.map((row) => (

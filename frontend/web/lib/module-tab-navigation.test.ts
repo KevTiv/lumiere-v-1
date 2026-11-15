@@ -135,3 +135,22 @@ test("sales summary details preserve currency, exact decimals and incomplete sou
     },
   )
 })
+
+test("shop sale receipts open an exact Sales record with its stored shop and prices", () => {
+  assert.equal(
+    moduleBackfillRecordHref("shop_sales", { companyId: 7, recordId: "51" }),
+    "/sales?tab=shop-sales&backfillCompany=7&backfillRecord=51",
+  )
+  const fields = moduleBackfillSavedFields({
+    kind: "shop_sale",
+    shop: "Kicukiro",
+    product: "Whole chicken",
+    quantity: "12.00",
+    unit: null,
+    unitPrice: "5000.000",
+    amount: "60000.00",
+    currency: "RWF",
+  }, (key) => key)
+  assert.deepEqual(fields.map(({ id }) => id), ["shop", "product", "quantity", "unit", "unitPrice", "amount", "currency"])
+  assert.deepEqual(fields.find(({ id }) => id === "unitPrice")?.after, { kind: "value", value: "5000.000" })
+})

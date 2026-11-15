@@ -96,14 +96,14 @@ export function reviewDecisionDiff(
 }
 
 export function reviewSourceLabel(item: ReviewRow, t: Translate): string {
-  const { file, row, rowBasis } = item.source.source
+  const { file, sheet, row, rowBasis } = item.source.source
   const coordinate = t(
     rowBasis === "import_row"
       ? "settings.importReview.importRow"
       : "settings.importReview.sourceLine",
     { row },
   )
-  return `${file} · ${coordinate}`
+  return [file, sheet, coordinate].filter(Boolean).join(" · ")
 }
 
 export function reviewSourceDate(date: ReviewBusinessDate, t: Translate): string {

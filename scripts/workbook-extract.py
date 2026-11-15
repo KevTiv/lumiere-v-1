@@ -36,6 +36,7 @@ MAX_VIEWER_COLUMNS = 16_384
 MAX_VIEWER_OUTPUT = 10_000_000
 PREVIEW_POLICY_VERSION = "office-static-seccomp-v1"
 PREVIEW_SHEETS = 24
+IMPORT_SHEETS = 20
 PREVIEW_ROWS = 100
 PREVIEW_COLUMNS = 20
 PREVIEW_BLOCKS = 200
@@ -316,7 +317,7 @@ def date_styles(styles: ET.Element | None) -> set[int]:
     return result
 
 
-def workbook_parts(documents, seen, preview=False):
+def workbook_parts(documents, seen, preview=False, visible_selection=False):
     required = ("[content_types].xml", "xl/workbook.xml", "xl/_rels/workbook.xml.rels")
     if not all(name in seen for name in required):
         raise Rejected("workbook_required_parts")
@@ -329,10 +330,11 @@ def workbook_parts(documents, seen, preview=False):
     if not preview and (len(sheets) != 1 or len(worksheet_names) != 1 or
                         sheets[0].attrib.get("state", "visible") != "visible"):
         raise Rejected("workbook_single_visible_sheet_required")
+    allowed_states = {"visible", "hidden", "veryHidden"} if visible_selection else {"visible"}
     if preview and (not sheets or len(sheets) != len(worksheet_names) or
-                    any(sheet.attrib.get("state", "visible") != "visible" for sheet in sheets)):
+                    any(sheet.attrib.get("state", "visible") not in allowed_states for sheet in sheets)):
         raise Rejected("workbook_visible_sheets_required")
-    if preview and len(sheets) > PREVIEW_SHEETS:
+    if preview and len(sheets) > (IMPORT_SHEETS if visible_selection else PREVIEW_SHEETS):
         raise Rejected("sheet_budget")
     if preview:
         if relationships.tag != "{%s}Relationships" % REL_NS:
@@ -367,7 +369,10 @@ def workbook_parts(documents, seen, preview=False):
         if preview and name.casefold() in names:
             raise Rejected("workbook_duplicate_sheet_name")
         names.add(name.casefold())
-        sheet_parts.append((name, documents[target]))
+        if not visible_selection or sheet.attrib.get("state", "visible") == "visible":
+            sheet_parts.append((name, documents[target]))
+    if not sheet_parts:
+        raise Rejected("workbook_visible_sheets_required")
     strings_root = documents.get("xl/sharedStrings.xml")
     if strings_root is not None and strings_root.tag != "{%s}sst" % SHEET_NS:
         raise Rejected("workbook_string_structure")
@@ -380,7 +385,7 @@ def workbook_parts(documents, seen, preview=False):
     return sheet_parts, strings, styles, dates1904
 
 
-def worksheet_values(sheet, strings, styles, dates1904, preview=False):
+def worksheet_values(sheet, strings, styles, dates1904, preview=False, preserve_blank_rows=False):
     if sheet.tag != "{%s}worksheet" % SHEET_NS:
         raise Rejected("workbook_sheet_structure")
     rows = {}
@@ -390,10 +395,18 @@ def worksheet_values(sheet, strings, styles, dates1904, preview=False):
     if len(data_nodes) != 1:
         raise Rejected("workbook_sheet_structure")
     canonical_cells = set()
+    original_row_numbers = set()
     for row_node in data_nodes[0]:
         if row_node.tag != "{%s}row" % SHEET_NS:
             raise Rejected("workbook_sheet_structure")
         row_reference = row_node.attrib.get("r")
+        if preserve_blank_rows and row_reference is not None:
+            if (not re.fullmatch(r"[1-9][0-9]{0,5}", row_reference)
+                    or int(row_reference) > MAX_ROWS
+                    or row_reference in original_row_numbers):
+                raise Rejected("row_budget")
+            original_row_numbers.add(row_reference)
+            rows[int(row_reference)] = {}
         for cell in row_node:
             if preview and row_reference and cell.tag == "{%s}c" % SHEET_NS:
                 if not re.fullmatch(r"[A-Z]+" + re.escape(row_reference), cell.attrib.get("r", "")):
@@ -483,6 +496,44 @@ def extract(data: bytes) -> dict[str, str]:
     return {"csvText": csv_text, "sheetName": sheet_name,
             "sourceSha256": hashlib.sha256(data).hexdigest(),
             "policyVersion": POLICY_VERSION}
+
+
+def extract_import_worksheets(data, selected_names):
+    """Return workbook structure or exact original rows from explicitly selected sheets."""
+    if len(selected_names) > IMPORT_SHEETS or len(set(selected_names)) != len(selected_names):
+        raise Rejected("workbook_import_worksheet_selection")
+    documents, seen = unpack(data)
+    sheets, strings, styles, dates1904 = workbook_parts(documents, seen, preview=True, visible_selection=True)
+    available_names = [name for name, _ in sheets]
+    if any(any(ord(character) < 32 or ord(character) == 127 for character in name)
+           for name in available_names):
+        raise Rejected("sheet_name_budget")
+    if set(selected_names) - set(available_names):
+        raise Rejected("workbook_import_worksheet_selection")
+
+    selected = []
+    total_matrix = total_cells = total_rows = total_output = 0
+    for name, sheet in sheets:
+        if name not in selected_names:
+            continue
+        rows, width, count = worksheet_values(sheet, strings, styles, dates1904, preview=True,
+                                              preserve_blank_rows=True)
+        total_cells += count
+        total_rows += len(rows)
+        total_matrix += len(rows) * width
+        if total_cells > MAX_CELLS or total_rows > MAX_ROWS or total_matrix > MAX_MATRIX:
+            raise Rejected("worksheet_selection_budget")
+        matrix = [
+            [row_number, [columns.get(index, "") for index in range(max(columns, default=-1) + 1)]]
+            for row_number, columns in sorted(rows.items())
+        ]
+        total_output += len(json.dumps(matrix, ensure_ascii=True, separators=(",", ":")).encode("utf-8"))
+        if total_output > MAX_CSV:
+            raise Rejected("csv_output_budget")
+        selected.append({"name": name, "rows": matrix})
+    return {"worksheetNames": available_names, "worksheets": selected,
+            "multiWorksheet": len([part for part in documents if re.fullmatch(r"xl/worksheets/[^/]+\.xml", part)]) > 1,
+            "sourceSha256": hashlib.sha256(data).hexdigest(), "policyVersion": POLICY_VERSION}
 
 
 # Number format strings are exposed as source data. Render a subset of common
@@ -953,6 +1004,8 @@ def main() -> int:
             result = extract_viewer(sys.stdin.buffer.read(MAX_INPUT + 1))
         elif sys.argv[1:] in (["--preview-xlsx"], ["--preview-docx"]):
             result = preview(sys.stdin.buffer.read(MAX_INPUT + 1), sys.argv[1][10:])
+        elif sys.argv[1:2] == ["--import-worksheets"]:
+            result = extract_import_worksheets(sys.stdin.buffer.read(MAX_INPUT + 1), sys.argv[2:])
         elif sys.argv[1:]:
             raise Rejected("invalid_protocol")
         else:

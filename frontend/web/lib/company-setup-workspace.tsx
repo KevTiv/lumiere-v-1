@@ -16,6 +16,7 @@ import { Label } from "@lumiere/ui/components/label"
 import type { CompanyQueryRow } from "@lumiere/stdb/resource-reads"
 import { currencyOptionsFromRows } from "./form-lookup"
 import { CompanySetupPanel } from "./company-setup-panel"
+import { FarmOperationsSetting } from "./farm-operations-setting"
 import {
   CompanySetupAdmissionError,
   companySetupMetadata,
@@ -324,6 +325,14 @@ export function CompanySetupWorkspace({
               ? reviewed.companyId
               : null
           }}
+        />
+      )}
+      {company && canSave && (
+        <FarmOperationsSetting
+          key={company.id}
+          companyId={BigInt(company.id)}
+          companyName={company.name}
+          organizationId={organizationId}
         />
       )}
     </div>

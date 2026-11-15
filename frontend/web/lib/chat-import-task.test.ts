@@ -36,6 +36,27 @@ test("saved tasks reopen outside their original conversation without crossing co
   await assert.rejects(readSavedImportTask(async () => json(original), 4, id), /company/)
 })
 
+test("saved workbook coverage accepts separate sheets bound to one exact original", () => {
+  const workbook = { ...source, fileName: "farm.xlsx" }
+  const worksheet = {
+    fileName: workbook.fileName, sourceSha256: workbook.sha256, byteCount: workbook.size,
+    status: "prepared" as const, worksheet: "Intake", availableWorksheets: ["Intake", "Growth"],
+    recordCount: 0, reviewRecords: 0, blankRecords: 0, headerRecords: 0, records: [],
+    sections: [], layoutSha256: null, error: null,
+  }
+  const files = [worksheet, { ...worksheet, worksheet: "Growth" }]
+  const saved = task({
+    files: [{ ...workbook, ordinal: 0 }],
+    coverage: { version: 1, complete: true, files, reconciliation: [] },
+  })
+  assert.equal(parseSavedImportTask(saved, 3).coverage?.files.length, 2)
+  for (const conflict of [worksheet, { ...files[1]!, byteCount: workbook.size + 1 }, { ...files[1]!, worksheet: "Unknown" }]) {
+    assert.throws(() => parseSavedImportTask({
+      ...saved, coverage: { ...saved.coverage, files: [worksheet, conflict] },
+    }, 3), /coverage/)
+  }
+})
+
 test("saved task pagination omits conversation and keeps the opaque cursor", async () => {
   const page = await listSavedImportTasks(async url => {
     const parsed = new URL(url, "https://app.example")

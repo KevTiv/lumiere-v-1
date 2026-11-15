@@ -13,6 +13,7 @@
 pub mod bill_of_materials;
 pub mod costing;
 pub(crate) mod effects;
+mod farm_processing;
 pub mod manufacturing_orders;
 pub mod relations;
 pub mod work_centers;
