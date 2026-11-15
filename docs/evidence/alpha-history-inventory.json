@@ -518,7 +518,7 @@
     },
     {
       "path": "api-server/src/routes/farm_batches/mod.rs",
-      "sha256": "b2b333cc29241c36c1656d029ecade7f84be4e114756c22baa75f91f3a9dbe9f"
+      "sha256": "b1493982cdf755ef263bb2437956557339bba33ab9ea59b2a85fc05005adf317"
     },
     {
       "path": "api-server/src/routes/farm_batches/native_links.rs",
@@ -1719,7 +1719,7 @@
       "surface": "farm-batches",
       "source": "api-server/src/routes/farm_batches/mod.rs",
       "function": "create",
-      "line": 206,
+      "line": 218,
       "owner": "Farm Operations API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "scoped-farm-revision-or-exact-native-link-owner-review-required",
@@ -1732,7 +1732,7 @@
       "surface": "farm-batches",
       "source": "api-server/src/routes/farm_batches/mod.rs",
       "function": "append_event",
-      "line": 262,
+      "line": 274,
       "owner": "Farm Operations API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "scoped-farm-revision-or-exact-native-link-owner-review-required",
@@ -1745,7 +1745,7 @@
       "surface": "farm-batches",
       "source": "api-server/src/routes/farm_batches/mod.rs",
       "function": "revise_event",
-      "line": 287,
+      "line": 299,
       "owner": "Farm Operations API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "scoped-farm-revision-or-exact-native-link-owner-review-required",
@@ -1758,7 +1758,7 @@
       "surface": "farm-batches",
       "source": "api-server/src/routes/farm_batches/mod.rs",
       "function": "history",
-      "line": 313,
+      "line": 325,
       "owner": "Farm Operations API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "scoped-farm-revision-or-exact-native-link-owner-review-required",

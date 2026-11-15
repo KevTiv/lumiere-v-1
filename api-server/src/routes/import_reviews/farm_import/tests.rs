@@ -105,11 +105,7 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
     ] {
         client.batch_execute(migration).await?;
     }
-    let farm = FarmScope {
-        organization: 41,
-        company: 21,
-        actor: "reviewer".into(),
-    };
+    let farm = FarmScope::for_test(41, 21, "reviewer");
     let tx = client.transaction().await?;
     let task_id = "c".repeat(32);
     tx.execute(

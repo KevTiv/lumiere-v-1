@@ -44,6 +44,18 @@ pub(crate) struct FarmScope {
     local_date: NaiveDate,
 }
 
+#[cfg(test)]
+impl FarmScope {
+    pub(crate) fn for_test(organization: u64, company: u64, actor: &str) -> Self {
+        Self {
+            organization,
+            company,
+            actor: actor.into(),
+            local_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+        }
+    }
+}
+
 pub(crate) enum FarmAccess {
     Read,
     Create,

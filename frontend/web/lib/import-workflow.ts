@@ -214,7 +214,7 @@ export interface ImportWorkflow {
   proposals: ImportProposal[]
   nativeResults: ImportNativeResult[]
   nativeResultsMore: boolean
-  backfilledRecords?: Array<{ module: "sales" | "warehouse"; count: number }>
+  backfilledRecords?: Array<{ module: "sales" | "shop_sales" | "warehouse"; count: number }>
   farmResults?: Array<{ batchId: string; count: number }>
   farmResultsMore?: boolean
 }
@@ -405,7 +405,7 @@ export async function readImportWorkflow(
       proposals: z.array(z.unknown()),
       nativeResults: z.array(nativeResultSchema).max(20).default([]),
       nativeResultsMore: z.boolean().default(false),
-      backfilledRecords: z.array(z.object({ module: z.enum(["sales", "warehouse"]), count })).optional(),
+      backfilledRecords: z.array(z.object({ module: z.enum(["sales", "shop_sales", "warehouse"]), count })).optional(),
       farmResults: z.array(z.object({ batchId: positiveId, count })).max(20).optional(),
       farmResultsMore: z.boolean().optional(),
     })

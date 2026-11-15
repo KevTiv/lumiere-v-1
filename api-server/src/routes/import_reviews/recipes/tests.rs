@@ -52,7 +52,8 @@ fn workbook_recipe_pins_all_selected_sheets_as_one_source() -> Result<()> {
     let sources = [source];
     let document = recipe_document(&options, &coverage, &sources)?;
     let slot = &document.slots[0].options;
-    ensure!(slot.worksheet_names.as_deref() == Some(&["Intake".to_owned(), "Growth".to_owned()]));
+    let worksheets = ["Intake".to_owned(), "Growth".to_owned()];
+    ensure!(slot.worksheet_names.as_deref() == Some(worksheets.as_slice()));
     ensure!(slot.expected_layout_sha256 == Some("d".repeat(64)));
     coverage["files"][1] = covered_sheet("Intake");
     ensure!(recipe_document(&options, &coverage, &sources).is_err());
