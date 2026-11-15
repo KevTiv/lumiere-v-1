@@ -1,5 +1,20 @@
 {
+  "aiChat": {
+    "draft": {
+      "applied": "Appliqué",
+      "proposedValue": "Valeur proposée",
+      "beforeProposal": "Avant la proposition",
+      "proposedAt": "Proposé",
+      "reviewedAt": "Examiné",
+      "appliedAt": "Appliqué"
+    }
+  },
   "moduleRecords": {
+    "shopSales": "Ventes en boutique",
+    "saleDate": "Date de vente",
+    "savedShopSale": "Vente en boutique enregistrée",
+    "shop": "Boutique",
+    "emptyShopSales": "Aucune vente en boutique enregistrée.",
     "sales": "Récapitulatifs des ventes clients",
     "warehouse": "Comptages enregistrés",
     "period": "Période de vente",
@@ -21,7 +36,17 @@
     "emptyCounts": "Aucun comptage enregistré.",
     "emptyFiltered": "Aucun enregistrement ne correspond aux dates ou à l’import sélectionné.",
     "otherCompany": "Sélectionnez la société utilisée pour cet import afin de consulter ses enregistrements.",
-    "loadError": "Impossible de charger les enregistrements."
+    "loadError": "Impossible de charger les enregistrements.",
+    "recordHistory": "Voir l’historique",
+    "recordHistoryLabel": "Voir l’historique de la ligne {{row}} de {{file}}",
+    "savedSale": "Récapitulatif des ventes client enregistré",
+    "savedCount": "Comptage physique enregistré",
+    "recordUnavailable": "Cet enregistrement est indisponible dans votre espace de travail actuel.",
+    "sourceCustomer": "Nom du client dans la source",
+    "unit": "Unité dans la source",
+    "currency": "Devise",
+    "savedAt": "Enregistré le",
+    "sourceRevision": "Révision {{revision}}"
   },
   "aiHarness": {
     "platformProfile": {
@@ -117,6 +142,10 @@
     }
   },
   "recordChanges": {
+    "valueAbsent": "Champ absent",
+    "valueRestricted": "Accès restreint",
+    "valueUnavailable": "Valeur non enregistrée",
+    "savedChange": "Modification enregistrée",
     "fields": {
       "name": "Description",
       "debit": "Débit",
@@ -4374,6 +4403,14 @@
     }
   },
   "settings": {
+    "importReview": {
+      "grouped": {
+        "rowStatus": "Statut de la ligne",
+        "fieldConfirmation": "Confirmation de {{field}}",
+        "noDecisionChanges": "Aucune valeur enregistrée ni aucun statut de vérification n’a changé.",
+        "proposedAfter": "Après cette décision"
+      }
+    },
     "page": {
       "title": "Paramètres",
       "description": "Gérez votre compte et la configuration du système"
@@ -5140,6 +5177,9 @@
     }
   },
   "businessHistory": {
+    "allActivity": "Toute l’activité",
+    "openChange": "Ouvrir la modification",
+    "eventUnavailable": "Cette modification est indisponible pour la société actuelle ou selon vos droits d’accès.",
     "title": "Historique et sources",
     "changes": "Modifications",
     "activity": "Activité",

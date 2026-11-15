@@ -647,7 +647,11 @@ function ExecutionPanel({
       {view === "results" && workflow.data?.backfilledRecords?.map(({ module, count }) => (
         <p key={module}>
           <a className="underline underline-offset-4" href={moduleBackfillHref(module, { id: taskId, companyId })}>
-            {count} {module === "sales" ? "verified customer sales" : "verified inventory counts"}
+            {count} {{
+              sales: "verified customer sales",
+              shop_sales: "verified shop sales",
+              warehouse: "verified inventory counts",
+            }[module]}
           </a>
         </p>
       ))}

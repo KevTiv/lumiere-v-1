@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 import en from "../../../i18n/src/locales/en.json";
 import type { AccountMoveHistoryEntry } from "@lumiere/query-hooks/hooks/account-move-history-model";
+import { HistoryFieldDiff } from "./history-field-diff";
 import { RecordChangeHistory } from "./record-change-history";
 
 vi.mock("@lumiere/i18n", () => ({
@@ -41,7 +42,7 @@ describe("record changes", () => {
       { field: "currency_id", before: null, after: "9007199254740993" },
     ] }]} />);
     expect(screen.getByTestId("record-change-summary").textContent).toBe("Added journal item: Account and Currency");
-    expect(values("before")).toEqual(["No value", "No value"]);
+    expect(values("before")).toEqual(["Field absent", "Field absent"]);
     expect(values("after")).toEqual(["18446744073709551615", "9007199254740993"]);
     expect(screen.queryByText("Description")).toBeNull();
   });
@@ -93,6 +94,60 @@ describe("record changes", () => {
     expect(values("before")).toEqual([markup.changes[0]!.before]);
     expect(values("after")).toEqual([markup.changes[0]!.after]);
     expect(document.querySelector("img[src=x], svg[onload], script")).toBeNull();
+  });
+
+  it("visually marks proven changes and leaves unavailable or restricted values neutral", () => {
+    render(
+      <HistoryFieldDiff
+        beforeLabel="Earlier review"
+        afterLabel="This revision"
+        valueTestIdPrefix="record-change"
+        fields={[
+          { id: "added", label: "New field", before: { kind: "absent" }, after: { kind: "value", value: "0.000" } },
+          { id: "partial", label: "Partial field", before: { kind: "unavailable" }, after: { kind: "value", value: "0" } },
+          { id: "restricted", label: "Restricted field", before: { kind: "value", value: null }, after: { kind: "restricted" } },
+          { id: "removed", label: "Removed field", before: { kind: "value", value: "" }, after: { kind: "absent" } },
+        ]}
+      />,
+    );
+    expect(values("before")).toEqual(["Field absent", "Value not recorded", "No value", "Empty text"]);
+    expect(values("after")).toEqual(["0.000", "0", "Restricted", "Field absent"]);
+    const marks = (side: "before" | "after") => screen
+      .getAllByTestId(`record-change-${side}`)
+      .map((node) => node.closest("[data-value-kind]")?.getAttribute("data-diff-mark"));
+    expect(marks("before")).toEqual([null, null, null, "removed"]);
+    expect(marks("after")).toEqual(["added", null, null, null]);
+    expect(screen.getAllByText("Earlier review")).toHaveLength(4);
+    expect(screen.getAllByText("This revision")).toHaveLength(4);
+  });
+
+  it("opens and focuses the requested event while preserving manual disclosures", () => {
+    const otherEntry = { ...entry, id: "10", changes: [] };
+    const props = {
+      state: "ready" as const,
+      entries: [entry, otherEntry],
+      variant: "activity" as const,
+      renderEventLink: ({ id }: AccountMoveHistoryEntry) => <a href={`?event=${id}`}>Link to change</a>,
+    };
+    const view = render(<RecordChangeHistory {...props} selectedEventId="99" />);
+    const first = screen.getByTestId("record-change-9");
+    const last = screen.getByTestId("record-change-10");
+    expect(first.querySelector("details")?.open).toBe(false);
+    expect(last.querySelector("details")?.open).toBe(false);
+
+    fireEvent.click(first.querySelector("summary")!);
+    view.rerender(<RecordChangeHistory {...props} selectedEventId="10" />);
+    expect(first.querySelector("details")?.open).toBe(true);
+    expect(last.querySelector("details")?.open).toBe(true);
+    expect(document.activeElement).toBe(last.querySelector("summary"));
+    expect(last.id).toBe("history-event-activity-10");
+    expect(within(last).getByRole("link", { name: "Link to change" }).getAttribute("href")).toBe("?event=10");
+    expect(within(first).getByText("Saved change")).toBeTruthy();
+    expect(within(last).queryByText("Saved change")).toBeNull();
+
+    fireEvent.click(last.querySelector("summary")!);
+    view.rerender(<RecordChangeHistory {...props} selectedEventId="10" isRefreshing />);
+    expect(last.querySelector("details")?.open).toBe(false);
   });
 
   it("uses native disclosures for scope, changes, and full identity without intercepting keyboard events", () => {

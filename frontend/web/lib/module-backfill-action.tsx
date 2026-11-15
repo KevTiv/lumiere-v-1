@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
+import { isModuleBackfillRecordId } from "./module-backfill-navigation"
 import { apiFetch } from "./api-fetch"
 import type {
   ReviewDetail,
@@ -33,11 +34,13 @@ function destinationHref(
   destination: string,
   taskId: string | undefined,
   companyId: number,
+  recordId?: string,
 ) {
-  if (!taskId) return destination
+  if (!taskId && !recordId) return destination
   const [path, query] = destination.split("?", 2)
   const params = new URLSearchParams(query)
-  params.set("backfillTask", taskId)
+  if (taskId) params.set("backfillTask", taskId)
+  if (recordId) params.set("backfillRecord", recordId)
   params.set("backfillCompany", String(companyId))
   return `${path}?${params}`
 }
@@ -193,10 +196,20 @@ function BackfillAction({
     )?.results.filter(
       (row) => row.status === "held" || row.status === "conflict",
     ) ?? []
-  const matched =
-    write.data?.results.filter((row) => row.status === "matched").length ?? 0
-  const saved =
-    write.data?.results.filter((row) => row.status === "saved").length ?? 0
+  const results = write.variables === false ? (write.data?.results ?? []) : []
+  const matched = results.filter((row) => row.status === "matched").length
+  const saved = results.filter((row) => row.status === "saved").length
+  const links = results.flatMap((row) => {
+    if (
+      !isModuleBackfillRecordId(row.recordId) ||
+      (row.status !== "saved" && row.status !== "matched")
+    ) return []
+    return [{
+      key: row.itemId,
+      label: items.find((item) => item.id === row.itemId)?.source.label,
+      href: destinationHref(operation.destination, taskId, companyId, row.recordId),
+    }]
+  })
   return (
     <div className="space-y-2 rounded-lg border p-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
@@ -292,6 +305,17 @@ function BackfillAction({
           need attention
         </p>
       ) : null}
+      {links.length > 0 && (
+        <ul className="max-h-60 list-disc overflow-y-auto pl-5">
+          {links.map(({ key, href, label }) => (
+            <li key={key}>
+              <a className="underline underline-offset-4" href={href}>
+                {label ?? operation.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
       {held.length ? (
         <ul className="list-disc pl-5">
           {held.map((row) => (

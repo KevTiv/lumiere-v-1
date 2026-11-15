@@ -121,6 +121,30 @@ test("exact readback rejects a different company, organization, draft or malform
   assert.throws(() => exactAiActionDraftPayload({ data: [row] }, scope))
 })
 
+test("exact readback preserves draft event dates from the SpacetimeDB wire", () => {
+  const row = {
+    id: "41",
+    organizationId: "1",
+    companyId: "3",
+    status: "approved",
+    createDate: { microsSinceUnixEpoch: 1767225600123456 },
+    reviewedAt: { __timestamp_micros_since_unix_epoch__: "1767225601234567" },
+    executedAt: { microsSinceUnixEpoch: "1767225601234567" },
+  }
+  const scope = { organizationId: 1, companyId: 3, draftId: 41 }
+  const payload = exactAiActionDraftPayload({ data: row }, scope)
+  assert.equal(payload.proposedAt, "2026-01-01T00:00:00.123456Z")
+  assert.equal(payload.reviewedAt, "2026-01-01T00:00:01.234567Z")
+  assert.equal(payload.executedAt, "2026-01-01T00:00:01.234567Z")
+  const undated = exactAiActionDraftPayload(
+    { data: { ...row, createDate: null, reviewedAt: { none: [] }, executedAt: "2026" } },
+    scope,
+  )
+  assert.equal(undated.proposedAt, null)
+  assert.equal(undated.reviewedAt, null)
+  assert.equal(undated.executedAt, null)
+})
+
 test("unsafe numeric identities are never rounded into a different draft or result", () => {
   assert.throws(() => aiActionDraftRowToPayload({ id: "9007199254740993" }))
   const payload = aiActionDraftRowToPayload({ id: 41, status: "approved", executionRecordId: 9007199254740992, reducerName: "create_sale_order" })

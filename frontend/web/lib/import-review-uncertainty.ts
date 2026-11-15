@@ -391,17 +391,29 @@ export function buildBulkConfirmationPreview(args: {
   return result
 }
 
+export function canUndoReviewDecision(
+  item: ReviewRow,
+  entry: ReviewHistory,
+): entry is ReviewHistory & {
+  previousValues: ReviewRow["values"]
+  previousConfirmedFields: string[]
+  previousState: ReviewRow["state"]
+} {
+  return (
+    entry.itemId === item.id &&
+    entry.revision === item.revision &&
+    !!entry.previousValues &&
+    Array.isArray(entry.previousConfirmedFields) &&
+    !!entry.previousState
+  )
+}
+
 /** Undo is a new revision; it cannot erase the original source or audit trail. */
 export function undoReviewDecision(
   item: ReviewRow,
   entry: ReviewHistory,
 ): ReviewDecision {
-  if (
-    entry.itemId !== item.id ||
-    entry.revision !== item.revision ||
-    !entry.previousValues ||
-    !entry.previousState
-  )
+  if (!canUndoReviewDecision(item, entry))
     throw new Error(
       "Reload the current row before undoing its latest decision.",
     )
@@ -409,7 +421,7 @@ export function undoReviewDecision(
     itemId: item.id,
     expectedRevision: item.revision,
     values: { ...entry.previousValues },
-    confirmedFields: entry.previousConfirmedFields ?? [],
+    confirmedFields: [...entry.previousConfirmedFields],
     state: entry.previousState,
     reason: `Undo revision ${entry.revision}: ${entry.reason}`.slice(0, 2000),
   }

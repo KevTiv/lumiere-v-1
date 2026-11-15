@@ -104,6 +104,32 @@ const CUSTOMER_SALES: ReviewedRecord = ReviewedRecord {
     },
 };
 
+const SHOP_SALES: ReviewedRecord = ReviewedRecord {
+    dispatch: Module::ShopSales,
+    inputs: &[],
+    preview_fields: &[
+        field("shop", "Shop"),
+        field("product", "Product"),
+        field("quantity", "Quantity"),
+        field("unit", "Unit"),
+        field("unitPrice", "Unit price"),
+        field("amount", "Total"),
+        field("currency", "Currency"),
+    ],
+    source_shape: SourceShape {
+        keys: &[
+            "shop",
+            "sale_date",
+            "product_label",
+            "sold_quantity",
+            "sale_unit_price",
+            "sale_amount",
+            "currency_code",
+        ],
+        labels: &[],
+    },
+};
+
 const INVENTORY_COUNTS: ReviewedRecord = ReviewedRecord {
     dispatch: Module::Warehouse,
     inputs: &[],
@@ -191,6 +217,18 @@ pub(super) fn catalog() -> Vec<Capability> {
             blocking_reason: None,
             destination: "/sales?tab=customer-sales",
             reviewed_record: Some(&CUSTOMER_SALES),
+        },
+        Capability {
+            key: "shop_sales_backfill",
+            version: 1,
+            module: "sales",
+            label: "Shop sales",
+            target_entities: &["source_observation"],
+            required_facts: &["shop", "exact sale date", "product", "quantity, unit price, and total", "currency"],
+            readiness: Readiness::ReviewedRecords,
+            blocking_reason: None,
+            destination: "/sales?tab=shop-sales",
+            reviewed_record: Some(&SHOP_SALES),
         },
         held("sales_history", "sales", "Historical sales", &["sale_order", "sale_order_line"], "Resolve customer, product, units, historical prices, tax and document identity before preparing orders.", "/sales"),
         held("crm_history", "crm", "CRM history", &["crm_lead"], "CRM CSV import remains subject to its existing feature gate and permissions; a saved-task execution adapter is not available.", "/crm"),
