@@ -105,7 +105,7 @@ function permits(actions, action) {
   return false
 }
 
-async function inspectCapabilities(config, client, now, requireExistingBindings) {
+async function inspectCapabilities(config, client, now, requireChatBinding) {
   const org = config.organizationId, companyId = config.companyId, agentId = config.agentId
   await client.verifyTarget(org)
   const writerIdentity = await client.writerIdentity()
@@ -191,14 +191,15 @@ async function inspectCapabilities(config, client, now, requireExistingBindings)
     const inherited = rows.filter(row => unwrap(row.company_id) == null)
     check(inherited.length <= 1, 'duplicate organization skill bindings')
     const previous = scoped[0]
+    const preserveBinding = requireChatBinding && surface.skillKey === 'rag_generation'
     check((previous ?? inherited[0])?.is_enabled !== false, 'skill is explicitly disabled')
-    if (requireExistingBindings) check(previous?.is_enabled === true, `enabled company binding required for ${surface.skillKey}`)
+    if (preserveBinding) check(previous?.is_enabled === true, `enabled company binding required for ${surface.skillKey}`)
     const priorSettings = previous ?? inherited[0]
     const settings = priorSettings ? parsedObject(priorSettings.config_json, 'skill settings') : {}
     for (const key of ['defaultAgentId', 'default_agent_id']) check(settings[key] == null || Number(settings[key]) === agentId, 'skill is bound to another agent')
     for (const key of ['intelligencePolicyRef', 'intelligence_policy_ref']) check(settings[key] == null || settings[key] === config.intelligencePolicyRef, 'skill is bound to another policy')
     if (!previous || settings.defaultAgentId !== agentId || settings.intelligencePolicyRef !== config.intelligencePolicyRef) {
-      check(!requireExistingBindings, `confirmed company binding required for ${surface.skillKey}`)
+      check(!preserveBinding, `confirmed company binding required for ${surface.skillKey}`)
       bindingWrites.push({ company_id: some(companyId), skill_id: surface.skillId, is_enabled: true,
         config_json: JSON.stringify({ ...settings, defaultAgentId: agentId, intelligencePolicyRef: config.intelligencePolicyRef }),
         custom_instructions: priorSettings?.custom_instructions ?? none(), tool_overrides: priorSettings?.tool_overrides ?? [], metadata: priorSettings?.metadata ?? none() })
@@ -215,16 +216,16 @@ async function inspectCapabilities(config, client, now, requireExistingBindings)
     if (!latest) { priceWrites.push({ model: meter.model, unit: meter.unit, currency: config.currency, units_per_1_k: meter.unitsPer1k }); missing.push(`meter:${meter.model}:${meter.unit}`) }
   }
   missing.unshift(...capabilityWrites.map(write => `${write.reducer}:${write.item}`))
-  if (capabilityWrites.length || (requireExistingBindings && priceWrites.length)) {
+  if (capabilityWrites.length || (requireChatBinding && (priceWrites.length || bindingWrites.length))) {
     check(typeof client.verifyActivationAuthority === 'function', 'native operator authority and deployed toggle schema probe required before capability writes')
     await client.verifyActivationAuthority(org, agentId, priceWrites.length > 0)
   }
   return { bindingWrites, priceWrites, capabilityWrites, originalAgent, budgets: structuredClone(budgets), missing, billingPeriod: period }
 }
 
-export async function provisionCapabilities(config, client, apply = false, now = new Date(), { requireExistingBindings = false } = {}) {
+export async function provisionCapabilities(config, client, apply = false, now = new Date(), { requireChatBinding = false } = {}) {
   validateManifest(config)
-  const inspection = await inspectCapabilities(config, client, now, requireExistingBindings)
+  const inspection = await inspectCapabilities(config, client, now, requireChatBinding)
   if (apply) {
     // Every structural prerequisite was checked before the first mutation.
     // An uncertain response stops immediately; check durable state before retry.
@@ -239,7 +240,7 @@ export async function provisionCapabilities(config, client, apply = false, now =
     }
     for (const price of inspection.priceWrites) await client.call('configure_ai_metered_price', [config.organizationId, config.agentId, price])
     for (const binding of inspection.bindingWrites) await client.call('upsert_ai_skill_config', [config.organizationId, binding])
-    const verified = await inspectCapabilities(config, client, now, requireExistingBindings)
+    const verified = await inspectCapabilities(config, client, now, requireChatBinding)
     check(verified.missing.length === 0, 'provisioned capability readback differs; inspect durable state before retry')
     check(JSON.stringify(budgetSnapshot(verified.budgets)) === JSON.stringify(budgetSnapshot(inspection.budgets)),
       'pool readback changed during provisioning; inspect durable state before retry')
@@ -249,34 +250,45 @@ export async function provisionCapabilities(config, client, apply = false, now =
     missing: apply ? [] : inspection.missing, billableCalls: 0, deploymentAcceptance: false }
 }
 
-export async function provisionChatRetrieval(input, client, apply = false, now = new Date()) {
-  fields(input, ['version', 'organizationId', 'companyId', 'agentId', 'currency', 'pricesReviewedAt', 'unitsPer1k'], 'chat retrieval manifest')
-  check(input.version === 1, 'unsupported manifest version')
-  const { organizationId, companyId, agentId, unitsPer1k, ...settings } = input
-  id(organizationId, 'organizationId')
-  id(companyId, 'companyId')
-  id(agentId, 'agentId')
-  const skillKey = 'rag_generation'
-  await client.verifyTarget(organizationId)
+async function effectiveSurface(client, organizationId, skillKey) {
   const catalog = scope => client.sql(`SELECT id, organization_id, skill_key, is_active FROM ai_skill WHERE organization_id = ${scope} AND skill_key = '${skillKey}' LIMIT 2`)
   const scoped = await catalog(organizationId)
   const scope = scoped.length ? organizationId : 0
   const skill = one(scoped.length ? scoped : await catalog(scope), `${skillKey} catalog entry`)
-  check(Number(skill.organization_id) === scope && skill.skill_key === skillKey && skill.is_active === true, 'effective chat skill must be active')
-  const skillId = id(Number(skill.id), 'skillId')
+  check(Number(skill.organization_id) === scope && skill.skill_key === skillKey && skill.is_active === true, `effective ${skillKey} skill must be active`)
+  return { skillKey, skillId: id(Number(skill.id), 'skillId') }
+}
+
+export async function provisionChatRetrieval(input, client, apply = false, now = new Date()) {
+  fields(input, ['version', 'organizationId', 'companyId', 'agentId', 'currency', 'pricesReviewedAt', 'unitsPer1k', 'indexDocuments'], 'chat retrieval manifest')
+  check(input.version === 1, 'unsupported manifest version')
+  const { organizationId, companyId, agentId, unitsPer1k, indexDocuments = false, ...settings } = input
+  check(typeof indexDocuments === 'boolean', 'indexDocuments must be a boolean')
+  id(organizationId, 'organizationId')
+  id(companyId, 'companyId')
+  id(agentId, 'agentId')
+  await client.verifyTarget(organizationId)
+  const chat = await effectiveSurface(client, organizationId, 'rag_generation')
+  const { skillId } = chat
   const rows = await client.sql(`SELECT * FROM ai_skill_config WHERE organization_id = ${organizationId} AND skill_id = ${skillId}`)
   const binding = one(rows.filter(row => Number(unwrap(row.company_id)) === companyId), 'company chat binding')
   check(Number(binding.organization_id) === organizationId && Number(binding.skill_id) === skillId
     && binding.is_enabled === true, 'company chat binding must be active and in scope')
   const config = parsedObject(binding.config_json, 'chat binding settings')
   check(config.defaultAgentId === agentId, 'company chat binding must use the requested agent')
+  const surfaces = [chat]
+  const addActions = ['embedding_query']
+  if (indexDocuments) {
+    surfaces.push(await effectiveSurface(client, organizationId, 'document_embeddings'))
+    addActions.push('embedding_index')
+  }
 
   return provisionCapabilities({
     ...settings, organizationId, companyId, agentId, intelligencePolicyRef: config.intelligencePolicyRef,
-    surfaces: [{ skillKey, skillId }],
-    agentCapabilities: { addModels: ['mistral-embed'], addActions: ['embedding_query'] },
+    surfaces,
+    agentCapabilities: { addModels: ['mistral-embed'], addActions },
     meters: [{ model: 'mistral-embed', unit: 'tokens', unitsPer1k }],
-  }, client, apply, now, { requireExistingBindings: true })
+  }, client, apply, now, { requireChatBinding: true })
 }
 
 async function main() {

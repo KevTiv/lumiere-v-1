@@ -2,6 +2,9 @@
 //! A template authorizes a recurring sponsored cap for a bounded number of
 //! organizations. Companies share that organization's single agent and budget.
 use super::agents::{ai_agent, AiAgent};
+use super::metered_spend::{
+    ai_metered_price, latest_metered_price, AiMeteredPrice, EMBEDDING_MODEL,
+};
 use super::model_configuration::{
     ai_intelligence_policy, ai_model_profile, AiIntelligencePolicy, AiModelProfile,
     RegisterAiModelProfileParams,
@@ -20,6 +23,17 @@ use lumiere_policy_core::ai_skills::BUILTIN_SKILL_KEYS;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
+
+#[derive(Deserialize)]
+struct EmbeddingSurface {
+    skill_key: String,
+    name: String,
+}
+
+fn embedding_surfaces() -> Result<Vec<EmbeddingSurface>, String> {
+    serde_json::from_str(include_str!("../../assets/ai-infrastructure-skills.json"))
+        .map_err(|error| format!("invalid compiled AI infrastructure catalog: {error}"))
+}
 
 #[derive(Clone, Debug, SpacetimeType)]
 pub struct RegisterAiPlatformTemplateParams {
@@ -176,6 +190,12 @@ pub fn set_ai_platform_default(
             .find(id)
             .ok_or("AI template not found")?;
         validate_template_catalog(ctx, &template)?;
+        if template.generation_profile.provider == "mistral"
+            && latest_metered_price(ctx, 0, id, EMBEDDING_MODEL, "tokens", &template.currency)
+                .is_none()
+        {
+            return Err("Mistral platform activation requires an approved embedding price".into());
+        }
         ensure_builtin_skill_catalog(ctx)?;
     }
     if ctx
@@ -263,6 +283,63 @@ pub(crate) fn ensure_builtin_skill_catalog(ctx: &ReducerContext) -> Result<(), S
             metadata: Some(skill.metadata.to_string()),
         });
         audit(ctx, 0, row.id, "ai_skill", "CREATE");
+    }
+    for surface in embedding_surfaces()? {
+        if ctx
+            .db
+            .ai_skill()
+            .ai_skill_by_org_key()
+            .filter((&0u64, &surface.skill_key))
+            .next()
+            .is_some()
+        {
+            continue;
+        }
+        let skill = ctx.db.ai_skill().insert(AiSkill {
+            id: 0,
+            organization_id: 0,
+            skill_key: surface.skill_key,
+            name: surface.name,
+            description: None,
+            category: "infrastructure".into(),
+            prompt_template: String::new(),
+            required_tools: vec![],
+            optional_tools: vec![],
+            default_max_steps: 1,
+            default_max_tool_calls: 1,
+            output_schema: None,
+            config_schema: None,
+            dataset_specs: None,
+            allowed_action_drafts: vec![],
+            is_active: true,
+            is_system: true,
+            create_date: ctx.timestamp,
+            write_date: ctx.timestamp,
+            metadata: None,
+        });
+        audit(ctx, 0, skill.id, "ai_skill", "CREATE");
+    }
+    Ok(())
+}
+
+/// Called only from the platform-superuser metered-price approval reducer.
+pub(super) fn require_template_embedding_scope(
+    ctx: &ReducerContext,
+    template_id: u64,
+    model: &str,
+    currency: &str,
+) -> Result<(), String> {
+    let template = ctx
+        .db
+        .ai_platform_template()
+        .id()
+        .find(template_id)
+        .ok_or("AI platform template not found")?;
+    if template.generation_profile.provider != "mistral"
+        || model != EMBEDDING_MODEL
+        || template.currency != currency
+    {
+        return Err("embedding approval must match a Mistral template and its currency".into());
     }
     Ok(())
 }
@@ -403,19 +480,64 @@ pub(crate) fn enroll_company_from_platform(
         return Ok(());
     };
     ensure_period(ctx, org, &agent, &template)?;
-    for (skill_id, expected_fingerprint) in
-        template.skill_ids.iter().zip(&template.skill_fingerprints)
+    let mut surfaces = template
+        .skill_ids
+        .iter()
+        .copied()
+        .zip(template.skill_fingerprints.iter().map(Some))
+        .collect::<Vec<_>>();
+    if agent
+        .allowed_models
+        .iter()
+        .any(|model| model == EMBEDDING_MODEL)
+        && latest_metered_price(
+            ctx,
+            org,
+            agent.id,
+            EMBEDDING_MODEL,
+            "tokens",
+            &template.currency,
+        )
+        .is_some()
     {
+        for surface in embedding_surfaces()? {
+            let action = if surface.skill_key == "embedding_query" {
+                "embedding_query"
+            } else {
+                "embedding_index"
+            };
+            if !agent
+                .allowed_actions
+                .iter()
+                .any(|allowed| allowed == action)
+            {
+                continue;
+            }
+            let rows = ctx
+                .db
+                .ai_skill()
+                .ai_skill_by_org_key()
+                .filter((&0u64, &surface.skill_key))
+                .take(2)
+                .collect::<Vec<_>>();
+            if let [row] = rows.as_slice() {
+                if row.is_system {
+                    surfaces.push((row.id, None));
+                }
+            }
+        }
+    }
+    for (skill_id, expected_fingerprint) in surfaces {
         let Some(skill) = ctx
             .db
             .ai_skill()
             .id()
-            .find(*skill_id)
+            .find(skill_id)
             .filter(|row| row.organization_id == 0 && row.is_active)
         else {
             continue;
         };
-        if &skill_fingerprint(&skill) != expected_fingerprint {
+        if expected_fingerprint.is_some_and(|expected| &skill_fingerprint(&skill) != expected) {
             continue;
         }
         // An organization-owned catalog entry (including inactive) shadows the
@@ -530,6 +652,25 @@ fn create_enrollment(
             write_date: ctx.timestamp,
         });
     let p = &template.generation_profile;
+    let embedding_price = latest_metered_price(
+        ctx,
+        0,
+        template.id,
+        EMBEDDING_MODEL,
+        "tokens",
+        &template.currency,
+    );
+    let mut allowed_models = vec![p.model.clone(), template.review_profile.model.clone()];
+    let mut allowed_actions = vec![
+        "chat".into(),
+        "form_suggest".into(),
+        "action_draft".into(),
+        "skill_run".into(),
+    ];
+    if embedding_price.is_some() {
+        allowed_models.push(EMBEDDING_MODEL.into());
+        allowed_actions.extend(["embedding_query".into(), "embedding_index".into()]);
+    }
     let agent = ctx.db.ai_agent().insert(AiAgent {
         id: 0,
         organization_id: org,
@@ -547,13 +688,8 @@ fn create_enrollment(
         context_window: p.context_window,
         is_active: true,
         is_default: true,
-        allowed_models: vec![p.model.clone(), template.review_profile.model.clone()],
-        allowed_actions: vec![
-            "chat".into(),
-            "form_suggest".into(),
-            "action_draft".into(),
-            "skill_run".into(),
-        ],
+        allowed_models,
+        allowed_actions,
         rate_limit_per_minute: template.rate_limit_per_minute,
         cost_per_1k_tokens: 0.0,
         monthly_budget: None,
@@ -565,6 +701,17 @@ fn create_enrollment(
         write_date: ctx.timestamp,
         metadata: Some(serde_json::json!({"platformTemplateId":template.id}).to_string()),
     });
+    if let Some(price) = embedding_price {
+        let row = ctx.db.ai_metered_price().insert(AiMeteredPrice {
+            id: 0,
+            organization_id: org,
+            agent_id: agent.id,
+            version: 1,
+            created_at: ctx.timestamp,
+            ..price
+        });
+        audit(ctx, org, row.id, "ai_metered_price", "CREATE");
+    }
     ctx.db
         .ai_owner_configuration()
         .insert(AiOwnerConfiguration {
