@@ -52,7 +52,9 @@ vi.mock("@lumiere/ui/lib/rbac-context", () => ({
 }))
 vi.mock("@lumiere/query-hooks/hooks/organization-company", () => ({
   useCompanies: () => ({ data: state.companies, refetch: state.refetch }),
+  useCompanyVerticalPacks: () => ({ data: [] }),
   useCreateCompany: () => ({ mutateAsync: state.create }),
+  useSetCompanyVerticalPack: () => ({ mutateAsync: vi.fn() }),
   useUpdateCompany: () => ({ mutateAsync: state.update }),
 }))
 vi.mock("@lumiere/query-hooks/hooks/settings", () => ({

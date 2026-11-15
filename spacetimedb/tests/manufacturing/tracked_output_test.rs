@@ -929,11 +929,12 @@ fn test_farm_actual_lot_consumption(ctx: &ReducerContext) -> Result<(), String> 
         .id()
         .find(&primary.uom_id)
         .ok_or("farm count unit fixture missing")?;
-    ctx.db.uom().id().update(UOM {
+    let count_unit = ctx.db.uom().id().update(UOM {
         symbol: "ea".into(),
         is_reference_unit: true,
-        ..count_unit.clone()
+        ..count_unit
     });
+    let count_unit_id = count_unit.id;
     let kg = ctx.db.uom().insert(UOM {
         id: 0,
         name: "Kilogram".into(),
@@ -941,25 +942,27 @@ fn test_farm_actual_lot_consumption(ctx: &ReducerContext) -> Result<(), String> 
         is_reference_unit: true,
         ..count_unit
     });
-    ctx.db.product().id().update(Product {
+    let primary = ctx.db.product().id().update(Product {
         uom_id: kg.id,
         tracking: "lot".to_string(),
-        ..primary.clone()
+        ..primary
     });
+    let primary_id = primary.id;
     let live = ctx.db.product().insert(Product {
         id: 0,
         name: "Live flock fixture".into(),
+        uom_id: count_unit_id,
         tracking: "lot".into(),
-        ..primary.clone()
+        ..primary
     });
     let live_lot = create_lot(ctx, &fixture, live.id, "Live flock lot")?;
     let another_lot = create_lot(ctx, &fixture, live.id, "Separate flock lot")?;
-    let output_lot = create_lot(ctx, &fixture, primary.id, "Processed flock lot")?;
+    let output_lot = create_lot(ctx, &fixture, primary_id, "Processed flock lot")?;
     let base = ctx
         .db
         .stock_quant()
         .quant_by_product()
-        .filter(&primary.id)
+        .filter(&primary_id)
         .find(|row| row.company_id == fixture.company_id && row.location_id == fixture.location_id)
         .ok_or("farm source quant fixture missing")?;
     let source = ctx.db.stock_quant().insert(StockQuant {
@@ -981,7 +984,7 @@ fn test_farm_actual_lot_consumption(ctx: &ReducerContext) -> Result<(), String> 
     let bom = create_test_bom(
         ctx,
         &fixture,
-        primary.id,
+        primary_id,
         vec![BomLineInput {
             product_id: live.id,
             product_qty: 1.0,
