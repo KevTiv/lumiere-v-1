@@ -4,6 +4,8 @@ import { writeFile } from "node:fs/promises";
 const expect = baseExpect.configure({ timeout: 15_000 });
 
 test("Warehouse switches stock and its related sources together", async ({ page }) => {
+  // The dev server prewarms /product-fleet, so the first visit here compiles Inventory.
+  test.setTimeout(60_000);
   const scopedResources = ["stock-quants", "stock-pickings", "stock-moves", "warehouses", "stock-locations", "stock-production-lots", "replenishment-rules"];
   const paths = new Map<string, Set<string>>();
   await page.route("**/api/query/**", async (route) => {
