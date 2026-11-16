@@ -512,6 +512,9 @@ jobs:
       - name: Unit tests (accounting and cross-module overview models)
         run: pnpm --dir web test:accounting-ui:models
 
+      - name: Unit tests (full-history dashboard ranges)
+        run: pnpm --dir web test:history-ranges
+
       - name: Unit tests (productivity workspace models)
         run: pnpm --dir web test:productivity:models
 

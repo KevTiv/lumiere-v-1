@@ -10,6 +10,8 @@ import { workspaceStyles } from "@lumiere/ui/lib/workspace-styles"
 import { paymentMinorUnitsText } from "@lumiere/erp-shared/payment-allocation-projection"
 import { invoiceRecordHref } from "./invoice-record"
 import { AccountantInsights } from "./accountant-insights"
+import { useHistoryPeriod } from "@/lib/use-history-period"
+import { InvalidHistoryPeriod } from "../../../components/invalid-history-period"
 import {
   buildAccountantOverview, overviewDate, overviewDueDate, overviewLabel, overviewMoneyTotals,
   overviewNumber, overviewResidual, overviewTag,
@@ -31,7 +33,8 @@ export interface AccountantOverviewProps {
 export function AccountantOverview({ data, companyName, onNavigate, onCreateInvoice, onCreateBill, onCreateJournalEntry, onOpenBankLine, now }: AccountantOverviewProps) {
   const { t } = useTranslation()
   const tr = (key: string, defaultValue: string) => t(`accounting.overview.${key}`, { defaultValue })
-  const model = useMemo(() => buildAccountantOverview(data, now), [data, now])
+  const [historyPeriod, setHistoryPeriod, invalidPeriod] = useHistoryPeriod()
+  const model = useMemo(() => buildAccountantOverview(data, now, historyPeriod), [data, now, historyPeriod])
   const [selectedQueue, setSelectedQueue] = useState<OverviewQueueKey>("overdue")
   const [showAll, setShowAll] = useState(false)
   const queueDefs: Array<{ key: OverviewQueueKey; label: string; hint: string; icon: ReactNode; tab: string }> = [
@@ -51,9 +54,7 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
     : activeQueue.rows
   const activityTotal = model.activity.months.reduce((sum, month) => sum + month.invoices + month.bills, 0)
   const activityMax = Math.max(1, ...model.activity.months.flatMap((month) => [month.invoices, month.bills]))
-  const activityMonthLabel = (startMs: number, full = false) => new Intl.DateTimeFormat(undefined, {
-    month: full ? "long" : "short", ...(full ? { year: "numeric" as const } : {}), timeZone: "UTC",
-  }).format(new Date(startMs))
+  const activityMonthLabel = (startMs: number, _full = false) => model.activity.months.find((point) => point.startMs === startMs)?.label ?? ""
 
   function stateText(collection: OverviewCollection): string {
     switch (collection.state.status) {
@@ -188,34 +189,35 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
       </section>
     </div>
 
-    <AccountantInsights key={`${data.organizationId}:${data.companyId}`} data={data} now={now} />
+    {invalidPeriod ? <InvalidHistoryPeriod onClear={() => setHistoryPeriod("all")} /> : <>
+    <AccountantInsights key={`${data.organizationId}:${data.companyId}`} data={data} now={now} historyPeriod={historyPeriod} onHistoryPeriodChange={setHistoryPeriod} />
 
     <section className={`${workspaceStyles.surface} min-w-0 overflow-hidden`} aria-labelledby="accountant-activity-title">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
-        <div><h3 id="accountant-activity-title" className={workspaceStyles.sectionTitle}>{tr("activityTitle", "Document activity")}</h3><p className={`${workspaceStyles.sectionDescription} mt-1`}>{tr("activityHint", "Posted invoices and vendor bills over the past six months")}</p></div>
+        <div><h3 id="accountant-activity-title" className={workspaceStyles.sectionTitle}>{tr("activityTitle", "Document activity")}</h3><p className={`${workspaceStyles.sectionDescription} mt-1`}>{tr("activityHint", "Posted invoices and vendor bills in the selected analysis period")}</p></div>
         {model.activity.state.status === "ready" && <Badge variant="secondary" className="gap-2 tabular-nums">{tr("activityPosted", "Posted documents")}<span>{activityTotal}</span></Badge>}
       </div>
       <div className="space-y-4 p-5">
         {stateNotice({ rows: [], state: model.activity.state })}
         {model.activity.state.status === "ready" && <>
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground"><span className="flex items-center gap-2"><span className="size-2 rounded-sm bg-chart-1" />{tr("activityInvoices", "Customer invoices")}</span><span className="flex items-center gap-2"><span className="size-2 rounded-sm bg-chart-2" />{tr("activityBills", "Vendor bills")}</span></div>
-          {activityTotal === 0 ? <p className="flex min-h-36 items-center justify-center rounded-lg border border-dashed px-4 text-center text-sm text-muted-foreground">{tr("activityEmpty", "No posted documents in this period")}</p> : <div role="img" aria-label={tr("activityAccessible", "Monthly posted document counts. Expand monthly counts below for exact values.")}>
-            <div className="grid h-40 grid-cols-6 items-end gap-3 border-b border-dashed px-1 sm:gap-6" aria-hidden="true">
+          {activityTotal === 0 ? <p className="flex min-h-36 items-center justify-center rounded-lg border border-dashed px-4 text-center text-sm text-muted-foreground">{tr("activityEmpty", "No posted documents in this period")}</p> : <div role="img" aria-label={tr("activityAccessible", "Posted document counts by period. Expand period counts below for exact values.")}>
+            <div className="grid h-40 items-end gap-1 border-b border-dashed px-1" style={{ gridTemplateColumns: `repeat(${model.activity.months.length}, minmax(0, 1fr))` }} aria-hidden="true">
               {model.activity.months.map((month) => <div key={month.startMs} className="flex h-full items-end justify-center gap-1.5 sm:gap-3">
                 {[{ count: month.invoices, className: "bg-chart-1" }, { count: month.bills, className: "bg-chart-2" }].map((bar, index) => <div key={index} className="flex h-full w-full max-w-7 flex-col justify-end gap-1">
                   <span className="text-center text-[10px] tabular-nums text-muted-foreground">{bar.count || ""}</span><div className={`rounded-t-sm ${bar.className}`} style={{ height: `${bar.count / activityMax * 82}%` }} />
                 </div>)}
               </div>)}
             </div>
-            <div className="mt-2 grid grid-cols-6 gap-3 text-center text-[11px] text-muted-foreground sm:gap-6" aria-hidden="true">{model.activity.months.map((month) => <span key={month.startMs}>{activityMonthLabel(month.startMs)}</span>)}</div>
+            <div className="mt-2 flex flex-wrap justify-between gap-2 text-center text-[11px] text-muted-foreground" aria-hidden="true">{model.activity.months.map((month) => <span key={month.startMs}>{activityMonthLabel(month.startMs)}</span>)}</div>
           </div>}
           <div className="flex flex-wrap items-start justify-between gap-3 text-xs text-muted-foreground">
-            <p>{tr("activityPeriodHint", "Calendar months in UTC; the current month includes documents dated through today.")}</p>
+            <p>{tr("activityPeriodHint", "Adaptive reporting-calendar buckets in the selected analysis period; future postings excluded. Current queues and open balances are unaffected.")}</p>
             <details className="w-full">
-              <summary className="w-fit cursor-pointer rounded-sm font-medium text-foreground focus-visible:outline-2 focus-visible:outline-ring">{tr("activityTable", "View monthly counts")}</summary>
+              <summary className="w-fit cursor-pointer rounded-sm font-medium text-foreground focus-visible:outline-2 focus-visible:outline-ring">{tr("activityTable", "View period counts")}</summary>
               <table className="mt-3 w-full text-right tabular-nums">
                 <caption className="sr-only">{tr("activityTitle", "Document activity")}</caption>
-                <thead><tr className="border-b"><th scope="col" className="py-2 text-left font-medium">{tr("activityMonth", "Month")}</th><th scope="col" className="py-2 font-medium">{tr("activityInvoices", "Customer invoices")}</th><th scope="col" className="py-2 font-medium">{tr("activityBills", "Vendor bills")}</th></tr></thead>
+                <thead><tr className="border-b"><th scope="col" className="py-2 text-left font-medium">{tr("activityMonth", "Period")}</th><th scope="col" className="py-2 font-medium">{tr("activityInvoices", "Customer invoices")}</th><th scope="col" className="py-2 font-medium">{tr("activityBills", "Vendor bills")}</th></tr></thead>
                 <tbody>{model.activity.months.map((month) => <tr key={month.startMs} className="border-b last:border-0"><th scope="row" className="py-2 text-left font-normal">{activityMonthLabel(month.startMs, true)}</th><td className="py-2">{month.invoices}</td><td className="py-2">{month.bills}</td></tr>)}</tbody>
               </table>
             </details>
@@ -223,6 +225,7 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
         </>}
       </div>
     </section>
+    </>}
 
     <section className="min-w-0 overflow-hidden rounded-xl border bg-card" aria-labelledby="accountant-recent-title">
       <div className="flex items-center justify-between gap-3 border-b px-5 py-4"><div><h3 id="accountant-recent-title" className="font-semibold">{tr("recent", "Recent invoices and bills")}</h3><p className="mt-1 text-xs text-muted-foreground">{tr("recentHint", "Open a document to review its details and next action.")}</p></div><FileText className="size-4 shrink-0 text-muted-foreground" /></div>

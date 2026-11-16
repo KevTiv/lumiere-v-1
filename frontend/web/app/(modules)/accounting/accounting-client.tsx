@@ -4004,6 +4004,10 @@ function AccountingClientReady({
       companyName={companyLabelMap.get(String(operatingCompanyId))}
       data={{
         organizationId,
+        // The authorized client session exposes org/company IDs, not Organization.timezone.
+        // No organization read exists in the current resource contract; disclose UTC fallback
+        // rather than substituting a user/browser timezone or inventing a Company field.
+        timeZone: undefined,
         companyId: operatingCompanyId,
         moves: allMovesRead,
         payments: accountPaymentsRead,

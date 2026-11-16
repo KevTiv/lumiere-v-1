@@ -1158,7 +1158,7 @@ export const inventoryDashboard: DashboardConfig = {
         {
           id: "inv-movements",
           type: "bar-chart",
-          title: "Stock Movements (Last 7 Days)",
+          title: "Scheduled Transfers in Selected Period",
           width: "1/2",
           data: {
             categoryKey: "day",
@@ -1686,14 +1686,14 @@ export const hrDashboard: DashboardConfig = {
         {
           id: "hr-leave-usage",
           type: "metrics",
-          title: "Leave Balance Usage",
+          title: "Requested Leave Days in Selected Period",
           width: "1/2",
           data: { metrics: [] },
         },
         {
           id: "hr-headcount-trend",
           type: "line-chart",
-          title: "Headcount Trend",
+          title: "Reconstructed Headcount",
           width: "1/2",
           data: {
             xAxisKey: "month",

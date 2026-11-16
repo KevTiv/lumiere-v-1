@@ -16,6 +16,7 @@ import {
   mapDashboardWidgets,
   withDashboardSections,
 } from '@lumiere/ui/lib/dashboard-sections';
+import { createPageContentSection } from '@lumiere/ui/lib/page-composition';
 import { withInlineEdits } from '@lumiere/ui/lib/with-inline-edits';
 import { formatTimestampLike, getRowField, humanizeEnumValue, unwrapEntityValue } from '@lumiere/ui/lib/entity-row-values';
 import type { EntityRow } from '@lumiere/ui/lib/entity-view-types';
@@ -75,12 +76,14 @@ import {
   runRecordActionForRows,
   stockMovesTableConfig,
   EntityView,
-  type TimeRangeValue,
   isTimestampInRange,
   percentChange,
   previousPeriodMs,
   timeRangeToMs,
 } from '@lumiere/ui';
+import { useHistoryPeriod } from '@/lib/use-history-period';
+import { InvalidHistoryPeriod } from '../../../components/invalid-history-period';
+import { inventoryMovementHistory } from './inventory-history';
 import { useErpSession } from '@lumiere/erp-session';
 import { formNumber, formText, recordOptions, useFormDialog } from '@lumiere/ui';
 import type {
@@ -575,8 +578,7 @@ function InventoryClientLoaded({
     null,
   );
   const [csvKind, setCsvKind] = useState<InventoryCsvImportKind | null>(null);
-  const [dashboardTimeRange, setDashboardTimeRange] =
-    useState<TimeRangeValue>('30d');
+  const [dashboardTimeRange, setDashboardTimeRange, invalidHistoryPeriod] = useHistoryPeriod("all");
   const openErpAiChat = useOpenErpAiChat();
 
   const productsRead = moduleCollection(useProducts(orgId, initialProducts, readEnabled('products')));
@@ -1932,38 +1934,7 @@ function InventoryClientLoaded({
         return { ...w, data: { metrics } };
       }
       if (w.id === 'inv-movements') {
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const nowMs = Date.now();
-        const sevenDaysAgo = nowMs - 7 * 86400000;
-        const dayIn: Record<string, number> = {};
-        const dayOut: Record<string, number> = {};
-        const orderedDays: string[] = [];
-        for (let i = 6; i >= 0; i--) {
-          const d = new Date(nowMs - i * 86400000);
-          const label = days[d.getDay()];
-          if (!orderedDays.includes(label)) orderedDays.push(label);
-          dayIn[label] = 0;
-          dayOut[label] = 0;
-        }
-        for (const t of transfers) {
-          const ms = Number(t.scheduledDate ?? 0) / 1000;
-          if (ms < sevenDaysAgo || ms > nowMs) continue;
-          const label = days[new Date(ms).getDay()];
-          if (
-            String(t.pickingCode ?? '')
-              .toLowerCase()
-              .includes('in')
-          ) {
-            dayIn[label] = (dayIn[label] ?? 0) + 1;
-          } else {
-            dayOut[label] = (dayOut[label] ?? 0) + 1;
-          }
-        }
-        const values = orderedDays.map((day) => ({
-          day,
-          In: dayIn[day] ?? 0,
-          Out: dayOut[day] ?? 0,
-        }));
+        const values = inventoryMovementHistory(transfers, dashboardTimeRange);
         return {
           ...w,
           data: { ...(w.data as Record<string, unknown>), values },
@@ -3271,7 +3242,11 @@ function InventoryClientLoaded({
     const configured: ModuleConfig = {
       ...moduleConfig,
       tabs: [
-        ...withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+        ...withDashboardSections(moduleConfig, [...liveSections, createPageContentSection({
+          id: 'inventory-history-basis',
+          title: t('inventory.dashboard.historyBasisTitle'),
+          content: <p className="text-sm text-muted-foreground">{t('inventory.dashboard.historyBasis')}</p>,
+        })]).tabs.map((tab) => {
           if (tab.id === 'products') {
             return withTransferActions({
               ...tab,
@@ -3965,6 +3940,7 @@ function InventoryClientLoaded({
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
         activeTab={activeTab}
+        dashboardContent={invalidHistoryPeriod ? <InvalidHistoryPeriod onClear={() => setDashboardTimeRange("all")} /> : undefined}
         dashboardTimeRange={dashboardTimeRange}
         onDashboardTimeRangeChange={setDashboardTimeRange}
         onActiveTabChange={(tab) => {

@@ -1,6 +1,7 @@
 "use client"
 import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { createPageContentSection } from "@lumiere/ui/lib/page-composition"
 import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { withDetailInlineEdits, withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
@@ -36,12 +37,14 @@ import {
   employeeStatusBadges,
   leaveRequestStatusBadges,
   contractStatusBadges,
-  type TimeRangeValue,
   isTimestampInRange,
   percentChange,
   previousPeriodMs,
   timeRangeToMs,
 } from "@lumiere/ui"
+import { useHistoryPeriod } from "@/lib/use-history-period"
+import { InvalidHistoryPeriod } from "../../../components/invalid-history-period"
+import { headcountHistory, hrDateMs, leaveInHistory } from "./hr-history"
 import { allocationOptionalColumns, mapAllocationRows } from "@lumiere/query-hooks/hooks/hr-allocations"
 import { HrOffboardingPanel } from "./hr-offboarding-panel"
 import { HrStatutoryIdsPanel } from "./hr-statutory-ids-panel"
@@ -351,15 +354,6 @@ function recordTimestampMs(row: Record<string, unknown>): number {
   return n > 1e15 ? n / 1000 : n
 }
 
-function employeeStartMs(row: Record<string, unknown>): number {
-  const raw =
-    row.hireDate ?? row.hire_date ?? row.createDate ?? row.create_date ?? row.writeDate ?? row.write_date
-  if (raw == null) return 0
-  const n = Number(raw)
-  if (!Number.isFinite(n) || n <= 0) return 0
-  return n > 1e15 ? n / 1000 : n
-}
-
 function attachEmptyStateAction(
   ec: EntityViewConfig,
   onAction: () => void,
@@ -414,7 +408,7 @@ function HrClientLoaded({
   const [toolbarError, setToolbarError] = useState<string | null>(null)
   const [rowAction, setRowAction] = useState<HrRowAction>(null)
   const [rowActionError, setRowActionError] = useState<string | null>(null)
-  const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
+  const [dashboardTimeRange, setDashboardTimeRange, invalidHistoryPeriod] = useHistoryPeriod("all")
 
   const employeesRead = moduleCollection(useEmployees(orgId, initialEmployees))
   const employees = employeesRead.rows
@@ -950,8 +944,12 @@ function HrClientLoaded({
     const runningContracts = contracts.filter((c) => String(c.state) === "Open").length
     const openPositions = jobPositions.filter((j) => String(j.state) === "recruit").length
 
-    const currentLeaves = leaves.filter((l) => inCurrentRange(l as Record<string, unknown>)).length
-    const previousLeaves = leaves.filter((l) => inPreviousRange(l as Record<string, unknown>)).length
+    const visibleLeaves = leaves.filter(l => leaveInHistory(l, dashboardTimeRange))
+    const currentLeaves = visibleLeaves.length
+    const previousLeaves = leaves.filter(l => {
+      const ms = hrDateMs(l.dateFrom)
+      return previousRange != null && ms != null && isTimestampInRange(ms, previousRange.startMs, previousRange.endMs)
+    }).length
     const currentContracts = contracts.filter((c) => inCurrentRange(c as Record<string, unknown>)).length
     const previousContracts = contracts.filter((c) => inPreviousRange(c as Record<string, unknown>)).length
 
@@ -1020,11 +1018,11 @@ function HrClientLoaded({
                 (leaveTypes as Record<string, unknown>[]).map((lt) => [String(lt.id), String(lt.name ?? "")]),
               )
               const byType = groupBy(
-                leaves,
+                visibleLeaves,
                 (l) => leaveTypeNames.get(String(l.leaveTypeId ?? "")) || "Unspecified",
               )
               const colors = ["#6366f1", "#f59e0b", "#22c55e", "#8b5cf6"]
-              const totalDays = leaves.reduce((s, l) => s + Number(l.numberOfDays ?? 0), 0)
+              const totalDays = visibleLeaves.reduce((s, l) => s + Number(l.numberOfDays ?? 0), 0)
               const metrics = Object.entries(byType)
                 .map(([label, typeLeaves]) => ({
                   label,
@@ -1038,18 +1036,7 @@ function HrClientLoaded({
               return { ...w, data: { metrics } }
             }
             if (w.id === "hr-headcount-trend") {
-              const now = new Date()
-              const values: Array<{ month: string; Headcount: number }> = []
-              for (let i = 5; i >= 0; i--) {
-                const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999)
-                const monthEndMs = monthEnd.getTime()
-                const label = monthEnd.toLocaleDateString("en", { month: "short" })
-                const headcount = employees.filter((e) => {
-                  const startedMs = employeeStartMs(e as Record<string, unknown>)
-                  return startedMs === 0 || startedMs <= monthEndMs
-                }).length
-                values.push({ month: label, Headcount: headcount })
-              }
+              const values = headcountHistory(employees, dashboardTimeRange)
               return {
                 ...w,
                 title: t("hr.dashboard.headcountTrend"),
@@ -1109,7 +1096,11 @@ function HrClientLoaded({
       ({
         ...moduleConfig,
         tabs: [
-          ...withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+          ...withDashboardSections(moduleConfig, [...liveSections, createPageContentSection({
+            id: "hr-history-basis",
+            title: t("hr.dashboard.historyBasisTitle"),
+            content: <p className="text-sm text-muted-foreground">{t("hr.dashboard.historyBasis")}</p>,
+          })]).tabs.map((tab) => {
           if (tab.id === "recruitment") return null
           if (tab.id === "departments" && tab.entityConfig) {
             return {
@@ -1730,6 +1721,7 @@ function HrClientLoaded({
         dataLoading={dataLoading}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
+        dashboardContent={invalidHistoryPeriod ? <InvalidHistoryPeriod onClear={() => setDashboardTimeRange("all")} /> : undefined}
         dashboardTimeRange={dashboardTimeRange}
         onDashboardTimeRangeChange={setDashboardTimeRange}
       />

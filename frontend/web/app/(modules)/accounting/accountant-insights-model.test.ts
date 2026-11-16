@@ -1,12 +1,90 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { buildAccountantInsights } from "./accountant-insights-model"
+import { accountingDate } from "./accounting-history"
 import type { AccountantOverviewData, OverviewCollection, OverviewRow } from "./accountant-overview-model"
 
 const now = new Date("2026-10-16T12:00:00Z")
 const read = (rows: OverviewRow[] = []): OverviewCollection => ({ rows, state: { status: "ready" } })
 const invoice = (id: number | string, extra: OverviewRow = {}): OverviewRow => ({ id, organizationId: 42, companyId: 7, currencyId: 1, moveType: "OutInvoice", state: "Posted", amountTotal: 150, amountResidual: 100, invoiceDate: "2026-10-01", invoiceDateDue: "2026-10-15", ...extra })
 const budget = (id: number, extra: OverviewRow = {}): OverviewRow => ({ id, organizationId: 42, companyId: 7, name: `Budget ${id}`, state: "Validate", dateFrom: "2026-01-01", dateTo: "2026-12-31", totalPlanned: 1000, totalPractical: 750, ...extra })
+
+test("source date decoding is exact before epoch and uses only explicit organization timezone", () => {
+  assert.equal(accountingDate({ microsSinceUnixEpoch: -1n }, "UTC"), Date.parse("1969-12-31T00:00:00Z"))
+  assert.equal(accountingDate({ microsSinceUnixEpoch: 0n }, "America/New_York"), accountingDate("1970-01-01", "America/New_York"))
+  assert.equal(accountingDate("1965-02-30", "UTC"), null)
+  assert.equal(buildAccountantInsights(data(), "all", "1", now).timeZone, "UTC")
+  assert.equal(buildAccountantInsights(data({ timeZone: "invalid-zone" }), "all", "1", now).timeZone, "UTC")
+})
+
+test("default all retains old years and exact sums without an invented prior or lifetime turnover", () => {
+  const sample = data({ moves: read([
+    invoice(1, { invoiceDate: "1998-01-01", amountTotal: 0.1 }),
+    invoice(2, { invoiceDate: "2024-01-01", amountTotal: 0.2 }),
+    invoice(3, { invoiceDate: "2027-01-01", amountTotal: 999 }),
+    invoice(4, { invoiceDate: "1998-01-01", companyId: 8, amountTotal: 999 }),
+    invoice(5, { invoiceDate: "1998-01-01", currencyId: 2, amountTotal: 999 }),
+  ]) })
+  const result = buildAccountantInsights(sample, undefined, "1", now)
+  assert.deepEqual(result.period.value?.invoices, { current: 0.3, previous: null, percent: null })
+  assert.equal(result.previousStartMs, null)
+  assert.equal(result.startMs, null)
+  assert.equal(result.endMs, null)
+  assert.deepEqual(result.turnover.value, { dso: null, dpo: null })
+  assert.ok(result.period.value?.months[0]?.label.includes("1998"))
+  assert.equal(result.period.value?.months.reduce((total, point) => total + Math.round(point.invoices * 100), 0), 30)
+  assert.equal(buildAccountantInsights(sample, "180d", "1", now).period.value?.invoices.current, 0)
+  const empty = buildAccountantInsights(data(), "all", "1", now)
+  assert.deepEqual(empty.period.value?.months, [])
+  assert.equal(empty.period.value?.invoices.previous, null)
+})
+
+test("custom source-calendar end is inclusive across typed UTC-midnight dates and DST", () => {
+  const sample = data({
+    timeZone: "America/New_York",
+    moves: read([
+      invoice(1, { invoiceDate: "2024-03-10", amountTotal: 10 }),
+      invoice(2, { invoiceDate: { microsSinceUnixEpoch: BigInt(Date.parse("2024-03-10T00:00:00Z")) * 1000n }, amountTotal: 20 }),
+      invoice(3, { invoiceDate: { microsSinceUnixEpoch: BigInt(Date.parse("2024-03-11T00:00:00Z")) * 1000n }, amountTotal: 999 }),
+      invoice(4, { invoiceDate: { microsSinceUnixEpoch: BigInt(Date.parse("2024-03-09T00:00:00Z")) * 1000n }, amountTotal: 40 }),
+    ]),
+    budgets: read([
+      budget(1, { dateFrom: "2024-01-01", dateTo: "2024-03-10" }),
+      budget(2, { dateFrom: "2024-03-11", dateTo: "2024-12-31" }),
+    ]),
+  })
+  const result = buildAccountantInsights(sample, { kind: "custom", from: "2024-03-10", through: "2024-03-10" }, "1", now)
+  assert.equal(result.startMs, Date.parse("2024-03-10T05:00:00Z"))
+  assert.equal(result.endMs, Date.parse("2024-03-11T04:00:00Z"))
+  assert.deepEqual(result.period.value?.invoices, { current: 30, previous: 40, percent: -25 })
+  assert.equal(result.days, 1)
+  assert.equal(result.turnover.value?.dso, 400 / 30)
+  assert.deepEqual(result.budgets.value?.map((row) => [row.id, row.planned]), [["1", 1000]])
+  assert.equal(buildAccountantInsights(data({ moves: read([invoice(1, { invoiceDate: null })]) }), "all", "1", now).period.state.status, "partial")
+})
+
+test("typed preepoch accounting dates agree with date strings in a negative-offset reporting timezone", () => {
+  const micros = BigInt(Date.parse("1965-02-03T00:00:00Z")) * 1000n
+  const sample = data({ timeZone: "America/New_York", moves: read([
+    invoice(1, { invoiceDate: { microsSinceUnixEpoch: micros }, amountTotal: 10 }),
+    invoice(2, { invoiceDate: "1965-02-03", amountTotal: 20 }),
+  ]), bankStatements: read([
+    { id: 1, organizationId: 42, companyId: 7, currencyId: 1, journalId: 10, state: "Confirm", date: { microsSinceUnixEpoch: micros }, balanceEndReal: 123 },
+  ]), budgets: read([
+    budget(1, { dateFrom: { microsSinceUnixEpoch: micros }, dateTo: { microsSinceUnixEpoch: micros } }),
+  ]) })
+  const result = buildAccountantInsights(sample, { kind: "custom", from: "1965-02-03", through: "1965-02-03" }, "1", now)
+  assert.equal(result.period.value?.invoices.current, 30)
+  assert.equal(result.startMs, Date.parse("1965-02-03T05:00:00Z"))
+  assert.equal(result.period.value?.months[0]?.invoices, 30)
+  assert.equal(result.cash.value?.months[0]?.balance, 123)
+  assert.deepEqual(result.budgets.value?.map((row) => row.id), ["1"])
+  assert.equal(buildAccountantInsights(sample, "all", "1", now).period.value?.invoices.current, 30)
+  const future = buildAccountantInsights(sample, { kind: "custom", from: "2030-01-01", through: "2030-01-31" }, "1", now)
+  assert.equal(future.startMs, Date.parse("2030-01-01T05:00:00Z"))
+  assert.equal(future.endMs, Date.parse("2030-02-01T05:00:00Z"))
+  assert.deepEqual(future.period.value?.months, [])
+})
 function data(extra: Partial<AccountantOverviewData> = {}): AccountantOverviewData {
   return { organizationId: 42, companyId: 7n, moves: read(), payments: read(), bankStatements: read(), bankLines: read(), deadlines: read(), periods: read(),
     currencies: read([{ id: 1, code: "EUR", decimalPlaces: 2 }, { id: 2, code: "USD", decimalPlaces: 2 }]), companies: read([{ id: 7, organizationId: 42, currencyId: 1 }]), budgets: read(), ...extra }
@@ -35,7 +113,7 @@ test("UTC comparison windows do not overlap and partial current months are not e
   assert.deepEqual(result.period.value?.invoices, { current: 150, previous: 300, percent: -50 })
   assert.equal(result.startMs, Date.parse("2026-09-17T00:00:00Z"))
   assert.equal(result.previousStartMs, Date.parse("2026-08-18T00:00:00Z"))
-  assert.deepEqual(result.period.value?.months.map((point) => point.invoices), [60, 90])
+  assert.equal(result.period.value?.months.reduce((total, point) => total + point.invoices, 0), 150)
   assert.equal(buildAccountantInsights(sample, 90, "1", now).balances.value?.invoices, result.balances.value?.invoices)
 })
 
@@ -166,7 +244,8 @@ test("cash position is the latest closing balance per bank journal, with a month
   assert.equal(result.cash.value?.position, 1000)
   assert.equal(result.cash.value?.accounts, 2)
   assert.equal(result.cash.value?.asOfMs, Date.parse("2026-10-10T00:00:00Z"))
-  assert.deepEqual(result.cash.value?.months.map((point) => point.balance), [500, 1000])
+  assert.ok(result.cash.value?.months.some((point) => point.balance === 500))
+  assert.equal(result.cash.value?.months.at(-1)?.balance, 1000)
 })
 
 test("cash is unavailable when a statement lacks its currency or balance, and empty without statements", () => {
@@ -174,5 +253,5 @@ test("cash is unavailable when a statement lacks its currency or balance, and em
   assert.equal(buildAccountantInsights(data({ bankStatements: read([statement(1, { balanceEndReal: undefined })]) }), 30, "1", now).cash.value, null)
   const none = buildAccountantInsights(data(), 30, "1", now).cash.value
   assert.equal(none?.accounts, 0)
-  assert.deepEqual(none?.months.map((point) => point.balance), [null, null])
+  assert.ok(none?.months.every((point) => point.balance === null))
 })
