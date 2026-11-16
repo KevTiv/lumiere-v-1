@@ -7,6 +7,8 @@ use serde_json::json;
 
 use crate::config::{Config, MistralReasoningEffort};
 
+use super::openai_responses;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum LlmMessage {
     Text {
@@ -66,7 +68,9 @@ async fn bounded_response(mut response: reqwest::Response, limit: usize) -> Resu
     Ok(bytes)
 }
 
-async fn bounded_completion<T: DeserializeOwned>(response: reqwest::Response) -> Result<T> {
+pub(super) async fn bounded_completion<T: DeserializeOwned>(
+    response: reqwest::Response,
+) -> Result<T> {
     let bytes = bounded_response(response, MAX_COMPLETION_RESPONSE_BYTES).await?;
     serde_json::from_slice(&bytes).context("invalid provider completion envelope")
 }
@@ -233,6 +237,8 @@ pub struct LlmClient {
     mistral_reasoning_effort: Option<MistralReasoningEffort>,
     mistral_reasoning_models: Vec<String>,
     google_api_key: Option<String>,
+    openai_http: reqwest::Client,
+    openai_api_key: Option<String>,
     ollama_url: String,
     ollama_llm_model: String,
 }
@@ -265,12 +271,35 @@ impl LlmClient {
             mistral_reasoning_effort: config.mistral_reasoning_effort,
             mistral_reasoning_models: config.mistral_reasoning_models.clone(),
             google_api_key: config.google_api_key.clone(),
+            openai_http: reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()?,
+            openai_api_key: config.openai_api_key.clone(),
             ollama_url: config.ollama_url.clone(),
             ollama_llm_model: config.ollama_llm_model.clone(),
         })
     }
 
     pub fn validate_request(&self, req: &LlmRequest) -> Result<()> {
+        let provider = normalize_provider(&req.provider);
+        if provider == "openai" {
+            self.openai_api_key
+                .as_deref()
+                .context("OPENAI_API_KEY is required for the OpenAI provider")?;
+            anyhow::ensure!(
+                supports_openai_model(&req.model),
+                "unsupported OpenAI model"
+            );
+            anyhow::ensure!(
+                OPENAI_OUTPUT_LIMIT.contains(&req.max_tokens),
+                "OpenAI output token limit must be between 16 and 128000"
+            );
+            anyhow::ensure!(
+                req.thinking != ThinkingMode::Enabled,
+                "the OpenAI provider requires reasoning effort none"
+            );
+            openai_responses::validate_history(req)?;
+        }
         let mut replay_bytes = 0usize;
         for message in &req.messages {
             replay_bytes = replay_bytes
@@ -285,7 +314,7 @@ impl LlmClient {
                 "Mistral assistant replay cannot be sent through Kong"
             );
         }
-        if self.kong_url.is_none() && normalize_provider(&req.provider) == "mistral" {
+        if self.kong_url.is_none() && provider == "mistral" {
             anyhow::ensure!(
                 req.thinking != ThinkingMode::Enabled
                     || self
@@ -300,6 +329,13 @@ impl LlmClient {
 
     pub async fn complete(&self, req: LlmRequest) -> Result<LlmResponse> {
         self.validate_request(&req)?;
+        if normalize_provider(&req.provider) == "openai" {
+            let key = self
+                .openai_api_key
+                .as_deref()
+                .context("OPENAI_API_KEY is required for the OpenAI provider")?;
+            return openai_responses::complete(&self.openai_http, key, &req).await;
+        }
         if self.kong_url.is_some() {
             return self.complete_via_kong(&req).await;
         }
@@ -719,6 +755,14 @@ pub(crate) fn check_mistral_response(
     status: reqwest::StatusCode,
     retry_after: Option<&reqwest::header::HeaderValue>,
 ) -> Result<()> {
+    check_provider_response("Mistral", status, retry_after)
+}
+
+pub(super) fn check_provider_response(
+    provider: &str,
+    status: reqwest::StatusCode,
+    retry_after: Option<&reqwest::header::HeaderValue>,
+) -> Result<()> {
     if status.is_success() {
         return Ok(());
     }
@@ -731,7 +775,7 @@ pub(crate) fn check_mistral_response(
         }
         .into());
     }
-    anyhow::bail!("Mistral request failed with HTTP {status}")
+    anyhow::bail!("{provider} request failed with HTTP {status}")
 }
 
 /// Decode direct Mistral responses without exposing a constructor for native
@@ -1101,6 +1145,13 @@ pub fn normalize_provider(raw: &str) -> String {
         "ollama" => "ollama".to_string(),
         other => other.to_string(),
     }
+}
+
+pub(crate) const OPENAI_MODELS: [&str; 2] = ["gpt-6-luna", "gpt-6-sol"];
+pub(crate) const OPENAI_OUTPUT_LIMIT: std::ops::RangeInclusive<u32> = 16..=128_000;
+
+pub(crate) fn supports_openai_model(model: &str) -> bool {
+    OPENAI_MODELS.contains(&model)
 }
 
 #[derive(Debug, Deserialize)]
@@ -1701,12 +1752,36 @@ mod tests {
             kong_url: None,
             kong_token: None,
             mistral_api_key: None,
+            openai_http: reqwest::Client::new(),
+            openai_api_key: None,
             mistral_reasoning_effort: None,
             mistral_reasoning_models: Vec::new(),
             google_api_key: None,
             ollama_url: "http://localhost:11434".to_string(),
             ollama_llm_model: "llama3".to_string(),
         }
+    }
+
+    #[test]
+    fn openai_requires_its_own_key_and_supported_model_even_with_kong() {
+        let mut client = client();
+        client.kong_url = Some("https://kong.invalid".into());
+        client.kong_token = Some("kong-token".into());
+        let mut req = request(Vec::new());
+        req.provider = "OpenAI".into();
+        req.model = "gpt-6-luna".into();
+        assert!(client.validate_request(&req).is_err());
+
+        client.openai_api_key = Some("project-key".into());
+        assert!(client.validate_request(&req).is_ok());
+        req.thinking = ThinkingMode::Enabled;
+        assert!(client.validate_request(&req).is_err());
+        req.thinking = ThinkingMode::ProviderDefault;
+        req.max_tokens = 15;
+        assert!(client.validate_request(&req).is_err());
+        req.max_tokens = 256;
+        req.model = "gpt-6.1-sol".into();
+        assert!(client.validate_request(&req).is_err());
     }
 
     fn request(tools: Vec<ToolSpec>) -> LlmRequest {

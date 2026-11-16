@@ -753,7 +753,11 @@ fn validate_template(p: &RegisterAiPlatformTemplateParams) -> Result<(), String>
     }
     for profile in [&p.generation_profile, &p.review_profile] {
         super::model_configuration::validate_model_profile_params(profile)?;
-        if !matches!(profile.provider.as_str(), "mistral" | "gemini" | "ollama")
+        if !matches!(
+            profile.provider.as_str(),
+            "mistral" | "gemini" | "ollama" | "openai"
+        ) || (profile.provider == "openai"
+            && (profile.temperature.is_some() || profile.top_p.is_some()))
             || profile.model.len() > 128
             || profile.model.trim() != profile.model
             || profile.model.ends_with("-latest")
@@ -997,5 +1001,27 @@ mod tests {
         let mut p = valid;
         p.generation_profile.max_tokens = p.generation_profile.context_window;
         assert!(validate_template(&p).is_err());
+    }
+
+    #[test]
+    fn openai_templates_require_supported_models_with_provider_default_sampling() {
+        let mut template = template();
+        for (profile, model) in [
+            (&mut template.generation_profile, "gpt-6-luna"),
+            (&mut template.review_profile, "gpt-6-sol"),
+        ] {
+            profile.provider = "openai".into();
+            profile.model = model.into();
+            profile.temperature = None;
+            profile.top_p = None;
+        }
+        assert!(validate_template(&template).is_ok());
+
+        let mut unsupported = template.clone();
+        unsupported.review_profile.model = "gpt-6.1-sol".into();
+        assert!(validate_template(&unsupported).is_err());
+
+        template.generation_profile.temperature = Some(0.0);
+        assert!(validate_template(&template).is_err());
     }
 }

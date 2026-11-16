@@ -19,6 +19,20 @@ test("profile input strips authority, credentials and catalog IDs", () => {
   assert.deepEqual(parsePlatformAiProfile({ ...profileFixture, org_id: 99, stdb_token: "forged", skill_ids: [99] }), profileFixture)
 })
 
+test("OpenAI profiles require two distinct supported models", () => {
+  const profile = {
+    ...profileFixture,
+    generation_profile: { ...profileFixture.generation_profile, provider: "openai", model: "gpt-6-luna" },
+    review_profile: { ...profileFixture.review_profile, provider: "openai", model: "gpt-6-sol" },
+  }
+  assert.deepEqual(parsePlatformAiProfile(profile), profile)
+  assert.throws(() => parsePlatformAiProfile({
+    ...profile,
+    review_profile: { ...profile.review_profile, model: "gpt-6.1-sol" },
+  }), /Choose an OpenAI model/)
+  assert.throws(() => parsePlatformAiProfile({ ...profile, review_profile: profile.generation_profile }), /distinct/)
+})
+
 test("profile validation rejects impossible model routing and unsafe numeric limits", () => {
   for (const patch of [
     { template_key: "wrong.key" }, { template_key: "a".repeat(97) }, { template_version: 0 },

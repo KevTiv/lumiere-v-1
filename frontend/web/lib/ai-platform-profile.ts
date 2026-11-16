@@ -1,5 +1,17 @@
+export const platformModelProviders = [
+  { value: "mistral", label: "Mistral" },
+  { value: "gemini", label: "Gemini" },
+  { value: "ollama", label: "Ollama" },
+  { value: "openai", label: "OpenAI" },
+] as const
+
+export const openAiPlatformModels = ["gpt-6-luna", "gpt-6-sol"] as const
+export const openAiOutputLimits = { min: 16, max: 128_000 }
+
+type PlatformModelProvider = (typeof platformModelProviders)[number]["value"]
+
 export type PlatformModelProfile = {
-  provider: string
+  provider: PlatformModelProvider
   model: string
   max_tokens: number
   context_window: number
@@ -50,16 +62,18 @@ function identifier(value: unknown): string {
 
 function modelProfile(value: unknown): PlatformModelProfile {
   const row = record(value)
-  const provider = row.provider
-  if (provider !== "mistral" && provider !== "gemini" && provider !== "ollama") {
-    throw new Error("Select a supported AI provider")
-  }
+  const provider = platformModelProviders.find(({ value }) => value === row.provider)?.value
+  if (!provider) throw new Error("Select a supported AI provider")
   const model = row.model
   if (typeof model !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,127}$/.test(model)) {
     throw new Error("Enter an exact model identifier")
   }
   if (model.endsWith("-latest")) throw new Error("Use an exact model version instead of a latest alias")
-  const max_tokens = integer(row.max_tokens, 1, 0xffffffff)
+  if (provider === "openai" && !openAiPlatformModels.some((supported) => supported === model)) {
+    throw new Error(`Choose an OpenAI model from ${openAiPlatformModels.join(" or ")}`)
+  }
+  const limits = provider === "openai" ? openAiOutputLimits : { min: 1, max: 0xffffffff }
+  const max_tokens = integer(row.max_tokens, limits.min, limits.max)
   const context_window = integer(row.context_window, 1, 0xffffffff)
   if (max_tokens >= context_window) throw new Error("The context window must exceed the output token limit")
   return {

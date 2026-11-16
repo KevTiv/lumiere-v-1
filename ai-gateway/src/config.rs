@@ -93,7 +93,9 @@ pub struct Config {
     pub gemini_embed_model: String,
 
     // ── LLM (Kong internal route or direct provider HTTP) ────────────────────
-    /// When set, chat completions go through Kong AI Gateway (OpenAI-compatible).
+    /// Optional project API key for direct OpenAI Responses.
+    pub openai_api_key: Option<String>,
+    /// When set, other chat completions go through Kong AI Gateway.
     pub kong_llm_url: Option<String>,
     pub kong_llm_service_token: Option<String>,
     /// Optional exact, non-generative endpoint used by `/health/ready`.
@@ -268,6 +270,9 @@ impl Config {
             mistral_reasoning_effort,
             mistral_reasoning_models,
             google_api_key,
+            openai_api_key: std::env::var("OPENAI_API_KEY")
+                .ok()
+                .filter(|value| !value.trim().is_empty()),
             gemini_embed_model: std::env::var("GEMINI_EMBED_MODEL")
                 .unwrap_or_else(|_| "text-embedding-004".to_string()),
 

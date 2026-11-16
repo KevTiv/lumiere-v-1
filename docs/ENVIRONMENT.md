@@ -32,6 +32,7 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 |----------|---------|
 | `EMBEDDING_PROVIDER` | Unified Qdrant embed backend: `ollama` (default), `mistral`, or `gemini` |
 | `MISTRAL_API_KEY` / `GOOGLE_API_KEY` | Provider keys for LLM + embed when configured on `AiAgent` or `EMBEDDING_PROVIDER` |
+| `OPENAI_API_KEY` | Optional project key on ai-gateway for direct OpenAI Responses when a model profile selects `openai` |
 | `OLLAMA_URL` | Local Ollama for embed, vision, and chat |
 | `KONG_LLM_URL` | Optional internal Kong AI route for LLM chat (else direct provider HTTP) |
 | `KONG_LLM_READINESS_URL` | Optional exact non-generative Kong readiness endpoint; probed with `KONG_LLM_SERVICE_TOKEN` when set |

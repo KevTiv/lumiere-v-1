@@ -183,7 +183,18 @@ pub fn provider_descriptors(
 ) -> Vec<ProviderCapabilityDescriptor> {
     let mut out = Vec::new();
 
-    // LLM routing: Kong, when configured, carries every chat completion.
+    let openai_status = if present(config.openai_api_key.as_deref()) {
+        ProviderStatus::Available
+    } else {
+        ProviderStatus::Unconfigured
+    };
+    out.push(provider(
+        ProviderKind::Llm,
+        "openai",
+        openai_status,
+        &["chat", "tool_calling"],
+    ));
+    // Kong carries chat completions for the other drivers when configured.
     if present(config.kong_llm_url.as_deref()) {
         out.push(provider(
             ProviderKind::Llm,
@@ -430,6 +441,7 @@ pub(crate) mod test_support {
             ollama_llm_model: "llm-model".into(),
             ollama_supports_tool_calling: false,
             mistral_api_key: None,
+            openai_api_key: None,
             mistral_reasoning_effort: None,
             mistral_reasoning_models: Vec::new(),
             google_api_key: None,
@@ -736,6 +748,7 @@ mod tests {
         config.api_server_url = Some("http://api.internal.example".into());
         config.mistral_api_key = Some("sk-live-secret".into());
         config.google_api_key = Some("google-live-secret".into());
+        config.openai_api_key = Some("openai-live-secret".into());
         config.kong_llm_url = Some("http://kong.internal.example".into());
         config.kong_llm_service_token = Some("kong-service-secret".into());
         config.web_search_api_key = Some("search-secret".into());
@@ -743,6 +756,9 @@ mod tests {
         let state = test_support::state(config.clone()).await;
         let descriptor = describe(&config, &state, &BuildAdmission::CURRENT);
 
+        assert!(descriptor.providers.iter().any(|entry| {
+            entry.driver == "openai" && entry.status == ProviderStatus::Available
+        }));
         let value = serde_json::to_value(&descriptor).expect("json");
         let text = value.to_string();
         for leaked in [

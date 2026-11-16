@@ -2,6 +2,7 @@
 use crate::{
     error::{AppError, AppResult},
     orchestrator::surface_provisioning_api::{setup_error, ApiSurfaceWriter},
+    providers::llm::{supports_openai_model, OPENAI_OUTPUT_LIMIT},
     state::AppState,
 };
 use axum::{extract::State, Json};
@@ -68,7 +69,12 @@ impl PlatformProfile {
             ));
         }
         for p in [&self.generation_profile, &self.review_profile] {
-            if !matches!(p.provider.as_str(), "mistral" | "gemini" | "ollama")
+            if !matches!(
+                p.provider.as_str(),
+                "mistral" | "gemini" | "openai" | "ollama"
+            ) || (p.provider == "openai"
+                && (!supports_openai_model(&p.model)
+                    || !OPENAI_OUTPUT_LIMIT.contains(&p.max_tokens)))
                 || p.model.is_empty()
                 || p.model.len() > 128
                 || p.model.ends_with("-latest")
@@ -104,10 +110,15 @@ impl PlatformProfile {
         } else {
             vec!["review"]
         };
+        let temperature = if model.provider == "openai" {
+            json!({"none": []})
+        } else {
+            json!({"some": 0.0})
+        };
         json!({
             "profile_key": format!("{}-{role}", self.template_key), "profile_version": self.template_version,
             "provider": model.provider, "model": model.model, "allowed_roles": roles,
-            "temperature": {"some": 0.0}, "top_p": {"none": []},
+            "temperature": temperature, "top_p": {"none": []},
             "max_tokens": model.max_tokens, "context_window": model.context_window,
             "timeout_ms": model.timeout_ms, "max_retries": 0, "max_concurrency": model.max_concurrency,
             "supports_tool_calling": true, "supports_structured_output": true, "supports_parallel_requests": false,
@@ -220,6 +231,12 @@ pub async fn post_platform_profile(
         .map_err(|_| AppError::Forbidden("Platform administrator required".into()))?;
     if let Some(profile) = request.profile {
         profile.validate()?;
+        if profile.generation_profile.provider == "openai" && state.config.openai_api_key.is_none()
+        {
+            return Err(AppError::Unavailable(
+                "The OpenAI provider requires OPENAI_API_KEY on the AI gateway".into(),
+            ));
+        }
         let mut skill_ids = Vec::new();
         for key in [
             "rag_generation",
@@ -332,6 +349,24 @@ mod tests {
         p.review_profile.provider = "gemini".into();
         assert!(p.validate().is_err());
     }
+    #[test]
+    fn validates_openai_models_and_publishes_without_sampling_overrides() {
+        let mut p = profile();
+        p.generation_profile.provider = "openai".into();
+        p.generation_profile.model = "gpt-6-luna".into();
+        p.review_profile.provider = "openai".into();
+        p.review_profile.model = "gpt-6-sol".into();
+        assert!(p.validate().is_ok());
+        let wire = p.model_params(&p.generation_profile, "generation");
+        assert_eq!(wire["temperature"], json!({"none":[]}));
+        assert_eq!(wire["top_p"], json!({"none":[]}));
+        p.generation_profile.max_tokens = 15;
+        assert!(p.validate().is_err());
+        p.generation_profile.max_tokens = 256;
+        p.generation_profile.model = "gpt-6.1-sol".into();
+        assert!(p.validate().is_err());
+    }
+
     #[test]
     fn derives_roles_and_sats_options_without_client_authority_fields() {
         let p = profile();

@@ -560,6 +560,29 @@ Realtime WebSocket: Kong/same-origin deployments use `wss://<host>/v1/realtime/w
 
 Provider keys (`MISTRAL_API_KEY`, `GOOGLE_API_KEY`, etc.) depend on tenant `AiAgent` rows and `EMBEDDING_PROVIDER`.
 
+### OpenAI for hosted Assistant chat
+
+Set `OPENAI_API_KEY` on the **ai-gateway** service to enable the `openai`
+provider. The key belongs to an OpenAI API project. The gateway sends these
+requests directly to OpenAI Responses with `store: false`.
+
+In **AI Harness → AI profile**, a platform administrator can publish an OpenAI
+profile with `gpt-6-luna` for generation and `gpt-6-sol` for independent
+review. Enter reviewed input and output prices for both models and the intended
+tenant allowance. Both models run with reasoning effort `none`. The existing
+profile, spend, tool authorization, and approval checks apply to these requests.
+Publishing a default enrolls newly eligible organizations. Existing managed
+enrollments keep their pinned profile and require an explicit migration to
+change providers.
+
+Validate the rollout on an eligible test organization by sending a chat
+message and invoking one permitted read-only ERP tool. Confirm the run records
+OpenAI, the expected model, and settled usage. Embedding, OCR, and the
+Mistral-specific governed Report Analysis pilot have their own configuration.
+
+See [Try your ChatGPT plan in Lumière locally](chatgpt-plan-local.md) for the
+interactive sign-in prototype.
+
 The gateway exposes `/health` for process liveness and `/health/ready` for a
 bounded, read-only SpacetimeDB and primary-Qdrant check. Readiness also validates
 configured provider credentials/endpoints and calls only safe Ollama `/api/tags`

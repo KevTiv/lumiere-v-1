@@ -289,6 +289,14 @@ pub(crate) fn validate_model_profile_params(
     {
         return Err("profile_key, provider and model are required".to_string());
     }
+    if params.provider.trim().eq_ignore_ascii_case("openai") {
+        if !matches!(params.model.trim(), "gpt-6-luna" | "gpt-6-sol") {
+            return Err("OpenAI model must be gpt-6-luna or gpt-6-sol".into());
+        }
+        if !(16..=128_000).contains(&params.max_tokens) {
+            return Err("OpenAI output token limit must be between 16 and 128000".into());
+        }
+    }
     if params.profile_version == 0 {
         return Err("profile_version must be positive".to_string());
     }
