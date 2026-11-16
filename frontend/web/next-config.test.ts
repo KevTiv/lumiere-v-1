@@ -3,6 +3,7 @@ import test from "node:test"
 import type { NextConfig } from "next"
 
 import nextConfig from "./next.config.mjs"
+import "./tests/favicon-routing.test"
 
 test("webpack preserves Next's React aliases for server and browser rendering", () => {
   const config: NextConfig = nextConfig
