@@ -51,7 +51,12 @@ const nextConfig = {
     }]
   },
   async rewrites() {
-    return posthogRewrites()
+    return [
+      // Browsers request this path independently of metadata. Serve an existing
+      // static icon instead of rendering not-found through the authenticated layout.
+      { source: '/favicon.ico', destination: '/icon.svg' },
+      ...posthogRewrites(),
+    ]
   },
   typescript: {
     ignoreBuildErrors: true,
