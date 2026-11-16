@@ -311,7 +311,7 @@ pub(crate) fn budget_for_reservation(
     org: u64,
     agent: u64,
     period: &str,
-    currency: &str,
+    expected_currency: Option<&str>,
 ) -> Result<AiSpendBudget, String> {
     if current_period(ctx.timestamp)? != period {
         return Err("reservation period is not current UTC month".into());
@@ -327,7 +327,7 @@ pub(crate) fn budget_for_reservation(
     let policy = managed_allowance(ctx, org, agent);
     match rows.as_slice() {
         [budget] => {
-            if budget.currency != currency
+            if expected_currency.is_some_and(|currency| budget.currency != currency)
                 || policy.is_some_and(|(limit, code)| {
                     limit != budget.limit_units || code != budget.currency
                 })
