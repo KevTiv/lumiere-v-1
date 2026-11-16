@@ -18,10 +18,11 @@ use super::{
 
 pub const LOW_STOCK_SKILL_KEY: &str = "low_stock";
 pub const LOW_STOCK_SKILL_VERSION: u32 = 1;
-pub const LOW_STOCK_RELEASE_VERSION: &str = "1.0.3";
+pub const LOW_STOCK_RELEASE_VERSION: &str = "1.0.4";
 pub const LOW_STOCK_RESOURCE: &str = "inventory.low_stock.v1";
 pub const LOW_STOCK_OUTPUT_TYPE: &str = "inventory.low_stock.result.v1";
 pub const NAMED_READ_TOOL: &str = "named_resource_read";
+const MAX_SOURCE_ROWS: usize = 500;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -108,6 +109,9 @@ fn validate_input(value: &Value) -> Result<(), String> {
         .map_err(|error| format!("invalid low-stock input: {error}"))?;
     if !input.threshold.is_finite() || input.threshold < 0.0 {
         return Err("low-stock threshold must be a finite non-negative number".to_string());
+    }
+    if input.location_id == Some(0) {
+        return Err("low-stock location_id must be a positive record ID".to_string());
     }
     Ok(())
 }
@@ -255,11 +259,20 @@ async fn fetch_low_stock_output(
 ) -> Result<LowStockOutput, String> {
     validate_input(&serde_json::to_value(input).unwrap_or_default())?;
 
+    // Products are organization-shared templates. Company/location ownership
+    // belongs to stock_quant, whose product_id still names the template when
+    // product_variant_id is present. Variant reorder minima are not template
+    // fields; this template-level scan uses the explicitly requested threshold.
+    let source_limit = MAX_SOURCE_ROWS + 1;
     let product_sql = format!(
-        "SELECT id, default_code, name, reordering_min_qty FROM product WHERE organization_id = {organization_id} AND company_id = {company_id} LIMIT 500"
+        "SELECT id, organization_id, default_code, name FROM product WHERE organization_id = {organization_id} LIMIT {source_limit}"
     );
+    let location_filter = input
+        .location_id
+        .map(|id| format!(" AND location_id = {id}"))
+        .unwrap_or_default();
     let quant_sql = format!(
-        "SELECT product_id, location_id, quantity FROM stock_quant WHERE organization_id = {organization_id} AND company_id = {company_id} LIMIT 500"
+        "SELECT organization_id, company_id, product_id, location_id, quantity FROM stock_quant WHERE organization_id = {organization_id} AND company_id = {company_id}{location_filter} LIMIT {source_limit}"
     );
 
     let products = stdb
@@ -289,37 +302,40 @@ pub(crate) fn evaluate_low_stock_rows(
     input: &LowStockInput,
     max_rows: usize,
 ) -> Result<LowStockOutput, String> {
+    validate_input(&serde_json::to_value(input).map_err(|error| error.to_string())?)?;
+    if products.len() > MAX_SOURCE_ROWS || quants.len() > MAX_SOURCE_ROWS {
+        return Err("low-stock source row limit exceeded".to_string());
+    }
     let mut quantity_by_product = std::collections::BTreeMap::<u64, f64>::new();
     for row in quants {
-        if input.location_id.is_some()
-            && row_u64(row, "locationId", "location_id") != input.location_id
+        if row_u64(row, "organizationId", "organization_id") != Some(organization_id)
+            || row_u64(row, "companyId", "company_id") != Some(company_id)
         {
+            return Err("low-stock quant scope mismatch".to_string());
+        }
+        let location_id = required_id(row, "locationId", "location_id")?;
+        if input.location_id.is_some() && Some(location_id) != input.location_id {
             continue;
         }
-        let product_id = row_u64(&row, "productId", "product_id").unwrap_or(0);
-        if product_id == 0 {
-            continue;
+        let product_id = required_id(row, "productId", "product_id")?;
+        let quantity = row_f64(row, "quantity")
+            .filter(|value| value.is_finite())
+            .ok_or("low-stock quant quantity is missing or invalid")?;
+        let total = quantity_by_product.entry(product_id).or_default();
+        *total += quantity;
+        if !total.is_finite() {
+            return Err("low-stock quantity total is not finite".to_string());
         }
-        let quantity = row_f64(&row, "quantity").unwrap_or(0.0);
-        *quantity_by_product.entry(product_id).or_default() += quantity;
     }
 
     let mut items = Vec::new();
     for row in products {
-        let product_id = row_u64(&row, "id", "id").unwrap_or(0);
-        if product_id == 0 {
-            continue;
+        if row_u64(row, "organizationId", "organization_id") != Some(organization_id) {
+            return Err("low-stock product organization mismatch".to_string());
         }
+        let product_id = required_id(row, "id", "id")?;
         let quantity_on_hand = quantity_by_product.get(&product_id).copied().unwrap_or(0.0);
-        let reorder_level = row_f64(&row, "reorderingMinQty")
-            .or_else(|| row_f64(&row, "reordering_min_qty"))
-            .unwrap_or(0.0);
-        let threshold = if reorder_level > 0.0 {
-            reorder_level
-        } else {
-            input.threshold
-        };
-        if quantity_on_hand > threshold {
+        if quantity_on_hand > input.threshold {
             continue;
         }
         items.push(LowStockItem {
@@ -327,10 +343,9 @@ pub(crate) fn evaluate_low_stock_rows(
             company_id,
             product_id,
             sku: row_string(&row, "defaultCode", Some("default_code")).unwrap_or_default(),
-            name: row_string(&row, "name", None)
-                .unwrap_or_else(|| format!("Product #{product_id}")),
+            name: row_string(&row, "name", None).ok_or("low-stock product name is missing")?,
             quantity_on_hand,
-            reorder_level: threshold,
+            reorder_level: input.threshold,
         });
         if items.len() > max_rows {
             return Err("low-stock row limit exceeded".to_string());
@@ -339,8 +354,8 @@ pub(crate) fn evaluate_low_stock_rows(
 
     items.sort_by(|left, right| {
         left.quantity_on_hand
-            .partial_cmp(&right.quantity_on_hand)
-            .unwrap_or(std::cmp::Ordering::Equal)
+            .total_cmp(&right.quantity_on_hand)
+            .then(left.product_id.cmp(&right.product_id))
     });
 
     let output = LowStockOutput { items };
@@ -349,6 +364,12 @@ pub(crate) fn evaluate_low_stock_rows(
 }
 
 use crate::wire_decode::{row_u64, snake_to_camel};
+
+fn required_id(row: &Value, camel: &str, snake: &str) -> Result<u64, String> {
+    row_u64(row, camel, snake)
+        .filter(|id| *id > 0)
+        .ok_or_else(|| format!("low-stock {snake} must be a positive record ID"))
+}
 
 fn row_f64(row: &Value, field: &str) -> Option<f64> {
     let camel = snake_to_camel(field);
@@ -391,6 +412,223 @@ mod tests {
         let error =
             validate_input(&serde_json::json!({"threshold": 5.0, "sql": "SELECT *"})).unwrap_err();
         assert!(error.contains("unknown field"));
+    }
+
+    fn input(location_id: Option<u64>) -> LowStockInput {
+        LowStockInput {
+            threshold: 4.0,
+            location_id,
+        }
+    }
+
+    fn product(id: u64) -> Value {
+        serde_json::json!({
+            "id": id, "organizationId": 7, "defaultCode": format!("SKU-{id}"),
+            "name": format!("Template {id}")
+        })
+    }
+
+    fn quant(product_id: u64, location_id: u64, quantity: f64) -> Value {
+        serde_json::json!({
+            "organizationId": 7, "companyId": 9, "productId": product_id,
+            "locationId": location_id, "quantity": quantity
+        })
+    }
+
+    #[test]
+    fn template_scan_sums_variant_quants_and_uses_the_entered_threshold() {
+        let products = vec![product(20), product(21), product(22)];
+        let mut first = quant(20, 4, 2.0);
+        first["productVariantId"] = Value::from(201);
+        let mut second = quant(20, 4, 1.0);
+        second["productVariantId"] = Value::from(202);
+        let output = evaluate_low_stock_rows(
+            &products,
+            &[first, second, quant(21, 4, 9.0)],
+            7,
+            9,
+            &input(None),
+            100,
+        )
+        .unwrap();
+
+        assert_eq!(output.items.len(), 2);
+        assert_eq!(output.items[0].product_id, 22);
+        assert_eq!(output.items[0].quantity_on_hand, 0.0);
+        assert_eq!(output.items[1].product_id, 20);
+        assert_eq!(output.items[1].quantity_on_hand, 3.0);
+        assert_eq!(output.items[1].sku, "SKU-20");
+        assert!(output.items.iter().all(|item| {
+            item.organization_id == 7 && item.company_id == 9 && item.reorder_level == 4.0
+        }));
+    }
+
+    #[test]
+    fn location_filter_never_borrows_another_locations_stock() {
+        let output = evaluate_low_stock_rows(
+            &[product(20)],
+            &[quant(20, 4, 2.0), quant(20, 5, 99.0)],
+            7,
+            9,
+            &input(Some(4)),
+            100,
+        )
+        .unwrap();
+        assert_eq!(output.items[0].quantity_on_hand, 2.0);
+        assert!(
+            validate_input(&serde_json::json!({"threshold": 4.0, "location_id": 0}))
+                .unwrap_err()
+                .contains("positive record ID")
+        );
+    }
+
+    #[test]
+    fn foreign_company_or_organization_rows_fail_closed() {
+        let mut foreign_company = quant(20, 4, 2.0);
+        foreign_company["companyId"] = Value::from(10);
+        let mut foreign_org = quant(20, 4, 2.0);
+        foreign_org["organizationId"] = Value::from(8);
+        for row in [foreign_company, foreign_org] {
+            assert_eq!(
+                evaluate_low_stock_rows(&[product(20)], &[row], 7, 9, &input(None), 100)
+                    .unwrap_err(),
+                "low-stock quant scope mismatch"
+            );
+        }
+        let mut foreign_product = product(20);
+        foreign_product["organizationId"] = Value::from(8);
+        assert_eq!(
+            evaluate_low_stock_rows(&[foreign_product], &[], 7, 9, &input(None), 100).unwrap_err(),
+            "low-stock product organization mismatch"
+        );
+    }
+
+    #[test]
+    fn invalid_source_values_do_not_become_zero_stock_or_invented_products() {
+        let mut missing_quantity = quant(20, 4, 2.0);
+        missing_quantity.as_object_mut().unwrap().remove("quantity");
+        assert!(evaluate_low_stock_rows(
+            &[product(20)],
+            &[missing_quantity],
+            7,
+            9,
+            &input(None),
+            100
+        )
+        .unwrap_err()
+        .contains("quantity is missing or invalid"));
+        let mut missing_name = product(20);
+        missing_name.as_object_mut().unwrap().remove("name");
+        assert!(
+            evaluate_low_stock_rows(&[missing_name], &[], 7, 9, &input(None), 100)
+                .unwrap_err()
+                .contains("name is missing")
+        );
+        assert!(evaluate_low_stock_rows(
+            &[product(20)],
+            &[quant(0, 4, 2.0)],
+            7,
+            9,
+            &input(None),
+            100
+        )
+        .unwrap_err()
+        .contains("positive record ID"));
+        assert!(evaluate_low_stock_rows(
+            &[product(20)],
+            &[quant(20, 4, f64::MAX), quant(20, 4, f64::MAX)],
+            7,
+            9,
+            &input(None),
+            100
+        )
+        .unwrap_err()
+        .contains("not finite"));
+    }
+
+    #[test]
+    fn source_and_output_limits_reject_incomplete_scans() {
+        for (products, quants) in [
+            (vec![product(20); MAX_SOURCE_ROWS + 1], vec![]),
+            (
+                vec![product(20)],
+                vec![quant(20, 4, 1.0); MAX_SOURCE_ROWS + 1],
+            ),
+        ] {
+            assert_eq!(
+                evaluate_low_stock_rows(&products, &quants, 7, 9, &input(None), 100).unwrap_err(),
+                "low-stock source row limit exceeded"
+            );
+        }
+        assert_eq!(
+            evaluate_low_stock_rows(&[product(20), product(21)], &[], 7, 9, &input(None), 1)
+                .unwrap_err(),
+            "low-stock row limit exceeded"
+        );
+    }
+
+    #[tokio::test]
+    async fn native_http_queries_use_real_columns_and_keep_company_location_scope() {
+        use axum::{http::HeaderMap, routing::post, Json, Router};
+        use std::sync::{Arc, Mutex};
+
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let recorded = requests.clone();
+        let app = Router::new().route(
+            "/v1/database/fixture/sql",
+            post(move |headers: HeaderMap, sql: String| {
+                let recorded = recorded.clone();
+                async move {
+                    assert_eq!(headers["authorization"], "Bearer actor-fixture-token");
+                    recorded.lock().unwrap().push(sql.clone());
+                    let (columns, rows) = if sql.contains(" FROM product ") {
+                        assert_eq!(sql, "SELECT id, organization_id, default_code, name FROM product WHERE organization_id = 7 LIMIT 501");
+                        (
+                            vec!["id", "organization_id", "default_code", "name"],
+                            vec![serde_json::json!([20, 7, [0, "REAL-SKU"], "Real template"])],
+                        )
+                    } else {
+                        assert_eq!(sql, "SELECT organization_id, company_id, product_id, location_id, quantity FROM stock_quant WHERE organization_id = 7 AND company_id = 9 AND location_id = 4 LIMIT 501");
+                        (
+                            vec!["organization_id", "company_id", "product_id", "location_id", "quantity"],
+                            vec![serde_json::json!([7, 9, 20, 4, 2.5])],
+                        )
+                    };
+                    Json(serde_json::json!([{
+                        "schema": {"elements": columns.into_iter().map(|name| {
+                            let kind = match name {
+                                "default_code" => serde_json::json!({"Sum": {"variants": [
+                                    {"name": {"some": "some"}, "algebraic_type": {"String": []}},
+                                    {"name": {"some": "none"}, "algebraic_type": {"Product": {"elements": []}}}
+                                ]}}),
+                                "name" => serde_json::json!({"String": []}),
+                                "quantity" => serde_json::json!({"F64": []}),
+                                _ => serde_json::json!({"U64": []}),
+                            };
+                            serde_json::json!({"name": {"some": name}, "algebraic_type": kind})
+                        }).collect::<Vec<_>>()},
+                        "rows": rows
+                    }]))
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let client = StdbClient::new(
+            format!("http://{address}"),
+            "fixture".into(),
+            "actor-fixture-token".into(),
+        )
+        .with_http_client(reqwest::Client::builder().no_proxy().build().unwrap());
+        let result = fetch_low_stock_output(&client, 7, 9, &input(Some(4))).await;
+        server.abort();
+        let output = result.unwrap();
+        assert_eq!(requests.lock().unwrap().len(), 2);
+        assert_eq!(output.items[0].product_id, 20);
+        assert_eq!(output.items[0].sku, "REAL-SKU");
+        assert_eq!(output.items[0].quantity_on_hand, 2.5);
+        assert_eq!(output.items[0].reorder_level, 4.0);
     }
 
     #[test]
