@@ -5333,6 +5333,9 @@
       "pendingLeaveRequests": "Pending Leave Requests",
       "runningContracts": "Running Contracts",
       "headcountTrend": "Reconstructed Headcount",
+      "headcount": "Headcount",
+      "requestedLeaveDays": "Requested Leave Days in Selected Period",
+      "unspecifiedLeaveType": "Unspecified leave type",
       "historyBasisTitle": "Historical chart basis",
       "historyBasis": "Headcount is reconstructed from known hire and termination dates at each bucket end, not a complete historical staffing snapshot. Employees without hire dates and inactive employees without termination dates are excluded. Leave usage counts full requested days by request start date in the selected period, not prorated overlap. Dates use UTC. Current headcount and work queues remain current.",
       "payslipsToExport": "Payslips to export"

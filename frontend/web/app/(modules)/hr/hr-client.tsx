@@ -1019,7 +1019,7 @@ function HrClientLoaded({
               )
               const byType = groupBy(
                 visibleLeaves,
-                (l) => leaveTypeNames.get(String(l.leaveTypeId ?? "")) || "Unspecified",
+                (l) => leaveTypeNames.get(String(l.leaveTypeId ?? "")) || t("hr.dashboard.unspecifiedLeaveType"),
               )
               const colors = ["#6366f1", "#f59e0b", "#22c55e", "#8b5cf6"]
               const totalDays = visibleLeaves.reduce((s, l) => s + Number(l.numberOfDays ?? 0), 0)
@@ -1033,14 +1033,17 @@ function HrClientLoaded({
                 .sort((a, b) => b.value - a.value)
                 .slice(0, 4)
                 .map((m, i) => ({ ...m, color: colors[i] ?? "#6366f1" }))
-              return { ...w, data: { metrics } }
+              return { ...w, title: t("hr.dashboard.requestedLeaveDays"), data: { metrics } }
             }
-            if (w.id === "hr-headcount-trend") {
-              const values = headcountHistory(employees, dashboardTimeRange)
+            if (w.type === "line-chart" && w.id === "hr-headcount-trend") {
+              const headcountLabel = t("hr.dashboard.headcount")
+              const values = headcountHistory(employees, dashboardTimeRange).map(point => ({
+                month: point.month, [headcountLabel]: point.Headcount,
+              }))
               return {
                 ...w,
                 title: t("hr.dashboard.headcountTrend"),
-                data: { ...(w.data as Record<string, unknown>), values },
+                data: { ...w.data, series: w.data.series.map(series => ({ ...series, name: headcountLabel })), values },
               }
             }
             if (w.id === "hr-open-roles") {

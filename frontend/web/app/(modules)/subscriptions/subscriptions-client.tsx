@@ -743,7 +743,7 @@ function SubscriptionsClientLoaded({
         if (w.type === "combo-chart" && w.id === "sub-mrr-churn") {
           return {
             ...w,
-            title: t("subscriptions.workflow.contractMrrHistory", { defaultValue: "Estimated contract MRR and churn ({{currency}})", currency: onlyCurrency }),
+            title: t("subscriptions.workflow.contractMrrHistory", { currency: onlyCurrency }),
             data: { ...w.data, values: mrrAndChurnHistory(chartSubscriptions, now, historyPeriod, locale), valueFormat: money },
           }
         }
@@ -1043,10 +1043,8 @@ function SubscriptionsClientLoaded({
     ...(dataState.subscriptions.status === "ready" ? liveSections.filter((section) => section.id === "sub-charts") : []),
     createPageContentSection({
       id: "subscription-history-basis",
-      title: t("subscriptions.workflow.historyBasisTitle", { defaultValue: "Contract history estimate" }),
-      content: <p className="text-sm text-muted-foreground">{t("subscriptions.workflow.historyBasis", {
-        defaultValue: "History applies current contract MRR to recorded start and close dates; it is not a historical billing or MRR ledger. Contracts with unknown start dates or closed contracts with unknown close dates are excluded. The selected range uses UTC dates and ends no later than now. Plan mix always shows current contract MRR, regardless of the selected range.",
-      })}</p>,
+      title: t("subscriptions.workflow.historyBasisTitle"),
+      content: <p className="text-sm text-muted-foreground">{t("subscriptions.workflow.historyBasis")}</p>,
     }),
     createPageContentSection({
       id: "subscription-imports",
