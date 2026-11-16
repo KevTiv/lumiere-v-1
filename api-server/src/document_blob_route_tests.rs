@@ -164,17 +164,19 @@ async fn sql(State(rows): State<Arc<Mutex<Rows>>>, headers: HeaderMap, query: St
             rows.templates.clone()
         } else if query.contains(" FROM queue_job ") {
             assert!(
-                query.contains("company_id = 3")
+                !query.contains("company_id =")
                     && query.contains("id = 51")
-                    && query.contains("queue_name = 'embedding'"),
+                    && query.contains("queue_name = 'embedding'")
+                    && query.ends_with("LIMIT 2"),
                 "{query}"
             );
             rows.embedding_jobs.clone()
         } else if query.contains(" FROM search_embedding ") {
             assert!(
-                query.contains("company_id = 3")
+                !query.contains("company_id =")
                     && query.contains("content_id = 61")
-                    && query.contains("content_type = 'ai_evidence_passage'"),
+                    && query.contains("content_type = 'ai_evidence_passage'")
+                    && query.ends_with("LIMIT 2"),
                 "{query}"
             );
             rows.embeddings.clone()
@@ -1206,10 +1208,10 @@ async fn submission_receipt_recovers_same_blob_and_separates_failed_indexing() {
     {
         let mut rows = fixture.rows.lock().unwrap();
         rows.embedding_jobs = vec![
-            json!({"id":51,"status":"Completed","semantic_key":format!("embedding:ai_evidence_passage:61:{}:semantic-index-v1", "a".repeat(64))}),
+            json!({"id":51,"organization_id":7,"company_id":3,"queue_name":"embedding","status":"Completed","semantic_key":format!("embedding:ai_evidence_passage:61:{}:semantic-index-v1", "a".repeat(64))}),
         ];
         rows.embeddings = vec![
-            json!({"expected_fingerprint":"a".repeat(64),"index_generation":"semantic-index-v1","sync_status":"synced"}),
+            json!({"organization_id":7,"company_id":3,"content_type":"ai_evidence_passage","content_id":61,"expected_fingerprint":"a".repeat(64),"index_generation":"semantic-index-v1","sync_status":"synced"}),
         ];
     }
     let completed = fixture
@@ -1219,6 +1221,24 @@ async fn submission_receipt_recovers_same_blob_and_separates_failed_indexing() {
         .json();
     assert_eq!(completed["indexing"], "completed");
     assert_eq!(completed["documentId"], "21");
+    // A completed row from another company, or shared queue work, cannot
+    // certify this company's saved document as indexed.
+    fixture.rows.lock().unwrap().embeddings[0]["company_id"] = json!(4);
+    let foreign = fixture
+        .get("actor-token", &receipt_url)
+        .await
+        .expect_status(StatusCode::OK)
+        .json();
+    assert_eq!(foreign["indexing"], "unavailable");
+    fixture.rows.lock().unwrap().embeddings[0]["company_id"] = json!(3);
+    fixture.rows.lock().unwrap().embedding_jobs[0]["company_id"] = Value::Null;
+    let shared = fixture
+        .get("actor-token", &receipt_url)
+        .await
+        .expect_status(StatusCode::OK)
+        .json();
+    assert_eq!(shared["indexing"], "unavailable");
+    fixture.rows.lock().unwrap().embedding_jobs[0]["company_id"] = json!(3);
     // A stale index generation must not be presented as completed.
     fixture.rows.lock().unwrap().embeddings[0]["index_generation"] = json!("different-generation");
     let unavailable = fixture

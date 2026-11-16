@@ -4,6 +4,20 @@ use serde_json::{json, Value};
 
 const ACTOR: &str = "abababababababababababababababababababababababababababababababab";
 
+fn read_access(resource: &str) -> stdb_auth::FieldAccessContext {
+    stdb_auth::FieldAccessContext {
+        organization_id: 7,
+        role_id: 12,
+        role_name: "member".into(),
+        is_superuser: false,
+        role_permissions: vec![format!("{resource}:read")],
+        identity_hex: ACTOR.into(),
+        field_permissions: Vec::new(),
+        role_ids: vec![12],
+        org_permissions: Vec::new(),
+    }
+}
+
 async fn fixture(
     wide: bool,
     membership: bool,
@@ -40,12 +54,13 @@ async fn company_configuration_reads_follow_membership_not_organization_default(
     ] {
         for requested in [None, Some(9)] {
             let server = fixture(false, true, 9).await;
+            let access = read_access(resource);
             let rows = execute_resource_query_for_company(
                 &server.client,
                 resource,
                 7,
                 ACTOR,
-                None,
+                Some(&access),
                 requested,
             )
             .await
@@ -71,12 +86,13 @@ async fn company_configuration_reads_reject_foreign_selection_before_business_re
     ] {
         for (wide, member, requested) in [(false, true, 8), (true, true, 99), (false, false, 9)] {
             let server = fixture(wide, member, requested).await;
+            let access = read_access(resource);
             let result = execute_resource_query_for_company(
                 &server.client,
                 resource,
                 7,
                 ACTOR,
-                None,
+                Some(&access),
                 Some(requested),
             )
             .await;
@@ -93,15 +109,36 @@ async fn company_configuration_reads_reject_foreign_selection_before_business_re
 #[tokio::test]
 async fn company_configuration_reads_honor_authorized_owner_company_selection() {
     let server = fixture(true, true, 10).await;
+    let access = read_access("delivery-carriers");
     let rows = execute_resource_query_for_company(
         &server.client,
         "delivery-carriers",
         7,
         ACTOR,
-        None,
+        Some(&access),
         Some(10),
     )
     .await
     .unwrap();
     assert_eq!(rows[0]["companyId"], Value::from(10));
+}
+
+#[tokio::test]
+async fn company_configuration_reads_keep_permission_denials_before_sql() {
+    let server = fixture(true, true, 10).await;
+    let mut access = read_access("delivery-carriers");
+    access.role_permissions.clear();
+    assert!(matches!(
+        execute_resource_query_for_company(
+            &server.client,
+            "delivery-carriers",
+            7,
+            ACTOR,
+            Some(&access),
+            Some(10)
+        )
+        .await,
+        Err(ApiError::Forbidden(_))
+    ));
+    assert!(server.requests.lock().unwrap().is_empty());
 }
