@@ -1748,14 +1748,14 @@ export const hrDashboard: DashboardConfig = {
         {
           id: "hr-leave-usage",
           type: "metrics",
-          title: "Leave Balance Usage",
+          title: "Requested Leave Days in Selected Period",
           width: "1/2",
           data: { metrics: [] },
         },
         {
           id: "hr-headcount-trend",
           type: "line-chart",
-          title: "Headcount Trend",
+          title: "Reconstructed Headcount",
           width: "1/2",
           data: {
             xAxisKey: "month",

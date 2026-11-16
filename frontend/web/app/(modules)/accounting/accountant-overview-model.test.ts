@@ -141,7 +141,7 @@ test("tax queue includes organization deadlines, excludes completed, deleted, ot
   assert.deepEqual(result.queues.deadlines.rows.map((row) => row.id), [1, 2])
 })
 
-test("activity counts posted invoice and bill documents in six UTC calendar months, without adding currencies", () => {
+test("activity counts all dated posted invoice and bill history, without adding currencies", () => {
   const result = buildAccountantOverview(data({ moves: read([
     move(1, { invoiceDate: "2026-05-01T00:00:00Z", currencyId: 1 }),
     move(2, { invoiceDate: "2026-10-01", currencyId: 2 }),
@@ -152,20 +152,15 @@ test("activity counts posted invoice and bill documents in six UTC calendar mont
     move(7, { invoiceDate: "2026-10-15", companyId: 8 }),
     move(8, { invoiceDate: "2026-10-15", moveType: "OutRefund" }),
   ]) }), NOW)
-  assert.deepEqual(result.activity.months, [
-    { startMs: Date.UTC(2026, 4, 1), invoices: 1, bills: 0 },
-    { startMs: Date.UTC(2026, 5, 1), invoices: 0, bills: 0 },
-    { startMs: Date.UTC(2026, 6, 1), invoices: 0, bills: 0 },
-    { startMs: Date.UTC(2026, 7, 1), invoices: 0, bills: 0 },
-    { startMs: Date.UTC(2026, 8, 1), invoices: 0, bills: 0 },
-    { startMs: Date.UTC(2026, 9, 1), invoices: 1, bills: 1 },
-  ])
+  assert.equal(result.activity.months.reduce((total, point) => total + point.invoices, 0), 3)
+  assert.equal(result.activity.months.reduce((total, point) => total + point.bills, 0), 1)
+  assert.equal(result.activity.months[0]?.startMs, Date.parse("2026-04-30T00:00:00Z"))
 })
 
 test("activity distinguishes an empty successful period from unavailable or undated documents", () => {
   const empty = buildAccountantOverview(data(), NOW).activity
   assert.equal(empty.state.status, "ready")
-  assert.equal(empty.months.length, 6)
+  assert.equal(empty.months.length, 0)
   const denied = buildAccountantOverview(data({ moves: { rows: [move(1)], state: { status: "denied" } } }), NOW).activity
   assert.equal(denied.state.status, "denied")
   assert.deepEqual(denied.months, [])
@@ -174,6 +169,20 @@ test("activity distinguishes an empty successful period from unavailable or unda
   assert.deepEqual(undated.months, [])
 })
 
+
+test("all activity preserves old-year documents and custom period shares company calendar boundaries", () => {
+  const sample = data({ timeZone: "America/New_York", moves: read([
+    move(1, { invoiceDate: { microsSinceUnixEpoch: BigInt(Date.parse("1965-01-01T00:00:00Z")) * 1000n } }),
+    move(2, { invoiceDate: { microsSinceUnixEpoch: BigInt(Date.parse("2024-03-10T00:00:00Z")) * 1000n } }),
+    move(3, { invoiceDate: { microsSinceUnixEpoch: BigInt(Date.parse("2024-03-11T00:00:00Z")) * 1000n } }),
+  ]) })
+  const all = buildAccountantOverview(sample, NOW)
+  assert.equal(all.activity.months.reduce((total, row) => total + row.invoices, 0), 3)
+  assert.ok(all.activity.months[0]?.label.includes("1965"))
+  const custom = buildAccountantOverview(sample, NOW, { kind: "custom", from: "2024-03-10", through: "2024-03-10" })
+  assert.equal(custom.activity.months.reduce((total, row) => total + row.invoices, 0), 1)
+  assert.equal(custom.receivables.rows.length, all.receivables.rows.length)
+})
 
 test("bills due queue contains only open company bills overdue or due through the next seven UTC days", () => {
   const bill = (id: number, date: string, extra: OverviewRow = {}) => move(id, { moveType: "InInvoice", invoiceDateDue: date, ...extra })

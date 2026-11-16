@@ -14,6 +14,18 @@ import type { ModuleDataState } from "../../../../../packages/ui/src/lib/module-
 import { ModuleInsights, type InsightPeriodRange } from "../../../../components/module-insights"
 import { insightDefinitions, type InsightModule } from "../../../../lib/module-insights-model"
 import { moduleInsightNow, moduleInsightRows } from "../../module-insights-fixtures"
+import { useHistoryPeriod } from "../../../../lib/use-history-period"
+import { serializeHistoryPeriod } from "@lumiere/erp-shared/history-period"
+
+/** Capture the first render after a company-keyed remount, not eventual router convergence. */
+function PeriodRemountProbe({ onSwitch }: { onSwitch: () => void }) {
+  const [period, setPeriod] = useHistoryPeriod()
+  const [initialPeriod] = useState(() => serializeHistoryPeriod(period))
+  return <div className="flex flex-wrap items-center gap-3">
+    <Button variant="outline" onClick={() => { setPeriod("180d"); onSwitch() }}>Select period and immediately switch company</Button>
+    <span data-testid="period-at-company-remount">{initialPeriod}</span>
+  </div>
+}
 
 function Preview() {
   const [hydrated, setHydrated] = useState(false)
@@ -47,6 +59,7 @@ function Preview() {
       <Button variant="outline" onClick={() => setPalette("ocean")}>Synthetic Ocean palette</Button>
     </div>
     <p role="status" data-testid="module-insights-fixture-action">{message}</p>
+    <PeriodRemountProbe key={String(companyId)} onSwitch={() => setCompanyId(value => value === 1n ? 2n : 1n)} />
     <p className="text-xs text-muted-foreground" data-testid="module-insights-period-callback">{periodRange ? Number.isFinite(periodRange.startMs) && Number.isFinite(periodRange.endMs) ? `${new Date(periodRange.startMs).toISOString()} – ${new Date(periodRange.endMs).toISOString()}` : "All history" : "Pending period"}</p>
     <ModuleView config={config} activeTab={tab} onActiveTabChange={setTab} dashboardTimeRange="30d" onDashboardTimeRangeChange={() => {}} dashboardContent={<ModuleInsights input={{ module, organizationId: 1, companyId, records: { rows: emptySources ? [] : moduleInsightRows(module).map((row) => longNames && row.id === "101" ? { ...row, name: `Synthetic international ${"LongReference".repeat(20)}` } : row), state: { status: emptySources ? "denied" : sourceState } }, currencies: { rows: emptySources || currencyDenied ? [] : [{ id: 1, code: "EUR", decimalPlaces: 2 }, { id: 2, code: "USD", decimalPlaces: 2 }], state: { status: emptySources || currencyDenied ? "denied" : "ready" } } }} sections={sections} now={moduleInsightNow} onPeriodRangeChange={setPeriodRange} />} />
   </main>
