@@ -113,8 +113,9 @@ function chatRetrievalFixture() {
   }]
   const sql = f.client.sql.bind(f.client)
   f.client.sql = async (statement, role) => {
-    if (statement.includes("skill_key = 'rag_generation'")) {
-      return f.state.chatCatalog.filter(row => statement.includes(`organization_id = ${row.organization_id} AND`))
+    if (statement.includes('FROM ai_skill ') && statement.includes('skill_key = ')) {
+      return f.state.chatCatalog.filter(row => statement.includes(`organization_id = ${row.organization_id} AND`)
+        && statement.includes(`skill_key = '${row.skill_key}'`))
     }
     if (statement.startsWith('SELECT * FROM ai_skill WHERE id = ')) {
       return f.state.chatCatalog.filter(row => statement.endsWith(`= ${row.id}`))
@@ -150,7 +151,7 @@ test('chat retrieval adds only the missing embedding allowlist entries and meter
 
 test('chat retrieval honors disabled or mismatched tenant bindings', async () => {
   for (const [modify, expected] of [
-    [f => f.state.chatCatalog.push({ ...f.state.chatCatalog[0], organization_id: 9, id: 15, is_active: false }), /effective chat skill must be active/],
+    [f => f.state.chatCatalog.push({ ...f.state.chatCatalog[0], organization_id: 9, id: 15, is_active: false }), /effective rag_generation skill must be active/],
     [f => { f.state.bindings[0].is_enabled = false }, /company chat binding must be active/],
     [f => { f.input.agentId = 13 }, /company chat binding must use the requested agent/],
     [f => { f.state.bindings = [] }, /company chat binding must resolve exactly once/],
@@ -160,6 +161,26 @@ test('chat retrieval honors disabled or mismatched tenant bindings', async () =>
     await assert.rejects(provisionChatRetrieval(f.input, f.client, true, now), expected)
     assert.deepEqual(f.writes, [])
   }
+})
+
+test('an existing tenant can opt in to indexing with the same agent, meter and unchanged chat binding', async () => {
+  const f = chatRetrievalFixture()
+  f.input.indexDocuments = true
+  f.state.chatCatalog.push({ id: 7, organization_id: 0, skill_key: 'document_embeddings', is_active: true })
+  const priorChatBinding = structuredClone(f.state.bindings[0])
+  const plan = await provisionChatRetrieval(f.input, f.client, false, now)
+  assert.ok(plan.missing.includes('set_ai_agent_action:embedding_index'))
+  assert.ok(plan.missing.includes('binding:document_embeddings'))
+  assert.deepEqual(f.writes, [])
+  await provisionChatRetrieval(f.input, f.client, true, now)
+  assert.deepEqual(f.state.bindings[0], priorChatBinding)
+  const installed = f.state.bindings.find(row => row.skill_id === 7)
+  assert.deepEqual(installed.company_id, { some: 3 })
+  assert.deepEqual(JSON.parse(installed.config_json), { defaultAgentId: 12, intelligencePolicyRef: 'fixture-policy@1' })
+  const count = f.writes.length
+  installed.is_enabled = false
+  await assert.rejects(provisionChatRetrieval(f.input, f.client, true, now), /skill is explicitly disabled/)
+  assert.equal(f.writes.length, count)
 })
 
 test('chat retrieval rechecks pricing authority when recovering a partial apply', async () => {

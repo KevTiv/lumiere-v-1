@@ -1,8 +1,13 @@
 use crate::ai::agents::{ai_agent, set_ai_agent_active};
+use crate::ai::metered_spend::{
+    ai_metered_price, configure_ai_metered_price, reserve_ai_metered_spend,
+    ConfigureAiMeteredPriceParams, ReserveAiMeteredSpendParams,
+};
 use crate::ai::model_configuration::RegisterAiModelProfileParams;
 use crate::ai::platform_defaults::*;
 use crate::ai::skills::{ai_skill, ai_skill_config, AiSkill};
 use crate::ai::spend::ai_spend_budget;
+use crate::core::cold_tier_identity::{cold_tier_service_identity, ColdTierServiceIdentity};
 use crate::core::organization::{company, Company};
 use crate::core::permissions::{
     org_permission, role, OrgPermission, PermissionAction, PermissionEffect, PermissionSubject,
@@ -110,6 +115,20 @@ pub fn test_platform_defaults(ctx: &ReducerContext) -> Result<(), String> {
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
     });
+    if set_ai_platform_default(ctx, Some(template.id)).is_ok() {
+        return Err("activated Mistral without an embedding price".into());
+    }
+    configure_ai_metered_price(
+        ctx,
+        0,
+        template.id,
+        ConfigureAiMeteredPriceParams {
+            model: "mistral-embed".into(),
+            unit: "tokens".into(),
+            currency: "USD".into(),
+            units_per_1k: 111,
+        },
+    )?;
     set_ai_platform_default(ctx, Some(template.id))?;
     let catalog_snapshot = || {
         let mut rows: Vec<_> = ctx
@@ -142,6 +161,34 @@ pub fn test_platform_defaults(ctx: &ReducerContext) -> Result<(), String> {
         .organization_id()
         .find(first.organization_id)
         .ok_or("enrollment missing")?;
+    let agent = ctx
+        .db
+        .ai_agent()
+        .id()
+        .find(enrollment.agent_id)
+        .ok_or("managed agent missing")?;
+    if !agent
+        .allowed_models
+        .iter()
+        .any(|model| model == "mistral-embed")
+        || !["embedding_query", "embedding_index"]
+            .iter()
+            .all(|action| agent.allowed_actions.iter().any(|item| item == action))
+        || !ctx
+            .db
+            .ai_metered_price()
+            .ai_metered_price_by_org()
+            .filter(&first.organization_id)
+            .any(|price| {
+                price.agent_id == agent.id
+                    && price.model == "mistral-embed"
+                    && price.unit == "tokens"
+                    && price.currency == "USD"
+                    && price.units_per_1k == 111
+            })
+    {
+        return Err("fresh managed agent cannot reserve approved embeddings".into());
+    }
     let writer = template.runtime_writer_identity;
     let membership = ctx
         .db
@@ -268,7 +315,7 @@ pub fn test_platform_defaults(ctx: &ReducerContext) -> Result<(), String> {
         .ai_skill_config_by_org()
         .filter(&first.organization_id)
         .count()
-        != 6
+        != 12
     {
         return Err("company bindings were missing or duplicated".into());
     }
@@ -285,6 +332,73 @@ pub fn test_platform_defaults(ctx: &ReducerContext) -> Result<(), String> {
         .ok_or("budget missing")?;
     if after.settled_units != 100 || after.outstanding_units != 200 {
         return Err("renewal reset spend".into());
+    }
+    // Simulate the first uncached embedding after rollover, before LLM spend
+    // admission or the owner reconciliation screen has opened the new period.
+    let previous_month =
+        chrono::DateTime::from_timestamp_micros(ctx.timestamp.to_micros_since_unix_epoch())
+            .and_then(|now| now.checked_sub_months(chrono::Months::new(1)))
+            .ok_or("invalid rollover fixture timestamp")?
+            .format("%Y-%m")
+            .to_string();
+    ctx.db
+        .ai_spend_budget()
+        .id()
+        .update(crate::ai::spend::AiSpendBudget {
+            billing_period: previous_month,
+            ..after
+        });
+    let writer_binding = ctx
+        .db
+        .cold_tier_service_identity()
+        .cold_tier_service_identity_by_name()
+        .filter((&first.organization_id, &"ai_spend_writer".to_string()))
+        .next()
+        .ok_or("writer binding missing")?;
+    ctx.db
+        .cold_tier_service_identity()
+        .platform_id()
+        .update(ColdTierServiceIdentity {
+            identity: ctx.sender(),
+            ..writer_binding.clone()
+        });
+    reserve_ai_metered_spend(
+        ctx,
+        first.organization_id,
+        ReserveAiMeteredSpendParams {
+            company_id: first.company_id,
+            agent_id: agent.id,
+            run_id: 0,
+            actor_identity: ctx.sender().to_hex().to_string(),
+            request_key: format!("embedding:rollover:{}", first.organization_id),
+            model: "mistral-embed".into(),
+            unit: "tokens".into(),
+            allowance: 1000,
+        },
+    )?;
+    ctx.db
+        .cold_tier_service_identity()
+        .platform_id()
+        .update(writer_binding);
+    let current = ctx
+        .db
+        .ai_spend_budget()
+        .ai_spend_budget_by_agent_period()
+        .filter((&agent.id, &budget.billing_period))
+        .next()
+        .ok_or("new period was not opened")?;
+    let previous = ctx
+        .db
+        .ai_spend_budget()
+        .id()
+        .find(budget.id)
+        .ok_or("previous month was lost")?;
+    if current.outstanding_units != 111
+        || current.settled_units != 0
+        || previous.settled_units != 100
+        || previous.outstanding_units != 200
+    {
+        return Err("embedding renewal changed prior spend or reserved the wrong amount".into());
     }
     ctx.db.role().id().update(Role {
         is_active: false,

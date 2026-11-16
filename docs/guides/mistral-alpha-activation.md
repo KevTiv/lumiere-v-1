@@ -193,6 +193,40 @@ session to ask about an authorized indexed source and verify the reply and
 its citation. On a retrieval failure, filter AI gateway logs for
 `Chat query embedding unavailable` and inspect the `stage` field.
 
+For an existing tenant that needs to index documents, include `indexDocuments: true`
+in the same manifest. It adds the document indexing binding and action on the
+same agent. The publisher installs the infrastructure catalog on upgrade.
+Ingest an authorized test document through the Documents ingestion route and
+verify completed indexing before sending a question. Check for dead-lettered
+jobs if the source was queued before repair.
+
+For fresh managed enrollments, pass a reviewed `embeddingUnitsPer1k` in the
+Mistral manifest for `scripts/configure-ai-platform.mjs --activate`. The platform
+approval stores the rate for the selected template. Every new enrollment copies
+that rate into its own metering snapshot
+and enables query and indexing on the managed agent. Use the private operator
+path above for existing agents. An embedding request can open an eligible
+managed sponsored period at UTC month rollover through normal spend admission.
+
+### Verify a Railway release through authenticated chat
+
+Set the GitHub Environment variable `RAILWAY_VERIFY_GROUNDED_CHAT=true` and
+`AI_CHAT_ACCEPTANCE_URL` to the application's HTTPS origin. Set the Environment
+secret `AI_CHAT_ACCEPTANCE_JSON` with `fresh` and `upgraded` fixtures in different
+dedicated test companies. Provision the fresh fixture through the version being
+accepted and retain the upgraded fixture from an earlier version. Each fixture
+supplies `companyId`, `cookie` for an
+authorized signed-in operator, an indexed `documentId` and its `sourceVersion`,
+a `question` and an `expectedAnswerText` unique to that document. Use approved
+test data and an existing funded allowance. Rotate the session cookies before
+they expire.
+
+The check runs against the public chat streaming route after edge cutover. It
+requires a completed provider response, healthy retrieval, the expected fact and
+persisted claim support from the expected document version in both companies.
+It makes one chat attempt per fixture and prints only outcome labels. The same
+check can be run from the configured environment with `node scripts/verify-grounded-chat.mjs`.
+
 ## Document and activity flows
 
 Document ingestion resolves the current DMS document, version and stored blob,

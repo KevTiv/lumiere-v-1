@@ -18,7 +18,8 @@ FIXTURE = ROOT / "scripts/tests/fixtures/stdb-production-upgrade"
 TABLE_COLUMNS = json.loads((FIXTURE / "columns.json").read_text())
 BUILTIN_SKILLS = {
     skill["skill_key"]
-    for skill in json.loads((ROOT / "spacetimedb/assets/ai-builtin-skills.json").read_text())
+    for catalog in ("ai-builtin-skills.json", "ai-infrastructure-skills.json")
+    for skill in json.loads((ROOT / "spacetimedb/assets" / catalog).read_text())
 }
 
 

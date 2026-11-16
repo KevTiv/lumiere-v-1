@@ -1077,7 +1077,15 @@ pub fn finalize_embedding_job(
     job_id: u64,
     params: CompleteQueueJobParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "search_embedding", "write")?;
+    // The existing embedding lease and its canonical passage checks below
+    // bound the runtime writer to this job. Other callers still need write access.
+    if !crate::core::cold_tier_identity::is_active_cold_tier_service_identity(
+        ctx,
+        organization_id,
+        super::platform_runtime::WRITER_SERVICE,
+    ) {
+        check_permission(ctx, organization_id, "search_embedding", "write")?;
+    }
     let operating_company_id = company_id_from_scope(ctx, organization_id, company_id)?;
     if params.outcome != QueueCompletionOutcome::Succeeded {
         return Err("embedding finalization requires a successful job outcome".to_string());
