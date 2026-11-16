@@ -245,7 +245,7 @@
   "web/app/(modules)/helpdesk/helpdesk-ticket-dialog.tsx": 1,
   "web/app/(modules)/helpdesk/ticket-kpis.ts": 1,
   "web/app/(modules)/hr/hr-benefits-panel.tsx": 9,
-  "web/app/(modules)/hr/hr-client.tsx": 63,
+  "web/app/(modules)/hr/hr-client.tsx": 58,
   "web/app/(modules)/hr/hr-documents-panel.tsx": 4,
   "web/app/(modules)/hr/hr-offboarding-panel.tsx": 1,
   "web/app/(modules)/hr/hr-onboarding-panel.tsx": 10,
