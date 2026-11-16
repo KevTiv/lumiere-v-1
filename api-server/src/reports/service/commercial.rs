@@ -1,11 +1,14 @@
 use chrono::{SecondsFormat, Utc};
+use serde::Deserialize;
+use serde_json::Value;
 use stdb_client::StdbClient;
 
 use crate::error::ApiError;
 
 use crate::reports::{
     commercial::{
-        monthly_owner, payment_fee_summary, purchase_spend, sales_by_product, IdRow, ProductRow,
+        monthly_owner, payment_fee_summary, purchase_spend, sales_by_product, ContactRow, IdRow,
+        ProductRow,
     },
     common::{ReportCurrency, ReportEnvelope, ReportKey, SourceRowCount},
     timezone::{day_window, month_window},
@@ -22,6 +25,48 @@ pub(super) async fn commercial_products(
     organization_id: u64,
 ) -> Result<Vec<ProductRow>, ApiError> {
     query_typed(client, "product_variant", format!("SELECT product_tmpl_id, name, display_name, default_code FROM product_variant WHERE organization_id = {organization_id} AND is_active = true LIMIT {QUERY_LIMIT}")).await
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PurchaseContactSource {
+    id: u64,
+    organization_id: u64,
+    // Missing columns must not become deliberate shared/undeleted rows.
+    #[serde(deserialize_with = "serde::Deserialize::deserialize")]
+    company_id: Option<u64>,
+    display_name: String,
+    #[serde(deserialize_with = "serde::Deserialize::deserialize")]
+    deleted_at: Option<Value>,
+}
+
+#[cfg(test)]
+mod company_read_tests;
+
+async fn purchase_contacts(
+    client: &StdbClient,
+    organization_id: u64,
+    company_id: u64,
+) -> Result<Vec<ContactRow>, ApiError> {
+    // Bound the entire source before filtering decoded nullable columns.
+    let rows: Vec<PurchaseContactSource> = query_typed(client, "contact", format!(
+        "SELECT id, organization_id, company_id, display_name, deleted_at FROM contact WHERE organization_id = {organization_id} LIMIT {QUERY_LIMIT}"
+    )).await?;
+    let mut contacts = Vec::new();
+    for row in rows {
+        if row.organization_id != organization_id {
+            return Err(ApiError::Internal(
+                "purchase contact organization mismatch".into(),
+            ));
+        }
+        if row.deleted_at.is_none() && row.company_id.is_none_or(|id| id == company_id) {
+            contacts.push(ContactRow {
+                id: row.id,
+                display_name: row.display_name,
+            });
+        }
+    }
+    Ok(contacts)
 }
 
 pub(super) async fn preview_sales_by_product(
@@ -60,7 +105,7 @@ pub(super) async fn preview_purchase_spend(
         query_typed(client, "purchase_order_line", format!("SELECT product_id, product_template_id, partner_id, product_qty, price_total, currency_id, display_type FROM purchase_order_line WHERE organization_id = {organization_id} AND company_id = {} AND order_id IN ({ids}) LIMIT {QUERY_LIMIT}", company.id)).await?
     };
     let products = commercial_products(client, organization_id);
-    let contacts = query_typed(client, "contact", format!("SELECT id, display_name FROM contact WHERE organization_id = {organization_id} AND (company_id = {} OR company_id IS NULL) AND deleted_at IS NULL LIMIT {QUERY_LIMIT}", company.id));
+    let contacts = purchase_contacts(client, organization_id, company.id);
     let landed_costs = query_typed(client, "stock_landed_cost", format!("SELECT amount_total, currency_id FROM stock_landed_cost WHERE organization_id = {organization_id} AND company_id = {} AND state = 'Posted' AND date >= '{}' AND date < '{}' LIMIT {QUERY_LIMIT}", company.id, window.start_sql, window.end_sql));
     let (products, contacts, landed_costs) = tokio::try_join!(products, contacts, landed_costs)?;
     let generated_at = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);

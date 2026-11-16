@@ -1,7 +1,7 @@
 //! Scoped inventory query handlers.
 
 use super::company_scope::company_ids_for_organization;
-use super::company_scope::default_company_id;
+use super::company_scope::resolve_inventory_company_id;
 use super::row_values::{row_company_matches, row_u64};
 use crate::error::ApiError;
 use serde_json::Value;
@@ -154,11 +154,13 @@ pub(super) async fn read_delivery_carriers(
     client: &StdbClient,
     resource: &str,
     organization_id: u64,
+    identity_hex: &str,
+    requested_company_id: Option<u64>,
     fa: Option<&FieldAccessContext>,
 ) -> Result<Vec<Value>, ApiError> {
-    let Some(cid) = default_company_id(client, organization_id).await? else {
-        return Ok(vec![]);
-    };
+    let cid =
+        resolve_inventory_company_id(client, organization_id, identity_hex, requested_company_id)
+            .await?;
     let reg = registry_get(resource)
         .ok_or_else(|| ApiError::NotFound(format!("unknown resource: {resource}")))?;
     let sql = select_company_scoped_sql(resource, &reg.table, cid, fa, "", "")

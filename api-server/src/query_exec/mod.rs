@@ -401,7 +401,15 @@ async fn read_resource_query_for_company(
         | "delivery-price-rules"
         | "shipping-methods"
         | "pos-payment-methods" => {
-            return inventory::read_delivery_carriers(client, resource, organization_id, fa).await;
+            return inventory::read_delivery_carriers(
+                client,
+                resource,
+                organization_id,
+                identity_hex,
+                requested_company_id,
+                fa,
+            )
+            .await;
         }
         "picking-batches" => {
             return inventory::read_picking_batches(client, resource, fa, inventory_company_id)
@@ -581,5 +589,7 @@ async fn read_resource_query_for_company(
     Ok(rows)
 }
 
+#[cfg(test)]
+mod company_configuration_tests;
 #[cfg(test)]
 mod tests;

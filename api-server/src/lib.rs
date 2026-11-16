@@ -3,6 +3,8 @@
 mod auth_password;
 pub mod cold_tier;
 mod commands;
+#[cfg(test)]
+mod company_read_test_support;
 pub mod config;
 pub mod document_blob_migration;
 pub mod document_blob_store;

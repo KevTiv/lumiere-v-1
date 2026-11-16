@@ -458,17 +458,28 @@ pub async fn embedding_index_state_for_job(
     }
     let rows = stdb
         .query_sql(&format!(
-            "SELECT id, organization_id, company_id, expected_fingerprint, index_generation, sync_status \
+            "SELECT id, organization_id, company_id, content_type, content_id, expected_fingerprint, index_generation, sync_status \
              FROM search_embedding WHERE organization_id = {organization_id} \
-             AND company_id = {} AND content_type = '{}' AND content_id = {} LIMIT 1",
-            payload.company_id, payload.content_type, payload.content_id
+             AND content_type = '{}' AND content_id = {} LIMIT 2",
+            payload.content_type, payload.content_id
         ))
         .await
         .map_err(|error| anyhow::anyhow!("{error}"))?;
-    let row = rows
-        .into_iter()
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("embedding index state is missing"))?;
+    // HTTP SQL cannot compare nullable company_id to a scalar. Resolve the
+    // exact content reference, then enforce its decoded company ownership.
+    anyhow::ensure!(
+        rows.len() == 1,
+        "embedding index state is missing or ambiguous"
+    );
+    let row = &rows[0];
+    anyhow::ensure!(
+        u64_field(row, "organizationId", "organization_id") == Some(organization_id)
+            && u64_field(row, "companyId", "company_id") == Some(payload.company_id)
+            && u64_field(row, "contentId", "content_id") == Some(payload.content_id)
+            && string_field(row, "contentType", "content_type").as_deref()
+                == Some(payload.content_type.as_str()),
+        "embedding index state scope or content reference mismatch"
+    );
     let fingerprint = string_field(&row, "expectedFingerprint", "expected_fingerprint")
         .ok_or_else(|| anyhow::anyhow!("embedding index fingerprint is missing"))?;
     if fingerprint != payload.expected_fingerprint {
@@ -539,6 +550,94 @@ fn validate_canonical_passage(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn nullable_company_index_read_rejects_foreign_or_ambiguous_results() {
+        use axum::{http::HeaderMap, routing::post, Json, Router};
+        let option = |inner: Value| {
+            json!({"Sum":{"variants":[
+                {"name":{"some":"some"},"algebraic_type":inner},
+                {"name":{"some":"none"},"algebraic_type":{"Product":{"elements":[]}}}
+            ]}})
+        };
+        let elements = [
+            ("id", json!({"U64":[]})),
+            ("organization_id", json!({"U64":[]})),
+            ("company_id", option(json!({"U64":[]}))),
+            ("content_type", json!({"String":[]})),
+            ("content_id", json!({"U64":[]})),
+            ("expected_fingerprint", json!({"String":[]})),
+            ("index_generation", json!({"String":[]})),
+            ("sync_status", json!({"String":[]})),
+        ]
+        .into_iter()
+        .map(|(name, kind)| json!({"name":{"some":name},"algebraic_type":kind}))
+        .collect::<Vec<_>>();
+        let valid = json!([
+            41,
+            1,
+            [0, 2],
+            "ai_evidence_passage",
+            9,
+            payload().expected_fingerprint,
+            "qdrant-v1",
+            "pending"
+        ]);
+        let mut cases = vec![
+            (vec![valid.clone()], true),
+            (vec![], false),
+            (vec![valid.clone(), valid.clone()], false),
+        ];
+        for (column, value) in [
+            (1, json!(3)),
+            (2, json!([0, 3])),
+            (2, json!([1, []])),
+            (2, json!([0, "malformed"])),
+            (3, json!("other")),
+            (4, json!(10)),
+            (5, json!("stale-fingerprint")),
+            (6, json!("old-generation")),
+            (7, json!("synced")),
+        ] {
+            let mut row = valid.clone();
+            row[column] = value;
+            cases.push((vec![row], false));
+        }
+        for (rows, expected) in cases {
+            let body = json!([{"schema":{"elements":elements},"rows":rows}]);
+            let app = Router::new().route(
+                "/v1/database/test/sql",
+                post(move |headers: HeaderMap, sql: String| {
+                    let body = body.clone();
+                    async move {
+                        assert_eq!(headers["authorization"], "Bearer embedding-actor");
+                        assert!(!sql.contains("company_id ="));
+                        assert!(sql.contains("organization_id = 1"));
+                        assert!(
+                            sql.contains("content_type = 'ai_evidence_passage' AND content_id = 9")
+                        );
+                        assert!(sql.ends_with("LIMIT 2"));
+                        Json(body)
+                    }
+                }),
+            );
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+            let client = StdbClient::new(
+                format!("http://{address}"),
+                "test".into(),
+                "embedding-actor".into(),
+            )
+            .with_http_client(reqwest::Client::builder().no_proxy().build().unwrap());
+            let result = embedding_index_state_for_job(&client, 1, &payload()).await;
+            server.abort();
+            assert_eq!(result.is_ok(), expected, "{result:?}");
+            if expected {
+                assert_eq!(result.unwrap().id, 41);
+            }
+        }
+    }
 
     fn payload() -> EmbedJobPayload {
         let fingerprint = format!("{:x}", Sha256::digest(b"canonical text"));
