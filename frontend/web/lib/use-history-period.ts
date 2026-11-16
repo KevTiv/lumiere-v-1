@@ -8,7 +8,12 @@ import { parseHistoryPeriod, serializeHistoryPeriod, type HistoryPeriod } from "
 export function useHistoryPeriod(fallback: HistoryPeriod = "all") {
   const searchParams = useSearchParams()
   const pathname = usePathname()
-  const raw = searchParams?.get("period")
+  // Next's snapshot can lag its native History integration by a transition.
+  // A company-keyed remount must read the already-committed URL on its first render.
+  // useSearchParams still subscribes us to subsequent URL/Back navigation updates.
+  const raw = typeof window === "undefined"
+    ? searchParams?.get("period")
+    : new URLSearchParams(window.location.search).get("period")
   const fallbackKey = serializeHistoryPeriod(fallback)
   const invalidPeriod = raw != null && parseHistoryPeriod(raw) === null
   const [period, setPeriod] = useState<HistoryPeriod>(() => parseHistoryPeriod(raw) ?? fallback)

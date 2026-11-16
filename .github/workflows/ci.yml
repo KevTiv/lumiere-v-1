@@ -596,6 +596,11 @@ jobs:
         run: >-
           pnpm exec playwright test --config playwright.overflow.config.ts
 
+      - name: History ranges and company-remount browser regressions
+        env:
+          ACCOUNTING_UI_WARMUP_ROUTES: /insights,/module-insights
+        run: pnpm --dir web test:e2e:history-ranges
+
       - name: Assistant document modal and dedicated-page browser regressions
         run: pnpm --dir web test:e2e:assistant-guides
 

@@ -22,6 +22,11 @@ custom dates include the entire final calendar day, and timestamp intervals are
 start-inclusive/end-exclusive. Buckets coarsen rather than truncate old dates.
 Observed dates determine chart layout only, not authoritative source coverage.
 
+The first-render remount regression exposed an additional race in #436: Next's
+search-parameter snapshot can lag the native History update. The hook reads the
+committed browser URL when rendering in the browser, while retaining Next's
+search-parameter subscription for subsequent navigation and Back updates.
+
 ## Data meaning and limits
 
 - Open balances, aging, bank cash position, stock, current headcount, work queues,
@@ -42,6 +47,8 @@ Observed dates determine chart layout only, not authoritative source coverage.
   excluded. It is not a billing or historical MRR ledger.
 - HR and subscription dates use UTC; future headcount and subscription snapshots
   are clamped to now. Historical accounting excludes future postings.
+- New user-facing copy uses i18n keys, including the HR leave-usage title,
+  headcount legend, unspecified leave type, and reconstruction disclosures.
 - Invalid period links suppress historical figures until explicitly cleared.
   Current accounting operational queues remain available.
 - Accounting exports identify period, timezone, date field, exclusive bounds,
@@ -64,6 +71,8 @@ Run with Node 26.5.0:
 - `pnpm --dir frontend/web test:accounting-ui:models`: 96 + 5 passed.
 - `pnpm --dir frontend/packages/erp-shared test`: 199 passed.
 - `pnpm --dir frontend i18n:check`: passed.
+- `pnpm --dir frontend type-debt:check`: passed after recording the reduction
+  from 63 to 58 opaque records in the HR client.
 - `NODE_OPTIONS=--max-old-space-size=8192 pnpm --dir frontend/web typecheck`:
   passed. The default 4 GiB heap ran out of memory.
 
@@ -71,3 +80,9 @@ Browser results and final diff/security CI status are recorded in the replacemen
 PR. Synthetic browser evidence verifies rendered controls, exports, reload/Back,
 and company remounts, not authenticated tenant-data completeness. No production
 build or live-tenant test is claimed.
+
+`pnpm --dir frontend/web test:e2e:history-ranges` is a dedicated browser CI gate.
+For an isolated local run, set `ACCOUNTING_UI_PORT` to an unused port and
+`ACCOUNTING_UI_WARMUP_ROUTES=/insights,/module-insights`; the normal fixture
+warmup still defaults to all its routes. An installed Chrome binary can be
+selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.

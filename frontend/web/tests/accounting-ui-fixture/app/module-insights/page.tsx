@@ -22,7 +22,7 @@ function PeriodRemountProbe({ onSwitch }: { onSwitch: () => void }) {
   const [period, setPeriod] = useHistoryPeriod()
   const [initialPeriod] = useState(() => serializeHistoryPeriod(period))
   return <div className="flex flex-wrap items-center gap-3">
-    <Button variant="outline" onClick={() => { setPeriod("180d"); onSwitch() }}>Select period and immediately switch company</Button>
+    <Button variant="outline" className="h-auto min-h-11 max-w-full whitespace-normal" onClick={() => { setPeriod("180d"); onSwitch() }}>Select period and immediately switch company</Button>
     <span data-testid="period-at-company-remount">{initialPeriod}</span>
   </div>
 }
