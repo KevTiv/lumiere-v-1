@@ -429,7 +429,7 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
 
     const currentName = `COV-26 current company ${Date.now()}`
     const foreignName = `COV-26 foreign company ${Date.now()}`
-    await page.route("**/api/query/saved-reports", async (route) => {
+    await page.route("**/api/query/saved-reports?**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",

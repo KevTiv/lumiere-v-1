@@ -1,7 +1,8 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
@@ -84,11 +85,15 @@ function positiveId(value: unknown): number | null {
   return Number.isSafeInteger(id) && id > 0 ? id : null
 }
 
-export function useImportJobs(organizationId: bigint, enabled = true) {
+export function useImportJobs(organizationId: bigint, enabled = true, companyId?: number) {
+  const baseKey = ["import-jobs", rqBigIntKey(organizationId)]
+  const path = companyId === undefined
+    ? "/api/query/import-jobs"
+    : `/api/query/import-jobs?companyId=${companyId}` as const
   return useQuery({
-    queryKey: ["import-jobs", rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList("/api/query/import-jobs", "Failed to fetch import jobs"),
-    enabled: organizationId > 0n && enabled,
+    queryKey: companyId === undefined ? baseKey : [...baseKey, "company", companyId],
+    queryFn: () => fetchQueryList(path, "Failed to fetch import jobs"),
+    enabled: organizationId > 0n && enabled && (companyId === undefined || !!parseStrictU64(companyId)),
     refetchInterval: (query) => {
       const rows = (query.state.data ?? []) as unknown as ImportJobRow[]
       const pending = rows.some((row) => {
@@ -97,6 +102,89 @@ export function useImportJobs(organizationId: bigint, enabled = true) {
       })
       return pending ? 2000 : false
     },
+  })
+}
+
+export function importJobReadPath(
+  resource: "import-jobs" | "import-job-errors",
+  companyId: number | bigint,
+  jobId: string,
+  cursor?: string,
+) {
+  if (!parseStrictU64(companyId) || !parseStrictU64(jobId) || (cursor && !parseStrictU64(cursor))) {
+    throw new Error("Invalid import job read scope")
+  }
+  const params = new URLSearchParams({ companyId: String(companyId), jobId })
+  if (cursor) params.set("cursor", cursor)
+  return `/api/query/${resource}?${params}` as const
+}
+
+export async function fetchExactImportJob(
+  companyId: number | bigint,
+  jobId: string,
+  fetcher: typeof apiFetch = apiFetch,
+): Promise<ImportJobRow[]> {
+  const response = await fetcher(importJobReadPath("import-jobs", companyId, jobId))
+  if (!response.ok) {
+    throw Object.assign(new Error("Failed to fetch the selected import job"), { status: response.status })
+  }
+  const page = await response.json() as { data: ImportJobRow[] } | null
+  if (!Array.isArray(page?.data) || page.data.length > 1 || page.data.some(row =>
+    String(row?.id) !== jobId || typeof row.status !== "string",
+  )) {
+    throw new Error("The selected import job could not be verified")
+  }
+  return page.data
+}
+
+export function useExactImportJob(
+  organizationId: bigint,
+  companyId: number | bigint | undefined | null,
+  jobId: string | undefined | null,
+) {
+  return useQuery({
+    queryKey: ["import-jobs", rqBigIntKey(organizationId), "detail", String(companyId ?? ""), jobId ?? ""],
+    queryFn: () => fetchExactImportJob(companyId!, jobId!),
+    enabled: organizationId > 0n && !!parseStrictU64(companyId) && !!parseStrictU64(jobId),
+    refetchInterval: (query) => query.state.data?.[0]?.status === "pending" ? 2000 : false,
+  })
+}
+
+export async function fetchExactImportJobErrorPage(
+  companyId: number | bigint,
+  jobId: string,
+  cursor: string | undefined,
+  fetcher: typeof apiFetch = apiFetch,
+) {
+  const response = await fetcher(importJobReadPath("import-job-errors", companyId, jobId, cursor))
+  if (!response.ok) {
+    throw Object.assign(new Error("Failed to fetch the import row errors"), { status: response.status })
+  }
+  const page = await response.json() as { data: ImportJobErrorRow[]; nextCursor: string | null } | null
+  const next = parseStrictU64(page?.nextCursor)
+  const current = parseStrictU64(cursor)
+  if (
+    !Array.isArray(page?.data) ||
+    page.data.some(row => String(row?.jobId ?? row?.job_id) !== jobId) ||
+    (page.nextCursor !== null && (typeof page.nextCursor !== "string" || !next || (current !== undefined && next >= current)))
+  ) {
+    throw new Error("The import error page could not be verified")
+  }
+  return page
+}
+
+export function useExactImportJobErrors(
+  organizationId: bigint,
+  companyId: number | bigint | undefined | null,
+  jobId: string | undefined | null,
+  enabled: boolean,
+) {
+  return useInfiniteQuery({
+    queryKey: ["import-job-errors", rqBigIntKey(organizationId), "detail", String(companyId ?? ""), jobId ?? ""],
+    queryFn: ({ pageParam }) => fetchExactImportJobErrorPage(companyId!, jobId!, pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    enabled: enabled && organizationId > 0n && !!parseStrictU64(companyId) && !!parseStrictU64(jobId),
   })
 }
 

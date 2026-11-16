@@ -438,50 +438,6 @@ export function useUnassignTeamMemberSkill(organizationId: number) {
   })
 }
 
-export type AiAgentRunRow = {
-  id: number
-  run_key: string
-  status: string
-  summary?: string
-  step_count?: number
-  error_message?: string
-}
-
-export function useAiAgentRuns(organizationId?: number) {
-  return useQuery({
-    queryKey: ["ai-agent-runs", organizationId],
-    enabled: organizationId != null && organizationId > 0,
-    queryFn: async () => {
-      const r = await apiFetch(`/api/query/ai-agent-runs?organizationId=${organizationId}`)
-      if (!r.ok) throw new Error(await parseAiError(r))
-      const json = (await r.json()) as { data?: AiAgentRunRow[] }
-      return json.data ?? []
-    },
-    refetchInterval: 5_000,
-  })
-}
-
-export function useCancelAiAgentRun(organizationId: number, companyId?: number) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (runId: number) => {
-      if (companyId == null || companyId <= 0) {
-        throw new Error("A valid company is required to cancel an AI agent run")
-      }
-      const { urlPath, init } = stdbBffCommandPost("cancel_ai_agent_run", {
-        companyId,
-        runId,
-        reason: "Cancelled from UI",
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseAiError(r))
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["ai-agent-runs", organizationId] })
-    },
-  })
-}
-
 // ── Harness skill runs (dedicated /api/ai/skills/* routes) ───────────────────
 
 /** Typed pre-dispatch rejection; unlike transport failure it proves no run started. */

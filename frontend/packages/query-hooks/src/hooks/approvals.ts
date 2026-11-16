@@ -119,8 +119,9 @@ export function humanTaskInboxQueryKey(organizationId: number, companyId?: numbe
   return ["workflow-human-tasks-inbox", String(organizationId), String(companyId ?? "")] as const
 }
 
-export async function fetchHumanTaskInboxRows(): Promise<HumanTaskRow[]> {
-  const r = await apiFetch("/api/query/workflow-human-tasks-inbox")
+export async function fetchHumanTaskInboxRows(companyId?: number | null): Promise<HumanTaskRow[]> {
+  const scope = companyId != null && companyId > 0 ? `?companyId=${companyId}` : ""
+  const r = await apiFetch(`/api/query/workflow-human-tasks-inbox${scope}`)
   if (!r.ok) throw new Error(await parseCallError(r))
   const j = (await r.json()) as { data?: HumanTaskRow[] }
   return j.data ?? []
@@ -134,7 +135,7 @@ export function useHumanTaskInbox(
   return useQuery({
     queryKey: humanTaskInboxQueryKey(organizationId, companyId),
     queryFn: async () => {
-      const rows = await fetchHumanTaskInboxRows()
+      const rows = await fetchHumanTaskInboxRows(companyId)
       if (companyId == null || companyId <= 0) return rows
       return rows.filter((row) => {
         const cid = Number(row.companyId ?? row.company_id ?? 0)
@@ -151,9 +152,14 @@ export function useApprovalInbox(organizationId: number, enabled = true) {
   return useHumanTaskInbox(organizationId, null, enabled)
 }
 
-export function useApprovalInboxCount(organizationId: number, enabled = true) {
-  const query = useHumanTaskInbox(organizationId, null, enabled)
-  const open = (query.data ?? []).filter((row) => {
+export function useApprovalInboxCount(
+  organizationId: number,
+  companyId: number | null,
+  enabled = true,
+) {
+  const scoped = enabled && companyId != null && companyId > 0
+  const query = useHumanTaskInbox(organizationId, companyId, scoped)
+  const open = (scoped && query.isSuccess ? query.data : []).filter((row) => {
     const status = taskStatusTag(row)
     return status === "Open" || status === "Claimed"
   })

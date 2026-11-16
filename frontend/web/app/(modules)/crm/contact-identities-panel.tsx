@@ -12,6 +12,8 @@ import {
 } from "lucide-react"
 
 import { useTranslation } from "@lumiere/i18n"
+import { moduleCollection } from "@lumiere/ui/lib/module-data-state"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
   assignContactRoleForm,
@@ -136,8 +138,8 @@ export function ContactIdentitiesPanel({
   const { t } = useTranslation()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const organization = BigInt(organizationId)
-  const { data: identityRows = [], isLoading: identitiesLoading } = useContactPhoneIdentities(organization)
-  const { data: roleRows = [], isLoading: rolesLoading } = useContactRoleAssignments(organization)
+  const { rows: identityRows, state: identityState } = moduleCollection(useContactPhoneIdentities(organization))
+  const { rows: roleRows, state: roleState } = moduleCollection(useContactRoleAssignments(organization))
   const createIdentity = useCreateContactIdentity(organization)
   const updateIdentity = useUpdateContactIdentity(organization)
   const archiveIdentity = useArchiveContactIdentity(organization)
@@ -280,14 +282,18 @@ export function ContactIdentitiesPanel({
           <CardTitle>Phone identities</CardTitle>
           <CardDescription>Masked by default. Keep the preferred contact method current.</CardDescription>
           <CardAction>
-            <Button size="sm" onClick={() => { setActionError(null); setIdentityFormError(null); setIdentityDialog("create") }}>
+            <Button size="sm" disabled={identityState.status !== "ready"} onClick={() => { setActionError(null); setIdentityFormError(null); setIdentityDialog("create") }}>
               <PlusIcon data-icon="inline-start" />
               Add phone
             </Button>
           </CardAction>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          {identities.length > 0 ? identities.map((identity) => {
+          {identityState.status === "loading" ? (
+            <p role="status" className="text-sm text-muted-foreground">{t("common.loading")}</p>
+          ) : identityState.status !== "ready" ? (
+            <ModuleDataNotice state={identityState} />
+          ) : identities.length > 0 ? identities.map((identity) => {
             const id = rowId(identity)
             const state = verificationState(identity)
             return (
@@ -318,11 +324,11 @@ export function ContactIdentitiesPanel({
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon"><PhoneIcon /></EmptyMedia>
-                <EmptyTitle>{identitiesLoading ? "Loading phone identities" : "No phone identities"}</EmptyTitle>
+                <EmptyTitle>No phone identities</EmptyTitle>
                 <EmptyDescription>Add a primary number before creating a reminder or mobile-money transaction.</EmptyDescription>
               </EmptyHeader>
               <EmptyContent>
-                <Button size="sm" onClick={() => { setActionError(null); setIdentityFormError(null); setIdentityDialog("create") }}>
+                <Button size="sm" disabled={identityState.status !== "ready"} onClick={() => { setActionError(null); setIdentityFormError(null); setIdentityDialog("create") }}>
                   <PlusIcon data-icon="inline-start" />
                   Add phone
                 </Button>
@@ -337,14 +343,18 @@ export function ContactIdentitiesPanel({
           <CardTitle>Roles</CardTitle>
           <CardDescription>Commercial roles are scoped to the active company when one is selected.</CardDescription>
           <CardAction>
-            <Button size="sm" variant="outline" onClick={() => { setActionError(null); setRoleFormError(null); setRoleDialogOpen(true) }}>
+            <Button size="sm" variant="outline" disabled={roleState.status !== "ready"} onClick={() => { setActionError(null); setRoleFormError(null); setRoleDialogOpen(true) }}>
               <UserRoundPlusIcon data-icon="inline-start" />
               Assign role
             </Button>
           </CardAction>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          {roles.length > 0 ? roles.map((role) => {
+          {roleState.status === "loading" ? (
+            <p role="status" className="text-sm text-muted-foreground">{t("common.loading")}</p>
+          ) : roleState.status !== "ready" ? (
+            <ModuleDataNotice state={roleState} />
+          ) : roles.length > 0 ? roles.map((role) => {
             const active = isActive(role)
             return (
               <div key={String(rowId(role))} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
@@ -364,7 +374,7 @@ export function ContactIdentitiesPanel({
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon"><ShieldCheckIcon /></EmptyMedia>
-                <EmptyTitle>{rolesLoading ? "Loading roles" : "No roles assigned"}</EmptyTitle>
+                <EmptyTitle>No roles assigned</EmptyTitle>
                 <EmptyDescription>Assign customer, supplier, member, or another operational role.</EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -374,7 +384,7 @@ export function ContactIdentitiesPanel({
 
       <RuntimeFormModal
         key={editingIdentity ? `identity-${rowId(editingIdentity)}` : "identity-new"}
-        open={identityDialog != null}
+        open={identityDialog != null && identityState.status === "ready"}
         onOpenChange={(open) => !open && setIdentityDialog(null)}
         staticConfig={identityConfig}
         moduleId="crm"
@@ -386,7 +396,7 @@ export function ContactIdentitiesPanel({
         onSubmit={saveIdentity}
       />
       <RuntimeFormModal
-        open={roleDialogOpen}
+        open={roleDialogOpen && roleState.status === "ready"}
         onOpenChange={(open) => !open && setRoleDialogOpen(false)}
         staticConfig={assignContactRoleForm(t)}
         moduleId="crm"
@@ -399,7 +409,7 @@ export function ContactIdentitiesPanel({
       />
       <RuntimeFormModal
         key={endingRole ? `role-${rowId(endingRole)}` : "role-none"}
-        open={endingRole != null}
+        open={endingRole != null && roleState.status === "ready"}
         onOpenChange={(open) => !open && setEndingRole(null)}
         staticConfig={endContactRoleForm(t)}
         moduleId="crm"

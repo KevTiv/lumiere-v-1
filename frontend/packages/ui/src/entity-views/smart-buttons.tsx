@@ -8,8 +8,8 @@ import { cn } from "../lib/utils"
 export interface SmartButton {
   id: string
   label: string
-  /** Number of related records. A button with `hideWhenZero` and no records is left out. */
-  count: number
+  /** Related-record count or a read status. `hideWhenZero` hides only a verified numeric zero. */
+  count: number | string
   icon?: ReactNode
   /** Where the button goes; give `onClick` instead for something that stays on the page. */
   href?: string

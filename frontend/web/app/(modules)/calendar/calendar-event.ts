@@ -87,6 +87,8 @@ export function calendarEventForView(event: Row, contacts: readonly Row[] = []):
     startTime,
     endTime,
     allDay: event.allday === true,
+    isRecurring: unwrapSome(event.recurrency) === true,
+    recurrenceRule: eventText(event.rrule),
     type: 'meeting',
     status: state === 'cancelled' || state === 'cancel' ? 'cancelled' : state === 'confirmed' ? 'confirmed' : state === 'completed' ? 'completed' : 'scheduled',
     createdBy: '',

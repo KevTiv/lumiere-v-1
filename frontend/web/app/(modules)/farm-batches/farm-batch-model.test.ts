@@ -1,11 +1,15 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { pinnedSourceReview } from "@lumiere/query-hooks/hooks/source-review-navigation"
+import { getProductSurfaceForPathname, isFirstOrgRouteAdmitted } from "@lumiere/ui/lib/product-surface-catalog"
 import { farmEventPrefill } from "./farm-assistant-prefill"
 import {
   FarmApiError,
   eventSummary,
   farmApiPath,
   farmDate,
+  farmImportHref,
+  farmSourceReviewHref,
   farmRecordId,
   farmResponse,
   selectedFarmEventKind,
@@ -74,4 +78,28 @@ test("a successful HTTP response without a native result still requires confirma
   )
   fetch.mock.mockImplementation(async () => Response.json({ data: [], nextBeforeId: "42" }))
   assert.deepEqual(await farmResponse("/api/farm-batches"), { data: [], nextBeforeId: "42" })
+})
+
+test("farm import and pinned provenance stay inside the admitted Farm Batches product surface", () => {
+  const companyId = "4097"
+  const intake = new URL(farmImportHref(companyId), "https://erp.test")
+  assert.equal(intake.pathname, "/farm-batches/import")
+  assert.equal(intake.searchParams.get("companyId"), companyId)
+  assert.equal(intake.hash, "#start-import")
+  const surface = getProductSurfaceForPathname(intake.pathname)
+  assert.equal(surface?.id, "farm-batches")
+  assert.equal(isFirstOrgRouteAdmitted(surface!.id, false), true)
+
+  const source = { reviewBatchId: "24", reviewItemId: "9007199254740993", revision: 3 }
+  const href = farmSourceReviewHref(companyId, source)
+  assert.ok(href)
+  const review = new URL(href, "https://erp.test")
+  assert.equal(review.pathname, intake.pathname)
+  assert.equal(review.hash, "#source-review-history")
+  assert.deepEqual(pinnedSourceReview(review.search, companyId), {
+    batchId: source.reviewBatchId, itemId: source.reviewItemId, revision: 3,
+  })
+  assert.equal(pinnedSourceReview(review.search, "4098"), null)
+  assert.equal(farmSourceReviewHref(companyId, { ...source, revision: 0 }), undefined)
+  assert.equal(farmSourceReviewHref(companyId, { file: "old.csv", row: 8 }), undefined)
 })

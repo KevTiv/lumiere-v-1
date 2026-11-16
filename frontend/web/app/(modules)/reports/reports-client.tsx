@@ -1106,10 +1106,13 @@ function ReportsClientLoaded({
             type: "custom" as const,
             customContent: (
               <PivotExplorer
+                key={String(operatingCompanyId)}
                 organizationId={orgId}
                 companyId={operatingCompanyId}
-                financialReports={reports as Record<string, unknown>[]}
-                trialBalances={trialBalances as Record<string, unknown>[]}
+                financialReports={reports}
+                trialBalances={scopedReports(trialBalances, orgId, operatingCompanyId)}
+                reportsState={moduleQueryState(reportsQuery)}
+                balancesState={moduleQueryState(trialBalancesQuery)}
               />
             ),
           }

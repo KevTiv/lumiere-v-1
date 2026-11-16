@@ -7,6 +7,7 @@ import Link from "next/link"
 import { useHistoryPeriod } from "@/lib/use-history-period"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
 import {
   Button,
   DashboardGrid,
@@ -29,7 +30,7 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useSaleOrders, type SaleOrder } from "@lumiere/query-hooks/hooks/sales"
 import { useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
 import { usePaymentReconciliations, usePaymentTransactions } from "@lumiere/query-hooks/hooks/accounting"
-import { useStockQuants, useProducts } from "@lumiere/query-hooks/hooks/inventory"
+import { useStockQuants, useReplenishmentRules } from "@lumiere/query-hooks/hooks/inventory"
 import { usePurchaseOrders, type PurchaseOrder } from "@lumiere/query-hooks/hooks/purchasing"
 import { useTasks, useProjects, type ProjectTask, type ProjectProject } from "@lumiere/query-hooks/hooks/projects"
 import { useContacts, type Contact } from "@lumiere/query-hooks/hooks/crm"
@@ -41,13 +42,13 @@ import { useExpenseSheetsToApprove } from "@lumiere/query-hooks/hooks/expenses"
 import { useMessageBatches } from "@lumiere/query-hooks/hooks/messages"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
-import { isDraftVendorBill, lowStockQuants, overduePostedInvoices } from "@/lib/owner-queues"
+import { stockReorderQueue } from "@lumiere/erp-shared/replenishment-stock"
+import { isDraftVendorBill, overduePostedInvoices } from "@/lib/owner-queues"
 import { OwnerControlLoop } from "./owner-control-loop"
 import { ActivationChecklistPanel } from "./activation-checklist-panel"
 import { useProductivitySections } from "@/lib/use-productivity-sections"
 import { DailyWorkWorkspace } from "../../../components/daily-work-workspace"
 import { overviewResourceStatus, resourceStatusLabel, combinedResourceStatus, type OverviewInitialStates } from "./resource-state"
-import type { StockQuant, Product } from "@lumiere/stdb/types"
 import { confirmedOrder, confirmedOrderTrend, orderDate, overviewFinancialInputsComplete, overviewMoneySummary } from "./financial-summary"
 import { overviewTaskMetrics } from "./task-metrics"
 
@@ -55,8 +56,6 @@ interface OverviewClientProps {
   organizationId?: number
   initialResourceStates?: OverviewInitialStates
   initialOrders?: SaleOrder[]
-  initialStockQuants?: StockQuant[]
-  initialProducts?: Product[]
   initialTasks?: ProjectTask[]
   initialProjects?: ProjectProject[]
   initialPurchaseOrders?: PurchaseOrder[]
@@ -110,8 +109,6 @@ function OverviewClientLoaded({
   organizationId,
   initialResourceStates,
   initialOrders,
-  initialStockQuants,
-  initialProducts,
   initialTasks,
   initialProjects,
   initialPurchaseOrders,
@@ -123,14 +120,16 @@ function OverviewClientLoaded({
   const { target: compositionTarget, slot: compositionSlot } = usePageCompositionActionSlot()
   const historyBounds = useMemo(() => invalidPeriod ? null : resolveHistoryPeriod(timeRange, { timeZone: "UTC" }), [invalidPeriod, timeRange])
   const { orgId } = orgBigInts(organizationId)
+  const { activeCompanyReady } = useErpSession()
   const operatingCompanyId = useOperatingCompanyId(organizationId)
   const companies = useCompanies(organizationId, true)
   const companyName = companies.data?.find((company) => String(company.id) === String(operatingCompanyId))?.name
 
   const ordersQuery = useSaleOrders(orgId, initialOrders)
   const movesQuery = useAccountMoves(orgId)
-  const stockQuantsQuery = useStockQuants(orgId, initialStockQuants)
-  const productsQuery = useProducts(orgId, initialProducts)
+  const stockCompanyId = activeCompanyReady && operatingCompanyId ? BigInt(operatingCompanyId) : undefined
+  const stockQuantsQuery = useStockQuants(orgId, undefined, stockCompanyId != null, stockCompanyId)
+  const reorderRulesQuery = useReplenishmentRules(orgId, undefined, stockCompanyId != null, stockCompanyId)
   const tasksQuery = useTasks(orgId, initialTasks)
   const projectsQuery = useProjects(orgId, initialProjects)
   const purchaseOrdersQuery = usePurchaseOrders(orgId, initialPurchaseOrders)
@@ -149,7 +148,7 @@ function OverviewClientLoaded({
   const orders = ordersQuery.data ?? []
   const moves = movesQuery.data ?? []
   const stockQuants = stockQuantsQuery.data ?? []
-  const products = productsQuery.data ?? []
+  const reorderRules = reorderRulesQuery.data ?? []
   const tasks = tasksQuery.data ?? []
   const contacts = contactsQuery.data ?? []
   const paymentTransactions = paymentTransactionsQuery.data ?? []
@@ -159,8 +158,8 @@ function OverviewClientLoaded({
   const resourceStates = {
     "sale-orders": overviewResourceStatus(ordersQuery, initialResourceStates?.["sale-orders"]),
     "account-moves": overviewResourceStatus(movesQuery),
-    "stock-quants": overviewResourceStatus(stockQuantsQuery, initialResourceStates?.["stock-quants"]),
-    products: overviewResourceStatus(productsQuery, initialResourceStates?.products),
+    "stock-quants": overviewResourceStatus(stockQuantsQuery),
+    "replenishment-rules": overviewResourceStatus(reorderRulesQuery),
     tasks: overviewResourceStatus(tasksQuery, initialResourceStates?.tasks),
     projects: overviewResourceStatus(projectsQuery, initialResourceStates?.projects),
     "purchase-orders": overviewResourceStatus(purchaseOrdersQuery, initialResourceStates?.["purchase-orders"]),
@@ -180,7 +179,7 @@ function OverviewClientLoaded({
   const currencyState = resourceStatusLabel(resourceStates.currencies)
   const aiState = resourceStatusLabel(resourceStates["ai-action-drafts"])
   const paymentsState = companyState ?? resourceStatusLabel(combinedResourceStatus(resourceStates["payment-transactions"], resourceStates["payment-reconciliations"]))
-  const stockState = companyState ?? resourceStatusLabel(combinedResourceStatus(resourceStates["stock-quants"], resourceStates.products))
+  const stockState = companyState ?? resourceStatusLabel(combinedResourceStatus(resourceStates["stock-quants"], resourceStates["replenishment-rules"]))
   const messagesState = companyState ?? resourceStatusLabel(resourceStates["message-batches"])
   const [isHydrated, setIsHydrated] = useState(false)
 
@@ -301,12 +300,13 @@ function OverviewClientLoaded({
       const payment = row as Record<string, unknown>
       return matchesCompany(payment, operatingCompanyId) && enumTag(payment.status) === "Posted" && !reconciledTransactionIds.has(String(payment.id))
     }).length
-    const lowStockProducts = lowStockQuants(stockQuants, products, { organizationId: orgId, companyId: operatingCompanyId }).length
+    const lowStock = stockReorderQueue(stockQuants, reorderRules, { organizationId: orgId, companyId: operatingCompanyId })
+    const lowStockProducts = lowStock.incomplete ? t("inventory.stockReadIncomplete", { defaultValue: "Stock data incomplete" }) : lowStock.entries.length
     const pendingMessageApprovals = messageBatches.filter((row) => matchesCompany(row as Record<string, unknown>, operatingCompanyId) && enumTag((row as Record<string, unknown>).status) === "PendingApproval").length
     const overdueInvoices = invoicesComplete ? overduePostedInvoices(scopedMoves).length : incompleteFinancialData
     const draftBills = scopedMoves.filter(isDraftVendorBill).length
     return { overdueInvoices, unreconciledPayments, lowStockProducts, pendingMessageApprovals, draftBills }
-  }, [messageBatches, operatingCompanyId, orgId, paymentReconciliations, paymentTransactions, products, scopedMoves, stockQuants, invoicesComplete, incompleteFinancialData])
+  }, [messageBatches, operatingCompanyId, orgId, paymentReconciliations, paymentTransactions, reorderRules, scopedMoves, stockQuants, invoicesComplete, incompleteFinancialData, t])
 
   const router = useRouter()
   const workspaceProfile = useWorkspaceProfile()

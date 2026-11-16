@@ -7,6 +7,7 @@ import {
   useSetCompanyCountryPack,
 } from "@lumiere/query-hooks/hooks/organization-company"
 import { CountryPackReadinessPanel } from "@lumiere/ui"
+import { mergeModuleStates, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import {
   Card,
   CardDescription,
@@ -49,7 +50,7 @@ export function CrmCountryPackPanel({
       <CountryPackReadinessPanel
         definitions={catalog.data ?? []}
         activations={packs.data ?? []}
-        isLoading={catalog.isLoading || packs.isLoading}
+        dataState={mergeModuleStates([moduleQueryState(catalog), moduleQueryState(packs)])}
         isPending={setPack.isPending}
         title={t("crm.countryPacks.title", "Country packs")}
         description={t(

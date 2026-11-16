@@ -4095,6 +4095,12 @@
       "opportunityFunnel": "Opportunity Funnel",
       "weightedPipeline": "Weighted pipeline",
       "forecastSnapshot": "Last forecast",
+      "forecastCaptured": "Captured",
+      "forecastEmpty": "No forecast snapshots for this company.",
+      "forecastPeriod": "Snapshot period",
+      "forecastSaved": "Forecast snapshot saved",
+      "forecastSaving": "Saving forecast snapshot…",
+      "forecastStoredWeight": "Weighted pipeline (currency unspecified)",
       "pipelineHealthAttribution": "Pipeline & attribution"
     },
     "leads": {
@@ -4983,12 +4989,44 @@
     },
     "segments": {
       "rulesTitle": "Dynamic segment rules",
-      "rulesDescription": "Bounded AST (country / flags). Evaluate to refresh membership.",
+      "rulesDescription": "Contacts must match every rule. Evaluate to refresh membership.",
       "select": "Dynamic segment",
       "selectPlaceholder": "Choose segment",
       "noRules": "No rules yet.",
-      "applySample": "Apply AU customer rules",
-      "evaluate": "Evaluate"
+      "evaluate": "Evaluate",
+      "addRule": "Add rule",
+      "evaluated": "Membership refreshed.",
+      "existingMembers": "Current membership: {{count}}",
+      "removeAllImpact": "This removes every rule. Current membership stays in place, and evaluation requires at least one rule.",
+      "removeRule": "Remove rule",
+      "replacementImpact": "These rules replace the current rules. Existing membership changes when you evaluate the new rules.",
+      "replacementTitle": "Rules after saving",
+      "resetRules": "Reload saved rules",
+      "reviewRules": "Review changes",
+      "ruleField": "Rule field {{number}}",
+      "ruleOperator": "Rule operator {{number}}",
+      "rulesCannotEdit": "These saved rules include settings that this editor cannot preserve.",
+      "rulesChanged": "The saved rules changed while you were editing.",
+      "rulesRefreshConflict": "Saved rules could not be verified. Reload the saved rules before replacing them.",
+      "rulesSaved": "Rules saved. Evaluate to update membership.",
+      "ruleValue": "Rule value {{number}}",
+      "saveRules": "Save replacement rules",
+      "fields": {
+        "CountryCode": "Country code",
+        "City": "City",
+        "Industry": "Industry",
+        "IsCustomer": "Customer",
+        "IsProspect": "Prospect",
+        "IsVendor": "Vendor",
+        "TagId": "Contact tag"
+      },
+      "operators": {
+        "Eq": "Equals",
+        "Neq": "Does not equal",
+        "Contains": "Contains",
+        "IsTrue": "Yes",
+        "IsFalse": "No"
+      }
     },
     "inlineEdit": {
       "emailInvalid": "Enter a valid email address",
@@ -6058,7 +6096,12 @@
       "pendingTransfers": "Pending Transfers",
       "stockTurnover": "Top Products by Stock Movement",
       "skuFallback": "SKU-{{id}}",
-      "productFallback": "Product {{id}}"
+      "productFallback": "Product {{id}}",
+      "belowMinimum": "Below minimum",
+      "categoryUnavailable": "Category unavailable",
+      "incompleteLowStock": "Low Stock Items · incomplete data",
+      "rulesWithoutStock": "{{count}} reorder positions have no stock record. Open Replenishment to review those rules.",
+      "zeroAvailable": "Zero available"
     },
     "tabs": {
       "productCategories": "Categories",
@@ -7405,7 +7448,12 @@
         "empty": "No attributes or variants configured for this product.",
         "title": "Variants",
         "valueCount": "Count",
-        "values": "Values"
+        "values": "Values",
+        "attributes": "Variant attributes",
+        "noAttributes": "No variant attributes configured.",
+        "noSaved": "No saved variants for this product.",
+        "reference": "Variant reference",
+        "unavailable": "Saved variants are unavailable."
       },
       "vendors": {
         "currency": "Currency",
@@ -7444,6 +7492,16 @@
       "description": "Packed shipments awaiting confirmation or dispatch",
       "emptyMessage": "No packages found.",
       "title": "Packages"
+    },
+    "currencyEmpty": "No active currencies are available.",
+    "currencyLoading": "Loading currencies…",
+    "stockReadIncomplete": "Stock data incomplete",
+    "warehouse3d": {
+      "invalidMove": "Choose a different active internal location and enter a quantity within available stock.",
+      "loading": "Loading warehouse data…",
+      "noWarehouses": "No active warehouses in this company.",
+      "noZones": "No 3D zones are set up for this warehouse.",
+      "selectWarehouse": "Select a warehouse"
     }
   },
   "purchasing": {
@@ -8307,6 +8365,8 @@
       "attachments": "Attachments",
       "backToOrders": "Back to purchase orders",
       "bills": "Vendor bills",
+      "relatedAccessRestricted": "Access restricted",
+      "relatedUnavailable": "Unavailable",
       "createBill": "Create bill",
       "discussion": "Discussion",
       "handoffs": "Receipts & vendor bills",
@@ -10391,6 +10451,7 @@
       "confirm": "Confirm event",
       "noAttendees": "No attendees",
       "editRecurrence": "Edit recurrence",
+      "invalidRecurrence": "Enter a valid daily, weekly, monthly or yearly recurrence rule.",
       "rrule": "Recurrence rule",
       "rruleType": "Recurrence type",
       "duplicate": "Duplicate",
@@ -10441,6 +10502,7 @@
       "agendaRange": "{{start}} to {{end}}",
       "eventDetails": "Event details",
       "browserTimezone": "Times shown in {{timezone}} (this browser)",
+      "recurrenceUnavailable": "Some recurring dates could not be displayed. Open the original event to check its recurrence.",
       "timezoneSource": {
         "account": "Times shown in {{timezone}} (account setting)",
         "browser": "Times shown in {{timezone}} (browser fallback)",
@@ -10989,7 +11051,10 @@
       "manage": "Manage",
       "deleteAction": "Move to recycle bin",
       "versionChanges": "Changes",
-      "standalone": "Standalone file"
+      "standalone": "Standalone file",
+      "holdStatusChanged": "Legal hold status changed or is unavailable. Check the current status and try again.",
+      "holdUnavailable": "Legal hold status is unavailable.",
+      "loadingHold": "Checking legal hold status…"
     },
     "knowledgeActions": {
       "categoryInvalid": "Enter a name, a colour from 0 to 11 and a whole-number sequence.",
@@ -13987,7 +14052,9 @@
       "chooseOutcome": "Choose a verdict",
       "reviewNote": "Review note",
       "saveReview": "Save review",
-      "navigation": "Guide navigation"
+      "navigation": "Guide navigation",
+      "historyLoading": "Loading revision history…",
+      "historyUnavailable": "Revision history is unavailable."
     },
     "title": "AI Assistant",
     "subtitle": "Type @ for commands",
@@ -14296,7 +14363,8 @@
       "failed": "Failed",
       "expired": "Expired",
       "parameters": "Draft parameters"
-    }
+    },
+    "skillSetupUnavailable": "Ask your Lumière administrator to check AI setup for this company."
   },
   "aiHarness": {
     "platformProfile": {
@@ -14508,7 +14576,9 @@
       "summaryWithheld": "The summary is withheld pending verification. You can review the source figures below.",
       "citationsTitle": "Citations",
       "rowsProcessed": "{{count}} rows",
-      "browserTimezone": "Uses this browser’s timezone. Financial reports may use a different reporting timezone."
+      "browserTimezone": "Uses this browser’s timezone. Financial reports may use a different reporting timezone.",
+      "catalogEmpty": "No reports are available for composition.",
+      "catalogUnavailable": "The report catalog could not be loaded."
     },
     "redAction": {
       "title": "Red Action Drafts",
@@ -15081,6 +15151,11 @@
       "discussion": "Discussion",
       "notFound": "Vehicle not found",
       "notFoundHint": "It may have been deleted, or belong to another company."
+    },
+    "position": {
+      "lastKnown": "Last known position · {{timestamp}}",
+      "recent": "Recent position · {{timestamp}}",
+      "timestampUnavailable": "Position timestamp unavailable"
     }
   },
   "tasks": {
@@ -16270,7 +16345,8 @@
       "errorsLoading": "Loading import row errors…",
       "unknownStatus": "Status unavailable",
       "backToResults": "Back to ERP results",
-      "backToImports": "Back to Data import"
+      "backToImports": "Back to Data import",
+      "loadMoreErrors": "Load more row errors"
     },
     "importReview": {
       "sourceMeaning": "Interpret source notes",
@@ -17530,6 +17606,8 @@
       "updateDefinition": "Update pivot",
       "deleteDefinition": "Delete pivot",
       "exportXlsx": "Export XLSX",
+      "exportFailed": "Could not export the pivot table. Try again.",
+      "noSourceReports": "Generate a financial report to preview a pivot.",
       "empty": "Select a generated report to preview the pivot.",
       "searchPlaceholder": "Search pivot rows…"
     },
@@ -18452,7 +18530,7 @@
       "update": "Update"
     },
     "agentRuns": {
-      "description": "Live skill orchestration runs for this organization.",
+      "description": "Live skill orchestration runs for the selected company.",
       "empty": "No runs yet.",
       "stepCount": " ({{count}} steps)",
       "stepCount_one": " ({{count}} step)",
@@ -18467,12 +18545,16 @@
         "pending": "Pending",
         "running": "Running"
       },
-      "title": "Agent runs"
+      "title": "Agent runs",
+      "chooseCompany": "Select a company to view its agent runs.",
+      "unavailable": "Agent runs could not be loaded for this company."
     },
     "assignments": {
       "description": "Link AI personas to skills they may run by default.",
       "empty": "No skill assignments yet.",
-      "title": "Team member skill assignments"
+      "title": "Team member skill assignments",
+      "inputsUnavailable": "The skill or team-member list is unavailable.",
+      "unavailable": "Skill assignments are unavailable."
     },
     "confirm": {
       "removeAssignment": "Remove this skill assignment?"
@@ -18834,7 +18916,8 @@
         "furniture": "Furniture",
         "packaging": "Packaging",
         "rawMaterials": "Raw Materials",
-        "tools": "Tools"
+        "tools": "Tools",
+        "unavailable": "Category unavailable"
       },
       "details": {
         "actions": "Actions",
@@ -18846,7 +18929,9 @@
         "quantity": "Quantity",
         "removeConfirmation": "Remove \"{{name}}\" from inventory?",
         "saveQuantity": "Save quantity",
-        "stockRange": "Min: {{min}} / Max: {{max}}"
+        "stockRange": "Min: {{min}} / Max: {{max}}",
+        "receivedOn": "Received on",
+        "reorderMinimum": "Reorder minimum: {{min}}"
       },
       "emptySlot": {
         "addItemHint": "Click to add item",

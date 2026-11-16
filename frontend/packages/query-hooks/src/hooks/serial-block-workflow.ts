@@ -27,6 +27,7 @@ type BlockRunInput = BlockSerialInput & {
 export function useSerialBlockWorkflow(
   organizationId: bigint,
   callbacks?: WorkflowSurfaceCallbacks,
+  companyId?: bigint,
 ) {
   const qc = useQueryClient()
   const runner = useWorkflowRunner(organizationId, callbacks)
@@ -41,12 +42,12 @@ export function useSerialBlockWorkflow(
           input,
           input.snapshot,
           (await qc.fetchQuery({
-            ...stockProductionSerialsQueryOptions(organizationId),
+            ...stockProductionSerialsQueryOptions(organizationId, companyId),
             staleTime: 0,
           })) as unknown as RowValueMap[],
         ),
     }),
-    [organizationId, qc],
+    [companyId, organizationId, qc],
   )
 
   const block = useMemo(
@@ -56,7 +57,7 @@ export function useSerialBlockWorkflow(
         context?: { navigateToNext?: boolean },
       ) => {
         const rows = (await qc.fetchQuery({
-          ...stockProductionSerialsQueryOptions(organizationId),
+          ...stockProductionSerialsQueryOptions(organizationId, companyId),
           staleTime: 0,
         })) as unknown as RowValueMap[]
         const snapshot = captureSerialBlockSnapshot(input, rows)
@@ -72,7 +73,7 @@ export function useSerialBlockWorkflow(
           { navigateToNext: context?.navigateToNext },
         )
       },
-    [organizationId, qc, runner, spec],
+    [companyId, organizationId, qc, runner, spec],
   )
 
   return {

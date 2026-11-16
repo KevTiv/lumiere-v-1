@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/select"
 import {
   User,
-  Bell,
   Palette,
   Users,
   Shield,
@@ -43,7 +42,6 @@ import { SsoSettings } from "./sso-settings"
 
 const iconMap: Record<string, ComponentType<{ className?: string }>> = {
   user: User,
-  bell: Bell,
   palette: Palette,
   users: Users,
   shield: Shield,
@@ -59,7 +57,7 @@ const settingsGroups = [
   {
     id: "account",
     title: "Account",
-    sectionIds: ["profile", "notifications", "appearance", "custom-fields"],
+    sectionIds: ["profile", "appearance", "custom-fields"],
   },
   {
     id: "organization",
@@ -201,7 +199,6 @@ export function SettingsModule({
       case "my-profile":
         return <ProfileSettings section="profile" />
       case "profile":
-      case "notifications":
       case "appearance":
         return <ProfileSettings section={active.id} />
       case "form-config":

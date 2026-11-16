@@ -12,9 +12,9 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { apiFetch, fetchQueryList, type QueryRow, type QueryRows, rqBigIntKey } from "../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
+import { parseStrictU64, scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import type {
   AiDocumentProcessingJob,
   AiInsight,
@@ -26,8 +26,8 @@ import type {
   KnowledgeArticleCategory,
 } from "@lumiere/stdb/types"
 
-import { decodeOperationDispatch } from "@lumiere/api-client"
-import { responseErrorMessage as parseCallErrorDocuments } from "@lumiere/api-client/response-error"
+import { decodeOperationDispatch, decodeQueryListResponse } from "@lumiere/api-client"
+import { httpResponseError, responseErrorMessage as parseCallErrorDocuments } from "@lumiere/api-client/response-error"
 
 import { dispatchNamedOperation } from "../operation-dispatch"
 import { resolveDocumentVersionEffect } from "./document-version-effect"
@@ -137,14 +137,37 @@ export function useDocumentVersions(organizationId: bigint, initialData?: QueryR
   })
 }
 
-export function useDocumentLegalHolds(organizationId: bigint, initialData?: QueryRows) {
-  return useQuery<QueryRows>({
-    queryKey: ['document-legal-holds', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList('/api/query/document-legal-holds', 'Failed to fetch document legal holds'),
+export function documentLegalHoldQueryOptions(
+  organizationId: bigint,
+  companyId: bigint | undefined,
+  actorId: string | null | undefined,
+  enabled = true,
+) {
+  return {
+    queryKey: ['document-legal-holds', rqBigIntKey(organizationId), companyId?.toString(), actorId] as const,
+    queryFn: async (): Promise<QueryRows> => {
+      if (companyId === undefined || !actorId) throw new Error("A company and signed-in user are required to check legal holds")
+      const response = await apiFetch(`/api/query/document-legal-holds?companyId=${companyId}`)
+      if (!response.ok) throw await httpResponseError(response, "Failed to fetch document legal holds")
+      return decodeQueryListResponse(await response.json(), (value) => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid legal hold response")
+        const row = value as QueryRow
+        if (!parseStrictU64(row.documentId ?? row.document_id)
+          || !parseStrictU64(row.id)
+          || typeof (row.isActive ?? row.is_active) !== "boolean") {
+          throw new Error("Legal hold status could not be verified")
+        }
+        return row
+      })
+    },
+    enabled: enabled && organizationId > 0n && companyId !== undefined && companyId > 0n && Boolean(actorId),
+    ...documentReadRefresh,
     staleTime: 30_000,
-    initialData,
-  })
+  }
+}
+
+export function useDocumentLegalHolds(...scope: Parameters<typeof documentLegalHoldQueryOptions>) {
+  return useQuery(documentLegalHoldQueryOptions(...scope))
 }
 
 export function useDocumentSignatureRequests(organizationId: bigint, initialData?: QueryRows) {

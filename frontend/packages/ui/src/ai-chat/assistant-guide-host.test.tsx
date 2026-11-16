@@ -1,6 +1,7 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, render as renderComponent, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { ReactNode } from "react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import type { GuideDocument } from "../lib/assistant-guide-types"
 
 const controls = vi.hoisted(() => ({
@@ -39,6 +40,11 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
+function render(tree: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return renderComponent(tree, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> })
+}
+
 it("replaces the loading skeleton inside the same guide dialog", async () => {
   let resolveGuide!: (guide: GuideDocument) => void
   controls.read.mockReturnValueOnce(new Promise<GuideDocument>((resolve) => { resolveGuide = resolve }))
@@ -55,6 +61,18 @@ for (const owner of ["modal", "page"] as const) describe(`${owner} guide revalid
   const tree = () => owner === "modal"
     ? <AssistantGuideHost request={request} companyId={controls.companyId} organizationId={1} onClose={vi.fn()} onSaved={vi.fn()} onAsk={controls.ask} />
     : <AssistantGuidePageClient guideId="42" />
+
+  it("keeps the current guide visible when revision history fails and recovers on retry", async () => {
+    controls.history.mockRejectedValueOnce(new GuideRequestError("History unavailable", 503))
+    render(tree())
+    expect((await screen.findByRole("alert")).textContent).toContain("Revision history is unavailable.")
+    expect(screen.getByText("Original instructions")).toBeTruthy()
+    expect(screen.queryByRole("combobox", { name: "History" })).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }))
+    expect(await screen.findByRole("combobox", { name: "History" })).toBeTruthy()
+    expect(controls.history).toHaveBeenLastCalledWith({ guideId: "42", revision: 1 }, "7", expect.any(AbortSignal))
+    expect(screen.queryByRole("alert")).toBeNull()
+  })
 
   it("retains title, Markdown and question after transient failure, then retries the exact revision", async () => {
     await act(async () => { render(tree()) })

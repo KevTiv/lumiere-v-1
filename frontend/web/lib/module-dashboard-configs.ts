@@ -1151,20 +1151,21 @@ export const inventoryDashboard: DashboardConfig = {
         {
           id: "inv-by-category",
           type: "metrics",
-          title: "Stock by Category",
+          title: "Stock Positions by Category",
           width: "1/2",
           data: { metrics: [] },
         },
         {
           id: "inv-movements",
           type: "bar-chart",
-          title: "Stock Movements (Last 7 Days)",
+          title: "Completed Transfers by Direction",
           width: "1/2",
           data: {
-            categoryKey: "day",
+            categoryKey: "period",
             series: [
               { name: "In", color: "#22c55e" },
               { name: "Out", color: "#ef4444" },
+              { name: "Internal", color: "#6366f1" },
             ],
             stacked: false,
             values: [],
@@ -1196,7 +1197,8 @@ export const inventoryDashboard: DashboardConfig = {
             columns: [
               { key: "sku", label: "SKU" },
               { key: "name", label: "Product" },
-              { key: "qty", label: "Qty On Hand", align: "right" },
+              { key: "location", label: "Location" },
+              { key: "qty", label: "Available Quantity", align: "right" },
               { key: "reorder", label: "Reorder Point", align: "right" },
               { key: "status", label: "Status" },
             ],

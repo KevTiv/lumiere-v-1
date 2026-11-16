@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { MoreHorizontal } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
+import { isCalendarRecurrenceRule } from '@lumiere/ui/lib/calendar-recurrence';
 import {
   Button,
   EntityDetail,
@@ -132,6 +133,7 @@ function CalendarEventPageLoaded({
   const [editing, setEditing] = useState(false);
   const [formTimezone, setFormTimezone] = useState<string | null>(null);
   const [editingRecurrence, setEditingRecurrence] = useState(false);
+  const [recurrenceError, setRecurrenceError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -316,7 +318,7 @@ function CalendarEventPageLoaded({
             <Button variant={stateActions.confirm ? 'outline' : 'default'} size="sm" disabled={!canWrite || !calendarTimezone.ready} data-testid="calendar-event-edit" onClick={() => { setFormTimezone(timeZone); setEditing(true); }}>
               {t('calendar.eventDetail.edit')}
             </Button>
-            <Button variant="outline" size="sm" disabled={!canWrite} data-testid="calendar-event-recurrence" onClick={() => setEditingRecurrence(true)}>
+            <Button variant="outline" size="sm" disabled={!canWrite} data-testid="calendar-event-recurrence" onClick={() => { setRecurrenceError(null); setEditingRecurrence(true); }}>
               {t('calendar.eventDetail.editRecurrence', { defaultValue: 'Edit recurrence' })}
             </Button>
             {stateActions.cancel ? (
@@ -486,23 +488,30 @@ function CalendarEventPageLoaded({
           onOpenChange={(open) => !open && setEditingRecurrence(false)}
           config={recurrenceForm}
           isPending={updateEvent.isPending}
-          onSubmit={(formData) => {
-            updateEvent.mutate(
-              { eventId: id, params: recurrenceParams(formData) },
-              {
-                onSuccess: () =>
-                  showWorkflowToast({
-                    kind: 'success',
-                    title: t('common.actionCompleted', {
-                      action: t('calendar.eventDetail.editRecurrence', { defaultValue: 'Edit recurrence' }),
-                    }),
-                    description: label,
-                  }),
-                onError: (error) =>
-                  showWorkflowToast({ kind: 'error', title: t('common.error.title'), description: error.message }),
-              },
-            );
-            setEditingRecurrence(false);
+          submitError={recurrenceError}
+          onSubmit={async (formData) => {
+            setRecurrenceError(null);
+            const params = recurrenceParams(formData);
+            const rule = String(params.rrule ?? event.rrule ?? '');
+            if (params.recurrency && !isCalendarRecurrenceRule(rule)) {
+              setRecurrenceError(t('calendar.eventDetail.invalidRecurrence', {
+                defaultValue: 'Enter a valid daily, weekly, monthly or yearly recurrence rule.',
+              }));
+              return;
+            }
+            try {
+              await updateEvent.mutateAsync({ eventId: id, params });
+              setEditingRecurrence(false);
+              showWorkflowToast({
+                kind: 'success',
+                title: t('common.actionCompleted', {
+                  action: t('calendar.eventDetail.editRecurrence', { defaultValue: 'Edit recurrence' }),
+                }),
+                description: label,
+              });
+            } catch (error) {
+              setRecurrenceError(error instanceof Error ? error.message : String(error));
+            }
           }}
         />
       ) : null}

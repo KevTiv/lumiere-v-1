@@ -169,6 +169,7 @@ dependencies = [
  "lumiere-finance-review-core",
  "lumiere-policy-core",
  "lumiere-presentation-core",
+ "lumiere-report-schedule",
  "openssl",
  "printpdf",
  "pulldown-cmark",
@@ -2200,6 +2201,14 @@ dependencies = [
  "schemars 1.2.1",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "lumiere-report-schedule"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "chrono-tz",
 ]
 
 [[package]]

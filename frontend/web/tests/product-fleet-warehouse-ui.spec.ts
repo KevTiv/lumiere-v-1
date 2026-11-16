@@ -3,6 +3,54 @@ import { writeFile } from "node:fs/promises";
 
 const expect = baseExpect.configure({ timeout: 15_000 });
 
+test("Warehouse switches stock and its related sources together", async ({ page }) => {
+  // The dev server prewarms /product-fleet, so the first visit here compiles Inventory.
+  test.setTimeout(120_000);
+  const scopedResources = ["stock-quants", "stock-pickings", "stock-moves", "warehouses", "stock-locations", "stock-production-lots", "replenishment-rules"];
+  const paths = new Map<string, Set<string>>();
+  await page.route("**/api/query/**", async (route) => {
+    const url = new URL(route.request().url());
+    const resource = url.pathname.split("/").at(-1)!;
+    const company = url.searchParams.get("companyId") ?? "unscoped";
+    if (scopedResources.includes(resource)) {
+      if (!paths.has(company)) paths.set(company, new Set());
+      paths.get(company)!.add(resource);
+    }
+    const companyId = company === "22" ? "22" : "11";
+    const locationId = companyId === "22" ? "219" : "119";
+    const fixtures = {
+      companies: [{ id: "11", organizationId: "7" }, { id: "22", organizationId: "7" }],
+      products: [{ id: "41", name: "Coffee beans", defaultCode: "COF-001", uomId: "13" }],
+      uoms: [{ id: "13", name: "Unit" }],
+      "stock-quants": [{
+        id: `${companyId}1`, organizationId: "7", companyId, productId: "41",
+        locationId, quantity: companyId === "22" ? 45 : 15, availableQuantity: companyId === "22" ? 45 : 15,
+      }],
+      "stock-locations": [{
+        id: locationId, organizationId: "7", companyId, active: true, usage: "internal",
+        name: companyId === "22" ? "Musanze Bin" : "Kigali Bin",
+      }],
+      warehouses: [{
+        id: `${companyId}2`, organizationId: "7", companyId, active: true, lotStockId: locationId,
+        inTypeId: 1, outTypeId: 2, intTypeId: 3, packTypeId: 4, pickTypeId: 5,
+      }],
+    };
+    const data = fixtures[resource as keyof typeof fixtures] ?? [];
+    await route.fulfill({ json: { data } });
+  });
+
+  await page.goto("/warehouse-company-scope");
+  const warehouse = page.getByTestId("module-view-warehouse");
+  await expect(warehouse.getByRole("cell", { name: "Kigali Bin", exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Switch company" }).click();
+  await expect(warehouse.getByRole("cell", { name: "Musanze Bin", exact: true }).first()).toBeVisible();
+  await expect(warehouse.getByRole("cell", { name: "Kigali Bin", exact: true })).toHaveCount(0);
+  await expect.poll(() => ["11", "22"].map((companyId) =>
+    scopedResources.every((resource) => paths.get(companyId)?.has(resource)),
+  )).toEqual([true, true]);
+  expect(paths.has("unscoped")).toBe(false);
+});
+
 test("canvas controls fit their container and retain stock state", { tag: "@aside-fit" }, async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 850 });
   await page.goto("/canvas-controls");

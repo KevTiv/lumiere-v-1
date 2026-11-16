@@ -10,7 +10,8 @@ import { AssistantGuideViewer } from "@lumiere/ui"
 import { useUnsavedChangesGuard } from "@lumiere/ui/forms/use-unsaved-changes-guard"
 import type { GuideDocument } from "@lumiere/ui/lib/assistant-guide-types"
 import { useAssistantGuideConversation } from "@/lib/assistant-guide-context"
-import { assistantGuideHistory, guideAccessRevoked, guideId as parseGuideId, guideLibraryHref, guideReturnHref, guideRevision, guideSaveRequestKey, readAssistantGuide, saveAssistantGuide, guideVerificationChoices, requestGuideVerification, recordGuideReview } from "@/lib/assistant-guides"
+import { guideAccessRevoked, guideId as parseGuideId, guideLibraryHref, guideReturnHref, guideRevision, guideSaveRequestKey, readAssistantGuide, saveAssistantGuide, guideVerificationChoices, requestGuideVerification, recordGuideReview } from "@/lib/assistant-guides"
+import { useAssistantGuideRevisions } from "@/lib/use-assistant-guide-revisions"
 
 export function AssistantGuidePageClient({ guideId }: { guideId: string }) {
   const { organizationId, identity } = useErpSession()
@@ -27,7 +28,6 @@ export function AssistantGuidePageClient({ guideId }: { guideId: string }) {
   currentScope.current = scope
   const sequence = useRef(0)
   const [state, setState] = useState<{ scope: string; document: GuideDocument } | null>(null)
-  const [history, setHistory] = useState<GuideDocument[]>([])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -37,6 +37,7 @@ export function AssistantGuidePageClient({ guideId }: { guideId: string }) {
   const verificationRead = useRef(0)
   const navigationGuard = useUnsavedChangesGuard(dirty, saving)
   const guide = state?.scope === scope ? state.document : null
+  const revisions = useAssistantGuideRevisions(guide, scope)
   const latestDocument = useRef(guide)
   latestDocument.current = guide
   const inCompany = Boolean(companyId && (!companyParam || companyParam === String(companyId)))
@@ -45,7 +46,6 @@ export function AssistantGuidePageClient({ guideId }: { guideId: string }) {
     const epoch = ++sequence.current
     const controller = new AbortController()
     setState(null)
-    setHistory([])
     setError(null)
     setBusy(false)
     setVerificationUnavailable(false)
@@ -70,13 +70,10 @@ export function AssistantGuidePageClient({ guideId }: { guideId: string }) {
     void load().catch((cause) => {
       if (!controller.signal.aborted && epoch === sequence.current) setError(cause instanceof Error ? cause.message : "The guide is unavailable.")
     }).finally(() => { if (epoch === sequence.current) setBusy(false) })
-    void assistantGuideHistory({ guideId, revision: revision ?? 1 }, String(companyId), controller.signal).then((documents) => {
-      if (epoch === sequence.current && currentScope.current === scope) setHistory(documents)
-    }).catch(() => { if (epoch === sequence.current) setHistory([]) })
     const revalidate = () => {
       void load().catch((cause) => {
         if (!controller.signal.aborted && epoch === sequence.current && currentScope.current === scope) {
-          if (guideAccessRevoked(cause)) { setState(null); setHistory([]) }
+          if (guideAccessRevoked(cause)) setState(null)
           else setVerificationUnavailable(true)
           setError(guideAccessRevoked(cause) ? "This guide is no longer available in your current access scope." : "The guide's current access could not be checked. Your edits are retained. Retry before saving or asking a question.")
         }
@@ -104,7 +101,7 @@ export function AssistantGuidePageClient({ guideId }: { guideId: string }) {
     {!inCompany ? <p role="alert">{t("aiChat.guide.chooseCompany", { defaultValue: "Select the company this guide belongs to before opening it." })}</p>
       : !parseGuideId(guideId) || revision === null ? <p role="alert">{t("aiChat.guide.invalidReference", { defaultValue: "This guide link is invalid." })}</p>
       : guide ? <div className="flex h-[calc(100dvh-10rem)] min-h-96 flex-col overflow-hidden rounded-xl border border-border bg-background">
-        <AssistantGuideViewer document={guide} history={history} busy={busy} error={error} onDirtyChange={setDirty}
+        <AssistantGuideViewer document={guide} {...revisions} busy={busy} error={error} onDirtyChange={setDirty}
           onLoadVerificationChoices={async()=>{
             const epoch=sequence.current
             if(verificationUnavailable || currentScope.current!==scope)throw new Error("Reopen the current guide before selecting evidence.")

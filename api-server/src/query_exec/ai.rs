@@ -38,9 +38,10 @@ pub(crate) async fn read_ai_action_drafts(
 pub(crate) async fn read_ai_agent_runs(
     client: &StdbClient,
     organization_id: u64,
+    company_id: u64,
 ) -> Result<Vec<Value>, ApiError> {
     let sql = format!(
-                "SELECT id, organization_id, company_id, skill_id, run_key, status, summary, step_count, error_message, started_at, completed_at, create_date, write_date FROM ai_agent_run WHERE organization_id = {organization_id}"
+                "SELECT id, organization_id, company_id, skill_id, run_key, status, summary, step_count, error_message, started_at, completed_at, create_date, write_date FROM ai_agent_run WHERE organization_id = {organization_id} AND company_id = {company_id}"
             );
     let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
     sort_rows_by_id_desc(&mut rows);

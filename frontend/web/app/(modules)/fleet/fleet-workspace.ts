@@ -1,4 +1,5 @@
 import { parseStrictU64 } from "@lumiere/erp-shared/u64";
+import { kpiDate } from "@lumiere/ui/lib/kpi-tiles";
 import type { EntityRow } from "@lumiere/ui/lib/entity-view-types";
 import { fleetEnumTag } from "./fleet-record";
 
@@ -8,6 +9,30 @@ function optionalValue(value: unknown): unknown {
     if ("none" in value) return null;
   }
   return value;
+}
+
+/** Fleet maps are based on a saved position observation. */
+export function fleetPosition(row: EntityRow, now: Date = new Date()) {
+  const number = (snake: string, camel: string) => {
+    const value = optionalValue(field(row, snake, camel));
+    if (typeof value !== "number" && (typeof value !== "string" || !value.trim())) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+  const latitude = number("latitude", "latitude");
+  const longitude = number("longitude", "longitude");
+  if (latitude == null || longitude == null || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return undefined;
+
+  const timestamp = kpiDate(optionalValue(field(row, "last_position_at", "lastPositionAt")));
+  const observedAt = timestamp && Number.isFinite(timestamp.getTime()) ? timestamp : undefined;
+  const ageMs = observedAt ? now.getTime() - observedAt.getTime() : undefined;
+  return {
+    latitude,
+    longitude,
+    speedKmh: number("speed_kmh", "speedKmh"),
+    observedAt,
+    recent: ageMs != null && ageMs >= 0 && ageMs < 5 * 60_000,
+  };
 }
 
 /** Client-side narrowing of authorized reads, never a substitute for server policy. */

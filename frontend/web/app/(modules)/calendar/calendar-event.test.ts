@@ -131,3 +131,9 @@ test('all-day start and stop show the occupied date in the active zone', () => {
   assert.equal(eventBoundaryLabel(event, 'stop', 'en-US', 'America/New_York'), '10/28/2026');
   assert.equal(eventBoundaryLabel({ allday: true }, 'stop', 'en-US', 'UTC'), '—');
 });
+
+test('calendar projection keeps the saved recurrence and does not enable a disabled rule', () => {
+  const record = { id: 12, start: 1_000_000, stop: 2_000_000, rrule: { some: 'FREQ=WEEKLY;BYDAY=MO' } };
+  assert.equal(calendarEventForView({ ...record, recurrency: true })?.recurrenceRule, 'FREQ=WEEKLY;BYDAY=MO');
+  assert.equal(calendarEventForView({ ...record, recurrency: false })?.isRecurring, false);
+});

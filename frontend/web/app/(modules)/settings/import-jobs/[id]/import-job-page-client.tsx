@@ -12,12 +12,10 @@ import { Button } from "@lumiere/ui/components/button"
 import { useErpSession } from "@lumiere/erp-session"
 import { importTaskHref } from "../../../../../lib/import-task-navigation"
 import {
-  useImportJobErrors,
-  useImportJobs,
+  useExactImportJobErrors,
+  useExactImportJob,
   useRollbackImportJob,
   canRollbackImportJob,
-  type ImportJobErrorRow,
-  type ImportJobRow,
 } from "@lumiere/query-hooks/hooks/import-jobs"
 
 import { hasValidOrganizationId } from "@/lib/org-scoped"
@@ -42,12 +40,19 @@ export function ImportJobPageClient({ jobId, organizationId, fromTask, fromCompa
     return <MissingOrganization />
   }
 
+  if (!activeCompanyReady) return <p role="status">{t("common.loading", { defaultValue: "Loading…" })}</p>
+  if (!Number.isSafeInteger(operatingCompanyId) || operatingCompanyId <= 0) {
+    return <p>{t("settings.importTask.companyRequired", { defaultValue: "Select an operating company to start or review an import." })}</p>
+  }
+
   const savedTaskHref = activeCompanyReady && Number.isSafeInteger(operatingCompanyId) && operatingCompanyId > 0 &&
     fromCompanyId === String(operatingCompanyId) && fromTask && /^[a-f0-9]{32}$/.test(fromTask)
     ? importTaskHref({ taskId: fromTask, companyId: operatingCompanyId, view: "results" })
     : undefined
   return (
     <ImportJobPageLoaded
+      key={`${organizationId}:${operatingCompanyId}:${jobId}`}
+      companyId={operatingCompanyId}
       jobId={jobId}
       organizationId={BigInt(organizationId)}
       savedTaskHref={savedTaskHref}
@@ -59,33 +64,39 @@ export function ImportJobPageClient({ jobId, organizationId, fromTask, fromCompa
 function ImportJobPageLoaded({
   jobId,
   organizationId,
+  companyId,
   title,
   savedTaskHref,
 }: {
   jobId: string
   organizationId: bigint
+  companyId: number
   title: string
   savedTaskHref?: string
 }) {
-  const jobs = useImportJobs(organizationId)
-  const errors = useImportJobErrors(organizationId)
+  const jobs = useExactImportJob(organizationId, companyId, jobId)
   const rollbackJob = useRollbackImportJob(organizationId)
   const [rollbackError, setRollbackError] = useState<string | null>(null)
   const { t } = useTranslation()
   const { confirm, dismiss, dialog } = useConfirmDialog()
   const reviewing = useRef(false)
-  const scope = `${organizationId}:${jobId}`
-  const activeScope = useRef(scope)
+  const scope = `${organizationId}:${companyId}:${jobId}`
+  const activeScope = useRef<string | null>(scope)
   activeScope.current = scope
-  useEffect(() => { dismiss(); setRollbackError(null) }, [scope, dismiss])
+  useEffect(() => {
+    activeScope.current = scope
+    dismiss()
+    setRollbackError(null)
+    return () => { activeScope.current = null }
+  }, [scope, dismiss])
   const jobsState = moduleQueryState(jobs)
-  const errorsState = moduleQueryState(errors)
-  const job = (jobsState.status === "ready" ? (jobs.data ?? []) as unknown as ImportJobRow[] : []).find(
-    (row) => String(row.id ?? "") === jobId,
-  )
+  const job = jobsState.status === "ready" ? jobs.data?.find((row) => String(row.id ?? "") === jobId) : undefined
+  const errors = useExactImportJobErrors(organizationId, companyId, jobId, !!job)
+  const errorRows = errors.data?.pages.flatMap((page) => page.data) ?? []
+  const errorsState = moduleQueryState({ ...errors, data: errorRows })
 
   const handleRollback = async () => {
-    if (!job?.id || reviewing.current || rollbackJob.isPending || jobsState.status !== "ready" || errorsState.status !== "ready" || !canRollbackImportJob(job)) return
+    if (!job?.id || reviewing.current || rollbackJob.isPending || jobsState.status !== "ready" || errorsState.status !== "ready" || errors.hasNextPage || !canRollbackImportJob(job)) return
     reviewing.current = true
     setRollbackError(null)
     try {
@@ -106,7 +117,7 @@ function ImportJobPageLoaded({
       // The confirmation is a review checkpoint, not authority to reuse stale job state.
       const refreshed = await jobs.refetch()
       if (refreshed.isError || activeScope.current !== scope) throw new Error(t("settings.importJob.rollbackReadFailed", { defaultValue: "The import could not be refreshed. No rollback was submitted. Retry the job source." }))
-      const currentJob = refreshed.data?.find((row) => String(row.id ?? "") === String(exactJobId)) as ImportJobRow | undefined
+      const currentJob = refreshed.data?.find((row) => String(row.id ?? "") === String(exactJobId))
       if (!canRollbackImportJob(currentJob) || currentJob?.status !== job.status || currentJob?.metadata !== job.metadata
         || (currentJob?.importedRows ?? currentJob?.imported_rows) !== (job.importedRows ?? job.imported_rows)
         || (currentJob?.tableName ?? currentJob?.table_name) !== (job.tableName ?? job.table_name)
@@ -145,9 +156,11 @@ function ImportJobPageLoaded({
       {errorsState.status === "loading" ? <p role="status">{t("settings.importJob.errorsLoading", { defaultValue: "Loading import row errors…" })}</p> : null}
       <ImportJobStatusPanel
         job={job}
-        onRollback={errorsState.status === "ready" ? () => void handleRollback() : undefined}
+        onRollback={errorsState.status === "ready" && !errors.hasNextPage ? () => void handleRollback() : undefined}
         isRollbackPending={rollbackJob.isPending}
-        errors={(errorsState.status === "ready" ? errors.data ?? [] : []) as unknown as ImportJobErrorRow[]}
+        errors={errorsState.status === "ready" ? errorRows : []}
+        onLoadMoreErrors={errorsState.status === "ready" && errors.hasNextPage ? () => void errors.fetchNextPage() : undefined}
+        isLoadingMoreErrors={errors.isFetchingNextPage}
         isLoading={false}
         fileName={String(job?.fileName ?? job?.file_name ?? "") || undefined}
       />

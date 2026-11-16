@@ -534,6 +534,16 @@ fn inventory_resource_classification_covers_expected_resources() {
     assert!(!inventory_resource("quality-teams"));
     assert!(inventory_resource("replenishment-rules"));
     assert!(inventory_resource("picking-batches"));
+    for resource in [
+        "inventory-adjustments",
+        "inventory-valuations",
+        "inventory-exceptions",
+        "inventory-exceptions-expired-lots",
+        "inventory-exceptions-open-qc",
+        "inventory-exceptions-short-atp",
+    ] {
+        assert!(inventory_resource(resource), "{resource}");
+    }
     assert!(!inventory_resource("account-moves"));
     assert!(!inventory_resource("contacts"));
 }
@@ -784,6 +794,9 @@ fn domain_postfilters_preserve_shared_and_projected_company_contracts() {
     for (resource, expected) in [
         ("product-categories", &expected_shared),
         ("stock-locations", &expected_owned),
+        ("inventory-adjustments", &expected_owned),
+        ("inventory-valuations", &expected_owned),
+        ("inventory-exceptions-short-atp", &expected_owned),
     ] {
         let mut rows = input.clone();
         inventory::filter_inventory_company_rows(resource, 7, &mut rows);

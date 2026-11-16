@@ -23,6 +23,7 @@ pub(crate) mod action_drafts;
 mod activity_work;
 mod chat_history;
 mod expense_allocations;
+mod import_jobs;
 #[cfg(test)]
 mod read_reauthorization_test;
 mod record_creations;
@@ -37,6 +38,8 @@ pub(crate) struct OrgQuery {
     company_id: Option<u64>,
     #[serde(rename = "expenseId")]
     expense_id: Option<u64>,
+    #[serde(rename = "jobId")]
+    import_job_id: Option<u64>,
     #[serde(alias = "before")]
     cursor: Option<String>,
     #[serde(rename = "sessionKey")]
@@ -177,6 +180,20 @@ pub(crate) async fn get_query(
         let page = chat_history::read(&state.stdb, &context, &resource, &q).await?;
         context.require_current_placement(&state.organization_placements)?;
         return Ok(Json(page));
+    }
+
+    if let Some(result) = import_jobs::read(
+        &context,
+        &resource,
+        q.company_id,
+        q.import_job_id,
+        q.cursor.as_deref(),
+        q.limit,
+    )
+    .await?
+    {
+        context.require_current_placement(&state.organization_placements)?;
+        return Ok(Json(result));
     }
 
     let task_readback = crate::workflow_reads::WorkTaskReadbackRequest::parse(

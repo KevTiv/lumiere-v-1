@@ -29,9 +29,11 @@ describe("first-organization Settings exposure", () => {
     expect(isSettingsSectionAdmitted("unclassified-future-setting", true)).toBe(false)
   })
 
-  it("leaves settings unchanged outside the configured alpha organization", () => {
+  it("keeps the standard route available for implemented preferences", () => {
     expect(isSettingsSectionVisibleForProfile("profile", false, false)).toBe(true)
     expect(isSettingsSectionVisibleForProfile("users", true, false)).toBe(true)
+    expect(isSettingsSectionVisibleForProfile("appearance", false, false)).toBe(true)
+    expect(isSettingsSectionVisibleForProfile("notifications", true, false)).toBe(false)
     expect(isSettingsSectionVisibleForProfile("ai", true, false)).toBe(false)
     expect(isSettingsSectionVisibleForProfile("profile", true, true)).toBe(false)
   })

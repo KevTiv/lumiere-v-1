@@ -24,8 +24,8 @@ const unavailableNotes: Record<string, string> = {
   noProcessing: "Record a processing run.",
   missingProcessingWeight: "Enter the measured input and output weights.",
   nonpositiveWeight: "Verify the weight used in the calculation.",
-  missingRecognizedCosts: "Link verified costs attributable to sellable output.",
-  missingTraceableSales: "Link verified sales and the costs of those units.",
+  missingRecognizedCosts: "Unavailable until posted production costs can be allocated to the batch’s exact output lots and sellable weight.",
+  missingTraceableSales: "Unavailable until posted invoices and credit notes can be reconciled with delivered and returned lots and their posted costs.",
 }
 
 function MetricRow<T>({
@@ -120,7 +120,7 @@ function LinkedPostedCosts({
     <section className="space-y-2" aria-label="Linked posted costs">
       <h3 className={workspaceStyles.sectionTitle}>Linked posted costs</h3>
       <p className={workspaceStyles.sectionDescription}>
-        Subtotal of verified, accessible journal lines linked to this batch.
+        Subtotal of verified, accessible journal lines linked to this batch. It can be incomplete and does not supply the production cost or margin metrics.
       </p>
       {summary.isPending && (
         <p role="status" className="text-sm text-muted-foreground">

@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   packagingOptionLabel,
   packagingsForProduct,
+  productVariantReferences,
   variantLinesForTemplate,
   vendorPriceOptionLabel,
   vendorPricesForTemplate,
@@ -75,4 +76,10 @@ test('picker labels drop absent parts', () => {
   );
   assert.equal(vendorPriceOptionLabel({ partnerId: 7n }, new Map()), '');
   assert.equal(packagingOptionLabel({ name: 'Box', qty: 12, productId: 5n }, new Map([['5', 'Widget']])), 'Box · x12 · Widget');
+});
+
+test('committed variant references are available independently of template attributes', () => {
+  assert.deepEqual(productVariantReferences({ product_variant_ids: [41n, '42', '42'] }), [{ id: '41' }, { id: '42' }]);
+  assert.deepEqual(productVariantReferences({ productVariantIds: [] }), []);
+  assert.equal(productVariantReferences({ productVariantCount: 2 }), undefined);
 });

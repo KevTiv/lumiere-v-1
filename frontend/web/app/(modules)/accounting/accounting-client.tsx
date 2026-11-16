@@ -42,7 +42,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { OwnerQueueScope } from "../../../components/owner-queue-scope"
 import { isDraftVendorBill, isOwnerQueue, overdueInvoiceInputsComplete, overduePostedInvoices } from "@/lib/owner-queues"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "@lumiere/ui/lib/module-url-filters"
-import { useErpSession } from "@lumiere/erp-session"
+import { useCompanyHandoff } from "@/lib/use-company-handoff"
 import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
@@ -649,22 +649,11 @@ export function AccountingClient(props: AccountingClientProps) {
 }
 
 function AccountingClientLoaded(props: AccountingClientLoadedProps) {
-  const { companyIds, setActiveCompanyId } = useErpSession()
+  const switchingCompany = useCompanyHandoff()
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(props.organizationId)
   const retainedCompany = useRef(operatingCompanyId)
   if (operatingCompanyId != null) retainedCompany.current = operatingCompanyId
-  useEffect(() => {
-    const rawCompanyId = new URLSearchParams(window.location.search).get("companyId")
-    if (!rawCompanyId) return
-    const companyId = Number(rawCompanyId)
-    if (
-      !Number.isSafeInteger(companyId) ||
-      companyId <= 0 ||
-      !companyIds?.includes(companyId)
-    ) return
-    setActiveCompanyId?.(companyId)
-    window.history.replaceState(window.history.state, "", "/accounting")
-  }, [companyIds, setActiveCompanyId])
+  if (switchingCompany) return <p role="status">Switching operating company…</p>
   if (retainedCompany.current == null) {
     return (
       <div className="space-y-4 rounded-lg border border-dashed p-6 text-sm text-muted-foreground" role="status">

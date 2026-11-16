@@ -95,6 +95,7 @@ describe("first-org product surface census", () => {
     expect(isFirstOrgRouteAdmitted("forensics", true)).toBe(false)
     expect(isFirstOrgRouteAdmitted("map", true)).toBe(false)
     expect(isFirstOrgRouteAdmitted("ai-harness", true)).toBe(false)
+    expect(isFirstOrgRouteAdmitted("ai-skills", true)).toBe(false)
   })
 
   it("keeps every navigation destination aligned with the product surface authority", () => {

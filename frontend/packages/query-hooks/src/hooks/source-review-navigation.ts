@@ -18,11 +18,21 @@ export function pinnedSourceReview(search: string, companyId: string): PinnedSou
   return { batchId, itemId, revision: number };
 }
 
-export function sourceReviewHistoryHref(companyId: string, review: PinnedSourceReview): string {
+export function sourceReviewHistoryHref(
+  companyId: string,
+  review: PinnedSourceReview,
+  workspace: "/settings" | "/farm-batches/import" = "/settings",
+): string {
   if (!validHistoryId(companyId) || !validHistoryId(review.batchId) || !validHistoryId(review.itemId)
     || !Number.isInteger(review.revision) || review.revision < 1 || review.revision > 2_147_483_647) throw new Error("Invalid source review link");
-  return `/settings?${new URLSearchParams({ section: "imports", sourceReview: review.batchId,
-    sourceReviewCompany: companyId, sourceReviewItem: review.itemId, sourceReviewRevision: String(review.revision) })}#source-review-history`;
+  const params = new URLSearchParams({
+    ...(workspace === "/settings" ? { section: "imports" } : {}),
+    sourceReview: review.batchId,
+    sourceReviewCompany: companyId,
+    sourceReviewItem: review.itemId,
+    sourceReviewRevision: String(review.revision),
+  });
+  return `${workspace}?${params}#source-review-history`;
 }
 
 /** The receiving workspace reauthorizes this company and saved task. */

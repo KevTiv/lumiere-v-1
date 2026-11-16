@@ -8,7 +8,7 @@ import {
   useReducer,
   type ReactNode,
 } from 'react'
-import type { Zone, StorageSlot, StockItem, StockCategory } from './types'
+import { isLowStockItem, type Zone, type StorageSlot, type StockItem, type StockCategory } from './types'
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -87,7 +87,7 @@ interface Warehouse3DContextValue extends UIState {
   setFilterCategory: (category: StockCategory | null) => void
 
   // External callbacks (wired to SpacetimeDB reducers by parent)
-  onMoveItem?: (itemId: string, targetSlotId: string) => void
+  onMoveItem?: (itemId: string) => void
   onUpdateQuantity?: (itemId: string, quantity: number) => void
   onRemoveItem?: (itemId: string) => void
 
@@ -105,7 +105,7 @@ interface Warehouse3DProviderProps {
   zones: Zone[]
   slots: StorageSlot[]
   items: StockItem[]
-  onMoveItem?: (itemId: string, targetSlotId: string) => void
+  onMoveItem?: (itemId: string) => void
   onUpdateQuantity?: (itemId: string, quantity: number) => void
   onRemoveItem?: (itemId: string) => void
 }
@@ -160,9 +160,9 @@ export function Warehouse3DProvider({
   const filteredItems = useMemo(() => {
     switch (uiState.viewMode) {
       case 'low-stock':
-        return items.filter((item) => item.minStock && item.quantity <= item.minStock)
+        return items.filter(isLowStockItem)
       case 'category':
-        return uiState.filterCategory
+        return uiState.filterCategory != null
           ? items.filter((item) => item.category === uiState.filterCategory)
           : items
       default:

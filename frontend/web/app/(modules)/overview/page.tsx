@@ -10,16 +10,12 @@ export default async function OverviewPage() {
 
   const [
     orders,
-    stockQuants,
-    products,
     tasks,
     projects,
     purchaseOrders,
     contacts,
   ] = await Promise.all([
     serverFetchQueryListState(session, "sale-orders"),
-    serverFetchQueryListState(session, "stock-quants"),
-    serverFetchQueryListState(session, "products"),
     serverFetchQueryListState(session, "tasks"),
     serverFetchQueryListState(session, "projects"),
     serverFetchQueryListState(session, "purchase-orders"),
@@ -28,8 +24,6 @@ export default async function OverviewPage() {
 
   const initialResourceStates = {
     "sale-orders": orders,
-    "stock-quants": stockQuants,
-    products,
     tasks,
     projects,
     "purchase-orders": purchaseOrders,
@@ -41,8 +35,6 @@ export default async function OverviewPage() {
       organizationId={session.organizationId}
       initialResourceStates={initialResourceStates}
       initialOrders={orders.status === "ready" || orders.status === "empty" ? orders.rows : undefined}
-      initialStockQuants={stockQuants.status === "ready" || stockQuants.status === "empty" ? stockQuants.rows : undefined}
-      initialProducts={products.status === "ready" || products.status === "empty" ? products.rows : undefined}
       initialTasks={tasks.status === "ready" || tasks.status === "empty" ? tasks.rows : undefined}
       initialProjects={projects.status === "ready" || projects.status === "empty" ? projects.rows : undefined}
       initialPurchaseOrders={purchaseOrders.status === "ready" || purchaseOrders.status === "empty" ? purchaseOrders.rows : undefined}

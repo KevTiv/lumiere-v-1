@@ -33,6 +33,8 @@ import {
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "@lumiere/i18n";
 import { toast } from "sonner";
+import { moduleQueryState, type ModuleDataState } from "@lumiere/ui/lib/module-data-state";
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice";
 import { useRBAC } from "@lumiere/ui/lib/rbac-context";
 import { Button } from "@lumiere/ui/components/button";
 import {
@@ -361,6 +363,10 @@ function ScopedModulePageHost({
     staleTime: 30_000,
     retry: false,
   });
+  const savedCatalogState: ModuleDataState = canReadWidgets
+    ? moduleQueryState(widgetsQuery)
+    : { status: "denied" };
+  const canEditSavedWidgets = canCreateWidgets && savedCatalogState.status === "ready";
   const [draft, setDraft] = useState<PageCompositionValue>(null);
   const [editor, setEditor] = useState<WidgetEditor | null>(null);
   const editorRef = useRef<WidgetEditor | null>(null);
@@ -376,8 +382,8 @@ function ScopedModulePageHost({
   );
   const savedRows = useMemo(
     () =>
-      !canReadWidgets || widgetsQuery.error ? [] : (widgetsQuery.data ?? []),
-    [canReadWidgets, widgetsQuery.data, widgetsQuery.error],
+      savedCatalogState.status === "ready" ? (widgetsQuery.data ?? []) : [],
+    [savedCatalogState.status, widgetsQuery.data],
   );
   const savedById = useMemo(
     () => new Map(savedRows.map((row) => [String(row.id), row])),
@@ -560,7 +566,7 @@ function ScopedModulePageHost({
   }, [canCreateWidgets]);
   const openEditor = (initialDraft?: QueryBuilderDraft) =>
     new Promise<PageWidgetCatalogItem | null>((resolve) => {
-      if (!canCreateWidgets || !isCurrent(scopeKey) || editorRef.current) {
+      if (!canEditSavedWidgets || !isCurrent(scopeKey) || editorRef.current) {
         resolve(null);
         return;
       }
@@ -725,10 +731,14 @@ function ScopedModulePageHost({
             </Button>
           </div>
         )}
+        {!layout.error && displayedSavedIds.length > 0 && savedCatalogState.status === "error" && (
+          <ModuleDataNotice state={savedCatalogState} />
+        )}
         <PageComposition
           value={layout.error ? null : (layout.data?.layout?.widgets ?? null)}
           defaultValue={defaultValue}
           catalog={catalog}
+          savedCatalogState={savedCatalogState}
           revision={layout.data?.revision ?? null}
           canEdit={permitted && !layout.error && layout.isSuccess}
           isLoading={isLoading || layout.isPending}
@@ -737,9 +747,9 @@ function ScopedModulePageHost({
           focusSavedWidgetId={savedWidgetFocus}
           focusSavedPlacementId={savedPlacementFocus}
           onAssistantWidgetPlaced={markAssistantWidget}
-          onCreateWidget={canCreateWidgets ? () => openEditor() : undefined}
+          onCreateWidget={canEditSavedWidgets ? () => openEditor() : undefined}
           onConfigureWidget={
-            canCreateWidgets
+            canEditSavedWidgets
               ? (placement: PageWidgetPlacement) => {
                   const row = savedById.get(placement.widgetId);
                   const initial = row ? queryBuilderDraftFromWidget(row) : null;
@@ -792,6 +802,7 @@ function ScopedModulePageHost({
                   dashboards={[]}
                   initialDraft={editor.initialDraft}
                   pageTitle={title}
+                  historyBounds={bounds}
                   status={editorStatus}
                   onStatusChange={setEditorStatus}
                   onCreated={onCreated}

@@ -28,6 +28,8 @@ export type ImportJobStatusPanelProps = {
   retryRowCount?: number
   onRollback?: () => void
   isRollbackPending?: boolean
+  onLoadMoreErrors?: () => void
+  isLoadingMoreErrors?: boolean
 }
 
 export function ImportJobStatusPanel({
@@ -39,6 +41,8 @@ export function ImportJobStatusPanel({
   retryRowCount = 0,
   onRollback,
   isRollbackPending = false,
+  onLoadMoreErrors,
+  isLoadingMoreErrors = false,
 }: ImportJobStatusPanelProps) {
   const { t } = useTranslation()
 
@@ -136,7 +140,15 @@ export function ImportJobStatusPanel({
         </ul>
       ) : null}
 
-      {jobErrors.length > 0 ? (
+      {onLoadMoreErrors ? (
+        <Button type="button" variant="outline" size="sm" disabled={isLoadingMoreErrors} onClick={onLoadMoreErrors}>
+          {isLoadingMoreErrors
+            ? t("settings.importJob.errorsLoading", { defaultValue: "Loading import row errors…" })
+            : t("settings.importJob.loadMoreErrors", { defaultValue: "Load more row errors" })}
+        </Button>
+      ) : null}
+
+      {jobErrors.length > 0 && !onLoadMoreErrors ? (
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"

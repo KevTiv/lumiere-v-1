@@ -22,6 +22,8 @@ import {
   DialogTitle,
 } from "../components/dialog"
 import { cn } from "../lib/utils"
+import type { ModuleDataState } from "../lib/module-data-state"
+import { ModuleDataNotice } from "./module-data-notice"
 import {
   defaultPageWidgetWidth,
   findBuiltinPagePlacement,
@@ -38,6 +40,7 @@ import {
 interface PageCompositionGalleryProps {
   catalog: readonly PageWidgetCatalogItem[]
   placements: readonly PageWidgetPlacement[]
+  savedCatalogState?: ModuleDataState
   initialSearch?: string
   prompt?: string
   disabled?: boolean
@@ -66,6 +69,7 @@ function widgetIcon(item: PageWidgetCatalogItem) {
 export function PageCompositionGallery({
   catalog,
   placements,
+  savedCatalogState,
   initialSearch = "",
   prompt,
   disabled,
@@ -80,6 +84,9 @@ export function PageCompositionGallery({
   )
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [width, setWidth] = useState<PageWidgetWidth | null>(null)
+  const catalogNotice = source !== "builtin" && savedCatalogState?.status !== "ready"
+    ? savedCatalogState
+    : undefined
   const query = search.trim().toLocaleLowerCase()
   const filtered = catalog.filter(
     (item) =>
@@ -206,14 +213,21 @@ export function PageCompositionGallery({
         </div>
         <div className="grid min-h-56 gap-5 md:grid-cols-2">
           <div className="max-h-96 overflow-y-auto pr-1">
-            {filtered.length === 0 ? (
+            {catalogNotice?.status === "loading" ? (
+              <p role="status" className="p-3 text-sm text-muted-foreground">
+                {t("common.loading")}
+              </p>
+            ) : (
+              <ModuleDataNotice state={catalogNotice} />
+            )}
+            {filtered.length === 0 && !catalogNotice ? (
               <div className="flex min-h-48 items-center justify-center rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
                 {t("pageComposition.gallery.empty", {
                   defaultValue:
                     "No widgets match your search. Try another name or create a new widget.",
                 })}
               </div>
-            ) : (
+            ) : filtered.length > 0 ? (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
                 {filtered.map((item) => {
                   const key = pageWidgetKey(item)
@@ -272,7 +286,7 @@ export function PageCompositionGallery({
                   )
                 })}
               </div>
-            )}
+            ) : null}
           </div>
           {selected ? (
             <section

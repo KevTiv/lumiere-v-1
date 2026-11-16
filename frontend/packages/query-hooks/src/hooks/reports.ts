@@ -126,10 +126,14 @@ export function useAnalyticsMetrics(
 export function useSavedReports(
   organizationId: bigint,
   initialData?: QueryRows,
+  options?: { companyId?: bigint; enabled?: boolean },
 ) {
+  const companyId = options?.companyId?.toString()
+  const scope = companyId ? `?companyId=${encodeURIComponent(companyId)}` : ""
   return useQuery<QueryRows>({
-    queryKey: ['saved-reports', rqBigIntKey(organizationId)],
-    queryFn: () => fetchQueryList('/api/query/saved-reports', 'Failed to fetch saved reports'),
+    queryKey: ['saved-reports', rqBigIntKey(organizationId), companyId],
+    enabled: options?.enabled,
+    queryFn: () => fetchQueryList(`/api/query/saved-reports${scope}`, 'Failed to fetch saved reports'),
     staleTime: 30_000,
     initialData,
   })

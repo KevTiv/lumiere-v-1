@@ -13,6 +13,7 @@ members = [
     "crates/policy-core",
     "crates/finance-review-core",
     "crates/file-inspection",
+    "crates/report-schedule",
 ]
 
 [workspace.package]

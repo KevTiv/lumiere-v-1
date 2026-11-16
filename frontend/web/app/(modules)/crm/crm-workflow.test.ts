@@ -1,5 +1,8 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { contactParentChange } from "./contact-parent-change"
+import { latestCompanyForecast } from "./forecast-snapshot-model"
+import { maxSegmentRules, savedSegmentRules, segmentRuleReplacement } from "./segment-rule-editor"
 import {
   crmActivityQueues,
   crmActivityTarget,
@@ -172,4 +175,57 @@ test("follow-up submission uses the configured activity type and typed CRM targe
     toConvertLeadParams({ createContact: true, createOpportunity: false })?.opportunityStageId,
     undefined,
   )
+})
+
+test("the contact parent changes only on an explicit different selection", () => {
+  assert.equal(contactParentChange(7n), undefined)
+  assert.equal(contactParentChange(7n, "7"), undefined)
+  assert.equal(contactParentChange(null, "none"), undefined)
+  assert.equal(contactParentChange(7n, "none"), null)
+  assert.equal(contactParentChange(7n, "9007199254740993"), 9007199254740993n)
+  assert.equal(contactParentChange(7n, "18446744073709551616"), undefined)
+  assert.equal(contactParentChange(7n, ""), undefined)
+})
+
+test("segment editor uses current rules in saved order and writes the exact reviewed replacement", () => {
+  const rows = [
+    { id: "19", segmentId: "5", sequence: 2, field: "TagId", op: "Neq", valueId: { some: "9007199254740993" }, metadata: "reuse" },
+    { id: "18", segmentId: "5", sequence: 1, field: { tag: "City" }, op: { tag: "Eq" }, valueText: "Kigali", metadata: "reuse" },
+    { id: "20", segment_id: "7", sequence: 0, field: "CountryCode", op: "Eq", value_text: "NZ" },
+  ]
+  const current = savedSegmentRules(rows, 5n)
+  assert.equal(current.canEdit, true)
+  assert.equal(current.rules[0]?.value, "Kigali")
+  assert.equal(savedSegmentRules([...rows].reverse(), 5n).fingerprint, current.fingerprint)
+  assert.notEqual(savedSegmentRules(rows.filter(({ id }) => id !== "18"), 5n).fingerprint, current.fingerprint)
+  assert.deepEqual(segmentRuleReplacement([...current.rules, { field: "IsCustomer", operator: "IsFalse", value: "" }], current.metadata), {
+    replaceAll: true,
+    metadata: "reuse",
+    rules: [
+      { field: { tag: "City" }, op: { tag: "Eq" }, valueText: "Kigali", valueId: undefined },
+      { field: { tag: "TagId" }, op: { tag: "Neq" }, valueText: undefined, valueId: 9007199254740993n },
+      { field: { tag: "IsCustomer" }, op: { tag: "IsFalse" }, valueText: undefined, valueId: undefined },
+    ],
+  })
+})
+
+test("segment rules with unavailable ownership or unsupported data cannot be safely replaced", () => {
+  assert.equal(savedSegmentRules([{ id: 8, field: "City", op: "Eq" }], 5n).canEdit, false)
+  assert.equal(savedSegmentRules([{ id: 8, segmentId: 5, field: "City", op: "IsTrue" }], 5n).canEdit, false)
+  assert.equal(segmentRuleReplacement([{ field: "City", operator: "Eq", value: " " }]), null)
+  assert.equal(segmentRuleReplacement([{ field: "TagId", operator: "Contains", value: "7" }]), null)
+  assert.equal(segmentRuleReplacement(Array(maxSegmentRules + 1).fill({ field: "City", operator: "Eq", value: "Kigali" })), null)
+})
+
+test("forecast readback uses the latest saved snapshot in the current company", () => {
+  const row = (id: bigint, companyId: bigint, createdAt: string) => ({ id, companyId, createdAt }) as unknown as Parameters<typeof latestCompanyForecast>[0][number]
+  const rows = [
+    row(90n, 2n, "2026-11-16T10:00:00Z"),
+    row(81n, 1n, "2026-11-15T12:00:00Z"),
+    row(83n, 1n, "2026-11-15T12:00:00Z"),
+    row(82n, 1n, "2026-11-14T12:00:00Z"),
+  ]
+  assert.equal(latestCompanyForecast(rows, 1n)?.id, 83n)
+  assert.equal(latestCompanyForecast(rows, 2n)?.id, 90n)
+  assert.equal(latestCompanyForecast(rows, 3n), undefined)
 })

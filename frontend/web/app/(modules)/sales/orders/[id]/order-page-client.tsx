@@ -45,11 +45,13 @@ import {
 } from '@lumiere/ui/components/dropdown-menu';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
+import { moduleQueryState } from '@lumiere/ui/lib/module-data-state';
 import {
   isSaleOrderConfirmed,
   isSaleOrderLocked,
   presentableActions,
   saleOrderState,
+  withAvailableOrderCashSummary,
   type AnyWorkflowAction,
   type RowValueMap,
   type TransitionNotice,
@@ -102,6 +104,7 @@ import { parseCommissionRatePercent } from '../../sales-ops-panel';
 import { optionRowsForOrder } from '../../commission-plans';
 import { saleOrderNextStep, nextStepActionIds } from '../../sale-order-next-step';
 import { SaleOrderNextAction, SaleOrderWorkspace } from '../../sale-order-workspace';
+import { OrderSummaryNotices } from '../../order-summary-notices';
 import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
 
 interface SaleOrderPageClientProps {
@@ -623,6 +626,14 @@ function SaleOrderPageLoaded({
     try { return new Intl.NumberFormat(locale, { style: 'currency', currency: code }).format(Number(raw)); }
     catch { return t('sales.workspace.amountUnavailable', { defaultValue: 'Unavailable' }); }
   };
+  const lineState = moduleQueryState(linesQuery);
+  const deliveryState = moduleQueryState(stockPickingsQuery);
+  const invoiceState = moduleQueryState(accountMovesQuery);
+  const [orderWithSummary] = withAvailableOrderCashSummary([record], {
+    lines: lineState.status === 'ready' ? lines : undefined,
+    moves: invoiceState.status === 'ready' ? accountMoves as unknown as RowValueMap[] : undefined,
+    pickings: deliveryState.status === 'ready' ? stockPickings as unknown as RowValueMap[] : undefined,
+  });
   const detailConfig = saleOrderDetailWithPartners(t, partnerLabelById);
   const workspaceDetailConfig = {
     ...detailConfig,
@@ -739,7 +750,10 @@ function SaleOrderPageLoaded({
             label: t('common.overview', { defaultValue: 'Overview' }),
             content: (
               <SaleOrderWorkspace nextAction={null} totals={totals} lines={lineGrid} handoffs={handoffLinks}
-                details={<EntityDetail config={workspaceDetailConfig} data={order} />} />
+                details={<div className="space-y-3">
+                  <OrderSummaryNotices lines={lineState} transfers={deliveryState} invoices={invoiceState} />
+                  <EntityDetail config={workspaceDetailConfig} data={orderWithSummary ?? order} />
+                </div>} />
             ),
           },
           {

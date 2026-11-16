@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
+import type { HistoryBounds } from "@lumiere/erp-shared/history-period"
 import { Button, Input, Label, DashboardWidgetRenderer, resolveStoredDashboard } from "@lumiere/ui"
 import { Checkbox } from "@lumiere/ui/components/checkbox"
 import {
@@ -55,6 +56,7 @@ export type QueryBuilderProps = {
   initialDraft?: QueryBuilderDraft
   initialModel?: string
   pageTitle?: string
+  historyBounds?: HistoryBounds | null
   onCreated?: (widgetId: string) => void | Promise<void>
 }
 
@@ -90,6 +92,7 @@ export function QueryBuilder({
   initialDraft,
   initialModel,
   pageTitle,
+  historyBounds,
   onCreated,
 }: QueryBuilderProps) {
   const { t } = useTranslation()
@@ -165,7 +168,7 @@ export function QueryBuilder({
   )
 
   const previewResolution = useMemo(() => {
-    if (!model) return null
+    if (!model || historyBounds === null) return null
     if (widgetKind === "chart" && !groupBy) return null
     if (widgetKind === "table" && displayFields.length === 0) return null
 
@@ -188,7 +191,11 @@ export function QueryBuilder({
       isActive: true,
     }
 
-    return resolveStoredDashboard([syntheticRow], [0], dataSources, { sourceStates })
+    return resolveStoredDashboard([syntheticRow], [0], dataSources, {
+      sourceStates,
+      startMs: historyBounds?.startMs ?? undefined,
+      endMs: historyBounds?.endMs ?? undefined,
+    })
   }, [
     model,
     widgetKind,
@@ -204,6 +211,7 @@ export function QueryBuilder({
     limit,
     dataSources,
     sourceStates,
+    historyBounds,
     t,
   ])
 
@@ -712,7 +720,11 @@ export function QueryBuilder({
           <CardTitle>{t("reports.queryBuilder.preview")}</CardTitle>
         </CardHeader>
         <CardContent>
-          {sourceState === "loading" ? (
+          {historyBounds === null ? (
+            <p className="text-sm text-muted-foreground" role="status">
+              {t("pageComposition.invalidPeriod", { defaultValue: "Choose a valid page date range to display this widget." })}
+            </p>
+          ) : sourceState === "loading" ? (
             <p
               className="text-sm text-muted-foreground"
               role="status"

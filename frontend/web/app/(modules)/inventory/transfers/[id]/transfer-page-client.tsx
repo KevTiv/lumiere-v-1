@@ -115,10 +115,12 @@ function TransferPageLoaded({
 
   const { rows: pickings, state: pickingState } = moduleCollection(useStockPickings(orgId, undefined, true, operatingCompanyId));
   const { rows: moves, state: movesState } = moduleCollection(useStockMoves(orgId, undefined, true, operatingCompanyId));
-  const { rows: locations } = moduleCollection(useStockLocations(orgId));
+  const { rows: locations, state: locationsState } = moduleCollection(
+    useStockLocations(orgId, undefined, true, operatingCompanyId),
+  );
   const { rows: moveLines, state: moveLineState } = moduleCollection(useStockMoveLines(orgId, operatingCompanyId));
   const { data: products = [] } = useProducts(orgId);
-  const { data: lots = [] } = useProductionLots(orgId);
+  const { data: lots = [] } = useProductionLots(orgId, undefined, true, operatingCompanyId);
 
   const workflowSurface = useWorkflowSurface({ organizationId });
   const workflow = usePickingWorkflow(
@@ -260,7 +262,7 @@ function TransferPageLoaded({
   const locationCell = (keys: string[]) => (_value: unknown, row: Row) => {
     const id = keys.map((key) => row[key]).find((value) => value != null);
     if (id == null) return '—';
-    return locationLabelById.get(String(id)) ?? '(deleted)';
+    return locationLabelById.get(String(id)) ?? `#${String(id)}`;
   };
   const baseDetail = transferDetailConfig(t);
   const detailConfig = {
@@ -391,7 +393,12 @@ function TransferPageLoaded({
           {
             id: 'overview',
             label: t('common.overview', { defaultValue: 'Overview' }),
-            content: <EntityDetail config={detailConfig} data={transfer} />,
+            content: (
+              <>
+                <ModuleDataNotice state={locationsState} />
+                <EntityDetail config={detailConfig} data={transfer} />
+              </>
+            ),
           },
           {
             id: 'moves',

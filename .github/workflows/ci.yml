@@ -198,6 +198,11 @@ jobs:
       - name: Presentation contracts and draft validator
         run: cargo test --locked -p lumiere-presentation-core
 
+      - name: Owner report wall-clock scheduling
+        run: |
+          cargo test --locked -p lumiere-report-schedule
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::reports::owner_schedule_tests
+
       - name: Presentation discovery and authorized preview
         run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib presentation
 
@@ -207,6 +212,8 @@ jobs:
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib generated_pdf
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::documents::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::company_scope::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::tests::inventory_resource_classification
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::tests::domain_postfilters
 
       - name: Complete-file admission and source identity
         run: |
@@ -214,6 +221,7 @@ jobs:
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib file_extraction::
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib import_admissions::
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::import_inspection::
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::import_jobs::tests
           python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --bin gateway skills::import::
 
       - name: Saved import chat context and authority freshness
@@ -556,6 +564,9 @@ jobs:
 
       - name: Reports workflow browser regressions
         run: pnpm --dir web test:e2e:reports-ui
+
+      - name: Payment Operations read-state browser regressions
+        run: pnpm --dir web test:e2e:accounting-operations --grep "payment operations distinguish"
 
       - name: Report readiness browser regressions
         run: pnpm --dir web test:e2e:report-readiness

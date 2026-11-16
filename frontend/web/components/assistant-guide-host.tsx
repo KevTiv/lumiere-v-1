@@ -6,8 +6,9 @@ import { AssistantGuideModal } from "@lumiere/ui"
 import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
 import { isSavedGuide, type GuideDraft, type GuideDocument, type GuideReference, type OpenGuideRequest } from "@lumiere/ui/lib/assistant-guide-types"
-import { assistantGuideHistory, guideAccessRevoked, guidePageHref, guideSaveRequestKey, readAssistantGuide, saveAssistantGuide, guideVerificationChoices, requestGuideVerification, recordGuideReview } from "@/lib/assistant-guides"
+import { guideAccessRevoked, guidePageHref, guideSaveRequestKey, readAssistantGuide, saveAssistantGuide, guideVerificationChoices, requestGuideVerification, recordGuideReview } from "@/lib/assistant-guides"
 import { AI_WORKSPACE_SCOPES } from "@/lib/ai-workspace-scope"
+import { useAssistantGuideRevisions } from "@/lib/use-assistant-guide-revisions"
 
 const GUIDE_MODULE_OPTIONS = AI_WORKSPACE_SCOPES.filter((option) => option.value.startsWith("module:")).map((option) => ({ value: option.value.slice(7), label: option.label }))
 
@@ -30,7 +31,6 @@ export function AssistantGuideHost({ request, companyId, organizationId, onClose
   const generation = useRef(0)
   const revisionRead = useRef(0)
   const [state, setState] = useState<{ scope: string; document: GuideDraft | GuideDocument } | null>(null)
-  const [history, setHistory] = useState<GuideDocument[]>([])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [loadRetry, setLoadRetry] = useState(0)
@@ -40,13 +40,13 @@ export function AssistantGuideHost({ request, companyId, organizationId, onClose
   const verificationRead = useRef(0)
   const sameLoad = activeLoad !== null && activeLoad.request === request && activeLoad.scope === scope
   const document = sameLoad && state?.scope === scope ? state.document : null
+  const revisions = useAssistantGuideRevisions(document, scope)
 
   useEffect(() => {
     const epoch = ++generation.current
     const controller = new AbortController()
     setActiveLoad({ request, scope })
     setState(null)
-    setHistory([])
     setError(null)
     setBusy(false)
     setVerificationUnavailable(false)
@@ -78,9 +78,6 @@ export function AssistantGuideHost({ request, companyId, organizationId, onClose
     const reference = { guideId: document.guideId, revision: document.revision }
     const controller = new AbortController()
     const epoch = generation.current
-    void assistantGuideHistory(reference, String(companyId), controller.signal).then((guides) => {
-      if (epoch === generation.current && currentScope.current === scope) setHistory(guides)
-    }).catch(() => { if (epoch === generation.current) setHistory([]) })
     const revalidate = () => {
       const attempt = ++verificationRead.current
       void readAssistantGuide(reference, String(companyId), controller.signal).then((guide) => {
@@ -89,7 +86,7 @@ export function AssistantGuideHost({ request, companyId, organizationId, onClose
         }
       }).catch((cause) => {
         if (!controller.signal.aborted && attempt === verificationRead.current && epoch === generation.current && currentScope.current === scope) {
-          if (guideAccessRevoked(cause)) { setState(null); setHistory([]) }
+          if (guideAccessRevoked(cause)) setState(null)
           else setVerificationUnavailable(true)
           setError(guideAccessRevoked(cause) ? "This guide is no longer available in your current access scope." : "The guide's current access could not be checked. Your edits are retained. Retry before saving or asking a question.")
         }
@@ -150,7 +147,7 @@ export function AssistantGuideHost({ request, companyId, organizationId, onClose
     onRetryLoad={sameLoad && error ? () => setLoadRetry((attempt) => attempt + 1) : undefined} />
 
   return <AssistantGuideModal open onOpenChange={(open) => { if (!open) onClose() }}
-    document={document} onSave={save} busy={busy} error={error} history={history}
+    document={document} onSave={save} busy={busy} error={error} {...revisions}
     verificationUnavailable={verificationUnavailable} onRetryVerification={() => retryVerification.current?.()}
     moduleOptions={GUIDE_MODULE_OPTIONS}
     onLoadVerificationChoices={async()=>{
@@ -181,7 +178,7 @@ export function AssistantGuideHost({ request, companyId, organizationId, onClose
         }
       } catch (cause) {
         if (epoch === generation.current && revisionEpoch === revisionRead.current && currentScope.current === scope) {
-          if (guideAccessRevoked(cause)) { setState(null); setHistory([]) }
+          if (guideAccessRevoked(cause)) setState(null)
           else setVerificationUnavailable(true)
           setError(guideAccessRevoked(cause) ? "This guide is no longer available in your current access scope." : "The revision could not be checked. Your current guide and edits are retained.")
         }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import dynamic from "next/dynamic"
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query"
 import { LumiereApiProvider } from "@lumiere/api-client"
 import { I18nProvider } from "@lumiere/i18n"
 import { ErpSessionProvider, useErpSession } from "@lumiere/erp-session"
@@ -71,6 +71,7 @@ function queryClient() {
 
 function Operations() {
   const { setActiveCompanyId } = useErpSession()
+  const query = useQueryClient()
   const [hydrated, setHydrated] = useState(false)
   const [companyId, setCompany] = useState("11")
   const [stage, setStage] = useState("collections")
@@ -98,10 +99,16 @@ function Operations() {
     control.onmessage = (event) => {
       if (event.data === "11" || event.data === "22") switchCompany(event.data)
       else if (event.data === "actor-1" || event.data === "actor-2") setActorKey(event.data === "actor-1" ? "synthetic-accountant" : "other-accountant")
+      else if (event.data === "payment-sources-refresh") {
+        for (const resource of ["payment-accounts", "payment-transactions"]) {
+          void query.invalidateQueries({ queryKey: ["typed-stdb", resource, "7"] })
+        }
+        void query.invalidateQueries({ queryKey: ["bank-statement-imports", "7"] })
+      }
       else if (["collections", "bills", "import", "bank", "payments", "bank-lifecycle"].includes(event.data)) setStage(event.data)
     }
     return () => control.close()
-  }, [setActiveCompanyId])
+  }, [query, setActiveCompanyId])
   const sourceState: ModuleDataState = sourceStatus === "ready" ? { status: "ready" } : { status: sourceStatus, message: `Synthetic ${sourceStatus} source. Refresh canonical records before continuing.`, onRetry: () => setSourceStatus("ready") }
   const focusedBankLine = bankScenario === "exact" ? bankLine : { ...bankLine, amount: 80, foreignCurrencyId: bankScenario === "fx" ? "2" : null, transactionType: "Synthetic receipt under review" }
   const activeDocument = reminder && String(reminder.companyId) === companyId ? reminder : null

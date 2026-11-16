@@ -240,7 +240,15 @@ async fn read_resource_query_for_company(
             return read_ai_action_drafts(client, organization_id, identity_hex).await;
         }
         "ai-agent-runs" => {
-            return read_ai_agent_runs(client, organization_id).await;
+            let company_id = resolve_membership_company_id(
+                client,
+                organization_id,
+                identity_hex,
+                requested_company_id,
+                "Cannot read another company's AI agent runs",
+            )
+            .await?;
+            return read_ai_agent_runs(client, organization_id, company_id).await;
         }
         "ai-skill-versions" => {
             return read_ai_skill_versions(client, organization_id).await;
@@ -509,7 +517,17 @@ async fn read_resource_query_for_company(
         filter_crm_company_rows(client, resource, organization_id, company_id, &mut rows).await?;
     }
     if let Some(company_id) = inventory_company_id {
-        inventory::filter_inventory_company_rows(resource, company_id, &mut rows);
+        if resource == "warehouse-3d-zones" {
+            inventory::filter_warehouse_zone_company_rows(
+                client,
+                organization_id,
+                company_id,
+                &mut rows,
+            )
+            .await?;
+        } else {
+            inventory::filter_inventory_company_rows(resource, company_id, &mut rows);
+        }
     }
     if let Some(company_id) = purchasing_company_id {
         rows.retain(|row| row_company_matches(row, company_id, false));

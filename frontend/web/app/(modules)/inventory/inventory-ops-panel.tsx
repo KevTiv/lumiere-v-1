@@ -46,13 +46,13 @@ export function InventoryOpsPanel({
     checkPermission('stock_quant', 'read').allowed;
   const enabled = companyId !== undefined && companyId > 0n && canRead;
   const shortAtp = moduleCollection(
-    useInventoryExceptionsShortAtp(organizationId, undefined, enabled),
+    useInventoryExceptionsShortAtp(organizationId, undefined, enabled, companyId),
   );
   const expiredLots = moduleCollection(
-    useInventoryExceptionsExpiredLots(organizationId, undefined, enabled),
+    useInventoryExceptionsExpiredLots(organizationId, undefined, enabled, companyId),
   );
   const openQc = moduleCollection(
-    useInventoryExceptionsOpenQc(organizationId, undefined, enabled),
+    useInventoryExceptionsOpenQc(organizationId, undefined, enabled, companyId),
   );
 
   if (companyId === undefined || permissionsReady === false) {

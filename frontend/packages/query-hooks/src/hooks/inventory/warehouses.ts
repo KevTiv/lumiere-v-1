@@ -10,6 +10,8 @@ import { buildWarehouse3DView } from "@lumiere/erp-shared/warehouse-3d-from-api"
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
 import {
+  inventoryInitialData,
+  inventoryListQueryOptions,
   companyScopeParams,
   mergeReducerParams,
   CREATE_PRODUCT_DEFAULTS,
@@ -113,17 +115,27 @@ export function useWarehouses(
   organizationId: bigint,
   initialData?: Warehouse[],
   enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<Warehouse[]>({
     enabled,
-    queryKey: ['warehouses', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList('/api/query/warehouses', 'Failed to fetch warehouses'),
-    staleTime: 30_000,
-    initialData: coalesceQueryInitialData(initialData),
+    ...inventoryListQueryOptions('warehouses', organizationId, 'Failed to fetch warehouses', companyId),
+    initialData: inventoryInitialData(initialData, companyId),
   });
 }
 
+
+export function useWarehouse3DZones(organizationId: bigint, companyId: bigint, enabled = true) {
+  return useQuery<Warehouse3DZone[]>({
+    enabled: enabled && companyId > 0n,
+    queryKey: ['warehouse-3d-zones', rqBigIntKey(organizationId), String(companyId)],
+    queryFn: () => fetchQueryList(
+      `/api/query/warehouse-3d-zones?companyId=${companyId}`,
+      'Failed to fetch warehouse 3D zones',
+    ),
+    staleTime: 30_000,
+  });
+}
 
 export function useWarehouse3D(
   organizationId: bigint,

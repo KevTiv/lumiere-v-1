@@ -53,10 +53,13 @@ const cashSummaryBadges = (
   group: "delivery" | "invoice" | "payment",
   variants: Record<string, "default" | "secondary" | "outline" | "destructive">,
 ) => ({
-  badgeVariants: variants,
-  badgeLabels: Object.fromEntries(
-    Object.keys(variants).map((value) => [value, t(`sales.salesOrders.cashSummary.${group}.${value}`)]),
-  ),
+  badgeVariants: { ...variants, unavailable: "outline" as const },
+  badgeLabels: {
+    ...Object.fromEntries(
+      Object.keys(variants).map((value) => [value, t(`sales.salesOrders.cashSummary.${group}.${value}`)]),
+    ),
+    unavailable: t("sales.workspace.amountUnavailable", { defaultValue: "Unavailable" }),
+  },
 })
 
 const deliverySummaryBadges = (t: TFunction) =>

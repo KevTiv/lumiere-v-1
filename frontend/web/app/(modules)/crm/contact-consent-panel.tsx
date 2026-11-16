@@ -4,6 +4,8 @@ import { useMemo, useState } from "react"
 import { PlusIcon, ShieldIcon } from "lucide-react"
 
 import { useTranslation } from "@lumiere/i18n"
+import { moduleCollection } from "@lumiere/ui/lib/module-data-state"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
 import { useRecordPrivacyConsent } from "@lumiere/query-hooks/hooks/auth"
 import { usePrivacyConsents } from "@lumiere/query-hooks/hooks/crm"
 import { Badge } from "@/components/ui/badge"
@@ -56,7 +58,7 @@ export interface ContactConsentPanelProps {
 export function ContactConsentPanel({ organizationId, contactId }: ContactConsentPanelProps) {
   const { t } = useTranslation()
   const organization = BigInt(organizationId)
-  const { data: rows = [], isLoading } = usePrivacyConsents(organization)
+  const { rows, state } = moduleCollection(usePrivacyConsents(organization))
   const recordConsent = useRecordPrivacyConsent(organization)
 
   const [consentType, setConsentType] = useState("marketing")
@@ -85,6 +87,7 @@ export function ContactConsentPanel({ organizationId, contactId }: ContactConsen
   )
 
   async function onSubmit() {
+    if (state.status !== "ready") return
     setError(null)
     try {
       await recordConsent.mutateAsync({
@@ -113,6 +116,7 @@ export function ContactConsentPanel({ organizationId, contactId }: ContactConsen
             type="button"
             size="sm"
             variant="outline"
+            disabled={state.status !== "ready"}
             data-testid="contact-consent-record"
             onClick={() => setFormOpen((v) => !v)}
           >
@@ -150,7 +154,7 @@ export function ContactConsentPanel({ organizationId, contactId }: ContactConsen
             <Button
               type="button"
               size="sm"
-              disabled={recordConsent.isPending}
+              disabled={recordConsent.isPending || state.status !== "ready"}
               onClick={() => void onSubmit()}
               data-testid="contact-consent-submit"
             >
@@ -159,8 +163,10 @@ export function ContactConsentPanel({ organizationId, contactId }: ContactConsen
           </div>
         ) : null}
 
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">{t("crm.consent.loading", "Loading…")}</p>
+        {state.status === "loading" ? (
+          <p role="status" className="text-sm text-muted-foreground">{t("crm.consent.loading", "Loading…")}</p>
+        ) : state.status !== "ready" ? (
+          <ModuleDataNotice state={state} />
         ) : history.length === 0 ? (
           <Empty>
             <EmptyHeader>

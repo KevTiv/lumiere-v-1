@@ -36,7 +36,7 @@ import {
   farmDateLabel,
   farmDetailViews,
   farmEventLabels,
-  farmImportPath,
+  farmImportHref,
   farmRecordId,
   farmRequest,
   farmResponse,
@@ -110,12 +110,12 @@ function FarmNotice({ message, retry }: { message: string; retry?: () => void })
   )
 }
 
-function ImportLink() {
+function ImportLink({ companyId }: { companyId: string }) {
   return (
     <Button
       type="button"
       variant="outline"
-      render={<Link href={farmImportPath} />}
+      render={<Link href={farmImportHref(companyId)} />}
       nativeButton={false}
     >
       <Upload className="size-4" /> Import CSV or Excel
@@ -192,7 +192,7 @@ function FarmList({
             </Button>
           ) : undefined
         }
-        secondaryAction={canCreate && query.isSuccess ? <ImportLink /> : undefined}
+        secondaryAction={canCreate && query.isSuccess ? <ImportLink companyId={companyId} /> : undefined}
       />
       {permissionsReady === false || (canRead && query.isPending) ? (
         <FarmLoading />

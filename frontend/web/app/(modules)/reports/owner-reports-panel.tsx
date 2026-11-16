@@ -58,6 +58,7 @@ import {
   useReportPreview,
   useCreateOwnerReportSchedule,
   useOwnerReportScheduleRecipients,
+  useOwnerReportSchedulePreview,
   useOwnerReportSchedules,
   useRunOwnerReportSchedule,
   useUpdateOwnerReportSchedule,
@@ -157,6 +158,13 @@ export function OwnerReportsPanel({
   const [scheduledHour, setScheduledHour] = useState("8")
   const [scheduledMinute, setScheduledMinute] = useState("0")
   const [scheduledRecipients, setScheduledRecipients] = useState<string[]>([])
+  const hour = Number(scheduledHour)
+  const minute = Number(scheduledMinute)
+  const validScheduleTime = scheduledHour.trim() !== "" && Number.isInteger(hour) && hour >= 0 && hour <= 23
+    && scheduledMinute.trim() !== "" && Number.isInteger(minute) && minute >= 0 && minute <= 59
+  const timing = { frequency: scheduledFrequency, hour, minute, timezone }
+  const canPreviewSchedule = selectedCompanyNumber > 0 && Boolean(scheduledReportKey) && validScheduleTime
+  const schedulePreview = useOwnerReportSchedulePreview(organizationId, timing, canPreviewSchedule)
   const history = useGeneratedOwnerReportHistory(
     organizationId,
     Number.isFinite(selectedCompanyNumber) ? selectedCompanyNumber : undefined,
@@ -250,20 +258,21 @@ export function OwnerReportsPanel({
       toast({ title: "Choose a report and at least one active recipient", variant: "destructive" })
       return
     }
+    if (!validScheduleTime || !schedulePreview.isSuccess) return
     const catalogEntry = entries.find((entry) => entry.key === scheduledReportKey)
-    await createSchedule.mutateAsync({
-      name: `${catalogEntry?.title ?? scheduledReportKey} schedule`,
-      companyId,
-      reportKey: scheduledReportKey as ReportPreview["reportKey"],
-      frequency: scheduledFrequency,
-      hour: Math.max(0, Math.min(23, Number(scheduledHour) || 0)),
-      minute: Math.max(0, Math.min(59, Number(scheduledMinute) || 0)),
-      timezone,
-      recipientIdentities: scheduledRecipients,
-      nextRun: new Date(Date.now() + 60_000).toISOString(),
-      isActive: true,
-    })
-    await schedules.refetch()
+    try {
+      await createSchedule.mutateAsync({
+        name: `${catalogEntry?.title ?? scheduledReportKey} schedule`,
+        companyId,
+        reportKey: scheduledReportKey as ReportPreview["reportKey"],
+        ...timing,
+        recipientIdentities: scheduledRecipients,
+        isActive: true,
+      })
+      await schedules.refetch()
+    } catch {
+      toast({ title: "Could not create the report schedule", variant: "destructive" })
+    }
   }
 
   if (catalog.isLoading) {
@@ -391,11 +400,24 @@ export function OwnerReportsPanel({
           <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <Field><FieldLabel>Report</FieldLabel><Select value={scheduledReportKey} onValueChange={setScheduledReportKey}><SelectTrigger><SelectValue placeholder="Choose report" /></SelectTrigger><SelectContent>{entries.map((entry) => <SelectItem key={entry.key} value={entry.key}>{entry.title}</SelectItem>)}</SelectContent></Select></Field>
             <Field><FieldLabel>Cadence</FieldLabel><Select value={scheduledFrequency} onValueChange={(value) => setScheduledFrequency(value as "daily" | "weekly" | "monthly")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></Field>
-            <Field><FieldLabel>Hour</FieldLabel><InputGroup><InputGroupInput type="number" min="0" max="23" value={scheduledHour} onChange={(event) => setScheduledHour(event.target.value)} /></InputGroup></Field>
-            <Field><FieldLabel>Minute</FieldLabel><InputGroup><InputGroupInput type="number" min="0" max="59" value={scheduledMinute} onChange={(event) => setScheduledMinute(event.target.value)} /></InputGroup></Field>
+            <Field><FieldLabel htmlFor="owner-report-schedule-hour">Hour</FieldLabel><InputGroup><InputGroupInput id="owner-report-schedule-hour" type="number" min="0" max="23" value={scheduledHour} onChange={(event) => setScheduledHour(event.target.value)} /></InputGroup></Field>
+            <Field><FieldLabel htmlFor="owner-report-schedule-minute">Minute</FieldLabel><InputGroup><InputGroupInput id="owner-report-schedule-minute" type="number" min="0" max="59" value={scheduledMinute} onChange={(event) => setScheduledMinute(event.target.value)} /></InputGroup></Field>
           </FieldGroup>
           <Field><FieldLabel>Recipients</FieldLabel><div className="flex flex-wrap gap-3 text-sm">{recipients.data?.map((recipient) => { const identity = recipient.userIdentity ?? recipient.user_identity; if (!identity) return null; return <label key={identity} className="flex items-center gap-2"><input type="checkbox" checked={scheduledRecipients.includes(identity)} onChange={(event) => setScheduledRecipients((current) => event.target.checked ? [...current, identity] : current.filter((value) => value !== identity))} />{identity.slice(0, 16)}…</label> })}</div></Field>
-          <div><Button onClick={() => void handleCreateSchedule()} disabled={createSchedule.isPending || !scheduledReportKey}>Create schedule</Button></div>
+          {schedulePreview.isError ? (
+            <div role="alert" className="flex items-center gap-3 text-sm">
+              <span>Could not preview the first delivery.</span>
+              <Button size="sm" variant="outline" onClick={() => void schedulePreview.refetch()}>Retry</Button>
+            </div>
+          ) : schedulePreview.data ? (
+            <p className="text-sm text-muted-foreground">
+              First delivery if saved now is{" "}
+              <time dateTime={schedulePreview.data.nextRun}>
+                {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(schedulePreview.data.nextRun))}
+              </time>{" "}({timezone})
+            </p>
+          ) : canPreviewSchedule && schedulePreview.isPending ? <p role="status" className="text-sm">Checking the first delivery…</p> : null}
+          <div><Button onClick={() => void handleCreateSchedule()} disabled={createSchedule.isPending || !validScheduleTime || !schedulePreview.isSuccess || scheduledRecipients.length === 0}>Create schedule</Button></div>
           {(schedules.data?.schedules.length ?? 0) > 0 && <div className="flex flex-col gap-2 text-sm">{schedules.data?.schedules.map((schedule) => <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-3 rounded border p-3"><span>{schedule.ownerReportKey} · {schedule.frequency} · {String(schedule.hour).padStart(2, "0")}:{String(schedule.minute).padStart(2, "0")} · {schedule.isActive ? "active" : "paused"}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => void updateSchedule.mutateAsync({ scheduleId: schedule.id, input: { isActive: !schedule.isActive } }).then(() => schedules.refetch())}>{schedule.isActive ? "Pause" : "Resume"}</Button><Button size="sm" onClick={() => void runSchedule.mutateAsync(schedule.id).then(() => schedules.refetch())}>Run now</Button></div></div>)}</div>}
         </CardContent>
       </Card>

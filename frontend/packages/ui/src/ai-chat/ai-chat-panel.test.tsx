@@ -29,6 +29,17 @@ type StreamHandler = NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMes
 afterEach(cleanup)
 
 describe("AI chat workspace", () => {
+  it("uses an administrator recovery message until the skills route is available", () => {
+    const messages = [{ id: "setup", role: "assistant", content: "AI setup is incomplete.", timestamp: new Date(), recoveryPath: "/ai-skills" }] satisfies NonNullable<ComponentProps<typeof AIChatPanel>["initialMessages"]>
+    const props = { open: true, onClose: vi.fn(), initialMessages: messages }
+    const { rerender } = render(<AIChatPanel {...props} />)
+    expect(screen.getByText("aiChat.skillSetupUnavailable")).toBeTruthy()
+    expect(screen.queryByRole("link", { name: "aiSkills.title" })).toBeNull()
+    rerender(<AIChatPanel {...props} canOpenSkillSetup />)
+    expect(screen.getByRole("link", { name: "aiSkills.title" }).getAttribute("href")).toBe("/ai-skills")
+    expect(screen.queryByText("aiChat.skillSetupUnavailable")).toBeNull()
+  })
+
   it("keeps the shell composer mounted when a dock becomes a modal", async () => {
     const host = document.createElement("div")
     document.body.append(host)

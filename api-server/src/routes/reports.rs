@@ -7,7 +7,8 @@ use axum::{
     routing::{get, patch, post},
     Json, Router,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
+use lumiere_report_schedule::ReportSchedule;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tower_cookies::Cookies;
@@ -50,13 +51,28 @@ struct OwnerScheduleInput {
     name: String,
     company_id: u64,
     report_key: String,
+    #[serde(flatten)]
+    timing: OwnerScheduleTiming,
+    recipient_identities: Vec<String>,
+    is_active: Option<bool>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OwnerScheduleTiming {
     frequency: String,
     hour: u8,
     minute: u8,
     timezone: String,
-    recipient_identities: Vec<String>,
-    next_run: String,
-    is_active: Option<bool>,
+}
+
+impl OwnerScheduleTiming {
+    fn first_run(&self, now: DateTime<Utc>) -> Result<DateTime<Utc>, ApiError> {
+        let timezone = crate::reports::timezone::parse_timezone(&self.timezone)?;
+        ReportSchedule::new(&self.frequency, self.hour, self.minute, timezone)
+            .and_then(|schedule| schedule.first_run(now))
+            .map_err(|error| ApiError::BadRequest(error.into()))
+    }
 }
 
 #[derive(Deserialize)]
@@ -254,6 +270,23 @@ async fn owner_schedules_get(
     Ok(Json(OwnerScheduleList { schedules, runs }))
 }
 
+async fn owner_schedule_preview(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Query(timing): Query<OwnerScheduleTiming>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let session = resolve_session(&state, &headers, &cookies)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    require_org(&session)?;
+    ensure_report_history_access(session.field_access.as_ref())?;
+    let next_run = timing.first_run(Utc::now())?;
+    Ok(Json(
+        json!({ "nextRun": next_run.to_rfc3339_opts(SecondsFormat::Secs, true) }),
+    ))
+}
+
 async fn owner_schedule_create(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -271,8 +304,9 @@ async fn owner_schedule_create(
         report_key,
         ReportAccess::Export,
     )?;
-    let timezone = crate::reports::timezone::parse_timezone(&input.timezone)?;
-    let next_run = parse_schedule_timestamp(&input.next_run)?;
+    // Keep the wire shape required by the reducer. Both layers compute the first
+    // run from trusted clocks so legacy clients and rolling releases stay safe.
+    let next_run = input.timing.first_run(Utc::now())?;
     dispatch_session_reducer(
         &state,
         &session,
@@ -281,13 +315,13 @@ async fn owner_schedule_create(
                 "name": input.name,
                 "report_template_id": null,
                 "owner_report_key": input.report_key,
-                "timezone": timezone.name(),
+                "timezone": input.timing.timezone,
                 "model": "owner_report",
-                "frequency": input.frequency,
-                "hour": input.hour,
-                "minute": input.minute,
+                "frequency": input.timing.frequency,
+                "hour": input.timing.hour,
+                "minute": input.timing.minute,
                 "attachment_format": "PDF",
-                "next_run": timestamp_json(next_run),
+                "next_run": timestamp_json(next_run.timestamp_micros()),
                 "is_active": input.is_active.unwrap_or(true),
                 "recipients": [],
                 "recipient_identities": input.recipient_identities,
@@ -440,6 +474,7 @@ pub fn router() -> Router<Arc<AppState>> {
             "/reports/schedules",
             get(owner_schedules_get).post(owner_schedule_create),
         )
+        .route("/reports/schedules/preview", get(owner_schedule_preview))
         .route(
             "/reports/schedules/:report_id",
             patch(owner_schedule_update),
@@ -450,4 +485,28 @@ pub fn router() -> Router<Arc<AppState>> {
         )
         .route("/reports/:report_key/preview", post(preview_post))
         .route("/reports/:report_key/pdf", post(pdf_post))
+}
+
+#[cfg(test)]
+mod owner_schedule_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_create_timestamp_does_not_override_the_server_calculation() {
+        let input: OwnerScheduleInput = serde_json::from_value(json!({
+            "name": "Daily owner report",
+            "companyId": 11,
+            "reportKey": "daily_business_summary_v1",
+            "frequency": "daily",
+            "hour": 14,
+            "minute": 30,
+            "timezone": "Africa/Kigali",
+            "recipientIdentities": ["recipient"],
+            "nextRun": "2026-11-15T10:01:00Z"
+        }))
+        .expect("legacy create request parses");
+        let now: DateTime<Utc> = "2026-11-15T10:00:00Z".parse().unwrap();
+        let expected: DateTime<Utc> = "2026-11-15T12:30:00Z".parse().unwrap();
+        assert_eq!(input.timing.first_run(now).unwrap(), expected);
+    }
 }
