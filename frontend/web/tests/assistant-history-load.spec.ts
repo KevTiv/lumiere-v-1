@@ -25,6 +25,7 @@ test("keeps the authenticated mobile transcript bounded and preserves drafts acr
   const older = panel.getByRole("button", { name: "Load older messages", exact: true })
   const search = panel.getByRole("searchbox", { name: "Search conversations", exact: true })
   const title = "Products long-thread acceptance"
+  const recentMarker = "PRODUCTS-RECENT-CATALOG-2026"
   const draft = "Keep this question after visiting another conversation."
   const cdp = await context.newCDPSession(page)
   const heap = async () => {
@@ -35,8 +36,35 @@ test("keeps the authenticated mobile transcript bounded and preserves drafts acr
   await expect(panel).toHaveAttribute("data-mode", "full")
   await expect(messages.first()).toBeVisible()
   await history.click()
-  await search.fill("PRODUCTS-RECENT-CATALOG-2026")
-  await panel.getByRole("button", { name: title, exact: true }).click()
+  await panel.getByRole("combobox", { name: "Module", exact: true }).click()
+  await page.getByRole("option", { name: "Products", exact: true }).click()
+  const firstSearchPage = page.waitForResponse((response) => {
+    const { pathname, searchParams } = new URL(response.url())
+    return pathname === "/api/query/ai-chat-sessions"
+      && searchParams.get("companyId") === company
+      && searchParams.get("module") === "products"
+      && searchParams.get("search") === recentMarker
+      && !searchParams.has("cursor")
+  })
+  await search.fill(recentMarker)
+  const response = await firstSearchPage
+  expect(response.ok(), `Products transcript search returned HTTP ${response.status()}`).toBe(true)
+  const firstPage = (await response.json()) as { data: unknown[]; nextCursor?: string }
+  // The seeded newer Products thread is empty, so the matching transcript is on the next page.
+  expect(firstPage.data).toEqual([])
+  expect(firstPage.nextCursor).toBeTruthy()
+  await panel.getByRole("button", { name: "Load more conversations", exact: true }).click()
+  const hit = panel.getByRole("button", { name: title, exact: true }).filter({ hasText: recentMarker })
+  await expect(hit).toBeVisible()
+  await expect(panel.getByRole("button", { name: recentMarker, exact: true })).toHaveCount(0)
+  await hit.click()
+  await expect(messages.filter({ hasText: recentMarker }).first()).toBeVisible()
+
+  // Measure the transcript window without a pinned search-result message.
+  await history.click()
+  await search.clear()
+  await panel.getByRole("button", { name: title, exact: true }).filter({ hasNotText: recentMarker }).click()
+  await expect(page).toHaveURL((url) => url.searchParams.get("assistantThread") === thread && !url.searchParams.has("assistantMessage"))
   await expect(messages.first()).toBeVisible()
   await expect(older).toBeVisible()
   await input.fill(draft)
