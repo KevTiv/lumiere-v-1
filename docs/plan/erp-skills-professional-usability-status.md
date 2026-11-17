@@ -1,5 +1,9 @@
 # ERP skill usability implementation status
 
+Current lifecycle policy: [repository-owned versus user-created skills](skill-ownership-and-lifecycle.md).
+The source-bound proposal/activation process recorded below is historical and
+does not apply to repository-owned skills or harness updates.
+
 Date: 2026-10-28. Plan: [ERP skills professional usability](../plans/erp-skills-professional-usability.md).
 Implementation rebased onto main at `36578a83`; pilot baseline prompts retain
 their original `dd5481dc` snapshot.
@@ -13,12 +17,12 @@ model qualification evidence.
 | Package | Implemented | Remaining acceptance |
 | --- | --- | --- |
 | ERP-SKILL-01 | Generated catalog/README from registered routes, Rust input structs and actual prompt dependencies; Rust parity checks compare the compiler and reviewed tool allowlists. | Maintain generator checks as contracts change. |
-| ERP-SKILL-02 | Remove obsolete SQL, unsupported tools/drafts, finance input drift and ambiguous deterministic-helper claims; fail on missing/escaped references and malformed metadata. Database overlays cannot restore stale tools or drafts. | Changed releases need independent certification before use. |
+| ERP-SKILL-02 | Remove obsolete SQL, unsupported tools/drafts, finance input drift and ambiguous deterministic-helper claims; fail on missing/escaped references and malformed metadata. Database overlays cannot restore stale tools or drafts. | Repository-owned updates ship with the application; only user-created skills require certification and activation. |
 | ERP-SKILL-03 | Baseline snapshots, tested response examples for both pilots, 40 development/held-out scenario specifications, paired experiment preparation and provenance-checked metric collection. | Run the budgeted real-provider comparisons and independent usefulness grading. Scenarios are requirements, not completed measurements. |
 | ERP-SKILL-04 | Versioned deterministic eager compiler, dependency/content hashes in synchronization metadata, package-local reference validation, 64 KiB byte bounds, complete declared prompt inputs in certification binding and image build triggers. | Conditional reference selection remains deferred by the plan until the pilot demonstrates a benefit. Actual tokenizer measurements are still needed for the provisional token budget. |
 | ERP-SKILL-05 | Procedures and synthetic task-data examples across the remaining skills; ten review scenarios per remaining skill; documented closed input examples deserialize against the real contracts. | Materialize the additional scenarios through their owners; model-backed paths still need live profile qualification. |
 | ERP-SKILL-06 | Explicit reporting timezone selection, workflow-specific record/date labels, required-input guidance, and honest bounded empty-briefing output. Existing saved-run inspection remains the observation path. | Deployed responsive/keyboard operator acceptance and live availability/recovery walkthroughs. |
-| ERP-SKILL-07 | Source-bound proposed manifests and development seed prepared; source checks run in CI. | Actual provider/settled-spend evidence, independent tenant certification/promotion, staged activation and rollback rehearsal. |
+| ERP-SKILL-07 | Historical source-bound proposals have been retired; built-ins use deployed execution policy. | Actual provider/settled-spend evidence and deployment acceptance remain software-quality checks, not tenant certification/activation gates. |
 
 ## Release handling
 
@@ -39,13 +43,12 @@ After editing a procedure, reference or bound runtime source:
 
 ```sh
 python3 -B scripts/erp_skill_catalog.py --write
-python3 -B scripts/finance-skill-manifests.py --write
 python3 -B scripts/erp_skill_catalog.py --check
-python3 -B scripts/finance-skill-manifests.py --check
 ```
 
-The manifest helper updates the report proposal, development-only seed and five
-finance proposals. It never contacts a service, registers or promotes a release.
+Source-bound proposals and their manifest helper have been removed. Application
+deployment delivers these skills; only user-created skills need certification
+and activation.
 
 ## Verification
 

@@ -80,7 +80,7 @@ import { parseFarmComparisonRequest, readAssistantFarmMetrics } from "@/lib/assi
 import { useErpAiSelectionReporter } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { performSignOut } from "@/lib/auth-sign-out"
 import {
-  assistantAnswer, assistantAnswerMetadata, assistantSetupFailure, coordinateAssistantTurn,
+  assistantAnswer, assistantAnswerMetadata, assistantHistoryResult, assistantSetupFailure, coordinateAssistantTurn,
   parseStoredAssistantRecovery, readAssistantStream, withAssistantRecoveryMetadata, type AssistantTurnFailure,
 } from "@/lib/assistant-turn"
 import { i18n } from "@lumiere/i18n"
@@ -430,6 +430,7 @@ function ErpAiChatPanel({
       guides?: GuideReference[]
       importTaskIds?: string[]
       recoveryPath?: ChatMessage["recoveryPath"]
+      verification?: ReturnType<typeof assistantAnswer>["verification"]
     }) => {
       if (!sessionKey || !orgReady || operatingCompanyId == null || operatingCompanyId <= 0) return
       const { actorRequest } = args
@@ -452,7 +453,7 @@ function ErpAiChatPanel({
           ui_context_json: JSON.stringify(args.uiContext ?? null),
           model: args.model ?? null,
           duration_ms: args.durationMs ?? null,
-          metadata: withStoredTurnMetadata(args.turnId, args.earlierContextUnavailable, withAssistantRecoveryMetadata(
+          ...assistantHistoryResult(args.verification, withStoredTurnMetadata(args.turnId, args.earlierContextUnavailable, withAssistantRecoveryMetadata(
             withGuideReferencesMetadata(
               withNativeActionsMetadata(
                 args.actions?.length || args.runId != null
@@ -469,7 +470,7 @@ function ErpAiChatPanel({
               args.guides,
             ),
             args.recoveryPath,
-          ), args.importTaskIds),
+          ), args.importTaskIds)),
         }) },
       })
       if (result === "failed") setFailedHistoryScope(historyScope)
@@ -708,7 +709,7 @@ function ErpAiChatPanel({
         }
         try {
           setProgress("answering", Boolean(onDelta))
-          const answer = await rag.mutateAsync({
+          const answer = assistantAnswer(await rag.mutateAsync({
             query: selectedDocument.action === "explain"
               ? "Explain the selected spreadsheet cells."
               : "Check the selected spreadsheet cells for issues.",
@@ -717,12 +718,12 @@ function ErpAiChatPanel({
             signal,
             spreadsheet_selection: documentSelectionAnalysisReference(selectedDocument.selection),
             ...(requestedAgentId ? { agent_id: requestedAgentId } : {}),
-          })
+          }))
           if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
           const sources = answer.sources.map(mapRagSourceToChatSource)
-          await saveReply({ userText, assistantText: answer.answer, sources, uiContext: null, runId: answer.run_id })
+          await saveReply({ userText, assistantText: answer.answer, sources, uiContext: null, runId: answer.run_id, verification: answer.verification })
           if (selectedReferences?.length && isCurrent()) clearReferences(sessionKey)
-          return { content: answer.answer, sources, runId: answer.run_id, earlierContextUnavailable: answer.earlier_context_unavailable }
+          return { content: answer.answer, sources, runId: answer.run_id, earlierContextUnavailable: answer.earlierContextUnavailable }
         } catch (error) {
           if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
           const setup = assistantSetupFailure(error)
@@ -868,6 +869,7 @@ function ErpAiChatPanel({
         earlierContextUnavailable: out?.earlierContextUnavailable,
         durationMs: Math.round(performance.now() - started), model: out?.model ?? null,
         actions: actions.length ? actions : undefined, runId: out?.run_id, recoveryPath,
+        verification: out?.verification,
       })
       if (out && selectedReferences?.length && isCurrent()) clearReferences(sessionKey)
       return { content, runId: out?.run_id, sources, guides, recoveryPath, importTaskIds, importTasks: taskStatuses, actions: actions.length ? actions : undefined, earlierContextUnavailable: out?.earlierContextUnavailable }

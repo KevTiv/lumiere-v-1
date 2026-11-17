@@ -1,6 +1,6 @@
 //! Additive AI skill versioning, release provenance, and run policy snapshots.
 
-use lumiere_policy_core::{ai_skills::is_builtin_skill, skill_projection::SkillProjection};
+use lumiere_policy_core::{ai_skills::is_user_created_skill, skill_projection::SkillProjection};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
@@ -560,6 +560,7 @@ pub fn create_ai_skill_version(
     check_permission(ctx, organization_id, "ai_skill", "create")?;
 
     let skill = load_available_skill(ctx, organization_id, params.skill_id)?;
+    require_user_created_skill(&skill, organization_id)?;
     validate_optional_text(
         "review_notes",
         params.review_notes.as_deref(),
@@ -569,9 +570,7 @@ pub fn create_ai_skill_version(
     let manifest = validate_manifest(&params.manifest_json, &skill.skill_key)?;
     let manifest_value: Value = serde_json::from_str(&params.manifest_json)
         .map_err(|error| format!("invalid manifest_json: {error}"))?;
-    if SkillProjection::from_manifest(&manifest_value)?.is_some() {
-        require_tenant_projection_skill(&skill, organization_id)?;
-    }
+    SkillProjection::from_manifest(&manifest_value)?;
     let version_key = format!(
         "{}:{}:{}",
         organization_id, params.skill_id, manifest.version
@@ -653,6 +652,7 @@ pub fn promote_ai_skill_version(
 
     let version = load_org_version(ctx, organization_id, skill_version_id)?;
     let skill = load_available_skill(ctx, organization_id, version.skill_id)?;
+    require_user_created_skill(&skill, organization_id)?;
     if !skill.is_active {
         return Err("skill is not active".to_string());
     }
@@ -682,7 +682,7 @@ pub fn create_ai_skill_fixture(
     validate_fixture_json("input_json", &params.input_json)?;
     validate_fixture_json("expected_output_json", &params.expected_output_json)?;
     if let Some(version_id) = projection_fixture_version(params.metadata.as_deref()) {
-        require_tenant_projection_skill(&skill, organization_id)?;
+        require_user_created_skill(&skill, organization_id)?;
         let version = load_org_version(ctx, organization_id, version_id)?;
         let manifest = serde_json::from_str(&version.manifest_json)
             .map_err(|error| format!("invalid stored skill manifest: {error}"))?;
@@ -965,7 +965,7 @@ pub fn request_ai_skill_certification(
     )?;
     let version = load_org_version(ctx, organization_id, params.skill_version_id)?;
     let skill = load_available_skill(ctx, organization_id, version.skill_id)?;
-    require_tenant_projection_skill(&skill, organization_id)?;
+    require_user_created_skill(&skill, organization_id)?;
     let superuser_bypass =
         require_workflow_company_access(ctx, organization_id, params.company_id, ctx.sender())?;
     require_skill_version_promotion_valid(ctx, version.id)?;
@@ -1302,6 +1302,7 @@ pub fn rollback_ai_skill_release(
     validate_required_text("reason", &reason, MAX_REVIEW_NOTES_LEN)?;
 
     let skill = load_available_skill(ctx, organization_id, skill_id)?;
+    require_user_created_skill(&skill, organization_id)?;
     if !skill.is_active {
         return Err("skill is not active".to_string());
     }
@@ -1880,13 +1881,14 @@ fn terminalize_exhausted_certification_request(
     );
 }
 
-fn require_tenant_projection_skill(skill: &AiSkill, organization_id: u64) -> Result<(), String> {
-    if organization_id == 0
-        || skill.organization_id != organization_id
-        || skill.is_system
-        || is_builtin_skill(&skill.skill_key)
-    {
-        return Err("draft testing is only available for tenant-authored skills".to_string());
+fn require_user_created_skill(skill: &AiSkill, organization_id: u64) -> Result<(), String> {
+    if !is_user_created_skill(
+        &skill.skill_key,
+        skill.is_system,
+        skill.organization_id,
+        organization_id,
+    ) {
+        return Err("Only user-created skills use versioning, certification and activation. Repository skills are available with the deployed application.".to_string());
     }
     Ok(())
 }
@@ -1926,7 +1928,7 @@ fn require_tenant_draft_tests(
     skill: &AiSkill,
     version: &AiSkillVersion,
 ) -> Result<(), String> {
-    if require_tenant_projection_skill(skill, version.organization_id).is_err() {
+    if require_user_created_skill(skill, version.organization_id).is_err() {
         return Ok(());
     }
     let manifest = serde_json::from_str(&version.manifest_json)

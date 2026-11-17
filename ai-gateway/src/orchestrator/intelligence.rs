@@ -219,6 +219,8 @@ pub enum GenerationResponseFormat {
     #[default]
     Text,
     FinalDraft,
+    /// RAG's claim-to-support contract, distinct from report passage citations.
+    RagAnswer,
 }
 
 /// `generate()` synthesizes a draft. The response format does not admit
