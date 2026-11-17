@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto"
 import { expect, test, type Locator, type Page } from "@playwright/test"
+import type { ChatImportReviewedRecords } from "@lumiere/ui/lib/import-task-status"
 import type { ChatImportTask as Task } from "../lib/chat-import-task"
 
 // Production chat/task components, synthetic HTTP only. Original private farm
@@ -14,6 +15,7 @@ async function mockTasks(page: Page, options: {
   loseDecisionReply?: boolean
   seedPendingTask?: boolean
   waitForScan?: Promise<void>
+  reviewedRecords?: () => ChatImportReviewedRecords | undefined
 } = {}) {
   const tasks = new Map<string, Task>()
   const pending = ({
@@ -139,6 +141,7 @@ async function mockTasks(page: Page, options: {
       return route.fulfill({ json: {
         version: 1, organizationId: "8001", companyId: task.companyId, requestId: task.requestId,
         capabilities: [], proposals: [], nativeResults: [], nativeResultsMore: false,
+        reviewedRecords: options.reviewedRecords?.(),
       } })
     }
     const decisionId = url.searchParams.get("decisionId")
@@ -325,6 +328,117 @@ test("a prepared task opens its exact source in the existing review workspace", 
   expect(requests.decisionPosts).toHaveLength(1)
   expect(requests.preparations).toBe(1)
   expect(requests.businessWrites).toBe(0)
+})
+
+test("Shop Sales approves only ready rows and reopens exact verified records from a new chat", async ({ page }) => {
+  let reviewedRecords: ChatImportReviewedRecords | undefined
+  const requests = await mockTasks(page, { reviewedRecords: () => reviewedRecords })
+  await mockSourceReview(page)
+
+  const item = (id: string, sheet: string, product: string, price: string, amount: string, row = 11) => {
+    const values = {
+      shop: sheet === "Ventes Kimironko" ? "KIMIRONKO" : "ZINIA",
+      sale_date: "2024-04-12", currency_code: "RWF", product_label: product,
+      sold_quantity: "2", sale_unit_price: price, sale_amount: amount,
+    }
+    const fields = Object.entries(values).map(([key, sourceValue]) => ({
+      key, label: key.replaceAll("_", " "), kind: "text", sourceValue, required: true, export: false,
+    }))
+    return {
+      id, revision: 3, state: "confirmed", values, confirmedFields: Object.keys(values),
+      reason: null, reviewedBy: "ab".repeat(32), reviewedAt: "2026-11-01T10:05:00Z",
+      source: {
+        key: `shop-${id}`, label: product, fields, proposed: values,
+        issue: "Reviewed historical quantity and price.",
+        source: { file: "synthetic-farm-1.xlsx", row, sheet, multiWorksheet: true, sha256: "a".repeat(64), rowBasis: "import_row" },
+      },
+    }
+  }
+  const sales = [
+    item("711", "Ventes Kimironko", "Inkoko", "16250", "32500"),
+    item("712", "Ibyagurishijwe Zinia", "Brochette", "5000.225", "10000.45"),
+    item("713", "Ibyagurishijwe Zinia", "Doubtful amount", "1500", "2999.50", 13),
+  ]
+  const review = {
+    id: "71", title: "Synthetic farm history", targetEntity: "source_observation",
+    sourceFile: "synthetic-farm-1.xlsx", total: 3, pending: 0, confirmed: 3, excluded: 0,
+    items: sales, history: [], reviewOperations: [{
+      key: "shop_sales_backfill", version: 1, label: "Shop sales", destination: "/sales?tab=shop-sales",
+      itemIds: sales.map(row => row.id), reviewedRecord: {
+        dispatch: "shop_sales", inputs: [], previewFields: [
+          { key: "product", label: "Product" }, { key: "amount", label: "Total" }, { key: "currency", label: "Currency" },
+        ],
+      },
+    }],
+  }
+  await page.route(/\/api\/import-reviews\/71(?:\?|$)/, route => route.fulfill({ json: review }))
+  const previewDigests = ["c".repeat(64), "d".repeat(64)]
+  const recordIds = ["9007199254740993", "62"]
+  const commands: unknown[] = []
+  await page.route("**/api/import-reviews/71/module-backfill", route => {
+    const request = route.request().postDataJSON()
+    commands.push(request)
+    if (request.preview) return route.fulfill({ json: { results: [
+      ...sales.slice(0, 2).map((row, index) => ({
+        itemId: row.id, status: "ready", digest: previewDigests[index],
+        periodStart: row.values.sale_date, periodEnd: row.values.sale_date,
+        facts: { product: row.values.product_label, amount: row.values.sale_amount, currency: "RWF" },
+        recordId: index ? recordIds[index] : undefined,
+      })),
+      { itemId: "713", status: "held", reason: "Quantity times price differs from the source amount." },
+    ] } })
+    reviewedRecords = {
+      counts: { verified: 2, alreadyPresent: 1 },
+      records: sales.slice(0, 2).map((row, index) => ({
+        id: recordIds[index]!, module: "shop_sales", periodStart: row.values.sale_date,
+        displayLabel: row.values.product_label,
+      })),
+      more: false,
+    }
+    return route.fulfill({ json: { results: sales.slice(0, 2).map((row, index) => ({
+      itemId: row.id, status: index ? "matched" : "saved", recordId: recordIds[index],
+    })) } })
+  })
+
+  await openChat(page)
+  await page.getByTestId("erp-ai-chat-file-input").setInputFiles({
+    name: review.sourceFile,
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: Buffer.from("Simulated workbook bytes. Real workbook parsing is verified separately."),
+  })
+  await approvePreparation(page)
+  await page.getByRole("button", { name: "Review Synthetic farm history", exact: true }).click()
+  const dialog = page.getByRole("dialog")
+  await dialog.getByRole("button", { name: "Preview shop sales" }).click()
+  await expect(dialog.getByText("Quantity times price differs from the source amount.", { exact: false })).toBeVisible()
+  await expect(dialog.getByText("Total 10000.45", { exact: false })).toBeVisible()
+  expect(commands).toEqual([{
+    companyId: 9001, module: "shop_sales", preview: true,
+    rows: sales.map(row => ({ itemId: row.id, revision: row.revision })),
+  }])
+  await dialog.getByRole("button", { name: "Save and verify 2 records" }).click()
+  await expect(dialog.getByText("1 saved · 1 matched existing records", { exact: false })).toBeVisible()
+  await expect(dialog.getByRole("link", { name: "Inkoko", exact: true })).toHaveAttribute(
+    "href", new RegExp(`^/sales\\?tab=shop-sales&backfillCompany=9001&backfillRecord=${recordIds[0]}&backfillTask=[a-f0-9]{32}$`),
+  )
+  expect(commands[1]).toEqual({
+    companyId: 9001, module: "shop_sales", preview: false,
+    rows: sales.slice(0, 2).map((row, index) => ({ itemId: row.id, revision: row.revision, expectedDigest: previewDigests[index] })),
+  })
+
+  await page.goto("/chat-import?thread=sales-follow-up")
+  await page.getByRole("button", { name: "Continue saved import", exact: true }).click()
+  await dialog.getByRole("button", { name: "Open saved task", exact: true }).click()
+  await dialog.getByRole("tab", { name: "ERP results", exact: true }).click()
+  await expect(dialog.getByText("2 verified ERP records", { exact: false })).toBeVisible()
+  await dialog.getByText("Exact ERP records", { exact: true }).click()
+  await expect(dialog.getByRole("link", { name: /Inkoko/ })).toHaveAttribute(
+    "href", `/sales?tab=shop-sales&backfillCompany=9001&backfillRecord=${recordIds[0]}`,
+  )
+  expect(commands).toHaveLength(2)
+  expect(requests.posts).toBe(1)
+  expect(requests.businessWrites).toBe(0)
+  await expect(page.getByTestId("chat-text-requests")).toHaveText("0")
 })
 
 test("saved import stages sit above their panels in the narrow Settings workspace", async ({ page }) => {

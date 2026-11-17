@@ -43,7 +43,7 @@ pub(super) async fn hold_candidates(
         return apply_candidate_holds(scope, definition, BTreeMap::new());
     }
     let entries = json!(definition.entries.iter().map(|entry| json!({
-        "itemId":entry.item_id,"sourceKey":claim_key(entry),"amount":entry.amount,
+        "itemId":entry.item_id,"sourceKey":claim_key(entry),"compatibleSourceKey":compatible_claim_key(entry),"amount":entry.amount,
         "currencyId":definition.configuration.currency_id,"dateFrom":entry.business_identity.date_from,
         "dateTo":entry.business_identity.date_to_exclusive,"externalReference":entry.business_identity.external_reference,
     })).collect::<Vec<_>>());
@@ -59,7 +59,7 @@ pub(super) async fn hold_candidates(
                     (SELECT entry.value->'businessIdentity'->>'category'
                      FROM jsonb_array_elements(proposal.definition_json->'entries') entry(value)
                      WHERE entry.value->>'itemId'=claim.item_id::text LIMIT 1) AS category,
-                    CASE WHEN claim.source_key=selected.value->>'sourceKey' THEN 'same_source'
+                    CASE WHEN claim.source_key IN (selected.value->>'sourceKey', selected.value->>'compatibleSourceKey') THEN 'same_source'
                          WHEN claim.external_reference=selected.value->>'externalReference' THEN 'same_reference'
                          ELSE 'overlapping_period_amount' END AS reason
              FROM lumiere_platform.import_workflow_source_claim claim
@@ -67,7 +67,7 @@ pub(super) async fn hold_candidates(
                ON proposal.organization_id=claim.organization_id AND proposal.company_id=claim.company_id AND proposal.id=claim.proposal_id
              WHERE claim.organization_id=$1::text::numeric AND claim.company_id=$2::text::numeric
                AND claim.effect_kind=$4 AND claim.released_at IS NULL AND ($5::bigint IS NULL OR claim.proposal_id<>$5)
-               AND (claim.source_key=selected.value->>'sourceKey'
+               AND (claim.source_key IN (selected.value->>'sourceKey', selected.value->>'compatibleSourceKey')
                     OR (claim.currency_id=(selected.value->>'currencyId')::numeric
                         AND ((claim.external_reference IS NOT NULL AND claim.external_reference=selected.value->>'externalReference')
                              OR (claim.amount=(selected.value->>'amount')::numeric
@@ -104,7 +104,12 @@ pub(super) async fn hold_candidates(
 fn selected_candidate(left: &Entry, right: &Entry, currency: &str) -> Option<OverlapCandidate> {
     let a = &left.business_identity;
     let b = &right.business_identity;
-    let reason = if claim_key(left) == claim_key(right) {
+    let left_key = claim_key(left);
+    let right_key = claim_key(right);
+    let reason = if left_key == right_key
+        || compatible_claim_key(left).as_ref() == Some(&right_key)
+        || compatible_claim_key(right).as_ref() == Some(&left_key)
+    {
         "same_source"
     } else if a.external_reference.is_some() && a.external_reference == b.external_reference {
         "same_reference"

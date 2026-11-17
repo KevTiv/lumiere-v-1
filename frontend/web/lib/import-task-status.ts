@@ -5,8 +5,8 @@ import type {
 } from "@lumiere/ui/lib/import-task-status"
 import type { ChatMessageSourceRef } from "@lumiere/ui/lib/ai-chat-types"
 import { importTaskStatusIsCurrent } from "@lumiere/ui/lib/import-task-status"
-import { parseChatImportTask, type ChatImportScope } from "./chat-import-task"
-import { readImportWorkflow, type WorkflowFetch } from "./import-workflow"
+import { parseSavedImportTask, type ChatImportScope } from "./chat-import-task"
+import { importAmountUnits, readImportWorkflow, reviewedRecordsSchema, type WorkflowFetch } from "./import-workflow"
 
 const id = z.string().regex(/^[1-9]\d{0,19}$/)
 const count = z.number().int().min(0).max(1_000_000_000)
@@ -49,10 +49,6 @@ const nativeResultSchema = z
       })
     }
   })
-function amountUnits(value: string): bigint {
-  const [whole, fraction = ""] = value.split(".")
-  return BigInt(whole!) * 1_000_000n + BigInt(fraction.padEnd(6, "0"))
-}
 const statusSchema = z
   .object({
     taskId: taskIdSchema,
@@ -119,6 +115,7 @@ const statusSchema = z
       .max(10),
     nativeResults: z.array(nativeResultSchema).max(20).default([]),
     nativeResultsMore: z.boolean().default(false),
+    reviewedRecords: reviewedRecordsSchema.optional(),
   })
   .superRefine((status, ctx) => {
     const issue = () =>
@@ -147,7 +144,7 @@ const statusSchema = z
         result &&
         (result.recordCount !== proposal.expectedRecords ||
           result.lineCount !== result.recordCount * 2 ||
-          amountUnits(result.totalDebit) !== amountUnits(result.totalCredit) ||
+          importAmountUnits(result.totalDebit) !== importAmountUnits(result.totalCredit) ||
           (result.records &&
             (result.records.length !== result.recordCount ||
               new Set(result.records.map((record) => record.id)).size !==
@@ -196,7 +193,7 @@ export function parseStoredImportTaskIds(
 /** Reopen a saved reference through the actor-scoped task and workflow reads. */
 export async function readChatImportTaskStatus(
   fetcher: WorkflowFetch,
-  scope: ChatImportScope,
+  scope: Pick<ChatImportScope, "companyId" | "organizationId">,
   taskId: string,
   signal?: AbortSignal,
 ): Promise<ChatImportTaskStatus> {
@@ -212,7 +209,7 @@ export async function readChatImportTaskStatus(
   if (body?.organizationId !== String(scope.organizationId)) {
     throw new Error("Saved import organization changed")
   }
-  const task = parseChatImportTask(body, scope, taskId)
+  const task = parseSavedImportTask(body, scope.companyId, taskId)
   const workflow = await readImportWorkflow(read, { ...scope, taskId })
   const sourceRows = task.reviews.reduce(
     (sum, review) => ({
@@ -248,6 +245,7 @@ export async function readChatImportTaskStatus(
     })),
     nativeResults: workflow.nativeResults,
     nativeResultsMore: workflow.nativeResultsMore,
+    reviewedRecords: workflow.reviewedRecords,
   })
 }
 

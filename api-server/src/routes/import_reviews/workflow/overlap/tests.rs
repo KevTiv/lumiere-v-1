@@ -17,6 +17,8 @@ fn entry(item: &str) -> Entry {
         source_file: "history.csv".into(),
         source_row: item.parse::<u32>().unwrap_or(1) + 1,
         source_sha256: "a".repeat(64),
+        source_sheet: None,
+        unqualified_source_sheet: None,
         reference: format!("SOURCE-{item}"),
         date: "2026-01-01".into(),
         description: format!("Electricity {item}"),

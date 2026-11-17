@@ -54,12 +54,15 @@ TEXT_RULE_FIELDS = frozenset({
     "industry", "notes", "complete_name", "product_label", "category", "counterparty",
     "document_reference", "external_reference", "currency", "business_interpretation",
 })
-OBSERVATION_DECIMALS = frozenset({"amount", "quantity", "pieces", "kilograms", "debit", "credit"})
-OBSERVATION_DATES = frozenset({"date", "business_date", "as_of", "invoice_date", "count_date", "balance_date"})
+SHOP_SALE_AMOUNTS = ("sold_quantity", "sale_unit_price", "sale_amount")
+SHOP_SALE_REQUIRED = frozenset({"shop", "sale_date", "product_label", "currency_code", *SHOP_SALE_AMOUNTS})
+SALE_LINE_IDENTITY = ("sale_line_issuer", "sale_line_reference")
+OBSERVATION_DECIMALS = frozenset({"amount", "quantity", "pieces", "kilograms", "debit", "credit", *SHOP_SALE_AMOUNTS})
+OBSERVATION_DATES = frozenset({"date", "business_date", "as_of", "invoice_date", "count_date", "balance_date", "sale_date"})
 OBSERVATION_FIELDS = frozenset({
     "description", "name", "product_label", "category", "counterparty", "document_reference",
     "external_reference", "currency", "unit", "reported_method", "reported_destination",
-    "business_interpretation", "observation_kind",
+    "business_interpretation", "observation_kind", "shop", "currency_code", "source_unit", *SALE_LINE_IDENTITY,
 }) | OBSERVATION_DECIMALS | OBSERVATION_DATES
 
 

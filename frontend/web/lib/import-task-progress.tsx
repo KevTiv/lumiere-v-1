@@ -174,9 +174,10 @@ export function ImportTaskProgress({
         defaultValue: "ERP records",
       }),
       description: workflow
-        ? t("settings.importTask.progressRecordCounts", {
+        ? t("settings.importTask.progressVerifiedRecordCounts", {
             defaultValue:
-              "{{drafts}} verified drafts shown · {{receipts}} native job receipts",
+              "{{records}} verified historical records · {{drafts}} verified drafts shown · {{receipts}} native job receipts",
+            records: workflow.reviewedRecords?.counts.verified ?? workflow.backfilledRecords?.reduce((total, result) => total + result.count, 0) ?? 0,
             drafts: verifiedDrafts,
             receipts: nativeReceipts,
           })

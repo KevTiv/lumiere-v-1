@@ -1,4 +1,5 @@
 import { z } from "zod"
+import type { ChatImportReviewedRecords } from "@lumiere/ui/lib/import-task-status"
 
 const positiveId = z.string().regex(/^[1-9]\d*$/)
 const requestId = z.string().regex(/^[0-9a-f]{32}$/)
@@ -15,6 +16,34 @@ const day = z
     )
   }, "Use a valid calendar date.")
 const count = z.number().int().nonnegative()
+const recordModule = z.enum(["sales", "shop_sales", "warehouse"])
+export const reviewedRecordsSchema = z
+  .object({
+    counts: z.object({ verified: count.max(1_000_000_000), alreadyPresent: count.max(1_000_000_000) }),
+    records: z.array(z.object({
+      id: positiveId.max(20),
+      module: recordModule,
+      periodStart: day,
+      displayLabel: z.string().min(1).max(240).optional(),
+    })).max(20),
+    more: z.boolean(),
+    salesTotals: z.array(z.object({
+      currency: z.string().regex(/^[A-Z]{3}$/),
+      amount: z.string().regex(/^\d{1,30}(?:\.\d{1,6})?$/),
+      count: count.min(1).max(1_000_000_000),
+    })).max(20).optional(),
+  })
+  .refine(({ counts, records, more, salesTotals }) =>
+    counts.alreadyPresent <= counts.verified &&
+    records.length === Math.min(counts.verified, 20) &&
+    more === (counts.verified > records.length) &&
+    new Set(records.map((record) => record.id)).size === records.length &&
+    (!salesTotals || (
+      new Set(salesTotals.map((total) => total.currency)).size === salesTotals.length &&
+      salesTotals.reduce((sum, total) => sum + total.count, 0) <= counts.verified
+    )),
+    "The reviewed import record summary is inconsistent.",
+  )
 const sourceRevision = z.object({
   itemId: positiveId,
   batchId: positiveId,
@@ -97,6 +126,7 @@ const proposalSchema = z.object({
         sourceRevision: z.number().int().positive(),
         sourceFile: z.string(),
         sourceRow: z.number().int().positive(),
+        sourceSheet: z.string().min(1).max(255).nullish(),
         sourceSha256: digest,
         reference: z.string(),
         date: day,
@@ -214,6 +244,7 @@ export interface ImportWorkflow {
   proposals: ImportProposal[]
   nativeResults: ImportNativeResult[]
   nativeResultsMore: boolean
+  reviewedRecords?: ChatImportReviewedRecords
   backfilledRecords?: Array<{ module: "sales" | "shop_sales" | "warehouse"; count: number }>
   farmResults?: Array<{ batchId: string; count: number }>
   farmResultsMore?: boolean
@@ -291,7 +322,8 @@ export class ImportWorkflowRequestError extends Error {
   }
 }
 
-function units(value: string): bigint {
+/** Scale a validated decimal with up to six fractional places. */
+export function importAmountUnits(value: string): bigint {
   const negative = value.startsWith("-")
   const [whole, fraction = ""] = (negative ? value.slice(1) : value).split(".")
   const scaled = BigInt(whole!) * 1_000_000n + BigInt(fraction.padEnd(6, "0"))
@@ -321,10 +353,10 @@ export function parseImportProposal(
             source.revision === entry.sourceRevision,
         ),
     ) ||
-    entries.some((entry) => units(entry.amount) <= 0n) ||
-    units(summary.totalDebit) !==
-      entries.reduce((total, entry) => total + units(entry.amount), 0n) ||
-    units(summary.totalCredit) !== units(summary.totalDebit) ||
+    entries.some((entry) => importAmountUnits(entry.amount) <= 0n) ||
+    importAmountUnits(summary.totalDebit) !==
+      entries.reduce((total, entry) => total + importAmountUnits(entry.amount), 0n) ||
+    importAmountUnits(summary.totalCredit) !== importAmountUnits(summary.totalDebit) ||
     summary.currencyId !== proposal.configuration.currencyId
   ) {
     throw new Error(
@@ -350,8 +382,8 @@ export function parseImportProposal(
       result.lineIds.length !== result.lineCount ||
       new Set(result.recordIds).size !== result.recordCount ||
       new Set(result.lineIds).size !== result.lineCount ||
-      units(result.totalDebit) !== units(summary.totalDebit) ||
-      units(result.totalCredit) !== units(summary.totalCredit))
+      importAmountUnits(result.totalDebit) !== importAmountUnits(summary.totalDebit) ||
+      importAmountUnits(result.totalCredit) !== importAmountUnits(summary.totalCredit))
   ) {
     throw new Error(
       "The ERP readback does not match the approved preview and company.",
@@ -405,7 +437,8 @@ export async function readImportWorkflow(
       proposals: z.array(z.unknown()),
       nativeResults: z.array(nativeResultSchema).max(20).default([]),
       nativeResultsMore: z.boolean().default(false),
-      backfilledRecords: z.array(z.object({ module: z.enum(["sales", "shop_sales", "warehouse"]), count })).optional(),
+      reviewedRecords: reviewedRecordsSchema.optional(),
+      backfilledRecords: z.array(z.object({ module: recordModule, count })).optional(),
       farmResults: z.array(z.object({ batchId: positiveId, count })).max(20).optional(),
       farmResultsMore: z.boolean().optional(),
     })

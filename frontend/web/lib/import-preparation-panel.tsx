@@ -254,6 +254,14 @@ function PreparationEditor({
             ))}
         </ul>
       )}
+      {task.coverage ? <ReportControls files={task.coverage.files} /> : null}
+      {!!task.coverage?.reconciliation.length && (
+        <ReconciliationCoverage
+          key={task.requestId}
+          groups={task.coverage.reconciliation}
+          files={task.coverage.files}
+        />
+      )}
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -652,12 +660,6 @@ function PreparationEditor({
           </Button>
         </fieldset>
       </details>
-      {!!task.coverage?.reconciliation.length && (
-        <ReconciliationCoverage
-          key={task.requestId}
-          groups={task.coverage.reconciliation}
-        />
-      )}
     </section>
   )
 }
@@ -1286,13 +1288,154 @@ function SourceCoverage({
   )
 }
 
+type CoverageFile = ImportCoverage["files"][number]
+type ReportControl = NonNullable<CoverageFile["controls"]>[number]
+
+function ReportControlAmounts({ control }: { control: ReportControl }) {
+  const { t } = useTranslation()
+  const unknown = t("settings.importReview.unknown")
+  return (
+    <dl className="space-y-1 text-sm">
+      <div className="flex flex-wrap gap-x-2">
+        <dt>
+          {t("settings.importPreparation.reportedTotal", {
+            defaultValue: "Reported",
+          })}
+        </dt>
+        <dd className="tabular-nums">{control.reported ?? unknown}</dd>
+      </div>
+      <div className="flex flex-wrap gap-x-2">
+        <dt>
+          {t("settings.importPreparation.computedTotal", {
+            defaultValue: "Sum of numeric lines",
+          })}
+        </dt>
+        <dd className="tabular-nums">{control.computed}</dd>
+      </div>
+      <div className="flex flex-wrap gap-x-2">
+        <dt>
+          {t("settings.importPreparation.totalDifference", {
+            defaultValue: "Reported minus calculated",
+          })}
+        </dt>
+        <dd
+          className={
+            control.difference != null &&
+            !/^-?0+(?:\.0+)?$/.test(control.difference)
+              ? "font-medium tabular-nums text-destructive"
+              : "tabular-nums"
+          }
+        >
+          {control.difference ?? unknown}
+        </dd>
+      </div>
+      <div className="flex flex-wrap gap-x-2">
+        <dt>
+          {t("settings.importPreparation.controlCurrency", {
+            defaultValue: "Currency",
+          })}
+        </dt>
+        <dd>{control.currency ?? unknown}</dd>
+      </div>
+      {control.missingLineValues > 0 ? (
+        <div className="flex flex-wrap gap-x-2">
+          <dt>
+            {t("settings.importPreparation.missingLineValues", {
+              defaultValue: "Lines with no usable amount",
+            })}
+          </dt>
+          <dd>{control.missingLineValues}</dd>
+        </div>
+      ) : null}
+    </dl>
+  )
+}
+
+function ReportControls({ files }: { files: CoverageFile[] }) {
+  const { t } = useTranslation()
+  const [page, setPage] = useState(0)
+  const controls = files.flatMap((file) =>
+    (file.controls ?? []).map((control) => ({ file, control })),
+  )
+  if (!controls.length) return null
+  const currentPage = Math.min(page, Math.ceil(controls.length / 50) - 1)
+  return (
+    <details className="space-y-2 text-sm">
+      <summary className="cursor-pointer font-medium">
+        {t("settings.importPreparation.reportControls", {
+          defaultValue: "Reported and calculated subtotals ({{count}})",
+          count: controls.length,
+        })}
+      </summary>
+      <p>
+        {t("settings.importPreparation.reportControlPurpose", {
+          defaultValue:
+            "Use these totals to check coverage and investigate differences in the source report.",
+        })}
+      </p>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {controls
+          .slice(currentPage * 50, (currentPage + 1) * 50)
+          .map(({ file, control }) => (
+            <li
+              key={JSON.stringify([
+                file.fileName,
+                file.worksheet,
+                control.row,
+                control.sectionKey,
+              ])}
+              className="min-w-0 space-y-1 rounded border p-2"
+            >
+              <p className="font-medium">{control.label}</p>
+              <p className="break-words text-muted-foreground">
+                {[
+                  file.fileName,
+                  file.worksheet,
+                  t("settings.importPreparation.controlRow", {
+                    defaultValue: "Row {{row}}",
+                    row: control.row,
+                  }),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+              <ReportControlAmounts control={control} />
+            </li>
+          ))}
+      </ul>
+      <CoveragePages
+        page={currentPage}
+        total={controls.length}
+        onPage={setPage}
+      />
+    </details>
+  )
+}
+
 function ReconciliationCoverage({
   groups,
+  files,
 }: {
   groups: ImportCoverage["reconciliation"]
+  files: CoverageFile[]
 }) {
   const { t } = useTranslation()
   const [page, setPage] = useState(0)
+  const controlsByReport = new Map<string, ReportControl[]>()
+  for (const file of files) {
+    for (const control of file.controls ?? []) {
+      if (control.reportRow == null) continue
+      const key = JSON.stringify([
+        file.fileName,
+        file.sourceSha256,
+        file.worksheet,
+        control.reportRow,
+      ])
+      const controls = controlsByReport.get(key) ?? []
+      controls.push(control)
+      controlsByReport.set(key, controls)
+    }
+  }
   const statusLabel = (
     status: ImportCoverage["reconciliation"][number]["status"],
   ) =>
@@ -1329,15 +1472,52 @@ function ReconciliationCoverage({
         {groups.slice(page * 50, (page + 1) * 50).map((group, index) => (
           <li key={page * 50 + index} className="rounded border p-2">
             <p className="font-medium">{statusLabel(group.status)}</p>
-            <p>
-              {group.sources
-                .slice(0, 10)
-                .map(
-                  (source) =>
-                    `${[source.fileName, source.worksheet].filter(Boolean).join(" · ")}: ${source.rowStart === source.rowEnd ? source.rowStart : `${source.rowStart}–${source.rowEnd}`}`,
+            <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+              {group.sources.slice(0, 10).map((source) => {
+                const key = JSON.stringify([
+                  source.fileName,
+                  source.sourceSha256,
+                  source.worksheet ?? null,
+                  source.rowStart,
+                ])
+                const controls = controlsByReport.get(key) ?? []
+                return (
+                  <li
+                    key={JSON.stringify([
+                      key,
+                      source.rowEnd,
+                      source.sectionKey,
+                      source.itemKey,
+                    ])}
+                    className="min-w-0 space-y-1 rounded border p-2"
+                  >
+                    <p className="break-words font-medium">
+                      {[source.fileName, source.worksheet]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {t("settings.importPreparation.originalRows", {
+                        defaultValue: "Original rows",
+                      })}{" "}
+                      {source.rowStart === source.rowEnd
+                        ? source.rowStart
+                        : `${source.rowStart}–${source.rowEnd}`}
+                      {" · "}
+                      {source.sourceSha256.slice(0, 12)}
+                    </p>
+                    {controls.map((control) => (
+                      <div
+                        key={JSON.stringify([control.sectionKey, control.row])}
+                      >
+                        <p className="font-medium">{control.label}</p>
+                        <ReportControlAmounts control={control} />
+                      </div>
+                    ))}
+                  </li>
                 )
-                .join(" · ")}
-            </p>
+              })}
+            </ul>
             {group.sources.length > 10 && (
               <p>
                 {t("settings.importPreparation.otherRecords", {

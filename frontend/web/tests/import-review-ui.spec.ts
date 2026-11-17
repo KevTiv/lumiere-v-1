@@ -348,6 +348,43 @@ function editor(page: Page) {
   })
 }
 
+test("unresolved issue navigation shows the exact source and proposed values", async ({
+  page,
+}) => {
+  const missing = source("11")
+  missing.source.fields = missing.source.fields.filter(
+    ({ key }) => key === "quantity",
+  )
+  missing.source.label = "Unknown quantity"
+  const proposed = source("12")
+  proposed.source.fields = proposed.source.fields.filter(
+    ({ key }) => key === "unit_price",
+  )
+  proposed.source.label = "Proposed unit price"
+  proposed.source.source.sheet = "Shop Sales"
+  const server = await mockReview(page, [missing, proposed])
+
+  await page.goto("/import-review")
+  await page
+    .getByRole("button", { name: "Review next unresolved issue", exact: true })
+    .click()
+  await expect(page.getByText("Unknown quantity", { exact: true })).toBeVisible()
+  await expect(page.getByText("Proposed unit price", { exact: true })).toHaveCount(
+    0,
+  )
+  await page
+    .getByRole("button", { name: "Next unresolved issue", exact: true })
+    .click()
+  await page.getByText("Source examples · 1 to review", { exact: true }).click()
+  await expect(
+    page.getByText("Original 600 · proposed 4800", { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByText(/historic-shop\.csv · Shop Sales/).first(),
+  ).toBeVisible()
+  expect(server.writes()).toBe(0)
+})
+
 test("the review renders and dispatches server-registered operations", async ({
   page,
 }) => {

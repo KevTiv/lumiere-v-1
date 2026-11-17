@@ -27,6 +27,18 @@ export interface ChatImportJournalRecord {
   reference: string
 }
 
+export interface ChatImportReviewedRecords {
+  counts: { verified: number; alreadyPresent: number }
+  records: Array<{
+    id: string
+    module: "sales" | "shop_sales" | "warehouse"
+    periodStart: string
+    displayLabel?: string
+  }>
+  more: boolean
+  salesTotals?: Array<{ currency: string; amount: string; count: number }>
+}
+
 /** Deterministic saved status, separate from generated assistant prose. */
 export interface ChatImportTaskStatus {
   taskId: string
@@ -61,6 +73,7 @@ export interface ChatImportTaskStatus {
   }>
   nativeResults: ChatImportNativeResult[]
   nativeResultsMore: boolean
+  reviewedRecords?: ChatImportReviewedRecords
 }
 
 export const IMPORT_TASK_STATUS_MAX_AGE_MS = 5 * 60 * 1000

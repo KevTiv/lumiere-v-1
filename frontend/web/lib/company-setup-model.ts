@@ -1,3 +1,5 @@
+import type { CompanyQueryRow } from "@lumiere/stdb/resource-reads"
+
 export type TaxRegistration = "unknown" | "registered" | "not-registered"
 export type HistoricalDataMode =
   | "undecided"
@@ -20,6 +22,20 @@ export interface CompanySetupCompany {
   fiscalYearEndMonth: number
   fiscalYearEndDay: number
   metadata?: string
+}
+
+export function companySetupFromQuery(row: CompanyQueryRow): CompanySetupCompany {
+  return {
+    id: String(row.id),
+    name: row.name ?? "",
+    code: row.code ?? "",
+    countryCode: row.addressCountryCode ?? "",
+    currencyId: String(row.currencyId ?? ""),
+    taxId: row.taxId ?? "",
+    fiscalYearEndMonth: Number(row.fiscalYearEndMonth),
+    fiscalYearEndDay: Number(row.fiscalYearEndDay),
+    metadata: row.metadata ?? undefined,
+  }
 }
 
 export interface CompanySetupDraft {

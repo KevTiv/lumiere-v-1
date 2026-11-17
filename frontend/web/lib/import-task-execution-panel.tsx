@@ -10,6 +10,7 @@ import { useAccountJournals } from "@lumiere/query-hooks/hooks/accounting/journa
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { sourceReviewHistoryHref } from "@lumiere/query-hooks/hooks/source-review-navigation"
+import { ReviewedImportRecords } from "@lumiere/ui/ai-chat/import-task-status-card"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -21,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { apiFetch } from "./api-fetch"
+import { companySetupFromQuery, newCompanySetupDraft } from "./company-setup-model"
 import {
   ImportChoice as Choice,
   ImportTextField as TextField,
@@ -116,6 +118,7 @@ function ExecutionPanel({
   const journals = journalsQuery.isError ? [] : (journalsQuery.data ?? [])
   const companies = companiesQuery.isError ? [] : (companiesQuery.data ?? [])
   const company = companies.find((row) => String(row.id) === String(companyId))
+  const companySetup = company && newCompanySetupDraft(taskId, companySetupFromQuery(company))
   const currencyId =
     company?.currencyId == null ? "" : String(company.currencyId)
   const currencyCode = currenciesQuery.isError
@@ -151,10 +154,11 @@ function ExecutionPanel({
       )
       .flatMap((proposal) => proposal.entries.map((entry) => entry.itemId)),
   )
+  const reviewedModuleRows = new Set(review.data?.reviewOperations?.flatMap((operation) => operation.itemIds))
   const availableRows = review.isError
     ? []
     : (review.data?.items ?? []).filter(
-        (row) => row.state !== "excluded" && !consumedIds.has(row.id),
+        (row) => row.state !== "excluded" && !consumedIds.has(row.id) && !reviewedModuleRows.has(row.id),
       )
   const chosenRows = selectedRows
     ? availableRows.filter((row) => selectedRows.has(row.id))
@@ -188,7 +192,8 @@ function ExecutionPanel({
         capability.readiness === "native_preview" &&
         capability.targetEntities.includes(review.data.targetEntity),
     )
-  const expenseSource = review.data?.targetEntity === "source_observation"
+  const expenseSource = review.data?.targetEntity === "source_observation" &&
+    (availableRows.length > 0 || reviewedModuleRows.size === 0)
   const canPrepare =
     !!expenseSource &&
     !review.isError &&
@@ -294,14 +299,43 @@ function ExecutionPanel({
             void preparation.check()
             void workflow.refetch()
             if (reviewId) void review.refetch()
+            if (view === "preview") {
+              void companiesQuery.refetch()
+              void currenciesQuery.refetch()
+            }
           }}
         >
           {t("settings.importWorkflow.reload")}
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        {t("settings.importWorkflow.explanation")}
+        {t("settings.importWorkflow.operationExplanation", {
+          defaultValue: "Review the exact source rows and proposed ERP changes before saving. Check the saved records under Results.",
+        })}
       </p>
+      {view === "preview" && (
+        <section className="space-y-2 rounded-md border p-3 text-sm" aria-label={t("settings.importWorkflow.companySetup", { defaultValue: "Company setup for this import" })}>
+          <h4 className="font-medium">{t("settings.importWorkflow.companySetup", { defaultValue: "Company setup for this import" })}</h4>
+          {companySetup ? (
+            <>
+              <p>{companySetup.name} · {companySetup.countryCode || t("settings.importWorkflow.countryUnspecified", { defaultValue: "Country unspecified" })} · {currencyCode || t("settings.importWorkflow.currencyUnknown", { defaultValue: "Base currency unavailable" })}</p>
+              <p className="text-muted-foreground">
+                {companySetup.historicalMode === "opening-balances"
+                  ? t("settings.importWorkflow.historicalModeOpenings", { defaultValue: "Saved historical-data choice: opening balances at cutover." })
+                  : companySetup.historicalMode === "full-history"
+                    ? t("settings.importWorkflow.historicalModeFull", { defaultValue: "Saved historical-data choice: detailed history." })
+                    : t("settings.importWorkflow.historicalModeUnknown", { defaultValue: "No saved historical-data choice. Check the source dates and cutover before preparing opening balances or posting." })}
+              </p>
+              <p className="text-muted-foreground">{t("settings.importWorkflow.sourceOptionsStillRequired", { defaultValue: "Confirm date formats, units and currency from the source before saving. A historical export can contain a different currency than the company base currency." })}</p>
+            </>
+          ) : (
+            <p role="status" className="text-muted-foreground">{companiesQuery.isPending ? t("common.loading") : t("settings.importWorkflow.companySetupUnavailable", { defaultValue: "Company settings could not be read. Check the selected company and refresh." })}</p>
+          )}
+          <a className="inline-block text-primary underline underline-offset-4" href="/settings?section=finance-setup" target="_blank" rel="noreferrer">
+            {t("settings.importWorkflow.openCompanySetup", { defaultValue: "Open company setup in a new tab" })}
+          </a>
+        </section>
+      )}
       {workflow.isLoading && <p role="status">{t("common.loading")}</p>}
       {(workflow.error || actionError || preparation.error) && (
         <div
@@ -655,6 +689,9 @@ function ExecutionPanel({
           </a>
         </p>
       ))}
+      {view === "results" && !!workflow.data?.reviewedRecords?.counts.verified && (
+        <ReviewedImportRecords reviewed={workflow.data.reviewedRecords} companyId={companyId} />
+      )}
       {view === "results" && workflow.data?.farmResults?.map(({ batchId, count }) => (
         <p key={batchId}>
           <a className="underline underline-offset-4" href={`/farm-batches/${batchId}?view=history`}>
@@ -1152,7 +1189,7 @@ function ProposalDetails({
                       revision: entry.sourceRevision,
                     })}
                   >
-                    {entry.sourceFile}:{entry.sourceRow}
+                    {[entry.sourceFile, entry.sourceSheet, entry.sourceRow].filter(Boolean).join(" · ")}
                   </a>
                   <p>{entry.description}</p>
                 </TableCell>

@@ -76,6 +76,11 @@ def nonempty_rows(rows):
     return result
 
 
+AUDIT_PRODUCT_HEADERS = {"description", "product", "produit", "igicuruzwa", "ibisobanuro"}
+AUDIT_OPENING_HEADERS = {"s i", "si", "stock initial", "opening stock", "ububiko bw intangiriro"}
+AUDIT_SUBTOTAL_LABELS = {"subtotal", "sous total", "igiteranyo", "igiteranyo rusange"}
+
+
 def audit_blocks(filename, rows, parse_number=number):
     titles = [(i, next(cell for cell in row if compact(cell).upper().startswith("AUDIT ")))
               for i, row in enumerate(rows)
@@ -86,8 +91,10 @@ def audit_blocks(filename, rows, parse_number=number):
         block_rows = rows[start:end]
         for header, row in enumerate(block_rows):
             labels = [source_notes.normalized(cell) for cell in row]
-            if "description" in labels and ({"s i", "si"} & set(labels)):
-                d = labels.index("description")
+            product_columns = [column for column, label in enumerate(labels[:-1])
+                               if label in AUDIT_PRODUCT_HEADERS and labels[column + 1] in AUDIT_OPENING_HEADERS]
+            if len(product_columns) == 1:
+                d = product_columns[0]
                 break
         else:
             continue
@@ -110,7 +117,7 @@ def audit_blocks(filename, rows, parse_number=number):
         for offset in range(header + 1, len(block_rows)):
             row = block_rows[offset]
             prefix = [compact(c).upper() for c in row[:d + 7]]
-            if any(c.startswith("TOTAL") for c in prefix):
+            if any(c.startswith("TOTAL") or source_notes.normalized(c) in AUDIT_SUBTOTAL_LABELS for c in prefix):
                 total_row = row
                 supplementary_start_row = start + offset + 1
                 primary_total_row = start + offset + 1

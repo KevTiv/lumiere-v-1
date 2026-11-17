@@ -226,6 +226,7 @@ def xlsx_rows(data, selection=None):
             fail("The workbook exceeds safe expansion limits or is encrypted.")
         workbook = xml_document(archive, "xl/workbook.xml")
         sheets = [node for node in workbook.iter() if local_tag(node) == "sheet"]
+        multiple_worksheets = len(sheets) > 1
         if selection:
             sheets = [sheet for sheet in sheets if sheet.attrib.get("name") == selection.sheet_name]
         if len(sheets) != 1:
@@ -298,7 +299,7 @@ def xlsx_rows(data, selection=None):
                 fail("The workbook exceeds the 25,000-row preparation limit.")
         if selection and (previous_row < selection.last_row or max_column < selection.last_column):
             fail("The selected cell range is outside the worksheet.")
-        return rows, checked_value(sheet.attrib.get("name", "Worksheet"))
+        return rows, checked_value(sheet.attrib.get("name", "Worksheet")), multiple_worksheets
 
 
 def import_workbook(data, worksheets=()):
@@ -431,12 +432,12 @@ AUDIT_ISSUES = {
     "unlabeled_primary_subtotal": "An unlabeled subtotal was detected and needs review.",
     "settlement_section_without_primary_subtotal": "Settlement entries start before a product subtotal can be identified.",
 }
-SHOP_SALE_AMOUNT_FIELDS = ("sold_quantity", "sale_unit_price", "sale_amount")
 SHOP_SALE_HEADERS = (
-    {"qte s", "qtes s", "quantite vendue", "quantites vendues", "sold quantity"},
-    {"pu", "p u", "prix unitaire", "unit price"},
-    {"total", "montant", "montant total", "sale amount", "sales total"},
+    {"qte s", "qtes s", "quantite vendue", "quantites vendues", "sold quantity", "quantity sold", "ingano yagurishijwe", "umubare wagurishijwe"},
+    {"pu", "p u", "prix unitaire", "unit price", "igiciro kuri kimwe"},
+    {"total", "montant", "montant total", "sale amount", "sales total", "amafaranga yose", "igiteranyo"},
 )
+SHOP_SALE_CONTROLS = {"total", "subtotal", "grand total", "sous total", "total general", "igiteranyo", "igiteranyo rusange"}
 REPORT_CURRENCY = re.compile(r"\b(?:RWF|FRW|BIF|CDF|EUR|GBP|KES|TZS|UGX|USD)\b", re.IGNORECASE)
 
 
@@ -635,7 +636,22 @@ def raw_observation(file, number, cells, *, key=None, issue=None):
             "proposed": {"source_cells": raw}}
 
 
+def sale_currency(value):
+    code = value.strip().upper()
+    if code == "FRW":
+        return "RWF"
+    return code if re.fullmatch(r"[A-Z]{3}", code) else None
+
+
+def exact_sale_amounts(values):
+    if not all(values):
+        return False
+    quantity, price, amount = map(Fraction, values)
+    return min(quantity, price, amount) > 0 and quantity * price == amount
+
+
 def mapped_observation_items(file, headers, rows, section):
+    sales = rules.SHOP_SALE_REQUIRED <= set(headers)
     items = []
     for number, cells in rows:
         item = raw_observation(file, number, cells)
@@ -646,12 +662,17 @@ def mapped_observation_items(file, headers, rows, section):
             safe_key = key if known else f"source_column_{section.first_column + column}"
             kind = ("decimal" if key in rules.OBSERVATION_DECIMALS else
                     "date" if key in rules.OBSERVATION_DATES else "text")
-            value = field(safe_key, original, kind=kind, required=bool(original.strip()) and kind != "text")
+            required = (sales and key in rules.SHOP_SALE_REQUIRED) or (bool(original.strip()) and kind != "text")
+            label = clipped(section.expected_headers[column], 200)
+            value = field(safe_key, original, kind=kind, required=required, label=label or None)
+            value["sourceColumn"] = section.first_column + column
             item["fields"].append(value)
             if kind == "date":
                 evidence = source_day(original, order=file["options"].date_order)
                 dates.append(evidence)
                 candidate = evidence.get("from")
+            elif sales and key == "currency_code":
+                candidate = sale_currency(original)
             else:
                 candidate = field_proposal(value, file["options"])
             item["proposed"][safe_key] = rules.apply_text_rules(candidate, safe_key, section)
@@ -667,6 +688,17 @@ def mapped_observation_items(file, headers, rows, section):
                 item["issue"] = "Source dates are invalid or conflict; confirm the relevant business date."
             else:
                 item["businessDate"] = next((value for value in dates if value["precision"] == "day"), dates[0])
+        if sales:
+            proposed = item["proposed"]
+            if not exact_sale_amounts([proposed[key] for key in rules.SHOP_SALE_AMOUNTS]):
+                proposed["sale_amount"] = None
+                item["issue"] += " Reconcile positive quantity, unit price and the recorded sale amount."
+            if bool(proposed.get("sale_line_issuer")) != bool(proposed.get("sale_line_reference")):
+                item["issue"] += " A source sale-line reference requires its issuing system."
+            if proposed.get("sale_date") is None or item["businessDate"]["precision"] != "day":
+                item["issue"] += " Confirm the exact supported sale date."
+            if proposed.get("currency_code") is None:
+                item["issue"] += " Confirm the sales currency from the source or company records."
         item["issue"] += " These are historical source facts, not verified settlement, current stock, or posted transactions."
         items.append(item)
     return items
@@ -716,6 +748,9 @@ def prepare_sections(file, mode, duplicate):
         file["sections"].append(section_metadata(section, target))
         claimed[section.header_record].update(range(section.first_column, section.last_column + 1))
         rows = []
+        control_rows = []
+        sales = section.target_entity == "source_observation" and rules.SHOP_SALE_REQUIRED <= set(headers)
+        product_column = headers.index("product_label") if sales else None
         for record in range(section.first_record, section.last_record + 1):
             number, full_cells = file["rows"][record - 1]
             cells = full_cells[section.first_column - 1:section.last_column]
@@ -726,6 +761,12 @@ def prepare_sections(file, mode, duplicate):
                 continue
             # Control totals remain evidence. They must never become an extra
             # product/contact or another financial transaction.
+            if sales and any(
+                farm.source_notes.normalized(cells[index]) in SHOP_SALE_CONTROLS
+                for index in {0, product_column} if index < len(cells)
+            ):
+                control_rows.append((number, cells))
+                continue
             if header_keys(cells)[0] in {"total", "subtotal", "grand_total"}:
                 continue
             claimed[record].update(range(section.first_column, section.last_column + 1))
@@ -736,6 +777,8 @@ def prepare_sections(file, mode, duplicate):
             items = mapped_observation_items(file, headers, rows, section)
         else:
             items = standard_items(file, headers, target, rows, section)
+        if sales:
+            add_mapped_sales_controls(file, section, headers, rows, control_rows)
         for item in items:
             item["key"] = f"{section.key}-{item['key']}"
             if section.identity_fields and mode != "inspect_only" and not duplicate:
@@ -758,8 +801,10 @@ def prepare_sections(file, mode, duplicate):
     for record, (number, cells) in enumerate(file["rows"], 1):
         unselected = [value if column not in claimed[record] else "" for column, value in enumerate(cells, 1)]
         if any(value.strip() for value in unselected):
-            remaining.append(raw_observation(file, number, unselected, key=f"unselected-row-{number}",
-                                             issue="These cells are outside the selected data sections or contain control totals. They remain source evidence for review."))
+            item = raw_observation(file, number, unselected, key=f"unselected-row-{number}",
+                                   issue="These cells are outside the selected data sections or contain control totals. They remain source evidence for review.")
+            add_control_evidence(file, item)
+            remaining.append(item)
     if remaining:
         batches.append(("source_observation", remaining))
     notes = ["Prepared sections preserve all unselected source cells as evidence. No business records were created."]
@@ -807,10 +852,14 @@ def file_coverage(file, batches):
         records.append({"record": index, "rowStart": start, "rowEnd": end, "columns": len(cells),
                         "sectionKeys": sections, "disposition": disposition, "itemKeys": item_keys[number]})
     counts = Counter(record["disposition"] for record in records)
-    return {"fileName": file["name"], "sourceSha256": file["sha256"], "byteCount": file["byte_count"],
+    coverage = {"fileName": file["name"], "sourceSha256": file["sha256"], "byteCount": file["byte_count"],
             "status": "prepared", "worksheet": file["sheet"], "recordCount": len(records),
             "reviewRecords": counts["review"], "blankRecords": counts["blank"], "headerRecords": counts["header"],
             "records": records, "sections": file["sections"], "layoutSha256": layout_fingerprint(file), "error": None}
+    if file["controls"]:
+        coverage["controls"] = [{key: value for key, value in control.items() if key not in {"raw", "column"}}
+                                for group in file["controls"].values() for control in group]
+    return coverage
 
 
 def reconcile_report_periods(files):
@@ -937,25 +986,20 @@ def source_day(raw, *, day_first=False, order="iso"):
     return rules.parse_date(raw, "dmy" if day_first else order)
 
 
-def shop_sale_report(file, block):
-    """Bind a dated sales proposal to the recognizable sales columns of an audit."""
-    day = business_date(block)
-    if (day["precision"] != "day" or block["shop_basis"] != "explicit_report_heading"
-            or set(block["issues"]) & {"file_and_title_shop_disagree", "duplicate_audit_dataset",
-                                       "conflicting_same_title_audits"}):
-        return None
+def shop_sale_columns(file, block):
+    """Locate the sales triplet within the known report layout."""
     column = block["sale_first_column"]
-    header = file["rows"][block["header_row"] - 1][1][column:column + 3]
+    header = file["rows"][block["header_row"] - 1][1][column:]
     labels = [farm.source_notes.normalized(REPORT_CURRENCY.sub("", value)) for value in header]
-    if len(labels) != 3 or not all(label in choices for label, choices in zip(labels, SHOP_SALE_HEADERS)):
+    if (len(labels) < 3 or not all(label in choices for label, choices in zip(labels, SHOP_SALE_HEADERS))
+            or any(label in choices for label in labels[3:] for choices in SHOP_SALE_HEADERS)):
         return None
     currencies = {}
-    for text in (block["title"], *header):
+    for text in (block["title"], *header[:3]):
         for raw in REPORT_CURRENCY.findall(text):
-            code = raw.upper()
-            currencies["RWF" if code == "FRW" else code] = raw
+            currencies[sale_currency(raw)] = raw
     currency, raw_currency = next(iter(currencies.items())) if len(currencies) == 1 else (None, None)
-    return column, currency, raw_currency
+    return column, currency, raw_currency, len(currencies) > 1
 
 
 def shop_sale_amounts(line, raw_amounts):
@@ -963,13 +1007,88 @@ def shop_sale_amounts(line, raw_amounts):
     # ordinary fixed-point source cells and the native operation's value bounds.
     if len(raw_amounts) != 3 or not all(re.fullmatch(r"[+]?[0-9][0-9., ]*", raw.strip()) for raw in raw_amounts):
         return None
-    values = [proposed_value(line[key] or "", "decimal") for key in SHOP_SALE_AMOUNT_FIELDS]
-    if not all(values):
-        return None
-    quantity, price, amount = map(Fraction, values)
-    if min(quantity, price, amount) <= 0 or quantity * price != amount:
-        return None
-    return dict(zip(SHOP_SALE_AMOUNT_FIELDS, zip(raw_amounts, values)))
+    values = [proposed_value(line[key] or "", "decimal") for key in rules.SHOP_SALE_AMOUNTS]
+    return dict(zip(rules.SHOP_SALE_AMOUNTS, zip(raw_amounts, values))) if exact_sale_amounts(values) else None
+
+
+def sales_control(file, section_key, number, column, raw, values, currency, reported, report_row=None):
+    total = sum((Decimal(value) for value in values if value is not None), Decimal(0))
+    control = {
+        "sectionKey": section_key, "label": "Reported shop sales subtotal", "row": number,
+        "reported": reported, "computed": format(total, "f"),
+        "difference": format(Decimal(reported) - total, "f") if reported is not None else None,
+        "currency": currency, "missingLineValues": values.count(None), "raw": raw, "column": column,
+    }
+    if report_row is not None:
+        control["reportRow"] = report_row
+    file["controls"][number].append(control)
+
+
+def cell_at(cells, column):
+    return cells[column] if column < len(cells) else ""
+
+
+def add_mapped_sales_controls(file, section, headers, rows, controls):
+    if len(controls) != 1 or not rows:
+        return
+    number, cells = controls[0]
+    if rows[-1][0] >= number:
+        return
+    column = headers.index("sale_amount")
+    currency_column = headers.index("currency_code")
+    currencies = {sale_currency(cell_at(row, currency_column)) for _, row in rows}
+    if len(currencies) != 1 or None in currencies:
+        return
+    raw = cell_at(cells, column)
+    options = file["options"]
+    sales_control(file, section.key, number, section.first_column + column, raw,
+                  [rules.parse_decimal(cell_at(row, column), options) for _, row in rows],
+                  next(iter(currencies), None), rules.parse_decimal(raw, options))
+
+
+def add_audit_sales_control(file, block, columns):
+    subtotal_record = block["primary_total_row"]
+    if subtotal_record is None or not block["lines"]:
+        return
+    number, subtotal = file["rows"][subtotal_record - 1]
+    column, currency, _, currency_conflict = columns
+    if currency_conflict:
+        return
+    column += 2
+    options = file.get("options")
+
+    def parse(raw):
+        if not re.fullmatch(r"[+]?[0-9][0-9., ]*", raw.strip()):
+            return None
+        if options and options.decimal_separator:
+            return rules.parse_decimal(raw, options)
+        return proposed_value(farm.number(raw) or "", "decimal")
+
+    raw = cell_at(subtotal, column)
+    sales_control(file, "table-1", number, column + 1, raw,
+                  [parse(cell_at(file["rows"][line["source"]["row"] - 1][1], column)) for line in block["lines"]],
+                  currency, parse(raw), file["rows"][block["source"]["row"] - 1][0])
+
+
+def add_control_evidence(file, item):
+    controls = file["controls"].get(item["source"]["row"], [])
+    if not controls:
+        return
+    item["issue"] = clipped(item["issue"] + " This subtotal is reconciliation evidence. It does not create a sale.", 2000)
+    if len(controls) != 1:
+        return
+    control = controls[0]
+    field_values = (
+        ("reported_sales_subtotal", "Reported shop sales subtotal", control["raw"], control["reported"]),
+        ("source_sales_line_sum", "Sum of populated source sales lines", None, control["computed"]),
+        ("sales_subtotal_difference", "Reported subtotal minus source line sum", None, control["difference"]),
+    )
+    for key, label, raw, value in field_values:
+        evidence = field(key, raw, label=label)
+        if raw is not None:
+            evidence["sourceColumn"] = control["column"]
+        item["fields"].append(evidence)
+        item["proposed"][key] = value
 
 
 def audit_observation(block, line, cells, sale_report, inspection_only):
@@ -977,14 +1096,24 @@ def audit_observation(block, line, cells, sale_report, inspection_only):
     line_issues = set(block["issues"] + line["issues"])
     sale_amounts = None
     if sale_report and line["raw_product_label"]:
-        column, currency, raw_currency = sale_report
-        sale_amounts = shop_sale_amounts(line, cells[column:column + 3])
-    fields = [field("product_label", line["raw_product_label"], required=sale_amounts is not None)]
+        column, currency, raw_currency, currency_conflict = sale_report
+        if (not currency_conflict and date_evidence["precision"] == "day" and block["shop_basis"] == "explicit_report_heading"
+                and not set(block["issues"]) & {"file_and_title_shop_disagree", "duplicate_audit_dataset",
+                                               "conflicting_same_title_audits"}):
+            sale_amounts = shop_sale_amounts(line, cells[column:column + 3])
+    product_column = block["sale_first_column"] - 8
+    product = field("product_label", cell_at(cells, product_column), required=sale_amounts is not None)
+    product["sourceColumn"] = product_column + 1
+    fields = [product]
     proposed = {"product_label": line["product_label"]}
     issues = []
     if sale_amounts is None:
         fields.append(field("unit", None, required=not inspection_only))
         proposed["unit"] = None
+        if not sale_report and not inspection_only:
+            issues.append("The sales column layout is unfamiliar, ambiguous or duplicated. Review the source column mapping before importing sales.")
+        elif sale_report and sale_report[3]:
+            issues.append("The report heading and sales columns contain conflicting currency codes. Resolve the currency before importing sales.")
     else:
         sale_date = date_evidence["from"]
         fields.extend([
@@ -1004,15 +1133,17 @@ def audit_observation(block, line, cells, sale_report, inspection_only):
         if declared is not None and Decimal(declared) != Decimal(subtotal["sum_of_nonblank_lines"]):
             line_issues.add("sale_amount_subtotal_mismatch")
     issues.extend(AUDIT_ISSUES.get(issue, issue.replace("_", " ")) for issue in sorted(line_issues))
-    for key in ["opening_quantity", "received_quantity", "available_quantity", "closing_quantity",
-                "consumed_quantity", "cost_unit_price", "consumed_cost", *SHOP_SALE_AMOUNT_FIELDS]:
+    for index, key in enumerate(["opening_quantity", "received_quantity", "available_quantity", "closing_quantity",
+                                 "consumed_quantity", "cost_unit_price", "consumed_cost", *rules.SHOP_SALE_AMOUNTS], product_column + 1):
         required = sale_amounts is not None and key in sale_amounts
         if required:
             original, value = sale_amounts[key]
         else:
-            original = line[key]
-            value = proposed_value(original or "", "decimal")
-        fields.append(field(key, original, kind="decimal", required=required))
+            original = cell_at(cells, index)
+            value = proposed_value(line[key] or "", "decimal")
+        evidence = field(key, original, kind="decimal", required=required)
+        evidence["sourceColumn"] = index + 1
+        fields.append(evidence)
         proposed[key] = value
     return date_evidence, fields, proposed, issues
 
@@ -1061,9 +1192,13 @@ def supplementary_date_facts(file):
 
 def observation_items(file, blocks, *, inspection_only=False, duplicate=False):
     by_record = {line["source"]["row"]: (block, line) for block in blocks for line in block["lines"]}
-    sale_reports = {} if inspection_only or duplicate else {
-        block["source"]["row"]: shop_sale_report(file, block) for block in blocks
-    }
+    sale_reports = {}
+    for block in blocks:
+        columns = shop_sale_columns(file, block)
+        if columns is not None:
+            add_audit_sales_control(file, block, columns)
+        if not inspection_only and not duplicate:
+            sale_reports[block["source"]["row"]] = columns
     items = []
     supplementary = supplementary_date_facts(file)
     # Use the same tail interpretation as offline recovery, retaining every raw
@@ -1167,6 +1302,7 @@ def observation_items(file, blocks, *, inspection_only=False, duplicate=False):
             fields.append(field("source_worksheet", file["sheet"]))
             proposed["source_worksheet"] = file["sheet"]
         item.update({"label": clipped(label, 300), "issue": clipped(" ".join(issues), 2000), "fields": fields, "proposed": proposed})
+        add_control_evidence(file, item)
         items.append(item)
     return items
 
@@ -1174,6 +1310,7 @@ def observation_items(file, blocks, *, inspection_only=False, duplicate=False):
 def source_rows(name, data, options=None):
     suffix = Path(name).suffix.lower()
     sheet = None
+    multiple_worksheets = False
     selection = options.managed_selection if options else None
     selection_header = None
     if suffix == ".csv":
@@ -1193,7 +1330,7 @@ def source_rows(name, data, options=None):
         try:
             if selection and (selection.encoding or options.delimiter):
                 fail("CSV parsing options cannot be applied to a worksheet.")
-            rows, sheet = xlsx_rows(data, selection)
+            rows, sheet, multiple_worksheets = xlsx_rows(data, selection)
             coordinates = [(number, number) for number, _ in rows]
             selection_header = selection.header_row if selection else None
         except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OverflowError, EOFError, zlib.error):
@@ -1205,7 +1342,7 @@ def source_rows(name, data, options=None):
         rows = [(number, (cells[start:end] + [""] * (end - start))[:end - start])
                 for number, cells in rows]
     validate_source_rows(rows)
-    return rows, sheet, coordinates, selection_header
+    return rows, sheet, coordinates, selection_header, multiple_worksheets
 
 
 def validate_source_rows(rows):
@@ -1221,7 +1358,7 @@ def prepared_source(name, digest, byte_count, rows, sheet, coordinates, options,
             "sheet": sheet, "coordinates": coordinates, "options": options,
             "selection_header": selection_header,
             "record_numbers": {number: index for index, (number, _) in enumerate(rows, 1)},
-            "sections": [], "identities": []}
+            "sections": [], "identities": [], "controls": defaultdict(list)}
 
 
 def read_original_sources(name, data, digest, options, available_worksheets):
@@ -1245,11 +1382,13 @@ def read_original_sources(name, data, digest, options, available_worksheets):
             sources.append(source)
         return sources
     try:
-        rows, sheet, coordinates, selection_header = source_rows(name, data, options)
+        rows, sheet, coordinates, selection_header, multiple_worksheets = source_rows(name, data, options)
     except WorksheetSelectionRequired:
         available_worksheets[name] = import_workbook(data)["worksheetNames"]
         raise
-    return [prepared_source(name, digest, len(data), rows, sheet, coordinates, options, selection_header)]
+    source = prepared_source(name, digest, len(data), rows, sheet, coordinates, options, selection_header)
+    source["multi_worksheet"] = multiple_worksheets
+    return [source]
 
 
 def coverage_held(original, message, worksheet=None):

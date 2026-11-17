@@ -14,13 +14,15 @@ import {
 } from "./import-task-status"
 import type { ImportTaskView } from "./import-task-navigation"
 
-export function chatImportReceiptKey(scope: ChatImportScope, taskId?: string) {
+export function chatImportReceiptKey(
+  scope: Pick<ChatImportScope, "identity" | "organizationId" | "companyId">,
+  taskId?: string,
+) {
   const scopeKey = [
     "assistant-import-receipt",
     scope.identity,
     scope.organizationId,
     scope.companyId,
-    scope.conversationKey,
   ]
   return taskId ? [...scopeKey, taskId] : scopeKey
 }
@@ -42,6 +44,7 @@ export function ChatImportReceipt({
     queryFn: ({ signal }) =>
       readChatImportTaskStatus(apiFetch, scope, taskId, signal),
     retry: false,
+    refetchOnMount: "always",
     refetchInterval: 4 * 60_000,
   })
   const status = receipt.isError ? undefined : receipt.data

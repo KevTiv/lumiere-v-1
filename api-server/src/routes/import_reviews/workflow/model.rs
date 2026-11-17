@@ -170,6 +170,13 @@ pub(super) struct Entry {
     pub source_file: String,
     pub source_row: u32,
     pub source_sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_sheet: Option<String>,
+    // Some earlier managed ranges kept a worksheet name without marking the
+    // workbook as multi-sheet. Keep its existing claim and check the qualified
+    // claim when reviewing a new proposal from that range.
+    #[serde(skip)]
+    pub unqualified_source_sheet: Option<String>,
     pub reference: String,
     pub date: String,
     pub description: String,
@@ -403,12 +410,20 @@ fn build_entry(
             "This source was excluded and will not create ERP records.",
         ));
     }
-    if row.source.source.multi_worksheet {
-        return Err((
-            "worksheet_scope_unsupported",
-            "Import expense journals from a single-sheet export so the journal can distinguish the original rows.",
-        ));
-    }
+    let source = &row.source.source;
+    let (source_sheet, unqualified_source_sheet) = if source.multi_worksheet {
+        let sheet = source
+            .sheet
+            .as_ref()
+            .filter(|name| !name.trim().is_empty() && !name.chars().any(char::is_control))
+            .ok_or((
+                "worksheet_scope_missing",
+                "The source worksheet is missing. Inspect the original workbook again.",
+            ))?;
+        (Some(sheet.clone()), None)
+    } else {
+        (None, source.sheet.clone())
+    };
     if !matches!(row.target.as_str(), "source_observation" | "hr_expense")
         || confirmed_value(row, "observation_kind") != Some("expense")
     {
@@ -479,9 +494,11 @@ fn build_entry(
         item_id: row.id.to_string(),
         batch_id: row.batch.to_string(),
         source_revision: row.revision,
-        source_file: row.source.source.file.clone(),
-        source_row: row.source.source.row,
-        source_sha256: row.source.source.sha256.clone(),
+        source_file: source.file.clone(),
+        source_row: source.row,
+        source_sha256: source.sha256.clone(),
+        source_sheet,
+        unqualified_source_sheet,
         reference: String::new(),
         date,
         description,
@@ -540,7 +557,36 @@ fn business_identity(
 }
 
 pub(super) fn claim_key(entry: &Entry) -> String {
+    entry.source_sheet.as_deref().map_or_else(
+        || unqualified_claim_key(entry),
+        |sheet| worksheet_claim_key(entry, sheet),
+    )
+}
+
+pub(super) fn compatible_claim_key(entry: &Entry) -> Option<String> {
+    if entry.source_sheet.is_some() {
+        // An older range selection could have claimed this row without its
+        // worksheet. Treat a bare claim as a hold until the source is traced.
+        return Some(unqualified_claim_key(entry));
+    }
+    entry
+        .unqualified_source_sheet
+        .as_deref()
+        .map(|sheet| worksheet_claim_key(entry, sheet))
+}
+
+fn unqualified_claim_key(entry: &Entry) -> String {
     hash(format!("{KIND}\0{}\0{}", entry.source_sha256, entry.source_row).as_bytes())
+}
+
+fn worksheet_claim_key(entry: &Entry, sheet: &str) -> String {
+    hash(
+        format!(
+            "{KIND}\0{}\0{}\0{sheet}",
+            entry.source_sha256, entry.source_row
+        )
+        .as_bytes(),
+    )
 }
 
 pub(super) fn native_amount_matches(expected: &str, actual: Option<f64>) -> bool {

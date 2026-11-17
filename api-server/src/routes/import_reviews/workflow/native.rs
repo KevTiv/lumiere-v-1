@@ -143,9 +143,13 @@ pub(super) fn source_binding(
     entry: &Entry,
     side: &str,
 ) -> Value {
-    json!({"version":1,"proposalId":proposal.id.to_string(),"proposalDigest":proposal.digest,"taskRequestId":task,
+    let mut binding = json!({"version":1,"proposalId":proposal.id.to_string(),"proposalDigest":proposal.digest,"taskRequestId":task,
         "companyId":scope.company.to_string(),"itemId":entry.item_id,"batchId":entry.batch_id,"revision":entry.source_revision,
-        "sourceFile":entry.source_file,"sourceRow":entry.source_row,"sourceSha256":entry.source_sha256,"side":side})
+        "sourceFile":entry.source_file,"sourceRow":entry.source_row,"sourceSha256":entry.source_sha256,"side":side});
+    if let Some(sheet) = &entry.source_sheet {
+        binding["sourceSheet"] = json!(sheet);
+    }
+    binding
 }
 
 fn metadata(

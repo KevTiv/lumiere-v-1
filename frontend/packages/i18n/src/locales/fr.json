@@ -4456,8 +4456,48 @@
     }
   },
   "settings": {
+    "importTask": {
+      "progressVerifiedRecordCounts": "{{records}} enregistrements historiques vérifiés · {{drafts}} brouillons vérifiés affichés · {{receipts}} reçus d’import",
+      "cardSourceCounts": "{{total}} lignes sources · {{ready}} confirmées · {{held}} à décider · {{excluded}} exclues",
+      "cardReviewPreview": "Examiner l’aperçu ERP",
+      "reviewRemainingRows": "Examiner les lignes sources restantes",
+      "previewReadyRows": "Prévisualiser les lignes prêtes",
+      "previewReviewGroup": "Groupe de lignes à prévisualiser",
+      "previewReviewOption": "{{title}} · {{confirmed}} confirmées · {{pending}} à examiner",
+      "cardVerifiedRecordsTitle": "{{count}} enregistrements ERP vérifiés",
+      "cardReviewedCounts": "{{count}} enregistrements ERP vérifiés · {{matched}} déjà présents",
+      "cardVerifiedSalesTotal": "{{currency}} {{amount}} · {{count}} ventes en boutique vérifiées",
+      "cardExactErpRecords": "Enregistrements ERP correspondants",
+      "cardMoreReviewedRecords": "Ouvrez les résultats de la tâche pour voir tous les enregistrements dans leurs modules ERP.",
+      "reviewedCustomerSales": "Ventes par client",
+      "reviewedShopSales": "Ventes en boutique",
+      "reviewedInventoryCounts": "Comptages enregistrés",
+      "shopSalesPreviewUnavailable": "Les totaux des ventes en boutique n’ont pas pu être vérifiés. Actualisez l’aperçu avant d’enregistrer.",
+      "shopSalesPreviewCounts": "Aperçu · {{newCount}} nouvelles · {{existingCount}} déjà présentes · {{heldCount}} en attente",
+      "shopSalesPreviewAmounts": "{{currency}} {{newAmount}} à créer · {{currency}} {{existingAmount}} déjà présents"
+    },
+    "importWorkflow": {
+      "operationExplanation": "Vérifiez les lignes source et les changements proposés avant l’enregistrement. Retrouvez les enregistrements dans Résultats.",
+      "companySetup": "Paramètres de la société pour cet import",
+      "countryUnspecified": "Pays non renseigné",
+      "currencyUnknown": "Devise de base indisponible",
+      "historicalModeOpenings": "Choix enregistré pour l’historique : soldes d’ouverture à la date de bascule.",
+      "historicalModeFull": "Choix enregistré pour l’historique : historique détaillé.",
+      "historicalModeUnknown": "Aucun choix enregistré pour l’historique. Vérifiez les dates source et la date de bascule avant de préparer les soldes d’ouverture ou de comptabiliser.",
+      "sourceOptionsStillRequired": "Confirmez le format des dates, les unités et la devise dans la source. La devise d’un export historique peut différer de la devise de base de la société.",
+      "companySetupUnavailable": "Impossible de lire les paramètres. Vérifiez la société sélectionnée et actualisez.",
+      "openCompanySetup": "Ouvrir les paramètres de la société dans un nouvel onglet"
+    },
     "importReview": {
+      "blankCell": "Cellule source vide",
+      "initialProposal": "Valeur préparée · {{value}}",
+      "saleMismatch": "Résolvez l’écart entre le montant enregistré et le montant calculé avant de confirmer la ligne.",
+      "saleReconciliation": "Montant enregistré {{amount}} · écart {{difference}}",
       "grouped": {
+        "nextIssue": "Anomalie suivante à résoudre",
+        "reviewNextIssue": "Examiner la prochaine anomalie à résoudre",
+        "issueExamples": "Exemples de la source · {{count}} à examiner",
+        "issueExample": "Valeur d’origine {{original}} · valeur proposée {{proposed}}",
         "rowStatus": "Statut de la ligne",
         "fieldConfirmation": "Confirmation de {{field}}",
         "noDecisionChanges": "Aucune valeur enregistrée ni aucun statut de vérification n’a changé.",
@@ -4483,6 +4523,25 @@
       "errorRows": "Erreurs"
     },
     "importPreparation": {
+      "computedTotal": "Somme des lignes chiffrées",
+      "controlCurrency": "Devise",
+      "controlRow": "Ligne {{row}}",
+      "missingLineValues": "Lignes sans montant exploitable",
+      "reportControlPurpose": "Utilisez ces totaux pour vérifier les lignes prises en compte et examiner les écarts dans le rapport source.",
+      "reportControls": "Sous-totaux déclarés et calculés ({{count}})",
+      "reportedTotal": "Total déclaré",
+      "totalDifference": "Total déclaré moins total calculé",
+      "fields": {
+        "currency_code": "Devise de la vente",
+        "sale_amount": "Montant de la vente enregistré",
+        "sale_date": "Date de la vente",
+        "sale_line_issuer": "Émetteur de la référence de ligne de vente",
+        "sale_line_reference": "Référence externe de ligne de vente",
+        "sale_unit_price": "Prix unitaire historique",
+        "shop": "Boutique",
+        "sold_quantity": "Quantité vendue",
+        "source_unit": "Unité de quantité déclarée"
+      },
       "worksheet": "Feuille de calcul",
       "worksheetHint": "Sélectionnez les feuilles à inclure. Chaque feuille conserve ses lignes d’origine et peut avoir sa propre correspondance de colonnes.",
       "worksheets": "Feuilles à préparer"

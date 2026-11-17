@@ -97,9 +97,14 @@ pub(super) async fn read_saved_binding(
     } else {
         "journal_credit"
     };
+    let mut source =
+        json!({"file":entry.source_file,"row":entry.source_row,"sha256":entry.source_sha256});
+    if let Some(sheet) = &entry.source_sheet {
+        source["sheet"] = json!(sheet);
+    }
     Ok(Some(json!({
         "batchId":entry.batch_id,"itemId":entry.item_id,"revision":entry.source_revision,
         "taskRequestId":row.get::<_,String>("task_request_id"),"proposalId":row.get::<_,i64>("id").to_string(),"proposalDigest":row.get::<_,String>("proposal_sha256"),
-        "source":{"file":entry.source_file,"row":entry.source_row,"sha256":entry.source_sha256},"role":role,
+        "source":source,"role":role,
     })))
 }

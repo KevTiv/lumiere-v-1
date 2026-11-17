@@ -55,7 +55,7 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
         actor: "actor-one",
     };
     let dataset: Dataset = serde_json::from_value(
-        json!({"format":"lumiere-import-review/v1","title":"Historic source","targetEntity":"source_observation","sourceFile":"shop.csv","items":[{"key":"row-8","label":"Sausage","source":{"file":"shop.csv","row":8,"sha256":"a".repeat(64)},"issue":"Weight is uncertain","fields":[{"key":"quantity","label":"Actual weight","kind":"decimal","sourceValue":"8","required":true},{"key":"unit_price","label":"Price per kg","kind":"decimal","sourceValue":"600","required":true},{"key":"amount","label":"Total","kind":"decimal","sourceValue":"4800","required":true}],"proposed":{"quantity":null,"unit_price":"4800","amount":"4800"}}]}),
+        json!({"format":"lumiere-import-review/v1","title":"Historic source","targetEntity":"source_observation","sourceFile":"shop.xlsx","items":[{"key":"row-8","label":"Sausage","source":{"file":"shop.xlsx","sheet":"Shop","row":8,"sha256":"a".repeat(64)},"issue":"Weight is uncertain","fields":[{"key":"quantity","label":"Actual weight","kind":"decimal","sourceValue":"8","required":true},{"key":"unit_price","label":"Price per kg","kind":"decimal","sourceValue":"600","required":true},{"key":"amount","label":"Total","kind":"decimal","sourceValue":"4800","required":true}],"proposed":{"quantity":null,"unit_price":"4800","amount":"4800"}}]}),
     )?;
     let created = create_draft(pool, scoped, &dataset).await?.0;
     let replay = create_draft(pool, scoped, &dataset).await?.0;
@@ -293,13 +293,25 @@ async fn verify_replayed_backfill_receipt(
             r#"INSERT INTO lumiere_platform.module_backfill_record
              (organization_id, company_id, module, batch_id, item_id, source_revision,
               source_sha256, source_row, source_file, period_start, period_end, facts, created_by)
-             VALUES (8001, 9001, 'sales', $1, $2, 2, repeat('a',64), 8, 'shop.csv',
+             VALUES (8001, 9001, 'sales', $1, $2, 2, repeat('a',64), 8, 'shop.xlsx',
                      '2022-06-13', '2022-06-13', '{"kind":"sales"}', 'actor-one')
              RETURNING id"#,
             &[&original_batch, &original_item],
         )
         .await?
         .get(0);
+    tx.batch_execute(include_str!(
+        "../../cold_tier/module_backfill_provenance_expand.sql"
+    ))
+    .await?;
+    let legacy_sheet: String = tx
+        .query_one(
+            "SELECT source_worksheet FROM lumiere_platform.module_backfill_record WHERE id=$1",
+            &[&record_id],
+        )
+        .await?
+        .get(0);
+    ensure!(legacy_sheet == "Shop");
     let task = "b".repeat(32);
     tx.execute(
         "INSERT INTO lumiere_platform.import_task
@@ -331,11 +343,26 @@ async fn verify_replayed_backfill_receipt(
     ensure!(module_backfill::task_results(&tx, other_actor, &task)
         .await?
         .is_empty());
+    let workflow = module_backfill::workflow_results(&tx, scoped, &task).await?;
+    ensure!(workflow["counts"] == json!({"verified":1,"alreadyPresent":0}));
+    ensure!(workflow["records"][0]["id"] == record_id.to_string());
+    ensure!(
+        module_backfill::workflow_results(&tx, other_actor, &task).await?["records"] == json!([])
+    );
+    module_backfill::exercise_persistence(&tx, original_batch, original_item).await?;
+    ensure!(
+        module_backfill::workflow_results(&tx, scoped, &task).await?["salesTotals"]
+            == json!([{"currency":"RWF","amount":"4000","count":2}])
+    );
     tx.execute(
         "DELETE FROM lumiere_platform.import_task_review WHERE batch_id = $1",
         &[&original_batch],
     )
     .await?;
     ensure!(module_backfill::task_results(&tx, scoped, &task).await? == results);
+    ensure!(
+        module_backfill::workflow_results(&tx, scoped, &task).await?["counts"]
+            == json!({"verified":1,"alreadyPresent":1})
+    );
     Ok(())
 }

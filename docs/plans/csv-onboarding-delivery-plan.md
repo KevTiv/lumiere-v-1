@@ -30,6 +30,24 @@ checks, and verification on the served build for each operation.
 
 ### Shop Sales acceptance fixture
 
+The local proofs cover different boundaries of the saved import path.
+
+| Check | Evidence |
+| --- | --- |
+| Original workbook preparation | [CLI fixture](../../scripts/tests/test_shop_sales_workbook_acceptance.py) reads two selected worksheets with English, French, and Kinyarwanda wording. Three traceable sale lines total RWF 45,500.50. The fixture retains a RWF 0.01 subtotal difference, holds a line whose quantity and price disagree with the amount, and preserves two distinct source rows at the same physical row number on different sheets. |
+| Chat and Settings continuation | [Browser fixture](../../frontend/web/tests/chat-import-ui.spec.ts) previews Shop Sales, approves the ready rows, and reopens the exact results in another chat. Simulated HTTP receipts exercise the real chat and import components, including an already-present record and a Sales link with the exact record ID. |
+| PostgreSQL identity and scope | [Import review storage tests](../../api-server/src/routes/import_reviews/postgres_tests.rs) cover worksheet-aware identity and replay, preservation of legacy source matches, and confirmed stable sale-line references for changed exports. Run with `C4_TEST_PG=1` and the disposable PostgreSQL configuration from CI. |
+
+Deploy the worksheet-aware writer and migration 51 together. The migration
+replaces the previous four-part source constraint, which the earlier writer
+names as its `ON CONFLICT` target. Pause Sales and Warehouse backfill writes
+during the cutover. A rollback also needs the compatible database schema or the
+worksheet-aware writer. Restoring the previous constraint after accepting data
+from multiple worksheets can fail when worksheets share a source row number.
+
+The signed-in pilot remains pending. Its target comes from the prepared source
+lines below.
+
 | Shop | Source lines |
 | --- | ---: |
 | Kicukiro | 11 |
@@ -38,11 +56,17 @@ checks, and verification on the served build for each operation.
 | Zinia | 436 |
 | Total | 907 |
 
-A disposable PostgreSQL run saved 907 synthetic lines totaling RWF 29,477,500. It matched all 907 on replay and returned the exact scoped Sales records. The authorized pilot target is **RWF 71,406,345.45**. Verify product, sale day,
-quantity, unit price, exact decimal amount, and original row on the served
-Sales view. Reconcile saved and matched results exactly once, replay the import,
-and verify zero additional ledger and stock effects. Record the actual release,
-CI run, native record links and reconciled subtotals here when the proof runs.
+An earlier disposable PostgreSQL run saved 907 synthetic lines totaling RWF
+29,477,500 and matched all 907 on replay. The pilot acceptance target is
+**RWF 71,406,345.45**. On the served release, confirm company and workbook scope,
+check the ready and held groups against the original sources, and approve the
+ready Shop Sales rows. Reopen from chat or Settings and check products, sale
+dates, quantities, unit prices, exact amounts, and source sheet and row references
+in Sales. Count each saved or matched record once. Run the exact-file replay and
+a changed-export replay where stable sale-line references are available. Keep
+rows with uncertain same-event identity for review. Verify zero duplicate sales
+and zero additional ledger and stock effects. Record the served revision, exact
+record links, verified totals, and remaining exceptions here.
 
 ## Scope
 

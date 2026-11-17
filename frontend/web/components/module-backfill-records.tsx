@@ -41,6 +41,7 @@ import {
 import {
   moduleBackfillSavedFields,
   moduleBackfillRecordKind,
+  moduleBackfillSourceName,
   type ModuleBackfillRecord,
 } from '@/lib/module-backfill-record'
 
@@ -355,7 +356,7 @@ function Records({
                       })}
                     >
                       {t('moduleRecords.sourceRow', {
-                        file: source.sourceFile,
+                        file: moduleBackfillSourceName(source),
                         row: source.sourceRow,
                       })}
                     </a>
@@ -373,7 +374,7 @@ function Records({
                           historyTrigger.current = event.currentTarget
                         }}
                         aria-label={t('moduleRecords.recordHistoryLabel', {
-                          file: source.sourceFile,
+                          file: moduleBackfillSourceName(source),
                           row: source.sourceRow,
                         })}
                       >
@@ -512,7 +513,7 @@ function SavedRecord({
               })}
             >
               {t('moduleRecords.sourceRow', {
-                file: record.sourceFile,
+                file: moduleBackfillSourceName(record),
                 row: record.sourceRow,
               })}
               {' · '}

@@ -303,6 +303,22 @@ const coverageSource = z.object({
   itemKey: z.string(),
   worksheet: text(255).optional(),
 })
+const sourceRow = z.number().int().min(1).max(5_000_000)
+const controlDecimal = z.string().regex(/^-?\d{1,32}(?:\.\d{1,18})?$/)
+const reportControl = z.object({
+  sectionKey: text(64),
+  label: text(200),
+  row: sourceRow,
+  reportRow: sourceRow.optional(),
+  reported: controlDecimal.nullable(),
+  computed: controlDecimal,
+  difference: controlDecimal.nullable(),
+  currency: z
+    .string()
+    .regex(/^[A-Z]{3}$/)
+    .nullable(),
+  missingLineValues: z.number().int().min(0).max(25_000),
+})
 export const importCoverageSchema = z.object({
   version: z.literal(1),
   complete: z.boolean(),
@@ -348,6 +364,7 @@ export const importCoverageSchema = z.object({
         layoutSha256: sha256.nullable(),
         availableWorksheets: z.array(text(255)).min(1).max(20).optional(),
         workbookLayoutSha256: sha256.optional(),
+        controls: z.array(reportControl).max(25_000).optional(),
         error: z.string().nullable(),
       }),
     )
