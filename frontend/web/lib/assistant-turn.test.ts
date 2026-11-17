@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { HttpResponseError, httpResponseError } from "@lumiere/api-client/response-error"
-import { assistantAnswer, assistantAnswerMetadata, coordinateAssistantTurn, parseStoredAssistantRecovery, readAssistantStream, turnFailure, withAssistantRecoveryMetadata } from "./assistant-turn"
+import { assistantAnswer, assistantAnswerMetadata, assistantHistoryResult, coordinateAssistantTurn, parseStoredAssistantRecovery, readAssistantStream, turnFailure, withAssistantRecoveryMetadata } from "./assistant-turn"
 
 const metadata = (raw: string): { sources: string[]; run_id: number } => {
   const parsed = JSON.parse(raw)
@@ -10,6 +10,28 @@ const metadata = (raw: string): { sources: string[]; run_id: number } => {
 }
 const sse = (text: string, crlf = false) => new Response(crlf ? text.replaceAll("\n", "\r\n") : text, { headers: { "content-type": "text/event-stream" } })
 const complete = 'event: delta\ndata: Admitted answer\n\nevent: sources\ndata: {"sources":["source"],"run_id":7}\n\nevent: done\ndata: {}\n\n'
+
+test("JSON and SSE retain a withheld verdict and persist a failed message with its run identity", async () => {
+  for (const outcome of ["blocked", "requires_review", "qualified", "admitted"] as const) {
+    const verification = { outcome, methods: ["deterministic"], limitations: [], reason: "checked" }
+    const payload = { answer: "A gated answer or withheld notice", sources: [], run_id: 4104, verification }
+    const json = assistantAnswer(payload)
+    const stream = await readAssistantStream(sse(`event: delta\ndata: ${payload.answer}\n\nevent: sources\ndata: ${JSON.stringify(payload)}\n\nevent: done\ndata: {}\n\n`), raw => assistantAnswerMetadata(JSON.parse(raw)))
+    for (const answer of [json, stream]) {
+      assert.deepEqual(answer.verification, verification)
+      const saved = assistantHistoryResult(answer.verification, JSON.stringify({ runId: answer.run_id, turnId: "turn" }))
+      assert.equal(saved.status, ["blocked", "requires_review"].includes(outcome) ? "failed" : "completed")
+      assert.deepEqual(JSON.parse(saved.metadata!), { runId: 4104, turnId: "turn", answerVerification: verification })
+    }
+  }
+})
+
+test("malformed answer verdicts cannot silently become completed chat messages", () => {
+  for (const verification of [{ outcome: "completed" }, { outcome: "admitted", methods: [], limitations: "none" }]) {
+    assert.throws(() => assistantAnswerMetadata({ sources: [], verification }), /Invalid assistant verification/)
+  }
+  assert.deepEqual(assistantHistoryResult(undefined, null), { status: "completed", metadata: null })
+})
 
 test("a failed stream never retries either dispatch and retains prepared drafts", async () => {
   let answers = 0, drafts = 0

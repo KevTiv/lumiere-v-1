@@ -103,16 +103,17 @@ impl QueueRows for StdbClient {
         method: Option<&str>,
         limit: usize,
     ) -> Result<Vec<Value>> {
-        let mut sql = format!(
-            "SELECT * FROM ai_evidence_claim WHERE organization_id = {organization_id} \
+        let mut predicate = format!(
+            "organization_id = {organization_id} \
              AND company_id = {company_id} AND status = '{}'",
             label(status)?
         );
         if let Some(method) = method {
-            sql.push_str(&format!(" AND verification_method = '{}'", label(method)?));
+            predicate.push_str(&format!(" AND verification_method = '{}'", label(method)?));
         }
-        sql.push_str(&format!(" ORDER BY id DESC LIMIT {limit}"));
-        self.query_sql(&sql).await.context("load claims for review")
+        self.query_newest_rows("ai_evidence_claim", &predicate, limit)
+            .await
+            .context("load claims for review")
     }
 
     async fn decisions_with_status(
@@ -122,11 +123,15 @@ impl QueueRows for StdbClient {
         status: &str,
         limit: usize,
     ) -> Result<Vec<Value>> {
-        self.query_sql(&format!(
-            "SELECT * FROM ai_evidence_decision WHERE organization_id = {organization_id} \
-             AND company_id = {company_id} AND status = '{}' ORDER BY id DESC LIMIT {limit}",
-            label(status)?
-        ))
+        self.query_newest_rows(
+            "ai_evidence_decision",
+            &format!(
+                "organization_id = {organization_id} \
+                 AND company_id = {company_id} AND status = '{}'",
+                label(status)?
+            ),
+            limit,
+        )
         .await
         .context("load decisions for review")
     }
@@ -137,11 +142,15 @@ impl QueueRows for StdbClient {
         company_id: u64,
         limit: usize,
     ) -> Result<Vec<Value>> {
-        self.query_sql(&format!(
-            "SELECT * FROM ai_artifact_component WHERE organization_id = {organization_id} \
-             AND company_id = {company_id} AND component_kind = 'workflow_step' \
-             AND status = 'current' ORDER BY id DESC LIMIT {limit}"
-        ))
+        self.query_newest_rows(
+            "ai_artifact_component",
+            &format!(
+                "organization_id = {organization_id} \
+                 AND company_id = {company_id} AND component_kind = 'workflow_step' \
+                 AND status = 'current'"
+            ),
+            limit,
+        )
         .await
         .context("load workflow-step components")
     }
@@ -299,6 +308,21 @@ fn reviewable(
 
 /// Assemble the queue for `viewer`, at most `limit` items per list.
 pub async fn build_queue(
+    rows: &dyn QueueRows,
+    viewer: Viewer,
+    limit: usize,
+) -> Result<ReviewQueue> {
+    // Leave room inside the API's 15-second gateway timeout for authorization
+    // and serialization, even when IDs are sparse or an upstream read stalls.
+    tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        build_queue_inner(rows, viewer, limit),
+    )
+    .await
+    .context("review queue read deadline exceeded")?
+}
+
+async fn build_queue_inner(
     rows: &dyn QueueRows,
     viewer: Viewer,
     limit: usize,
@@ -582,6 +606,48 @@ mod tests {
 
     const ME: &str = "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a";
     const OTHER: &str = "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b";
+
+    #[tokio::test]
+    async fn native_queue_reads_use_supported_scoped_sql_for_every_list() {
+        let queries = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let captured = queries.clone();
+        let app = axum::Router::new().route(
+            "/v1/database/test/sql",
+            axum::routing::post(move |sql: String| {
+                let captured = captured.clone();
+                async move {
+                    assert!(!sql.contains("ORDER BY"));
+                    assert!(sql.contains("organization_id = 7 AND company_id = 3"));
+                    assert!(sql.contains("LIMIT "));
+                    captured.lock().unwrap().push(sql);
+                    axum::Json(json!([{
+                        "schema": {"elements": [{"name": {"some":"id"}, "algebraic_type":{"U64":[]}}]},
+                        "rows": []
+                    }]))
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let client = StdbClient::new(format!("http://{address}"), "test".into(), "fixture".into());
+        let queue = build_queue(&client, viewer(), 25).await.unwrap();
+        assert!(
+            queue.claims.is_empty() && queue.decisions.is_empty() && queue.components.is_empty()
+        );
+        let queries = queries.lock().unwrap();
+        assert_eq!(queries.len(), 7);
+        for table in [
+            "ai_evidence_claim",
+            "ai_evidence_decision",
+            "ai_artifact_component",
+        ] {
+            assert!(queries
+                .iter()
+                .any(|sql| sql.contains(&format!("FROM {table} "))));
+        }
+        server.abort();
+    }
 
     fn viewer() -> Viewer {
         Viewer {

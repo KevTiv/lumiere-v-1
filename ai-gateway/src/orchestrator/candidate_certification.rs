@@ -788,19 +788,6 @@ mod tests {
         assert!(summary.contains("effective dates are not recorded"));
     }
 
-    #[test]
-    fn proposed_manifest_and_dev_fixture_bind_the_current_report_bundle() {
-        let manifest: Value = serde_json::from_str(include_str!(
-            "../../../infra/railway/pilots/report-analysis-certification-manifest.proposed.json"
-        ))
-        .unwrap();
-        let bundle = report_analysis_certification_bundle_hash();
-        assert_eq!(manifest["source_hash"], bundle);
-        assert_eq!(manifest["version"], REPORT_ANALYSIS_CERTIFICATION_VERSION);
-        let seed = include_str!("../../../spacetimedb/src/seed.rs");
-        assert!(seed.contains(&format!("\"{bundle}\".to_string()")));
-    }
-
     #[tokio::test]
     async fn executes_the_shared_graph_and_releases_a_grounded_synthetic_claim() {
         let execution = execute_report_analysis(request()).await.unwrap();

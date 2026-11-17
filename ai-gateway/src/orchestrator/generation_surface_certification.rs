@@ -341,7 +341,10 @@ impl GenerationProvider for Providers {
     async fn generate(&self, request: GenerationRequest) -> Result<GenerationResponse> {
         request.validate()?;
         ensure!(
-            request.response_format == GenerationResponseFormat::Text,
+            matches!(
+                request.response_format,
+                GenerationResponseFormat::Text | GenerationResponseFormat::RagAnswer
+            ),
             "unexpected generation response contract"
         );
         let mut recorded = self

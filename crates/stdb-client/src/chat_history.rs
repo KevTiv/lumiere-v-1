@@ -17,7 +17,6 @@ const SESSION_PREVIEW_COLUMNS: &str =
 const MAX_CONTEXT_BYTES: usize = 512 * 1024;
 const MAX_PAGE_ROWS: usize = 64;
 const MODULE_SESSION_SCAN_ROWS: usize = 30;
-const MAX_SEEK_QUERIES: usize = 256;
 const PAYLOAD_BATCH_ROWS: usize = 8;
 const MAX_BATCH_BYTES: usize = 512 * 1024;
 const MAX_LEGACY_ROW_BYTES: usize = 2 * 1024 * 1024;
@@ -81,73 +80,7 @@ async fn select_ids(
         (1..=MAX_PAGE_ROWS).contains(&limit),
         "invalid chat history limit"
     );
-    if low > high {
-        return Ok(Vec::new());
-    }
-
-    let client = client.with_query_limits(limit + 1, 64 * 1024)?;
-    // SpacetimeDB SQL LIMIT does not specify row order. Read only IDs until
-    // a range is proven complete, and visit the preferred half first. Even
-    // with globally sparse IDs, the stack is limited by the ID width.
-    let mut pending = vec![(low, high)];
-    let mut result = Vec::with_capacity(limit);
-    let mut probes = 0;
-    while let Some((low, high)) = pending.pop() {
-        probes += 1;
-        ensure!(
-            probes <= MAX_SEEK_QUERIES,
-            "chat history page scan exhausted"
-        );
-        let available = limit - result.len();
-        let probe_limit = available + 1;
-        let sql = format!(
-            "SELECT id FROM {table} WHERE {predicate} AND id >= {low} AND id <= {high} LIMIT {probe_limit}"
-        );
-        let rows = client.query_sql(&sql).await?;
-        let mut ids = rows.iter().map(chat_row_id).collect::<Result<Vec<_>>>()?;
-        ids.sort_unstable();
-        ensure!(
-            ids.iter().all(|id| (low..=high).contains(id))
-                && ids.windows(2).all(|pair| pair[0] < pair[1]),
-            "chat history ID escaped its window"
-        );
-        if ids.len() <= available {
-            if newest_first {
-                ids.reverse();
-            }
-            result.extend(ids);
-            if result.len() == limit {
-                break;
-            }
-            continue;
-        }
-
-        // The full sample already proves there are enough IDs on the
-        // preferred side of its extreme, so discard the opposite tail.
-        let first = ids
-            .first()
-            .copied()
-            .context("empty full chat history sample")?;
-        let last = ids
-            .last()
-            .copied()
-            .context("empty full chat history sample")?;
-        let (low, high) = if newest_first {
-            (first, high)
-        } else {
-            (low, last)
-        };
-        ensure!(low < high, "invalid chat history ID interval");
-        let midpoint = low + (high - low) / 2;
-        if newest_first {
-            pending.push((low, midpoint));
-            pending.push((midpoint + 1, high));
-        } else {
-            pending.push((midpoint + 1, high));
-            pending.push((low, midpoint));
-        }
-    }
-    Ok(result)
+    crate::id_window::select_ids(client, table, predicate, low, high, limit, newest_first).await
 }
 
 async fn read_ids(

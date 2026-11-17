@@ -5,7 +5,7 @@
 //! then creates an immutable skill version. Certification and release remain the
 //! responsibility of the existing skill registry gates.
 
-use lumiere_policy_core::{ai_skills::is_builtin_skill, skill_projection::SkillProjection};
+use lumiere_policy_core::{ai_skills::is_user_created_skill, skill_projection::SkillProjection};
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
@@ -129,7 +129,7 @@ pub fn propose_ai_knowledge_skill_promotion(
     require_promotable_knowledge(ctx, &version)?;
 
     let manifest = validate_manifest(&params.manifest_json, params.skill_key.trim())?;
-    let projection = validate_promotion_executor(
+    validate_promotion_executor(
         organization_id,
         params.skill_key.trim(),
         &params.manifest_json,
@@ -142,8 +142,8 @@ pub fn propose_ai_knowledge_skill_promotion(
     }
     if let Some(skill_id) = params.skill_id {
         let skill = load_org_skill(ctx, organization_id, skill_id)?;
-        if projection && skill.is_system {
-            return Err("draft testing is only available for tenant-authored skills".into());
+        if skill.is_system {
+            return Err("Only user-created skills use the publication lifecycle".into());
         }
         if skill.skill_key != params.skill_key.trim() {
             return Err("existing skill key does not match the promotion skill_key".to_string());
@@ -261,14 +261,13 @@ pub fn review_ai_knowledge_skill_promotion(
         return Err("knowledge lineage changed after promotion was proposed".to_string());
     }
     let manifest = validate_manifest(&row.manifest_json, &row.skill_key)?;
-    let projection =
-        validate_promotion_executor(organization_id, &row.skill_key, &row.manifest_json)?;
+    validate_promotion_executor(organization_id, &row.skill_key, &row.manifest_json)?;
     let skill = match row.requested_skill_id {
         Some(id) => {
             let skill = load_org_skill(ctx, organization_id, id)?;
-            if projection && (skill.is_system || skill.skill_key != row.skill_key) {
+            if skill.is_system || skill.skill_key != row.skill_key {
                 return Err(
-                    "draft testing is only available for the selected tenant-authored skill".into(),
+                    "Publication is only available for the selected user-created skill".into(),
                 );
             }
             skill
@@ -323,14 +322,14 @@ fn validate_promotion_executor(
     organization_id: u64,
     skill_key: &str,
     manifest_json: &str,
-) -> Result<bool, String> {
+) -> Result<(), String> {
     let manifest = serde_json::from_str(manifest_json)
         .map_err(|error| format!("invalid skill manifest: {error}"))?;
-    let projection = SkillProjection::from_manifest(&manifest)?.is_some();
-    if projection && (organization_id == 0 || is_builtin_skill(skill_key)) {
-        return Err("draft testing is only available for tenant-authored skills".into());
+    SkillProjection::from_manifest(&manifest)?;
+    if !is_user_created_skill(skill_key, false, organization_id, organization_id) {
+        return Err("Only user-created skills use the publication lifecycle".into());
     }
-    Ok(projection)
+    Ok(())
 }
 
 fn require_promotable_knowledge(
@@ -675,6 +674,15 @@ fn audit(ctx: &ReducerContext, row: &AiKnowledgeSkillPromotion, action: &'static
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn knowledge_publication_cannot_target_repository_skills_even_without_an_executor() {
+        for key in lumiere_policy_core::ai_skills::BUILTIN_SKILL_KEYS {
+            assert!(validate_promotion_executor(7, key, "{}").is_err(), "{key}");
+        }
+        assert!(validate_promotion_executor(7, "tenant_stock_review", "{}").is_ok());
+        assert!(validate_promotion_executor(0, "tenant_stock_review", "{}").is_err());
+    }
 
     #[test]
     fn lineage_hash_changes_with_evidence_or_epoch() {

@@ -94,24 +94,15 @@ checks now apply to the exact five finance programs as well as `report_analysis`
 Plain prose acquires no claims implicitly. Independent semantic rejection
 withholds the answer. A snapshot hash is an identity, not an admission certificate.
 
-Shared executor/registry changes alter the pilot's compiled source binding.
-This branch proposes **`report_analysis` 1.0.6**, with updated proposed manifest
-and local development seed hash. It does not change a deployed 1.0.5 release.
-Integration must certify/promote that new version before deploying this branch
-to a pilot that requires it.
+Historically, shared executor/registry changes required a new pilot source
+binding and proposed release. That process is superseded: repository-owned
+skills now update with the application deployment, without certification or
+activation.
 
-Each finance skill starts at **1.0.0**. Prepare/check its proposed local artifacts:
-
-```sh
-python3 scripts/finance-skill-manifests.py --write
-python3 scripts/finance-skill-manifests.py --check
-```
-
-Manifests live in `infra/skill-releases/finance/`. The script reads source only;
-it never contacts a service, registers a skill or issues a certificate. Empty
-permission arrays grant nothing; source access is independently intersected at
-read time. Source hashes bind prompts, shared admission/executor sources,
-transport, projection, source/report/blob owners and the bounded database client.
+The former source-bound proposed-manifest workflow is retired. Repository-owned
+finance skills ship with the application, without tenant certification,
+activation, or per-code-change skill-version bumps. Only user-created skills use
+the publication lifecycle. See [current ownership policy](skill-ownership-and-lifecycle.md).
 
 The certification worker supports all five adapters. Its normal pinned transcript
 dataset also carries `financeSource`: `preview` for reports; `statements`, `lines`,

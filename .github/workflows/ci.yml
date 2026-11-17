@@ -34,10 +34,8 @@ jobs:
         run: python3 -B scripts/generate-finance-change-review-inventory.py --check
       - name: Verify alpha history coverage inventory
         run: python3 -B scripts/generate-alpha-history-inventory.py --check
-      - name: Validate ERP skill contracts and source-bound manifests
-        run: |
-          python3 -B scripts/erp_skill_catalog.py --check
-          python3 -B scripts/finance-skill-manifests.py --check
+      - name: Validate repository-owned ERP skill contracts
+        run: python3 -B scripts/erp_skill_catalog.py --check
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc

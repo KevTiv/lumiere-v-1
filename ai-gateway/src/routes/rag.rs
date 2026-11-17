@@ -185,7 +185,7 @@ fn no_relevant_information_response(
         return Err(AppError::RetrievalUnavailable);
     }
     let answer = if related_guides.is_empty() {
-        "No relevant information found for your query."
+        "No authorized data is available for this question. Open a permitted record, select spreadsheet cells, or select a saved import before asking again. For a financial summary, also specify the reporting period and report or records to review. Page labels and earlier conversation are not current ERP evidence."
     } else if retrieval_degraded {
         "Semantic retrieval is unavailable. Saved guides are available for this question. Open a guide to review its saved instructions. Draft guides have not been independently verified."
     } else {
@@ -428,7 +428,10 @@ pub(crate) async fn release_rag_answer(
     let mut gated = admission
         .admit(candidate, &text_evidence, &passages)
         .await?;
-    let mut run_failure: Option<&'static str> = None;
+    // A parser/coverage rejection is a withheld result too, not a successfully
+    // completed run. Later rechecks may replace this with a more specific cause.
+    let mut run_failure =
+        (!gated.is_released()).then_some("answer was withheld by the evidence gate");
     // Any answer generated with passages in its prompt depends on the actor's
     // continuing access to them, whether or not it cites one.
     let depends_on_passages = !passages.is_empty();
@@ -1065,9 +1068,11 @@ pub async fn post_rag(
         && live_snapshots.is_empty()
         && saved_imports.is_empty()
         && selected_spreadsheet.is_none()
-        && conversation.prompt.is_none()
         && history_references.is_empty()
     {
+        // Earlier conversation helps interpret a grounded question, but cannot
+        // turn an empty retrieval into current ERP evidence or justify a
+        // billable attempt with no support references.
         tracing::info!(
             company_id = req.company_id,
             org_id,
@@ -1514,8 +1519,11 @@ pub async fn post_rag(
         org_hit_count,
         live_snapshot_count,
         source_count = sources.len(),
+        run_id = run.run_id,
+        run_status,
+        verification_outcome = ?verification.as_ref().map(|verdict| &verdict.outcome),
         duration_ms = started.elapsed().as_millis() as u64,
-        "RAG query answered"
+        "RAG query finished"
     );
 
     Ok(Json(RagResponse {
@@ -1595,7 +1603,7 @@ mod tests {
         let response = no_relevant_information_response(false, Vec::new(), false).unwrap();
         assert_eq!(
             response.answer,
-            "No relevant information found for your query."
+            "No authorized data is available for this question. Open a permitted record, select spreadsheet cells, or select a saved import before asking again. For a financial summary, also specify the reporting period and report or records to review. Page labels and earlier conversation are not current ERP evidence."
         );
         assert!(!response.retrieval_degraded);
         assert!(response.sources.is_empty());
@@ -2034,6 +2042,33 @@ mod tests {
         assert!(release.provenance.claims.is_empty());
         assert!(!release.provenance.persisted);
         assert!(release.provenance.claim_ids.is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_initial_claimless_rejection_is_a_failed_run_not_completed_prose() {
+        let access = FakeAccess::new(5, 4096).with_passage(7, BODY);
+        let evidence = authorized_evidence(&access).await;
+        let sink = MemorySink::ok();
+        let released = release(
+            &json!({"content": "Unverified answer", "claims": [], "calculations": []}).to_string(),
+            &evidence,
+            &[],
+            None,
+            &sink,
+            &access,
+        )
+        .await;
+        assert_eq!(released.verification.outcome, TextAnswerOutcome::Blocked);
+        assert_eq!(
+            released.run_failure,
+            Some("answer was withheld by the evidence gate")
+        );
+        assert_eq!(sink.calls.load(Ordering::SeqCst), 0);
+        assert_withheld(
+            &released,
+            &response_of(&released, &evidence),
+            &["Unverified answer", BODY],
+        );
     }
 
     #[tokio::test]

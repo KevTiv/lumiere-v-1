@@ -1854,6 +1854,12 @@ impl GovernedProgramExecutor<'_> {
                             format: generate.format.clone(),
                             response_format: if report_evidence_node(context).is_some() {
                                 super::intelligence::GenerationResponseFormat::FinalDraft
+                            } else if super::governed_programs::governed_program_for_skill(
+                                "rag_generation",
+                            )
+                            .is_some_and(|entry| entry.program_ref == context.program_ref)
+                            {
+                                super::intelligence::GenerationResponseFormat::RagAnswer
                             } else {
                                 super::intelligence::GenerationResponseFormat::Text
                             },

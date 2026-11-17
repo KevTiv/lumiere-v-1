@@ -19,6 +19,12 @@ type SetupFailure = {
   recoveryPath?: "/ai-skills"
 }
 export type AssistantTurnFailure = { kind: TurnFailure; setup?: SetupFailure; retryMessage?: string }
+export type AssistantVerification = {
+  outcome: "admitted" | "qualified" | "requires_review" | "blocked"
+  methods: string[]
+  limitations: string[]
+  reason?: string | null
+}
 type TurnAttempt<T> = { kind: "ready"; value: T } | AssistantTurnFailure
 export type AssistantTurn<A, D> = {
   answer: TurnAttempt<A>
@@ -163,10 +169,34 @@ export async function readAssistantStream<T>(
   }
 }
 
+function assistantVerification(value: unknown): AssistantVerification | undefined {
+  if (value == null) return undefined
+  if (typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid assistant verification")
+  const raw = value as Partial<AssistantVerification>
+  if (!["admitted", "qualified", "requires_review", "blocked"].includes(raw.outcome ?? "")
+    || !Array.isArray(raw.methods) || raw.methods.some(method => typeof method !== "string")
+    || !Array.isArray(raw.limitations) || raw.limitations.some(limit => typeof limit !== "string")
+    || (raw.reason != null && typeof raw.reason !== "string")) throw new Error("Invalid assistant verification")
+  return { outcome: raw.outcome as AssistantVerification["outcome"], methods: raw.methods, limitations: raw.limitations, reason: raw.reason }
+}
+
+/** Persist the verdict rather than treating a successful transport as an admitted answer.
+ * This browser-authored history metadata is not independent evidence or review authority.
+ */
+export function assistantHistoryResult(verification: AssistantVerification | undefined, metadata: string | null) {
+  const withheld = verification?.outcome === "blocked" || verification?.outcome === "requires_review"
+  return {
+    status: withheld ? "failed" : "completed",
+    metadata: verification
+      ? JSON.stringify({ ...(metadata ? JSON.parse(metadata) : {}), answerVerification: verification })
+      : metadata,
+  }
+}
+
 /** Fail closed before joining an answer to independently prepared draft cards. */
-export function assistantAnswerMetadata(value: unknown): { sources: AiRagSource[]; model?: string; run_id?: number; guides?: GuideReference[]; ui_actions?: AssistantUiProposal[]; importTasks?: ChatImportTaskStatus[]; earlierContextUnavailable?: boolean } {
+export function assistantAnswerMetadata(value: unknown): { sources: AiRagSource[]; model?: string; run_id?: number; guides?: GuideReference[]; ui_actions?: AssistantUiProposal[]; importTasks?: ChatImportTaskStatus[]; earlierContextUnavailable?: boolean; verification?: AssistantVerification } {
   if (value == null || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid assistant metadata")
-  const raw = value as { sources?: unknown; model?: unknown; run_id?: unknown; related_guides?: unknown; ui_actions?: unknown; import_task_statuses?: unknown; earlier_context_unavailable?: unknown }
+  const raw = value as { sources?: unknown; model?: unknown; run_id?: unknown; related_guides?: unknown; ui_actions?: unknown; import_task_statuses?: unknown; earlier_context_unavailable?: unknown; verification?: unknown }
   if (!Array.isArray(raw.sources)) throw new Error("Invalid assistant sources")
   for (const item of raw.sources) {
     if (item == null || typeof item !== "object" || Array.isArray(item)) throw new Error("Invalid assistant source")
@@ -196,7 +226,9 @@ export function assistantAnswerMetadata(value: unknown): { sources: AiRagSource[
       return { guideId: id, revision, title: typeof ref.title === "string" ? ref.title : undefined, module: typeof ref.module === "string" ? ref.module : undefined }
     })
   }
+  const verification = assistantVerification(raw.verification)
   return { sources: raw.sources as AiRagSource[], guides, model: typeof raw.model === "string" ? raw.model : undefined, run_id: typeof raw.run_id === "number" ? raw.run_id : undefined,
+    ...(verification ? { verification } : {}),
     ...(raw.earlier_context_unavailable === true ? { earlierContextUnavailable: true } : {}),
     ...(raw.ui_actions !== undefined ? { ui_actions: parseAssistantUiProposals(raw.ui_actions) } : {}),
     ...(raw.import_task_statuses !== undefined ? { importTasks: parseImportTaskStatuses(raw.import_task_statuses) } : {}),

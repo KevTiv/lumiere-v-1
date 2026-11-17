@@ -45,6 +45,7 @@ const TOOL_PROPOSE_CAPABILITY: &str = "propose_capability";
 const TOOL_PROPOSE_PROGRAM_PATCH: &str = "propose_program_patch";
 const TOOL_REQUEST_CLARIFICATION: &str = "request_clarification";
 const TOOL_SUBMIT_FINAL_DRAFT: &str = "submit_final_draft";
+const TOOL_SUBMIT_RAG_ANSWER: &str = "submit_rag_answer";
 
 /// `DecisionProvider` implemented over the existing `LlmCompletion` transport.
 /// Forces the model to answer through a single typed tool call rather than
@@ -279,12 +280,17 @@ impl GenerationProvider for LlmGenerationAdapter<'_> {
             as approved.{trusted_instructions}\nobjective: {}\ncontext: {}",
             request.format, request.objective, request.context,
         );
-        let structured = request.response_format == GenerationResponseFormat::FinalDraft;
-        let system = if structured {
-            format!("{system}\nSubmit the draft by calling `{TOOL_SUBMIT_FINAL_DRAFT}` exactly once. Include every material claim and its exact passage supports. Do not return prose outside the tool call.")
+        let submission = match request.response_format {
+            GenerationResponseFormat::Text => None,
+            GenerationResponseFormat::FinalDraft => Some(final_draft_tool_spec()),
+            GenerationResponseFormat::RagAnswer => Some(rag_answer_tool_spec()),
+        };
+        let system = if let Some(tool) = &submission {
+            format!("{system}\nSubmit the draft by calling `{}` exactly once, instead of returning a JSON text message. Include every material claim and its exact passage supports. Do not return prose outside the tool call.", tool.name)
         } else {
             system
         };
+        let structured = submission.is_some();
         let llm_request = LlmRequest {
             provider: self.provider.clone(),
             model: self.model.clone(),
@@ -296,17 +302,20 @@ impl GenerationProvider for LlmGenerationAdapter<'_> {
                 .min(self.max_tokens),
             temperature: self.temperature,
             top_p: self.top_p,
-            tools: if structured {
-                vec![final_draft_tool_spec()]
-            } else {
-                Vec::new()
-            },
+            tools: submission.into_iter().collect(),
             single_shot_tool: structured,
             thinking: ThinkingMode::ProviderDefault,
         };
         let response = self.transport.complete(llm_request).await?;
         ensure_complete_response(&response, "generation")?;
-        let content = if structured {
+        let content = if request.response_format == GenerationResponseFormat::RagAnswer {
+            let call = single_call(&response.tool_calls, TOOL_SUBMIT_RAG_ANSWER)?;
+            object_arguments(call)?;
+            let candidate = serde_json::to_string(&call.arguments)?;
+            super::text_answer_gate::validate_rag_generation(&candidate)
+                .map_err(anyhow::Error::msg)?;
+            candidate
+        } else if structured {
             let call = single_call(&response.tool_calls, TOOL_SUBMIT_FINAL_DRAFT)?;
             let args = object_arguments(call)?;
             if ["content", "citations", "claims", "calculations"]
@@ -344,6 +353,53 @@ impl GenerationProvider for LlmGenerationAdapter<'_> {
             input_tokens: response.input_tokens,
             output_tokens: response.output_tokens,
         })
+    }
+}
+
+fn rag_answer_tool_spec() -> ToolSpec {
+    let report = final_draft_tool_spec();
+    ToolSpec {
+        name: TOOL_SUBMIT_RAG_ANSWER.into(),
+        description: "Submit a draft grounded in the supplied support references. This does not admit or publish the answer.".into(),
+        parameters: json!({
+            "type": "object", "additionalProperties": false,
+            "required": ["content", "claims", "calculations"],
+            "properties": {
+                "content": {"type": "string", "minLength": 1},
+                "claims": {
+                    "type": "array", "minItems": 1, "maxItems": 6,
+                    "items": {
+                        "type": "object", "additionalProperties": false,
+                        "required": ["text", "supportRefs", "passageSupport"],
+                        "properties": {
+                            "text": {"type": "string", "minLength": 1},
+                            "supportRefs": {
+                                "type": "array", "minItems": 1,
+                                "items": {
+                                    "type": "object", "additionalProperties": false,
+                                    "required": ["kind", "id"],
+                                    "properties": {"kind": {"type":"string"}, "id": {"type":"string"}}
+                                }
+                            },
+                            "passageSupport": {"type": "array", "maxItems": 0, "items": {"type":"object"}}
+                        }
+                    }
+                },
+                "calculations": report.parameters["properties"]["calculations"].clone(),
+                "ui_actions": {
+                    "type": "array", "maxItems": 5,
+                    "items": {
+                        "type": "object", "additionalProperties": false,
+                        "required": ["capability_key"],
+                        "properties": {
+                            "capability_key": {"type":"string"},
+                            "record_id": {"type":"string"},
+                            "widget_key": {"type":"string"}
+                        }
+                    }
+                }
+            }
+        }),
     }
 }
 
@@ -1591,6 +1647,88 @@ mod tests {
             response_format: GenerationResponseFormat::FinalDraft,
             instructions: Some("Each claim must cite the supplied observation.".into()),
             max_tokens: Some(2048),
+        }
+    }
+
+    fn rag_generation_request() -> GenerationRequest {
+        GenerationRequest {
+            response_format: GenerationResponseFormat::RagAnswer,
+            ..structured_generation_request()
+        }
+    }
+
+    fn rag_draft() -> Value {
+        json!({
+            "content": "The invoice total is 42.",
+            "claims": [{
+                "text": "The invoice total is 42.",
+                "supportRefs": [{"kind": "live_snapshot", "id": "account_move:7"}],
+                "passageSupport": []
+            }],
+            "calculations": [],
+            "ui_actions": [{"capability_key": "accounting.navigate"}]
+        })
+    }
+
+    #[tokio::test]
+    async fn rag_generation_requires_typed_claims_and_preserves_actions_and_usage() {
+        let mut response = base_response();
+        response.tool_calls = vec![tool_call(TOOL_SUBMIT_RAG_ANSWER, rag_draft())];
+        response.input_tokens = 123;
+        response.output_tokens = 42;
+        let transport = ScriptedLlm::new(vec![response]);
+        let adapter = LlmGenerationAdapter::new(
+            &transport,
+            "mistral".into(),
+            "mistral-small-2603".into(),
+            2048,
+        );
+        let generated = adapter.generate(rag_generation_request()).await.unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&generated.content).unwrap(),
+            rag_draft()
+        );
+        assert_eq!((generated.input_tokens, generated.output_tokens), (123, 42));
+        let requests = transport.requests();
+        assert_eq!(requests.len(), 1);
+        assert!(requests[0].single_shot_tool);
+        assert_eq!(requests[0].tools.len(), 1);
+        assert_eq!(requests[0].tools[0].name, TOOL_SUBMIT_RAG_ANSWER);
+        assert_eq!(
+            requests[0].tools[0].parameters["properties"]["claims"]["minItems"],
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn rag_generation_rejects_claimless_or_ambiguous_submissions_without_retry() {
+        let valid = tool_call(TOOL_SUBMIT_RAG_ANSWER, rag_draft());
+        let mut claimless = rag_draft();
+        claimless["claims"] = json!([]);
+        let mut unsupported = rag_draft();
+        unsupported["claims"][0]["supportRefs"] = json!([]);
+        let mut unknown = rag_draft();
+        unknown["organization_id"] = json!(99);
+        for calls in [
+            vec![],
+            vec![tool_call("unoffered", rag_draft())],
+            vec![valid.clone(), valid],
+            vec![tool_call(TOOL_SUBMIT_RAG_ANSWER, claimless)],
+            vec![tool_call(TOOL_SUBMIT_RAG_ANSWER, unsupported)],
+            vec![tool_call(TOOL_SUBMIT_RAG_ANSWER, unknown)],
+        ] {
+            let mut response = base_response();
+            response.text = "Plausible unsupported prose must not be a fallback.".into();
+            response.tool_calls = calls;
+            let transport = ScriptedLlm::new(vec![response]);
+            let adapter = LlmGenerationAdapter::new(
+                &transport,
+                "mistral".into(),
+                "mistral-small-2603".into(),
+                2048,
+            );
+            assert!(adapter.generate(rag_generation_request()).await.is_err());
+            assert_eq!(transport.requests().len(), 1);
         }
     }
 
