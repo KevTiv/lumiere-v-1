@@ -754,15 +754,74 @@ async fn read_worker_status(
     validate_job_refs(&jobs)?;
     let mut statuses = Vec::with_capacity(jobs.len());
     for job in jobs {
-        let rows = client.query_sql(&format!(
-            "SELECT id, status, semantic_key FROM queue_job WHERE organization_id = {organization_id} AND company_id = {company_id} AND id = {} AND queue_name = 'embedding' LIMIT 2", job.job_id
-        )).await.map_err(ApiError::internal)?;
-        let embeddings = client.query_sql(&format!(
-            "SELECT expected_fingerprint, index_generation, sync_status FROM search_embedding WHERE organization_id = {organization_id} AND company_id = {company_id} AND content_type = 'ai_evidence_passage' AND content_id = {} LIMIT 2", job.passage_id
-        )).await.map_err(ApiError::internal)?;
-        statuses.push(worker_status(&job, &rows, &embeddings));
+        statuses.push(read_indexing_job_status(client, organization_id, company_id, &job).await?);
     }
     Ok(combine_worker_statuses(&statuses))
+}
+
+async fn read_indexing_job_status(
+    client: &stdb_client::StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    job: &IndexingJobRef,
+) -> Result<&'static str, ApiError> {
+    let rows = client.query_sql(&format!(
+        "SELECT id, organization_id, company_id, queue_name, status, semantic_key FROM queue_job WHERE organization_id = {organization_id} AND id = {} AND queue_name = 'embedding' LIMIT 2", job.job_id
+    )).await.map_err(ApiError::internal)?;
+    let embeddings = client.query_sql(&format!(
+        "SELECT organization_id, company_id, content_type, content_id, expected_fingerprint, index_generation, sync_status FROM search_embedding WHERE organization_id = {organization_id} AND content_type = 'ai_evidence_passage' AND content_id = {} LIMIT 2", job.passage_id
+    )).await.map_err(ApiError::internal)?;
+    Ok(scoped_worker_status(
+        job,
+        organization_id,
+        company_id,
+        &rows,
+        &embeddings,
+    ))
+}
+
+fn scoped_worker_status(
+    job: &IndexingJobRef,
+    organization_id: u64,
+    company_id: u64,
+    rows: &[Value],
+    embeddings: &[Value],
+) -> &'static str {
+    let scoped = |row: &Value| {
+        crate::query_exec::row_u64(row, "organizationId", "organization_id")
+            .ok()
+            .flatten()
+            == Some(organization_id)
+            && crate::query_exec::row_u64(row, "companyId", "company_id")
+                .ok()
+                .flatten()
+                == Some(company_id)
+    };
+    if rows.len() != 1 || embeddings.len() != 1 || !scoped(&rows[0]) || !scoped(&embeddings[0]) {
+        return "unavailable";
+    }
+    if crate::query_exec::row_u64(&rows[0], "id", "id")
+        .ok()
+        .flatten()
+        != Some(job.job_id)
+        || crate::query_exec::row_u64(&embeddings[0], "contentId", "content_id")
+            .ok()
+            .flatten()
+            != Some(job.passage_id)
+        || rows[0]
+            .get("queueName")
+            .or_else(|| rows[0].get("queue_name"))
+            .and_then(Value::as_str)
+            != Some("embedding")
+        || embeddings[0]
+            .get("contentType")
+            .or_else(|| embeddings[0].get("content_type"))
+            .and_then(Value::as_str)
+            != Some("ai_evidence_passage")
+    {
+        return "unavailable";
+    }
+    worker_status(job, rows, embeddings)
 }
 
 fn worker_status(job: &IndexingJobRef, rows: &[Value], embeddings: &[Value]) -> &'static str {
@@ -821,6 +880,100 @@ fn combine_worker_statuses(statuses: &[&str]) -> &'static str {
 #[cfg(test)]
 mod worker_status_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn nullable_company_status_readback_is_scoped_and_non_mutating() {
+        let server = crate::company_read_test_support::serve(|sql| {
+            assert!(!sql.contains("company_id ="));
+            assert!(sql.contains("organization_id = 1"));
+            assert!(sql.ends_with("LIMIT 2"));
+            if sql.contains(" FROM queue_job ") {
+                assert!(sql.contains("AND id = 10 AND queue_name = 'embedding'"));
+                vec![serde_json::json!({"id":10,"organization_id":1,"company_id":2,"queue_name":"embedding","status":"Completed","semantic_key":format!("embedding:ai_evidence_passage:20:{}:semantic-index-v1","a".repeat(64))})]
+            } else {
+                assert!(sql.contains("AND content_type = 'ai_evidence_passage' AND content_id = 20"));
+                vec![serde_json::json!({"organization_id":1,"company_id":2,"content_type":"ai_evidence_passage","content_id":20,"expected_fingerprint":"a".repeat(64),"index_generation":"semantic-index-v1","sync_status":"synced"})]
+            }
+        }).await;
+        let job = IndexingJobRef {
+            job_id: 10,
+            passage_id: 20,
+            fingerprint: "a".repeat(64),
+        };
+        assert_eq!(
+            read_indexing_job_status(&server.client, 1, 2, &job)
+                .await
+                .unwrap(),
+            "completed"
+        );
+        assert_eq!(
+            read_indexing_job_status(&server.client, 1, 3, &job)
+                .await
+                .unwrap(),
+            "unavailable"
+        );
+        assert_eq!(server.requests.lock().unwrap().len(), 4);
+    }
+
+    #[test]
+    fn foreign_missing_or_changed_status_references_are_unavailable() {
+        let (job, mut rows, mut embeddings) = fixture();
+        rows[0]["organizationId"] = serde_json::json!(1);
+        rows[0]["companyId"] = serde_json::json!(2);
+        rows[0]["queueName"] = serde_json::json!("embedding");
+        embeddings[0]["organizationId"] = serde_json::json!(1);
+        embeddings[0]["companyId"] = serde_json::json!(2);
+        embeddings[0]["contentType"] = serde_json::json!("ai_evidence_passage");
+        embeddings[0]["contentId"] = serde_json::json!(20);
+        assert_eq!(
+            scoped_worker_status(&job, 1, 2, &rows, &embeddings),
+            "completed"
+        );
+        for (column, value) in [
+            ("organizationId", serde_json::json!(3)),
+            ("companyId", serde_json::json!(3)),
+            ("companyId", Value::Null),
+            ("companyId", serde_json::json!("bad")),
+            ("id", serde_json::json!(11)),
+            ("queueName", serde_json::json!("email")),
+        ] {
+            let mut wrong = rows.clone();
+            wrong[0][column] = value;
+            assert_eq!(
+                scoped_worker_status(&job, 1, 2, &wrong, &embeddings),
+                "unavailable"
+            );
+        }
+        for (column, value) in [
+            ("organizationId", serde_json::json!(3)),
+            ("companyId", serde_json::json!(3)),
+            ("companyId", Value::Null),
+            ("contentId", serde_json::json!(21)),
+            ("contentType", serde_json::json!("other")),
+        ] {
+            let mut wrong = embeddings.clone();
+            wrong[0][column] = value;
+            assert_eq!(
+                scoped_worker_status(&job, 1, 2, &rows, &wrong),
+                "unavailable"
+            );
+        }
+        assert_eq!(
+            scoped_worker_status(&job, 1, 2, &[], &embeddings),
+            "unavailable"
+        );
+        assert_eq!(
+            scoped_worker_status(
+                &job,
+                1,
+                2,
+                &rows,
+                &[embeddings[0].clone(), embeddings[0].clone()]
+            ),
+            "unavailable"
+        );
+    }
+
     fn fixture() -> (IndexingJobRef, Vec<Value>, Vec<Value>) {
         let job = IndexingJobRef {
             job_id: 10,

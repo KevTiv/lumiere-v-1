@@ -662,6 +662,30 @@ async fn exact_row_id(rows: Vec<Value>, description: &str) -> Result<u64, ApiErr
         .ok_or_else(|| ApiError::Internal(format!("invalid {description} id")))
 }
 
+async fn read_document_embedding_job_id(
+    client: &stdb_client::StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    semantic_key: &str,
+) -> Result<u64, ApiError> {
+    // This key is server-derived. Nullable company_id cannot be compared to a
+    // scalar in HTTP SQL; validate the exact job's decoded ownership instead.
+    let jobs = client.query_sql(&format!(
+        "SELECT id, organization_id, company_id, queue_name, semantic_key FROM queue_job WHERE organization_id = {organization_id} AND queue_name = 'embedding' AND semantic_key = '{semantic_key}' LIMIT 2"
+    )).await.map_err(ApiError::internal)?;
+    if jobs.len() != 1
+        || value_u64(&jobs[0], "organizationId", "organization_id") != Some(organization_id)
+        || value_u64(&jobs[0], "companyId", "company_id") != Some(company_id)
+        || value_text(&jobs[0], "queueName", "queue_name") != Some("embedding")
+        || value_text(&jobs[0], "semanticKey", "semantic_key") != Some(semantic_key)
+    {
+        return Err(ApiError::Internal(
+            "document embedding job is missing, ambiguous or outside its exact scope".into(),
+        ));
+    }
+    exact_row_id(jobs, "document embedding job").await
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn persist_document_evidence(
     state: &AppState,
@@ -856,10 +880,13 @@ async fn persist_document_evidence(
         .await?;
         let semantic_key =
             format!("embedding:ai_evidence_passage:{passage_id}:{content_hash}:semantic-index-v1");
-        let jobs = context.client().query_sql(&format!(
-            "SELECT id FROM queue_job WHERE organization_id = {organization_id} AND company_id = {company_id} AND queue_name = 'embedding' AND semantic_key = '{semantic_key}' LIMIT 2"
-        )).await.map_err(ApiError::internal)?;
-        let job_id = exact_row_id(jobs, "document embedding job").await?;
+        let job_id = read_document_embedding_job_id(
+            context.client(),
+            organization_id,
+            company_id,
+            &semantic_key,
+        )
+        .await?;
         indexing_jobs.push(crate::document_blobs::upload_receipts::IndexingJobRef {
             job_id,
             passage_id,
@@ -1050,6 +1077,50 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn nullable_company_job_readback_requires_exact_scope_and_reference() {
+        let key = format!(
+            "embedding:ai_evidence_passage:20:{}:semantic-index-v1",
+            "a".repeat(64)
+        );
+        let valid = json!({"id":77,"organization_id":1,"company_id":2,"queue_name":"embedding","semantic_key":key});
+        let mut cases = vec![
+            (vec![valid.clone()], true),
+            (vec![], false),
+            (vec![valid.clone(), valid.clone()], false),
+        ];
+        for (column, value) in [
+            ("organization_id", json!(3)),
+            ("company_id", json!(3)),
+            ("company_id", Value::Null),
+            ("company_id", json!("malformed")),
+            ("queue_name", json!("email")),
+            ("semantic_key", json!("unrelated")),
+        ] {
+            let mut row = valid.clone();
+            row[column] = value;
+            cases.push((vec![row], false));
+        }
+        for (rows, expected) in cases {
+            let expected_key = key.clone();
+            let server = crate::company_read_test_support::serve(move |sql| {
+                assert!(!sql.contains("company_id ="));
+                assert!(sql.contains("organization_id = 1"));
+                assert!(sql.contains("queue_name = 'embedding'"));
+                assert!(sql.contains(&format!("semantic_key = '{expected_key}'")));
+                assert!(sql.ends_with("LIMIT 2"));
+                rows.clone()
+            })
+            .await;
+            let result = read_document_embedding_job_id(&server.client, 1, 2, &key).await;
+            assert_eq!(result.is_ok(), expected, "{result:?}");
+            if expected {
+                assert_eq!(result.unwrap(), 77);
+            }
+            assert_eq!(server.requests.lock().unwrap().len(), 1);
+        }
+    }
 
     #[test]
     fn document_version_checksum_decodes_nullable_sats_text() {
