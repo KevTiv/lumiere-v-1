@@ -7,6 +7,7 @@
  */
 import { formatEntityReference } from "@lumiere/ui/lib/entity-row-values"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
+import { createHistoryBuckets, resolveHistoryPeriod, type HistoryPeriod } from "@lumiere/erp-shared/history-period"
 import { variantTag } from "@lumiere/erp-workflows"
 import type { Subscription, SubscriptionPlan } from "@lumiere/stdb/types"
 import { chartColor, monthBuckets, type ChartDatum, type ChartSeriesSpec } from "@lumiere/ui/lib/chart-format"
@@ -42,10 +43,49 @@ function activeAt(row: Subscription, ms: number): boolean {
   return closed == null || closed > ms
 }
 
+/** Left-hand snapshot at an exclusive boundary, without rounding microsecond timestamps. */
+function activeBefore(row: Subscription, ms: number): boolean {
+  if (isTrial(row) || !["active", "closed"].includes(variantTag(row.state).toLowerCase())) return false
+  const start = timestampMs(row.dateStart) ?? timestampMs(row.createdAt)
+  const closed = closeMs(row)
+  return start !== null && start < ms && (closed === null || closed >= ms)
+}
+
 /** MRR at each month end, the MRR that started in the month, and churn as a share of opening MRR. */
 export function mrrAndChurnByMonth(subscriptions: readonly Subscription[], now: Date, months = 12, locale?: string): ChartDatum[] {
-  return monthBuckets(months, now, locale).map((bucket) => {
-    const monthEnd = Math.min(bucket.endMs, now.getTime())
+  // Legacy chart-kit buckets include the final millisecond; the history engine uses exclusive ends.
+  return contractMrrBuckets(subscriptions, now, monthBuckets(months, now, locale).map(bucket => ({ ...bucket, endMs: bucket.endMs + 1 })))
+}
+
+/** Full dated contract coverage, not an MRR ledger or a fabricated prior period. */
+export function mrrAndChurnHistory(
+  subscriptions: readonly Subscription[], now: Date, period: HistoryPeriod = "all",
+  locale?: string, timeZone = "UTC",
+): ChartDatum[] {
+  // Created/updated timestamps are not contract start/close evidence.
+  // Unknown dates must not extend contracts across invented intervals.
+  const dated = subscriptions.filter((row) => timestampMs(row.dateStart) !== null
+    && (variantTag(row.state).toLowerCase() !== "closed" || timestampMs(row.closeDate) !== null))
+  const bounds = resolveHistoryPeriod(period, { now, timeZone })
+  const endMs = Math.min(bounds.endMs ?? now.getTime(), now.getTime())
+  let startMs = bounds.startMs
+  if (startMs === null) {
+    for (const row of dated) {
+      if (isTrial(row) || !["active", "closed"].includes(variantTag(row.state).toLowerCase())) continue
+      const start = timestampMs(row.dateStart) ?? timestampMs(row.createdAt)
+      if (start !== null && start < endMs) startMs = Math.min(startMs ?? start, start)
+    }
+  }
+  if (startMs === null || startMs >= endMs) return []
+  return contractMrrBuckets(dated, now, createHistoryBuckets({ startMs, endMs }, { locale, timeZone, maxBuckets: 36 }))
+}
+
+function contractMrrBuckets(
+  subscriptions: readonly Subscription[], now: Date,
+  buckets: readonly { label: string; startMs: number; endMs: number }[],
+): ChartDatum[] {
+  return buckets.map((bucket) => {
+    const endMs = Math.min(bucket.endMs, now.getTime())
     let mrr = 0
     let opening = 0
     let added = 0
@@ -53,12 +93,12 @@ export function mrrAndChurnByMonth(subscriptions: readonly Subscription[], now: 
     for (const row of subscriptions) {
       const value = subscriptionMrr(row)
       if (value <= 0 || !["active", "closed"].includes(variantTag(row.state).toLowerCase())) continue
-      if (activeAt(row, monthEnd)) mrr += value
-      if (activeAt(row, bucket.startMs - 1)) opening += value
+      if (activeBefore(row, endMs)) mrr += value
+      if (activeBefore(row, bucket.startMs)) opening += value
       const start = timestampMs(row.dateStart) ?? timestampMs(row.createdAt)
-      if (!isTrial(row) && start != null && start >= bucket.startMs && start <= monthEnd) added += value
+      if (!isTrial(row) && start != null && start >= bucket.startMs && start < endMs) added += value
       const closed = closeMs(row)
-      if (!isTrial(row) && closed != null && closed >= bucket.startMs && closed <= monthEnd) churned += value
+      if (!isTrial(row) && start != null && closed != null && closed >= start && closed >= bucket.startMs && closed < endMs) churned += value
     }
     const row: ChartDatum = { month: bucket.label, mrr, newMrr: added }
     if (opening > 0) row.churnRate = Math.round((churned / opening) * 1000) / 10

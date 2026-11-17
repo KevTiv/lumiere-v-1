@@ -1,6 +1,8 @@
 import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 import { kpiDate } from "@lumiere/ui/lib/kpi-tiles"
 import { normalizedTag } from "@lumiere/erp-workflows"
+import type { HistoryPeriod } from "@lumiere/erp-shared/history-period"
+import { accountingDate, accountingHistory, accountingTimeZone } from "./accounting-history"
 import {
   projectPaymentAllocations,
   type PaymentAllocationBalance,
@@ -42,6 +44,8 @@ export interface OverviewCollection {
 }
 export interface AccountantOverviewData {
   organizationId: number
+  /** Authorized Organization.timezone; unavailable/invalid configuration uses a disclosed UTC fallback. */
+  timeZone?: string
   companyId: bigint | string
   moves: OverviewCollection
   payments: OverviewCollection
@@ -62,6 +66,7 @@ export interface AccountantOverviewData {
 export type OverviewQueueKey = "overdue" | "bills-due" | "draft-invoices" | "draft-bills" | "bank-lines" | "unlinked-payments" | "deadlines" | "periods"
 export interface OverviewActivityMonth {
   startMs: number
+  label: string
   invoices: number
   bills: number
 }
@@ -123,7 +128,7 @@ function bucket(source: OverviewCollection, matches: (row: OverviewRow) => boole
 }
 
 /** Derive operating queues only from successful, company-scoped reads. */
-export function buildAccountantOverview(data: AccountantOverviewData, now = new Date()) {
+export function buildAccountantOverview(data: AccountantOverviewData, now = new Date(), historyPeriod: HistoryPeriod = "all") {
   const moves = scoped(data.moves, data)
   const moveFields = (row: OverviewRow) => overviewTag(row.state) !== "" && overviewTag(cell(row, "moveType", "move_type")) !== ""
   const isType = (row: OverviewRow, type: string) => overviewTag(cell(row, "moveType", "move_type")) === type
@@ -179,15 +184,21 @@ export function buildAccountantOverview(data: AccountantOverviewData, now = new 
   const draftInvoices = bucket(moves, (row) => overviewTag(row.state) === "draft" && isType(row, "outinvoice"), moveFields)
   const draftBills = bucket(moves, (row) => overviewTag(row.state) === "draft" && isType(row, "ininvoice"), moveFields)
   const recent = bucket(moves, (row) => ["outinvoice", "ininvoice", "outrefund", "inrefund"].includes(overviewTag(cell(row, "moveType", "move_type"))), moveFields)
-  const activityDocuments = bucket(bucket(posted, (row) => isType(row, "outinvoice") || isType(row, "ininvoice")), () => true, (row) => overviewDate(row) != null)
-  const months: OverviewActivityMonth[] = activityDocuments.state.status === "ready" ? Array.from({ length: 6 }, (_, index) => ({
-    startMs: Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5 + index, 1), invoices: 0, bills: 0,
+  const timeZone = accountingTimeZone(data)
+  const postingDate = (row: OverviewRow) => accountingDate(row.invoiceDate ?? row.invoice_date ?? row.date, timeZone)
+  const activityDocuments = bucket(bucket(posted, (row) => isType(row, "outinvoice") || isType(row, "ininvoice")), () => true, (row) => postingDate(row) != null)
+  const history = accountingHistory(historyPeriod, now, timeZone, activityDocuments.rows.flatMap((row) => {
+    const date = postingDate(row)
+    return date === null ? [] : [date]
+  }))
+  const months: OverviewActivityMonth[] = activityDocuments.state.status === "ready" ? history.buckets.map((bucket) => ({
+    startMs: bucket.startMs, label: bucket.label, invoices: 0, bills: 0,
   })) : []
   for (const row of activityDocuments.rows) {
-    const date = overviewDate(row)!
-    if (date.getTime() > now.getTime()) continue
-    const monthStart = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)
-    const month = months.find((point) => point.startMs === monthStart)
+    const date = postingDate(row)!
+    if (!history.contains(date)) continue
+    const index = history.buckets.findIndex((point) => date >= point.startMs && date < point.endMs)
+    const month = months[index]
     if (month) { if (isType(row, "outinvoice")) month.invoices += 1; else month.bills += 1 }
   }
   const queues: Record<OverviewQueueKey, OverviewCollection> = {

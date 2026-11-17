@@ -529,6 +529,9 @@ jobs:
       - name: Unit tests (accounting and cross-module overview models)
         run: pnpm --dir web test:accounting-ui:models
 
+      - name: Unit tests (full-history dashboard ranges)
+        run: pnpm --dir web test:history-ranges
+
       - name: Unit tests (productivity workspace models)
         run: pnpm --dir web test:productivity:models
 
@@ -592,6 +595,11 @@ jobs:
         working-directory: frontend/web
         run: >-
           pnpm exec playwright test --config playwright.overflow.config.ts
+
+      - name: History ranges and company-remount browser regressions
+        env:
+          ACCOUNTING_UI_WARMUP_ROUTES: /insights,/module-insights
+        run: pnpm --dir web test:e2e:history-ranges
 
       - name: Assistant document modal and dedicated-page browser regressions
         run: pnpm --dir web test:e2e:assistant-guides

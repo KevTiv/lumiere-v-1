@@ -8,6 +8,8 @@ import { AccountantOverview } from "../../../../app/(modules)/accounting/account
 import type { ModuleDataState } from "../../../../../packages/ui/src/lib/module-data-state"
 import { fixtureNow, overviewFixture } from "../../fixtures"
 
+const sourceDate = (date: string) => ({ microsSinceUnixEpoch: BigInt(Date.parse(date)) * 1000n })
+
 function InsightsFixture() {
   const { setTheme } = useTheme()
   const [hydrated, setHydrated] = useState(false)
@@ -19,7 +21,12 @@ function InsightsFixture() {
   const state = (status: ModuleDataState["status"]): ModuleDataState => ({ status })
   const data = {
     ...overviewFixture, companyId,
+    // Synthetic stand-in for an authorized Organization.timezone projection.
+    timeZone: "America/New_York",
     moves: { rows: [...overviewFixture.moves.rows,
+      { id: "801", organizationId: 1, companyId: 1, name: "SYNTHETIC 1965 HISTORY", moveType: "OutInvoice", state: "Posted", amountTotal: 125, amountResidual: 0, currencyId: 1, invoiceDate: sourceDate("1965-01-01"), invoiceDateDue: sourceDate("1965-02-01") },
+      { id: "802", organizationId: 1, companyId: 1, name: "SYNTHETIC 2024 HISTORY", moveType: "OutInvoice", state: "Posted", amountTotal: 250, amountResidual: 0, currencyId: 1, invoiceDate: sourceDate("2024-03-10"), invoiceDateDue: sourceDate("2024-04-01") },
+      { id: "803", organizationId: 1, companyId: 1, name: "SYNTHETIC FUTURE", moveType: "OutInvoice", state: "Posted", amountTotal: 9999, amountResidual: 0, currencyId: 1, invoiceDate: "2030-01-01", invoiceDateDue: "2030-02-01" },
       { id: "9007199254740993", organizationId: 1, companyId: 2, name: "SYNTHETIC SECOND COMPANY", moveType: "OutInvoice", state: "Posted", amountTotal: 500, amountResidual: 250, currencyId: 2, invoiceDate: "2026-10-01", invoiceDateDue: "2026-10-30" },
     ], state: state(movesState) },
     currencies: { rows: currenciesState === "ready" ? overviewFixture.currencies.rows : [], state: state(currenciesState) },

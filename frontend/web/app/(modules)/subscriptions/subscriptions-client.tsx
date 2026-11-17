@@ -135,7 +135,9 @@ import { useContacts } from "@lumiere/query-hooks/hooks/crm"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
 import type { ChartValueFormat } from "@lumiere/ui/lib/chart-format"
-import { mrrAndChurnByMonth, planMix } from "./subscription-dashboard-charts"
+import { mrrAndChurnHistory, planMix } from "./subscription-dashboard-charts"
+import { useHistoryPeriod } from "@/lib/use-history-period"
+import { InvalidHistoryPeriod } from "../../../components/invalid-history-period"
 import { useAccountJournals, useAccountAccounts, useAccountMoves, useAccountMoveLines, useAccountPayments } from "@lumiere/query-hooks/hooks/accounting"
 import { subscriptionRecordLinks } from "@lumiere/query-hooks/hooks/cross-record-links"
 import { CrossRecordLinks } from "../../../components/order-handoff-links"
@@ -191,6 +193,7 @@ function SubscriptionsClientLoaded({
   useSubscriptionsModuleSubscription()
   const { t } = useTranslation()
   const router = useRouter()
+  const [historyPeriod, setHistoryPeriod, invalidHistoryPeriod] = useHistoryPeriod("all")
   const { checkPermission, permissionsReady } = useRBAC()
   const [createOpen, setCreateOpen] = useState(false)
   const [assistantPrompt, setAssistantPrompt] = useState<string | undefined>()
@@ -740,8 +743,8 @@ function SubscriptionsClientLoaded({
         if (w.type === "combo-chart" && w.id === "sub-mrr-churn") {
           return {
             ...w,
-            title: t("subscriptions.workflow.contractMrrHistory", { defaultValue: "Estimated MRR and churn · last 12 months ({{currency}})", currency: onlyCurrency }),
-            data: { ...w.data, values: mrrAndChurnByMonth(chartSubscriptions, now, 12, locale), valueFormat: money },
+            title: t("subscriptions.workflow.contractMrrHistory", { currency: onlyCurrency }),
+            data: { ...w.data, values: mrrAndChurnHistory(chartSubscriptions, now, historyPeriod, locale), valueFormat: money },
           }
         }
         if (w.type === "share-bar" && w.id === "sub-plan-mix") {
@@ -753,7 +756,7 @@ function SubscriptionsClientLoaded({
         }
         return w
           })
-  }, [locale, companyCurrencyRows, subscriptions, plans, currencies, moduleConfig, orgId, operatingCompanyId, t])
+  }, [historyPeriod, locale, companyCurrencyRows, subscriptions, plans, currencies, moduleConfig, orgId, operatingCompanyId, t])
 
   const reviewQueue = useMemo(() => {
     const scope = { organizationId: orgId, companyId: operatingCompanyId }
@@ -1039,6 +1042,11 @@ function SubscriptionsClientLoaded({
     }),
     ...(dataState.subscriptions.status === "ready" ? liveSections.filter((section) => section.id === "sub-charts") : []),
     createPageContentSection({
+      id: "subscription-history-basis",
+      title: t("subscriptions.workflow.historyBasisTitle"),
+      content: <p className="text-sm text-muted-foreground">{t("subscriptions.workflow.historyBasis")}</p>,
+    }),
+    createPageContentSection({
       id: "subscription-imports",
       title: t("subscriptions.workflow.imports"),
       content: <details><summary className="flex min-h-11 w-fit cursor-pointer items-center text-sm font-medium">{t("subscriptions.workflow.imports")}</summary><div className="flex flex-wrap gap-3 pt-3">
@@ -1052,6 +1060,10 @@ function SubscriptionsClientLoaded({
     <CurrencyFormatProvider currencies={currencies} rowCurrencyKey="currencyId">
     <EntityLabelsProvider value={entityLabels}>
       <ModuleView config={withDashboardSections(config, dashboardSections)} data={data} dataState={dataState} activeTab={activeTab} onActiveTabChange={setActiveTab} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending}
+        dashboardContent={invalidHistoryPeriod ? <InvalidHistoryPeriod onClear={() => setHistoryPeriod("all")} /> : undefined}
+        dashboardTimeRange={historyPeriod}
+        onDashboardTimeRangeChange={setHistoryPeriod}
+        historyTimeZone="UTC"
         assistantFormBlocked={createOpen || quickActionForm !== null}
         onAssistantFormScopeChange={() => { setCreateOpen(false); setQuickActionForm(null); setAssistantPrompt(undefined) }}
         onOpenCreateForm={(tabId, assistant) => {
