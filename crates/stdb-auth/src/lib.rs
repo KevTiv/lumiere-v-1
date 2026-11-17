@@ -31,22 +31,64 @@ pub use resource_registry::{registry_get, registry_json, registry_keys, Resource
 /// Apply the server-owned bootstrap lease to a SpacetimeDB SQL profile row.
 /// The trusted authority query must select metadata, including SATS Option values.
 pub fn profile_bootstrap_lease_active(profile: &serde_json::Value, now_micros: i64) -> bool {
+    profile_metadata(profile.get("metadata").unwrap_or(&serde_json::Value::Null)).is_ok_and(
+        |metadata| lumiere_policy_core::platform_bootstrap_lease_active(metadata, now_micros),
+    )
+}
+
+fn profile_metadata(value: &serde_json::Value) -> Result<Option<&str>, ()> {
     use serde_json::Value;
-    fn metadata(value: &Value) -> Result<Option<&str>, ()> {
-        match value {
-            Value::Null => Ok(None),
-            Value::String(text) => Ok(Some(text)),
-            Value::Object(fields) if fields.contains_key("some") => metadata(&fields["some"]),
-            Value::Object(fields) if fields.contains_key("none") => Ok(None),
-            Value::Array(fields) if fields.len() == 2 && fields[0] == 0 => metadata(&fields[1]),
-            Value::Array(fields) if fields.len() == 2 && fields[0] == 1 => Ok(None),
-            _ => Err(()),
-        }
+    match value {
+        Value::Null => Ok(None),
+        Value::String(text) => Ok(Some(text)),
+        Value::Object(fields) if fields.contains_key("some") => profile_metadata(&fields["some"]),
+        Value::Object(fields) if fields.contains_key("none") => Ok(None),
+        Value::Array(fields) if fields.len() == 2 && fields[0] == 0 => profile_metadata(&fields[1]),
+        Value::Array(fields) if fields.len() == 2 && fields[0] == 1 => Ok(None),
+        _ => Err(()),
     }
-    let value = profile.get("metadata").unwrap_or(&Value::Null);
-    metadata(value).is_ok_and(|metadata| {
-        lumiere_policy_core::platform_bootstrap_lease_active(metadata, now_micros)
-    })
+}
+
+/// A persistent non-human operator is never an interactive session principal.
+/// Canonical PG flags are projection data for this account, not an independent
+/// grant: stale flags cannot restore API authority after native revocation.
+pub fn profile_metadata_allows_interactive_session(
+    metadata: Option<&str>,
+    now_micros: i64,
+) -> bool {
+    if !lumiere_policy_core::platform_bootstrap_lease_active(metadata, now_micros) {
+        return false;
+    }
+    !metadata.is_some_and(metadata_marks_noninteractive_operator)
+}
+
+fn metadata_marks_noninteractive_operator(raw: &str) -> bool {
+    use lumiere_policy_core::PERSISTENT_PLATFORM_OPERATOR_METADATA_PREFIX as PREFIX;
+    use serde_json::Value;
+    match serde_json::from_str::<Value>(raw) {
+        Ok(Value::Object(fields)) => fields.keys().any(|key| key.starts_with(PREFIX)),
+        // Deny malformed/unknown reserved states, including JSON string storage.
+        _ => raw.contains(PREFIX),
+    }
+}
+
+/// Check account class before constructing a session, even without membership.
+pub fn profile_is_noninteractive_operator(profile: &serde_json::Value) -> bool {
+    let Ok(metadata) =
+        profile_metadata(profile.get("metadata").unwrap_or(&serde_json::Value::Null))
+    else {
+        return true;
+    };
+    let Some(raw) = metadata else {
+        return false;
+    };
+    metadata_marks_noninteractive_operator(raw)
+}
+
+/// Apply the same interactive boundary to every supported native SQL wire shape.
+pub fn profile_allows_interactive_session(profile: &serde_json::Value, now_micros: i64) -> bool {
+    profile_metadata(profile.get("metadata").unwrap_or(&serde_json::Value::Null))
+        .is_ok_and(|metadata| profile_metadata_allows_interactive_session(metadata, now_micros))
 }
 
 pub use lumiere_policy_core::platform_bootstrap_lease_active;
@@ -68,5 +110,45 @@ mod bootstrap_lease_tests {
             1
         ));
         assert!(profile_bootstrap_lease_active(&json!({"metadata":null}), 1));
+    }
+
+    #[test]
+    fn persistent_operator_projection_never_authorizes_an_interactive_session() {
+        let raw = json!({"persistent_platform_operator_v1":{"approvalRef":"approved"}}).to_string();
+        // Native operator authorization keeps the original lease semantics.
+        assert!(platform_bootstrap_lease_active(Some(&raw), 10));
+        for value in [json!(raw), json!({"some":raw}), json!([0, raw])] {
+            assert!(profile_is_noninteractive_operator(
+                &json!({"metadata":value})
+            ));
+            assert!(!profile_allows_interactive_session(
+                &json!({"metadata":value}),
+                10
+            ));
+        }
+        for raw in [
+            r#"{"persistent_platform_operator_v1":null}"#,
+            r#"{"persistent_platform_operator_v2":{}}"#,
+            r#"{"persistent_platform_operator_v1":"#,
+            r#""persistent_platform_operator_v1""#,
+        ] {
+            assert!(!profile_metadata_allows_interactive_session(Some(raw), 10));
+        }
+        assert!(profile_metadata_allows_interactive_session(
+            Some(r#"{"notes":"persistent_platform_operator_v1 is reserved"}"#),
+            10,
+        ));
+        assert!(profile_allows_interactive_session(
+            &json!({"metadata":null}),
+            10
+        ));
+        assert!(profile_allows_interactive_session(
+            &json!({"metadata":{"some":"lumiere-platform-bootstrap-v1:1:20"}}),
+            10,
+        ));
+        assert!(!profile_allows_interactive_session(
+            &json!({"metadata":{"some":"lumiere-platform-bootstrap-v1:1:20"}}),
+            20,
+        ));
     }
 }

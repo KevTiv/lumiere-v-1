@@ -8,6 +8,8 @@ import {
   within,
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { HistoryBounds } from "@lumiere/erp-shared/history-period";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ModulePageCompositionProvider,
@@ -35,6 +37,7 @@ const fixture = vi.hoisted(() => ({
     sourceStates: { sale_order: { status: "ready", rowCount: 1 } },
   },
   requestResult: "",
+  editorHistoryBounds: undefined as HistoryBounds | null | undefined,
 }));
 vi.mock("@lumiere/erp-session", () => ({
   useErpSession: () => ({ identity: "actor-a", organizationId: 1 }),
@@ -90,10 +93,13 @@ vi.mock("./dashboard-widget-renderer", () => ({
 vi.mock("@/app/(modules)/reports/query-builder", () => ({
   QueryBuilder: ({
     onCreated,
+    historyBounds,
   }: {
     onCreated: (id: string) => Promise<void>;
+    historyBounds?: HistoryBounds | null;
   }) => (
     <button
+      data-history-bounds={JSON.stringify(historyBounds)}
       onClick={() => {
         fixture.rows.push({
           id: "9007199254740993",
@@ -135,6 +141,7 @@ const clients: QueryClient[] = [];
 
 function Assistant() {
   const composer = useModulePageComposition()!;
+  const [outcome, setOutcome] = useState<string>();
   return (
     <>
       <button
@@ -146,6 +153,7 @@ function Assistant() {
             pageId: "dashboard",
             kind: "add_widget",
             widgetKey: "saved:42",
+            onPresentationOutcome: setOutcome,
           });
         }}
       >
@@ -154,6 +162,7 @@ function Assistant() {
       <output data-testid="registered-page">
         {composer.page?.moduleId}:{composer.page?.pageId}
       </output>
+      <output data-testid="page-presentation-outcome">{outcome}</output>
     </>
   );
 }
@@ -167,6 +176,7 @@ function App({ client }: { client: QueryClient }) {
           moduleId="sales"
           pageId="dashboard"
           title="Sales"
+          historyBounds={fixture.editorHistoryBounds}
           sections={sections}
         >
           <p>Native sales content</p>
@@ -288,6 +298,7 @@ beforeEach(() => {
     },
   ];
   fixture.requestResult = "";
+  fixture.editorHistoryBounds = undefined;
   pages.clear();
   writes.length = 0;
   fixture.fetchQueryList
@@ -451,6 +462,7 @@ describe("module page production host", () => {
     details.open = false;
     click("Add from chat");
     await screen.findByRole("button", { name: "Done" });
+    expect(screen.getByTestId("page-presentation-outcome").textContent).toBe("editor_opened");
     expect(details.open).toBe(true);
     expect(writes).toHaveLength(0);
   });
@@ -475,6 +487,33 @@ describe("module page production host", () => {
     expect(screen.getByText("Current orders")).toBeTruthy();
     expect(screen.queryByTestId("fixture-rendered-widget")).toBeNull();
     expect(writes).toHaveLength(0);
+  });
+
+  it("passes the active page date range to the widget builder preview", async () => {
+    fixture.editorHistoryBounds = { startMs: Date.UTC(2026, 10, 1), endMs: Date.UTC(2026, 11, 1) };
+    mount();
+    await ready();
+    click("Edit page");
+    click("Add widget");
+    await screen.findByRole("button", { name: "Create new widget" });
+    click("Create new widget");
+    const editor = await screen.findByRole("button", { name: "Save configured metric" });
+    expect(editor.getAttribute("data-history-bounds")).toBe(JSON.stringify(fixture.editorHistoryBounds));
+  });
+
+  it("recovers the saved-widget catalog without hiding built-in editing", async () => {
+    fixture.fetchQueryList.mockRejectedValueOnce(new Error("Catalog offline"));
+    mount();
+    await ready();
+    click("Edit page");
+    click("Add widget");
+    const dialog = within(screen.getByRole("dialog"));
+    expect(await dialog.findByText("Records could not be loaded.")).toBeTruthy();
+    expect(dialog.queryByRole("button", { name: "Create new widget" })).toBeNull();
+    expect(dialog.getByRole("button", { name: /Revenue/ })).toBeTruthy();
+    fireEvent.click(dialog.getByRole("button", { name: "Retry" }));
+    expect(await dialog.findByRole("button", { name: /Order count/ })).toBeTruthy();
+    expect(dialog.getByRole("button", { name: "Create new widget" })).toBeTruthy();
   });
 
   it("offers only active widget definitions with a verified current or shared company scope", async () => {

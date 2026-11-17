@@ -29,6 +29,18 @@ describe("SmartButtons", () => {
     expect(onClick).toHaveBeenCalledTimes(1)
   })
 
+  it("keeps the handoff shortcut reachable when the records could not be read", () => {
+    const openHandoffs = vi.fn()
+    render(<SmartButtons testIdPrefix="po" buttons={[
+      { id: "receipts", label: "Receipts", count: 2, hideWhenZero: true },
+      { id: "bills", label: "Vendor bills", count: "Unavailable", hideWhenZero: true, onClick: openHandoffs },
+    ]} />)
+    const bills = screen.getByRole("button", { name: "Unavailable Vendor bills" })
+    expect(screen.getByRole("button", { name: "2 Receipts" })).toBeTruthy()
+    fireEvent.click(bills)
+    expect(openHandoffs).toHaveBeenCalledOnce()
+  })
+
   it("hides a zero-count button only when asked to, and renders nothing when none are left", () => {
     const { container, rerender } = render(
       <SmartButtons

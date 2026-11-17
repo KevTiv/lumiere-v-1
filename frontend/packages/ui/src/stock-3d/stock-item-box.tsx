@@ -6,7 +6,7 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import type { Mesh } from 'three'
 import type { StockItem, Position3D } from './types'
-import { CATEGORY_COLORS } from './types'
+import { stockCategoryColor, isLowStockItem } from './types'
 import { useWarehouse3DContext } from './warehouse-3d-context'
 
 interface StockItemBoxProps {
@@ -25,9 +25,9 @@ export function StockItemBox({ item, position, size = [0.8, 0.8, 0.8] }: StockIt
 
   const isSelected = selectedItemId === item.id
   const isHighlighted = highlightedItemIds.includes(item.id)
-  const isLowStock = item.minStock !== undefined && item.quantity <= item.minStock
+  const isLowStock = isLowStockItem(item)
 
-  const baseColor = CATEGORY_COLORS[item.category]
+  const baseColor = stockCategoryColor(item.category)
 
   useFrame((state) => {
     if (!meshRef.current) return

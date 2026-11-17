@@ -534,18 +534,24 @@ export async function chooseFirstOption(page: Page, name: string) {
 async function openSelectListbox(page: Page, trigger: Locator) {
   await revealFormSection(trigger)
   await expect(trigger).toBeVisible({ timeout: 15_000 })
-  // Radix hides background controls from the accessibility tree while open.
-  // Resolve its popup before opening so role-based trigger locators remain usable.
-  let contentId = await trigger.getAttribute("aria-controls")
-  if (await trigger.getAttribute("aria-expanded") !== "true") await trigger.click()
-  if (!contentId) {
-    await expect(trigger).toHaveAttribute("aria-controls", /.+/)
-    contentId = await trigger.getAttribute("aria-controls")
-  }
-  if (!contentId) throw new Error("select trigger has no controlled popup")
-  const content = `[id=${JSON.stringify(contentId)}]`
-  const listbox = page.locator(`${content}[role="listbox"], ${content} [role="listbox"]`)
-  await expect(listbox).toBeVisible()
+  let listbox: Locator | undefined
+  await expect(async () => {
+    // Radix hides role-based triggers from the accessibility tree while open.
+    // Read the popup ID before clicking, and reacquire it if the form remounts.
+    let contentId = await trigger.getAttribute("aria-controls", { timeout: 1_500 })
+    if (await trigger.getAttribute("aria-expanded", { timeout: 1_500 }) !== "true") {
+      await trigger.click({ timeout: 3_000 })
+    }
+    if (!contentId) {
+      contentId = await trigger.getAttribute("aria-controls", { timeout: 1_500 })
+    }
+    if (!contentId) throw new Error("select trigger has no controlled popup")
+    const content = `[id=${JSON.stringify(contentId)}]`
+    const candidate = page.locator(`${content}[role="listbox"], ${content} [role="listbox"]`)
+    await expect(candidate).toBeVisible({ timeout: 1_000 })
+    listbox = candidate
+  }).toPass({ timeout: 15_000 })
+  if (!listbox) throw new Error("select trigger has no visible listbox")
   return listbox
 }
 
@@ -2286,13 +2292,16 @@ export async function isAiGatewayAvailable(page: Page): Promise<boolean> {
 export async function openErpAiChat(page: Page) {
   if (await page.evaluate(() => window.matchMedia("(max-width: 767px)").matches)) {
     const toggle = page.getByTestId("workspace-navigation-toggle")
+    await expect(toggle).toHaveCount(1, { timeout: 30_000 })
     await expect(toggle).toBeVisible()
     if ((await toggle.getAttribute("aria-expanded")) !== "true") {
       await toggle.click()
       await expect(toggle).toHaveAttribute("aria-expanded", "true")
     }
   }
-  await page.getByTestId("sidebar-open-ai-chat").click()
+  const opener = page.getByTestId("sidebar-open-ai-chat")
+  await expect(opener).toHaveCount(1, { timeout: 30_000 })
+  await opener.click()
   await expect(page.getByTestId("erp-ai-chat-panel")).toBeVisible({ timeout: 10_000 })
 }
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   fleetCompanyRows,
+  fleetPosition,
   fleetHistoryRows,
   fleetVehicleChoiceLabel,
   fleetVehicleRows,
@@ -112,4 +113,21 @@ test("history uses authorized names and retains real currency and exact accounti
   assert.equal(rows[1]?.currency_name, "—");
   assert.equal(rows[1]?.cost_amount, null);
   assert.equal(rows[1]?.outcome, "failed");
+});
+
+test("saved vehicle positions retain freshness and distinguish zero from an unavailable speed", () => {
+  const now = new Date("2026-01-01T12:00:00Z");
+  const old = fleetPosition({
+    latitude: 1,
+    longitude: 2,
+    last_position_at: { some: { microsSinceUnixEpoch: "1767265200000000" } },
+  }, now);
+  assert.equal(old?.recent, false);
+  assert.equal(old?.observedAt?.toISOString(), "2026-01-01T11:00:00.000Z");
+  assert.equal(old?.speedKmh, undefined);
+  const recent = fleetPosition({ latitude: 0, longitude: 0, speedKmh: 0, lastPositionAt: "2026-01-01T11:59:00Z" }, now);
+  assert.equal(recent?.recent, true);
+  assert.equal(recent?.speedKmh, 0);
+  assert.equal(fleetPosition({ latitude: 91, longitude: 0 }, now), undefined);
+  assert.equal(fleetPosition({ latitude: 10, longitude: 0, lastPositionAt: "2026-01-01T12:01:00Z" }, now)?.recent, false);
 });

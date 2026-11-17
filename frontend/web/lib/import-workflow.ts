@@ -64,7 +64,7 @@ export const importCapabilitySchema = z.object({
   label: z.string().min(1),
   targetEntities: z.array(z.string()),
   requiredFacts: z.array(z.string()),
-  readiness: z.enum(["task_execution", "native_preview", "evidence_only"]),
+  readiness: z.enum(["task_execution", "native_preview", "reviewed_records", "evidence_only"]),
   blockingReason: z.string().nullable(),
   destination: z.string().regex(/^\/(?!\/)[^\\\s]*$/),
 })
@@ -214,6 +214,9 @@ export interface ImportWorkflow {
   proposals: ImportProposal[]
   nativeResults: ImportNativeResult[]
   nativeResultsMore: boolean
+  backfilledRecords?: Array<{ module: "sales" | "shop_sales" | "warehouse"; count: number }>
+  farmResults?: Array<{ batchId: string; count: number }>
+  farmResultsMore?: boolean
 }
 export type WorkflowFetch = (
   url: string,
@@ -402,6 +405,9 @@ export async function readImportWorkflow(
       proposals: z.array(z.unknown()),
       nativeResults: z.array(nativeResultSchema).max(20).default([]),
       nativeResultsMore: z.boolean().default(false),
+      backfilledRecords: z.array(z.object({ module: z.enum(["sales", "shop_sales", "warehouse"]), count })).optional(),
+      farmResults: z.array(z.object({ batchId: positiveId, count })).max(20).optional(),
+      farmResultsMore: z.boolean().optional(),
     })
     .parse(body)
   if (

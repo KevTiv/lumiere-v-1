@@ -29,7 +29,19 @@ fn document_read_columns(
     projection: DocumentReadProjection,
 ) -> Result<Vec<String>, ApiError> {
     if matches!(projection, DocumentReadProjection::List) {
-        return resolve_http_sql_columns(resource, field_access).map_err(ApiError::Internal);
+        let mut columns =
+            resolve_http_sql_columns(resource, field_access).map_err(ApiError::Internal)?;
+        if resource == "documents" {
+            // The viewer validates the live row and its current version before fetching bytes.
+            for field in ["is_deleted", "current_version_id"] {
+                if has_resource_field_read_permission(field_access, resource, field)
+                    && !columns.iter().any(|column| column == field)
+                {
+                    columns.push(field.into());
+                }
+            }
+        }
+        return Ok(columns);
     }
     // A receipt needs fields omitted by the public lists. Select only those
     // fields here and enforce the caller's field permissions before the read.

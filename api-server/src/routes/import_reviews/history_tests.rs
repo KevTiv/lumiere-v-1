@@ -396,6 +396,18 @@ async fn exercise_history(pool: &deadpool_postgres::Pool) -> Result<()> {
         rows_data(&tx, "8001", "9002", &filters, 0, 50).await,
         Err(ApiError::NotFound(_))
     ));
+    let mut exact = query();
+    exact.batch_id = Some(batch);
+    exact.row_id = Some(oldest);
+    let (matched, next) = rows_data(&tx, "8001", "9001", &exact, 0, 50).await?;
+    ensure!(matched.len() == 1 && matched[0]["id"] == oldest.to_string() && next.is_none());
+    exact.view = Some(HistoryView::Reports);
+    exact.search = Some("historic.csv".into());
+    let (matched, _) = rows_data(&tx, "8001", "9001", &exact, 0, 50).await?;
+    ensure!(matched.len() == 1);
+    exact.view = Some(HistoryView::Sales);
+    let (matched, _) = rows_data(&tx, "8001", "9001", &exact, 0, 50).await?;
+    ensure!(matched.is_empty());
     let concurrent = pool.get().await?;
     concurrent
         .execute(
@@ -425,6 +437,7 @@ async fn exercise_history(pool: &deadpool_postgres::Pool) -> Result<()> {
     );
     tx.rollback().await?;
     exercise_confirmed_facts(&client, pool, batch, oldest, invalid).await?;
+    exercise_module_history(&client, pool, batch).await?;
     Ok(())
 }
 
@@ -477,6 +490,63 @@ async fn exercise_confirmed_facts(
     ensure!(actual == expected);
     let (other, _) = rows_data(&tx, "8002", "9001", &filters, 0, 50).await?;
     ensure!(other.is_empty(), "confirmation cannot cross tenant scope");
+    tx.rollback().await?;
+    Ok(())
+}
+
+async fn exercise_module_history(
+    client: &tokio_postgres::Client,
+    pool: &deadpool_postgres::Pool,
+    batch: i64,
+) -> Result<()> {
+    let sale = add_item(client, batch, "sale", None, Some("2024-04-09"), "confirmed").await?;
+    let held = add_item(
+        client,
+        batch,
+        "held-sale",
+        None,
+        Some("2024-04-09"),
+        "needs_review",
+    )
+    .await?;
+    let expense = add_item(
+        client,
+        batch,
+        "expense",
+        None,
+        Some("2024-04-09"),
+        "confirmed",
+    )
+    .await?;
+    let sale_values = json!({"product":"Whole chicken","shop":"Kicukiro","quantity":"9.555","unit_price":"3800","amount":"36309"});
+    let expense_values = json!({"observation_kind":"expense","shop":"Kicukiro","amount":"600"});
+    for (id, values) in [
+        (sale, &sale_values),
+        (held, &sale_values),
+        (expense, &expense_values),
+    ] {
+        client
+            .execute(
+                "UPDATE lumiere_platform.import_review_item SET proposed_json=$2 WHERE id=$1",
+                &[&id, values],
+            )
+            .await?;
+    }
+    let mut connection = pool.get().await?;
+    let tx = connection.transaction().await?;
+    let mut filters = query();
+    filters.view = Some(HistoryView::Sales);
+    filters.search = Some("kicukiro".into());
+    filters.from = Some("2024-04-09".into());
+    filters.to_exclusive = Some("2024-04-10".into());
+    let (sales, next) = rows_data(&tx, "8001", "9001", &filters, 0, 1).await?;
+    ensure!(sales.len() == 1 && next.is_none());
+    ensure!(sales[0]["id"] == sale.to_string() && sales[0]["values"]["amount"] == "36309");
+    filters.view = Some(HistoryView::Expenses);
+    let (expenses, _) = rows_data(&tx, "8001", "9001", &filters, 0, 50).await?;
+    ensure!(expenses.len() == 1 && expenses[0]["id"] == expense.to_string());
+    let (other, _) = rows_data(&tx, "8001", "9002", &filters, 0, 50).await?;
+    ensure!(other.is_empty());
     tx.rollback().await?;
     Ok(())
 }

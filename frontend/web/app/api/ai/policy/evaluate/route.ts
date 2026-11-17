@@ -1,10 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-import type {
-  ExecutionPlan,
-  PolicyControlledRequest,
-  SkillVersionRef,
-} from "@lumiere/erp-shared/ai-policy-schemas"
+import type { ExecutionPlan, SkillVersionRef } from "@lumiere/erp-shared/ai-policy-schemas"
 
 import {
   parseJsonBody,
@@ -64,25 +60,32 @@ export async function POST(request: NextRequest) {
   const input = sanitizeRecord(body.input) ?? {}
   const candidateOutput = sanitizeRecord(body.candidateOutput ?? body.candidate_output) ?? {}
 
-  const payload: PolicyControlledRequest = {
+  return proxyAiGateway("/v1/policy/evaluate", {
     execution: {
-      skill,
-      organizationId: orgId,
-      companyId,
-      correlationId,
+      skill: { skill_key: skill.skillKey, version: skill.version },
+      organization_id: orgId,
+      company_id: companyId,
+      correlation_id: correlationId,
       metadata: {
-        actorId: session.identityHex,
+        actor_id: session.identityHex,
       },
       input,
-      plan,
+      plan: {
+        named_resources: plan.namedResources,
+        tool_calls: plan.toolCalls.map(
+          ({ toolName, capability, namedResource }) => ({
+            tool_name: toolName,
+            capability,
+            named_resource: namedResource,
+          }),
+        ),
+        steps: plan.steps,
+        expected_rows: plan.expectedRows,
+        output_type: plan.outputType,
+      },
     },
-    candidateOutput,
-  }
-
-  return proxyAiGateway(
-    "/v1/policy/evaluate",
-    payload as unknown as Record<string, unknown>,
-  )
+    candidate_output: candidateOutput,
+  })
 }
 
 function parseSkillVersionRef(raw: unknown): SkillVersionRef | null {

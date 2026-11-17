@@ -30,6 +30,8 @@ import {
 import { Badge } from "@lumiere/ui/components/badge"
 import { Alert, AlertDescription, AlertTitle } from "@lumiere/ui/components/alert"
 import { Separator } from "@lumiere/ui/components/separator"
+import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
 import { Skeleton } from "@lumiere/ui/components/skeleton"
 import { DatePicker } from "@lumiere/ui/components/date-picker"
 import {
@@ -88,14 +90,11 @@ export function ReportComposerPanel({
     [companies],
   )
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(() => {
-    if (defaultCompanyId && defaultCompanyId > 0) return String(defaultCompanyId)
-    const first = companyOptions[0]
-    return first?.value ?? ""
-  })
-  const [reportKey, setReportKey] = useState<string>(
-    catalog.data?.reports.find((r) => r.key === "daily_business_summary_v1")?.key ?? "",
-  )
+  const [chosenCompanyId, setSelectedCompanyId] = useState<string | null>(null)
+  const defaultCompany = companyOptions.find(({ value }) => value === String(defaultCompanyId))
+  const selectedCompanyId = companyOptions.find(({ value }) => value === chosenCompanyId)?.value
+    ?? defaultCompany?.value ?? companyOptions[0]?.value ?? ""
+  const [selectedReportKey, setReportKey] = useState<string | null>(null)
   const [date, setDate] = useState("")
   useEffect(() => {
     if (calendarTimezone.ready) setDate((current) => current || zonedCalendarDay(new Date(), timezone))
@@ -109,10 +108,15 @@ export function ReportComposerPanel({
     [catalog.data],
   )
 
-  const handleRun = async () => {
+  const reportKey = reportOptions.some(({ value }) => value === selectedReportKey)
+    ? selectedReportKey ?? ""
+    : reportOptions.find(({ value }) => value === "daily_business_summary_v1")?.value ?? ""
+  const catalogState = moduleQueryState({ ...catalog, data: catalog.data?.reports })
+
+  const handleRun = () => {
     const companyId = Number(selectedCompanyId)
     if (!calendarTimezone.ready || !date || !reportKey || !Number.isFinite(companyId) || companyId <= 0) return
-    await compose.mutateAsync({
+    compose.mutate({
       reportKey,
       companyId,
       date,
@@ -120,8 +124,19 @@ export function ReportComposerPanel({
     })
   }
 
-  if (catalog.isLoading) {
+  if (catalogState.status === "loading") {
     return <ReportComposerPanelSkeleton />
+  }
+  if (catalogState.status !== "ready") {
+    return <ModuleDataNotice state={{
+      ...catalogState,
+      message: t("aiHarness.reportComposer.catalogUnavailable", { defaultValue: "The report catalog could not be loaded." }),
+    }} />
+  }
+  if (!reportOptions.length) {
+    return <p role="status" className="rounded-md border p-4 text-sm">
+      {t("aiHarness.reportComposer.catalogEmpty", { defaultValue: "No reports are available for composition." })}
+    </p>
   }
 
   return (
@@ -256,6 +271,9 @@ export function ReportComposerPanel({
 function ReportComposerResultView({ result }: { result: ReportComposerResult }) {
   const { t } = useTranslation()
   const { decision } = result.decision
+  const summaryWithheld =
+    result.summaryVerification.outcome === "requires_review" ||
+    result.summaryVerification.outcome === "blocked"
 
   return (
     <div className="flex flex-col gap-4">
@@ -304,7 +322,15 @@ function ReportComposerResultView({ result }: { result: ReportComposerResult }) 
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm leading-relaxed">{result.summary}</p>
+              {summaryWithheld ? (
+                <p className="text-sm leading-relaxed">
+                  {t("aiHarness.reportComposer.summaryWithheld", {
+                    defaultValue: "The summary is withheld pending verification. You can review the source figures below.",
+                  })}
+                </p>
+              ) : (
+                <p className="text-sm leading-relaxed">{result.summary}</p>
+              )}
             </CardContent>
           </Card>
 

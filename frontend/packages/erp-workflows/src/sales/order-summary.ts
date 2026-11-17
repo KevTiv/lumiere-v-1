@@ -128,3 +128,22 @@ export function withOrderCashSummary<T extends RowValueMap>(
     }
   })
 }
+
+/** Derive only the fields backed by reads that completed in the current scope. */
+export function withAvailableOrderCashSummary<T extends RowValueMap>(
+  orders: readonly T[],
+  related: {
+    lines?: readonly RowValueMap[]
+    moves?: readonly RowValueMap[]
+    pickings?: readonly RowValueMap[]
+  },
+) {
+  const { lines, moves, pickings } = related
+  return withOrderCashSummary(orders, lines ?? [], moves ?? [], pickings).map((row) => ({
+    ...row,
+    deliverySummary: lines === undefined || pickings === undefined ? "unavailable" as const : row.deliverySummary,
+    invoiceSummary: moves === undefined ? "unavailable" as const : row.invoiceSummary,
+    paymentSummary: moves === undefined ? "unavailable" as const : row.paymentSummary,
+    outstandingAmount: moves === undefined ? null : row.outstandingAmount,
+  }))
+}

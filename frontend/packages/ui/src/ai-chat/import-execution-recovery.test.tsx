@@ -451,7 +451,7 @@ it.each([false, true])(
     fireEvent.click(screen.getByText("settings.importWorkflow.openRecords"))
     expect(
       screen.getByRole("link", { name: "source-11" }).getAttribute("href"),
-    ).toBe("/accounting/invoices/100?companyId=3")
+    ).toBe("/accounting?tab=journal-entries&importEntryCompany=3&importEntryIds=100")
     expect(actions).toEqual(["prepare", "approve", "execute"])
   },
 )

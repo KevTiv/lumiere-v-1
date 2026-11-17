@@ -37,6 +37,7 @@ MODULES = {
     "reports": {"owner": "COV-20", "domains": ["analytics"]},
     "subscriptions": {"owner": "COV-12", "domains": ["subscriptions"]},
     "expenses": {"owner": "COV-11", "domains": ["expenses"]},
+    "inventory": {"owner": "COV-06", "domains": ["inventory"]},
     "products": {"owner": "COV-06", "files": ["inventory/product.rs", "inventory/product_category.rs"]},
     "warehouse": {"owner": "COV-06", "files": [
         "inventory/stock.rs", "inventory/warehouse.rs", "inventory/tracking.rs",
@@ -45,6 +46,7 @@ MODULES = {
         "inventory/replenishment.rs", "inventory/warehouse_sync.rs",
     ]},
     "fleet": {"owner": "COV-15", "domains": ["fleet"]},
+    "farm-batches": {"owner": "Farm Operations", "domains": []},
     "documents": {"owner": "COV-18", "domains": ["documents"]},
     "calendar": {"owner": "COV-19", "files": ["workflow/calendar.rs"]},
     "tasks": {"owner": "COV-10/COV-21", "files": ["crm/activities.rs"]},
@@ -70,7 +72,7 @@ IMPORT_FILES = {
     "analytics_imports.rs": ["reports"], "subscription_imports.rs": ["subscriptions"],
     "expenses_imports.rs": ["expenses"], "document_imports.rs": ["documents"],
     "core_imports.rs": ["settings", "products"],
-    "inventory_imports.rs": ["products", "warehouse"],
+    "inventory_imports.rs": ["inventory", "products", "warehouse"],
     "import_tracker.rs": ["settings"], "import_mapping_templates.rs": ["settings"],
 }
 LINKED_COMMUNICATIONS = {"core/messaging.rs", "core/operational_messaging.rs"}
@@ -90,6 +92,14 @@ SERVICE_PATHS = [
     ("native-import-recovery", "api-server/src/routes/import.rs", "read_exact_outcome", "settings"),
     ("review-import-binding", "api-server/src/routes/import_reviews/import_binding.rs", "record_review_binding", "settings"),
     ("review-import-binding-read", "api-server/src/routes/import_reviews/import_binding.rs", "read_review_binding", "settings"),
+    ("farm-batch-create", "api-server/src/routes/farm_batches/mod.rs", "create", "farm-batches"),
+    ("farm-event-append", "api-server/src/routes/farm_batches/mod.rs", "append_event", "farm-batches"),
+    ("farm-event-revision", "api-server/src/routes/farm_batches/mod.rs", "revise_event", "farm-batches"),
+    ("farm-event-history-read", "api-server/src/routes/farm_batches/mod.rs", "history", "farm-batches"),
+    ("farm-processing-link", "api-server/src/routes/farm_batches/native_links/processing.rs", "link_processing", "farm-batches"),
+    ("farm-processing-run", "api-server/src/routes/farm_batches/native_links/processing.rs", "run_processing", "farm-batches"),
+    ("farm-cost-link", "api-server/src/routes/farm_batches/native_links.rs", "link_cost", "farm-batches"),
+    ("farm-import-apply", "api-server/src/routes/import_reviews/farm_import.rs", "apply", "farm-batches"),
 ]
 
 
@@ -370,13 +380,16 @@ def service_paths(root: Path) -> list[dict[str, Any]]:
         match = re.search(rf"\basync\s+fn\s+{function}\s*\(", text)
         if match is None:
             raise ValueError(f"unresolved source/import service path: {source}::{function}")
+        farm = surface == "farm-batches"
         result.append({
             "path_id": identity, "surface": surface, "source": source,
             "function": function, "line": text.count("\n", 0, match.start()) + 1,
-            "owner": "source-review/import API",
+            "owner": "Farm Operations API" if farm else "source-review/import API",
             "authority": "existing-service-owner-not-a-new-native-operation",
-            "history_policy": "review-store-or-exact-native-receipt-owner-review-required",
-            "source_link_policy": "exact-review-revision-admission-and-import-outcome-required",
+            "history_policy": ("scoped-farm-revision-or-exact-native-link-owner-review-required" if farm
+                               else "review-store-or-exact-native-receipt-owner-review-required"),
+            "source_link_policy": ("exact-farm-event-revision-and-current-source-authorization-required" if farm
+                                   else "exact-review-revision-admission-and-import-outcome-required"),
             "runtime_evidence": [], "certification": "not-certified-by-static-inventory",
         })
     return result
@@ -503,7 +516,7 @@ def build_inventory(root: Path) -> dict[str, Any]:
         "status": "source-coverage-register-not-runtime-acceptance",
         "scope": {
             "profile": "finance-alpha", "surfaces": visible,
-            "standalone_hidden": ["inventory", "messages", "journal", "notebook", "pos", "manufacturing",
+            "standalone_hidden": ["messages", "journal", "notebook", "pos", "manufacturing",
                                   "helpdesk", "hr", "projects", "proposals", "distributor", "iot"],
             "linked_hidden_records_retain_existing_authority": True,
             "bounded_inventory_tabs_source": BOUNDED_TABS,

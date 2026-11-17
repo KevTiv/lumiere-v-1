@@ -120,9 +120,6 @@
             "AI_SPEND_READ_STDB_TOKEN": {
               "kind": "secret"
             },
-            "AI_CERTIFICATION_STDB_TOKEN": {
-              "kind": "secret"
-            },
             "AI_EXECUTION_ENVELOPE_KEY": {
               "kind": "secret"
             },
@@ -131,9 +128,6 @@
             },
             "MISTRAL_API_KEY": {
               "kind": "secret"
-            },
-            "AI_CERTIFICATION_RUNTIME_HASH": {
-              "kind": "non-placeholder"
             },
             "KONG_LLM_URL": {
               "kind": "empty"
@@ -146,14 +140,6 @@
             [
               "STDB_TOKEN",
               "AI_SPEND_READ_STDB_TOKEN"
-            ],
-            [
-              "STDB_TOKEN",
-              "AI_CERTIFICATION_STDB_TOKEN"
-            ],
-            [
-              "AI_SPEND_READ_STDB_TOKEN",
-              "AI_CERTIFICATION_STDB_TOKEN"
             ]
           ]
         }

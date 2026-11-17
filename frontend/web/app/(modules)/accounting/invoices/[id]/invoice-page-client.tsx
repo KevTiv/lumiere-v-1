@@ -1,5 +1,6 @@
 'use client';
 
+import { AskAboutRecordButton } from '../../../../../components/ask-about-record-button';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -790,6 +791,7 @@ function InvoicePageLoaded({
         }
         actions={
           <>
+            <AskAboutRecordButton entityType="account_move" recordId={moveId} label={label} activeTab={activeTab} />
             {kind !== 'invoice' && kind !== 'bill' ? <RecordWorkflowActions
               actions={postingActions}
               record={record}

@@ -1,10 +1,11 @@
+import { saleOrderRecordPageHref } from "@lumiere/erp-shared/record-links"
 import { saleOrderDetailConfig } from '@lumiere/ui';
 
 type OrderRow = Record<string, unknown>;
 
 /** Where an order's page lives. */
 export function saleOrderRecordHref(order: OrderRow): string | undefined {
-  return order.id == null ? undefined : `/sales/orders/${String(order.id)}`;
+  return order.id == null ? undefined : saleOrderRecordPageHref(String(order.id));
 }
 
 /** Overview sections of a sale order, with the customer shown by name rather than id. */

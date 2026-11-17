@@ -2,6 +2,7 @@
 
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { useCallback } from 'react'
+import type { ModuleTabFilter } from '@lumiere/ui/lib/workspace-navigation'
 import { moduleTabDestination } from '@/lib/module-tab-navigation'
 
 /**
@@ -29,13 +30,15 @@ export function useModuleTab(
   const rawTab = searchParams.get('tab')
   const activeTab = rawTab && validTabs.includes(rawTab) ? rawTab : defaultTab
 
-  const setActiveTab = useCallback(
-    (tab: string) => {
-      const destination = moduleTabDestination({ pathname, query: searchParams.toString(), tab, defaultTab, validTabs })
+  const navigateToTab = useCallback(
+    (tab: string, filter?: ModuleTabFilter) => {
+      const destination = moduleTabDestination({ pathname, query: searchParams.toString(), tab, defaultTab, validTabs, filter })
       if (destination) router[history](destination, { scroll: false })
     },
     [searchParams, router, pathname, defaultTab, validTabs, history],
   )
 
-  return { activeTab, setActiveTab }
+  const setActiveTab = useCallback((tab: string) => navigateToTab(tab), [navigateToTab])
+
+  return { activeTab, setActiveTab, navigateToTab }
 }

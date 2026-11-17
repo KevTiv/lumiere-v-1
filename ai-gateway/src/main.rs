@@ -18,6 +18,8 @@ mod skills;
 mod state;
 mod stdb_embed;
 mod tools;
+#[cfg(test)]
+mod wire_contract_tests;
 mod wire_decode;
 mod worker;
 
@@ -91,8 +93,8 @@ async fn main() -> anyhow::Result<()> {
             "{}",
             serde_json::json!({
                 "schemaVersion": 1,
-                "low_stock": {"version": harness::certification::LOW_STOCK_CERTIFICATION_VERSION, "sourceHash": harness::certification::low_stock_certification_bundle_hash()},
-                "report_composer": {"version": harness::certification::REPORT_COMPOSER_CERTIFICATION_VERSION, "sourceHash": harness::certification::report_composer_certification_bundle_hash()},
+                "low_stock": {"version": harness::low_stock::LOW_STOCK_RELEASE_VERSION, "sourceHash": harness::certification::low_stock_certification_bundle_hash()},
+                "report_composer": {"version": harness::report_composer::REPORT_COMPOSER_RELEASE_VERSION, "sourceHash": harness::certification::report_composer_certification_bundle_hash()},
                 "report_analysis": {"version": harness::certification::REPORT_ANALYSIS_CERTIFICATION_VERSION, "sourceHash": harness::certification::report_analysis_certification_bundle_hash()},
                 "rag_generation": {"version": orchestrator::generation_surface_certification::VERSION, "sourceHash": orchestrator::generation_surface_certification::bundle_hash("rag_generation").map_err(anyhow::Error::msg)?},
                 "form_suggestion": {"version": orchestrator::generation_surface_certification::VERSION, "sourceHash": orchestrator::generation_surface_certification::bundle_hash("form_suggestion").map_err(anyhow::Error::msg)?},

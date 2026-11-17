@@ -66,7 +66,7 @@ async fn require_superuser(
                 .or_else(|| profile.get("is_active"))
                 .and_then(serde_json::Value::as_bool)
                 == Some(true)
-                && stdb_auth::profile_bootstrap_lease_active(
+                && stdb_auth::profile_allows_interactive_session(
                     profile,
                     chrono::Utc::now().timestamp_micros(),
                 )

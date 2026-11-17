@@ -237,6 +237,11 @@ const page = productionExports(
         <button data-testid="edit-vehicle">Edit vehicle</button>
       ),
     },
+    "../../../../../components/ask-about-record-button": {
+      AskAboutRecordButton: ({ entityType, recordId, activeTab, label }: Record<string, string>) => (
+        <output data-testid="vehicle-chat-selection">{entityType}:{recordId}:{activeTab}:{label}</output>
+      ),
+    },
     "./vehicle-location-map": { VehicleLocationMap: () => null },
     "../../fleet-actions": {
       useFleetActions: () => ({
@@ -303,6 +308,16 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Fleet vehicle record read and action boundaries", () => {
+  it("keeps the exact vehicle and review tab in the Assistant handoff", () => {
+    search = "tab=inspections";
+    render(view());
+    expect(screen.getByTestId("vehicle-chat-selection").textContent).toBe(
+      "fleet_vehicle:41:inspections:Owned delivery van",
+    );
+    expect(screen.queryByTestId("vehicle-form")).toBeNull();
+    expect(submitFleet).not.toHaveBeenCalled();
+  });
+
   it("distinguishes loading, failed reads and a genuinely missing vehicle", () => {
     query.vehicles = { ...ready(), isLoading: true };
     const { rerender } = render(view());

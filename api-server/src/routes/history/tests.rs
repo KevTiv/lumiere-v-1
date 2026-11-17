@@ -70,6 +70,7 @@ pub(super) fn request(cursor: Option<String>, limit: u32) -> HistoryQuery {
         company_id: 7,
         cursor,
         limit: Some(limit),
+        event_id: None,
     }
 }
 
@@ -336,12 +337,38 @@ pub(super) async fn server(
             .next()
             .unwrap();
         let rows = match table {
-            "user_profile" => vec![
-                json!({"id":1,"organization_id":42,"is_active":true,"is_superuser":false,"name":"Reader","metadata":null}),
-            ],
-            "user_organization" => vec![
-                json!({"id":1,"organization_id":42,"company_id":7,"role_id":2,"is_active":true}),
-            ],
+            "user_profile" => {
+                assert_eq!(token, "Bearer owner-token");
+                if sql.starts_with("SELECT id, identity FROM ") {
+                    assert!(sql.contains("organization_id = 42 AND id = "));
+                    let identity = match bound(&sql, " AND id = ") {
+                        Some(9) => ACTOR.to_owned(),
+                        Some(10) => "cd".repeat(32),
+                        Some(11) => "ef".repeat(32),
+                        _ => String::new(),
+                    };
+                    if fixture.source_exists && !identity.is_empty() {
+                        vec![json!({"id":bound(&sql, " AND id = ").unwrap(),"identity":identity})]
+                    } else {
+                        vec![]
+                    }
+                } else {
+                    vec![
+                        json!({"id":1,"organization_id":42,"is_active":true,"is_superuser":false,"name":"Reader","metadata":null}),
+                    ]
+                }
+            }
+            "delegated_admin_scope" => {
+                assert_eq!(token, "Bearer actor-token");
+                assert!(sql.contains("organization_id = 42") && sql.contains(ACTOR));
+                vec![json!({"company_id":7})]
+            }
+            "user_organization" => {
+                let company_id = if sql.contains(&"cd".repeat(32)) { 8 } else { 7 };
+                vec![
+                    json!({"id":1,"organization_id":42,"company_id":company_id,"role_id":2,"is_active":true}),
+                ]
+            }
             "company" => {
                 vec![json!({"id":7,"organization_id":42,"name":"Company","currency_id":1})]
             }
@@ -380,6 +407,11 @@ pub(super) async fn server(
                 } else {
                     vec![]
                 }
+            }
+            "contact" => {
+                assert_eq!(token, "Bearer owner-token");
+                assert!(sql.contains("organization_id = 42 AND id = 9"));
+                vec![json!({"id":9,"organization_id":42,"company_id":7,"name":"Contact"})]
             }
             "product" => {
                 assert_eq!(token, "Bearer actor-token");
@@ -467,7 +499,10 @@ pub(super) async fn server(
                 {
                     assert!(sql.contains("resource = 'hr_expense_sheet'"));
                 }
-                assert!(sql.contains("record_id = 9"));
+                let exact = bound(&sql, " AND id <= ")
+                    .zip(bound(&sql, " AND id > "))
+                    .is_some_and(|(end, after)| end.saturating_sub(after) == 1);
+                assert!(exact || sql.contains("record_id = 9"));
                 assert!(!sql.contains("audit_log"));
                 fixture.evidence_read.store(true, Ordering::SeqCst);
                 let after = bound(&sql, " AND id > ").unwrap();

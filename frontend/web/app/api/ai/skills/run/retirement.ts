@@ -26,7 +26,7 @@ export function legacyRunRetirement(skillKey: string) {
   return {
     error: replacementPath
       ? `Skill '${normalized}' has migrated from the legacy skill runner; use ${replacementPath}.`
-      : `Skill '${normalized}' has no governed execution adapter; register and certify one before execution.`,
+      : `Skill '${normalized}' has no governed execution adapter.`,
     code: "legacy_skill_run_retired" as const,
     skillKey: normalized,
     ...(replacementPath ? { replacementPath } : {}),

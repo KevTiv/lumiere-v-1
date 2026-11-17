@@ -438,6 +438,7 @@ pub(crate) fn production_cost_inputs(
         let snapshot = &metadata["manufacturing_material_cost"];
         if snapshot["currency_id"].as_u64() != Some(currency_id)
             || snapshot["product_id"].as_u64() != Some(movement.product_id)
+            || snapshot["source_lot_id"].as_u64() != movement.lot_id
             || snapshot["stock_uom_id"].as_u64() != Some(movement.product_uom)
             || snapshot["production_id"].as_u64() != Some(mo.id)
             || snapshot["source_location_id"].as_u64() != Some(movement.location_id)
@@ -549,6 +550,7 @@ pub(crate) fn material_cost_snapshot(
     mo: &MrpProduction,
     product_id: u64,
     location_id: u64,
+    lot_id: Option<u64>,
     quantity: f64,
 ) -> Result<(f64, String), String> {
     let currency_id = company_currency(ctx, mo.organization_id, mo.company_id)?;
@@ -570,7 +572,8 @@ pub(crate) fn material_cost_snapshot(
             q.organization_id == mo.organization_id
                 && q.company_id == mo.company_id
                 && q.location_id == location_id
-                && q.lot_id.is_none()
+                && q.lot_id == lot_id
+                && (lot_id.is_none() || q.product_variant_id.is_none())
                 && q.package_id.is_none()
                 && q.owner_id.is_none()
         })
@@ -602,6 +605,7 @@ pub(crate) fn material_cost_snapshot(
         source.cost,
         serde_json::json!({"manufacturing_material_cost": {
             "source_quant_id": source.id, "currency_id": currency_id,
+            "source_lot_id": lot_id,
             "product_id": product_id, "stock_uom_id": component.uom_id,
             "production_id": mo.id, "source_location_id": location_id,
             "unit_cost": source.cost, "consumed_quantity": quantity, "value": value,

@@ -225,6 +225,18 @@ pub(super) fn record_adapters() -> Vec<RecordAdapter> {
         .collect()
 }
 
+fn activity_adapters(module: &str) -> Vec<RecordAdapter> {
+    record_adapters()
+        .into_iter()
+        .filter(|adapter| match module {
+            "overview" => true,
+            "inventory" => matches!(adapter.module, "products" | "warehouse"),
+            "tasks" => adapter.module == module || adapter.table == "activity",
+            _ => adapter.module == module,
+        })
+        .collect()
+}
+
 fn permission_resource(adapter: &RecordAdapter) -> &str {
     // The existing private workflow source owner gates virtual human tasks on
     // workflow:read, then applies candidate, assignment and delegation scope.
@@ -272,6 +284,22 @@ fn resource_predicate(adapter: &RecordAdapter) -> String {
         || format!("resource = '{}'", adapter.table),
         |alias| format!("(resource = '{}' OR resource = '{alias}')", adapter.table),
     )
+}
+
+/// Keep SpacetimeDB's SQL expression tree shallow for the Overview adapter catalog.
+fn activity_resource_predicate(adapters: &[RecordAdapter]) -> String {
+    match adapters {
+        [] => "false".into(),
+        [adapter] => resource_predicate(adapter),
+        _ => {
+            let (left, right) = adapters.split_at(adapters.len() / 2);
+            format!(
+                "({} OR {})",
+                activity_resource_predicate(left),
+                activity_resource_predicate(right),
+            )
+        }
+    }
 }
 
 fn require_history_access(access: &FieldAccessContext) -> Result<(), ApiError> {
@@ -467,9 +495,13 @@ pub(super) async fn require_record_with_access(
         if draft_source_exists(owner, context, company, record).await? {
             return Ok(());
         }
+    } else if adapter.resource == "user-profile" {
+        if profile_source_exists(owner, context, record, access).await? {
+            return Ok(());
+        }
     } else if exact_source_resource(adapter.resource) {
         if execute_authorized_resource_record(
-            context.client(),
+            source_read_client(owner, context, adapter.resource),
             adapter.resource,
             context.organization_id(),
             company,
@@ -508,6 +540,74 @@ async fn draft_source_exists(
     }
 }
 
+/// The owner returns only the identity needed to verify the exact current member.
+async fn profile_source_exists(
+    owner: &StdbClient,
+    context: &TrustedOperationContext,
+    record: u64,
+    access: &FieldAccessContext,
+) -> Result<bool, ApiError> {
+    let org = context.organization_id();
+    let profiles = owner
+        .query_sql(&format!(
+            "SELECT id, identity FROM user_profile WHERE organization_id = {org} AND id = {record} LIMIT 2"
+        ))
+        .await
+        .map_err(ApiError::internal)?;
+    let [profile] = profiles.as_slice() else {
+        return Ok(false);
+    };
+    if number(profile, "id", "id") != Some(record) {
+        return Err(malformed_evidence());
+    }
+    let identity = profile
+        .get("identity")
+        .and_then(identity_cell_to_hex)
+        .and_then(|identity| parse_stdb_identity_hex(&identity))
+        .ok_or_else(malformed_evidence)?;
+    if identity == context.actor_identity() {
+        // The enclosing history read has already resolved this actor's membership.
+        return Ok(true);
+    }
+    if !permission_allowed(access, "user_organization", "read") {
+        return Ok(false);
+    }
+    let actor =
+        stdb_auth::identity_sql_literal(context.actor_identity()).map_err(ApiError::Internal)?;
+    let scopes = context.client().query_sql(&format!(
+        "SELECT company_id FROM delegated_admin_scope WHERE organization_id = {org} AND user_identity = {actor} AND is_active = true LIMIT 2"
+    )).await.map_err(ApiError::internal)?;
+    let member = stdb_auth::identity_sql_literal(&identity).map_err(ApiError::Internal)?;
+    let memberships = context.client().query_sql(&format!(
+        "SELECT id, company_id FROM user_organization WHERE organization_id = {org} AND user_identity = {member} AND is_active = true LIMIT 2"
+    )).await.map_err(ApiError::internal)?;
+    let [membership] = memberships.as_slice() else {
+        return Ok(false);
+    };
+    match scopes.as_slice() {
+        [] => Ok(true),
+        [scope] => Ok(number(scope, "company_id", "companyId")
+            .filter(|id| *id > 0)
+            .is_some_and(|company| number(membership, "company_id", "companyId") == Some(company))),
+        _ => Ok(false),
+    }
+}
+
+/// Use the same private CRM and workflow owners as the ordinary query routes.
+fn source_read_client<'a>(
+    owner: &'a StdbClient,
+    context: &'a TrustedOperationContext,
+    resource: &str,
+) -> &'a StdbClient {
+    if crate::workflow_reads::is_private_workflow_resource(resource)
+        || crate::query_exec::crm_resource(resource)
+    {
+        owner
+    } else {
+        context.client()
+    }
+}
+
 async fn read_source_rows(
     owner: &StdbClient,
     context: &TrustedOperationContext,
@@ -515,18 +615,8 @@ async fn read_source_rows(
     company: u64,
     access: &FieldAccessContext,
 ) -> Result<Vec<Value>, ApiError> {
-    // Match the canonical query route's private workflow owner. This fixed
-    // dispatch retains its current candidate/identity/company policy; it does
-    // not grant owner SQL authority to another URL-selected table.
-    let client = if crate::workflow_reads::is_private_workflow_resource(adapter.resource)
-        || crate::query_exec::crm_resource(adapter.resource)
-    {
-        owner
-    } else {
-        context.client()
-    };
     execute_resource_query_for_company(
-        client,
+        source_read_client(owner, context, adapter.resource),
         adapter.resource,
         context.organization_id(),
         context.actor_identity(),
@@ -709,11 +799,42 @@ struct ProviderPage {
 
 fn provider_unavailable(error: ApiError) -> ApiError {
     match error {
-        ApiError::Internal(_) | ApiError::InternalSource(_) => ApiError::Unavailable(
-            "Change history evidence is temporarily unavailable. Verify the database schema release matches this API.".into(),
-        ),
+        ApiError::Internal(_) | ApiError::InternalSource(_) => {
+            tracing::warn!(error = ?error, "business history provider read failed");
+            ApiError::Unavailable(
+                "Change history evidence is temporarily unavailable. Verify the database schema release matches this API.".into(),
+            )
+        }
         other => other,
     }
+}
+
+#[derive(Clone, Copy)]
+struct ActivityEvent {
+    id: u64,
+    organization: bool,
+}
+
+fn activity_event(
+    query: &HistoryQuery,
+    module: Option<&str>,
+) -> Result<Option<ActivityEvent>, ApiError> {
+    let Some(value) = query.event_id.as_deref() else {
+        return Ok(None);
+    };
+    if module.is_none() || query.cursor.is_some() {
+        return Err(ApiError::BadRequest(
+            "An exact activity event cannot be combined with a record route or cursor".into(),
+        ));
+    }
+    let organization_id = value.strip_prefix("org:");
+    let id = decimal_id(organization_id.unwrap_or(value))
+        .filter(|id| *id > 0)
+        .ok_or_else(|| ApiError::BadRequest("Invalid activity event ID".into()))?;
+    Ok(Some(ActivityEvent {
+        id,
+        organization: organization_id.is_some(),
+    }))
 }
 
 async fn scan_provider(
@@ -725,6 +846,7 @@ async fn scan_provider(
     organization: bool,
     mut after: u64,
     limit: usize,
+    exact: Option<ActivityEvent>,
     source_rows: &mut HashMap<&'static str, Vec<Value>>,
 ) -> Result<ProviderPage, ApiError> {
     let permitted = selection
@@ -732,7 +854,7 @@ async fn scan_provider(
         .copied()
         .filter(|adapter| !organization || organization_scope(adapter))
         .collect::<Vec<_>>();
-    if permitted.is_empty() {
+    if permitted.is_empty() || exact.is_some_and(|event| event.organization != organization) {
         return Ok(ProviderPage {
             entries: VecDeque::new(),
             after,
@@ -740,11 +862,7 @@ async fn scan_provider(
         });
     }
     let org = context.organization_id();
-    let resources = permitted
-        .iter()
-        .map(resource_predicate)
-        .collect::<Vec<_>>()
-        .join(" OR ");
+    let resources = activity_resource_predicate(&permitted);
     let record_predicate = record
         .map(|id| format!(" AND record_id = {id}"))
         .unwrap_or_default();
@@ -769,13 +887,18 @@ async fn scan_provider(
     let mut data = VecDeque::new();
     let mut probes = 0;
     'windows: for _ in 0..MAX_WINDOWS {
-        let Some(witness) = reader.witness(after, None).await? else {
-            break;
+        let end = if let Some(event) = exact {
+            after = event.id - 1;
+            event.id
+        } else {
+            let Some(witness) = reader.witness(after, None).await? else {
+                break;
+            };
+            reader
+                .seek_window_start(&mut after, witness, &mut probes)
+                .await?;
+            after.saturating_add(ID_WINDOW)
         };
-        reader
-            .seek_window_start(&mut after, witness, &mut probes)
-            .await?;
-        let end = after.saturating_add(ID_WINDOW);
         let mut rows = owner
             .query_sql(&reader.window_sql(&columns, after, end))
             .await
@@ -806,9 +929,15 @@ async fn scan_provider(
                 if !draft_source_exists(owner, context, company, source_record).await? {
                     continue;
                 }
+            } else if adapter.resource == "user-profile" {
+                if !profile_source_exists(owner, context, source_record, context.field_access())
+                    .await?
+                {
+                    continue;
+                }
             } else if exact_source_resource(adapter.resource) {
                 if execute_authorized_resource_record(
-                    context.client(),
+                    source_read_client(owner, context, adapter.resource),
                     adapter.resource,
                     org,
                     company,
@@ -872,11 +1001,11 @@ async fn scan_provider(
             }
         }
         after = end;
-        if after == u64::MAX {
+        if exact.is_some() || after == u64::MAX {
             break;
         }
     }
-    let more = reader.witness(after, None).await?.is_some();
+    let more = exact.is_none() && reader.witness(after, None).await?.is_some();
     Ok(ProviderPage {
         entries: data,
         after,
@@ -958,7 +1087,8 @@ async fn read_general(
     module: Option<&str>,
     query: &HistoryQuery,
 ) -> Result<GeneralPage, ApiError> {
-    let limit = query.validate(record.unwrap_or(1))?;
+    let limit = query.validate_page(record.unwrap_or(1))?;
+    let exact = activity_event(query, module)?;
     require_history_access(context.field_access())?;
     let org = context.organization_id();
     let company = query.company_id;
@@ -998,6 +1128,7 @@ async fn read_general(
         false,
         starts.0,
         limit,
+        exact,
         &mut source_rows,
     )
     .await
@@ -1011,6 +1142,7 @@ async fn read_general(
         true,
         starts.1,
         limit,
+        exact,
         &mut source_rows,
     )
     .await
@@ -1051,9 +1183,13 @@ async fn read_general(
             if !draft_source_exists(owner, context, company, record_id).await? {
                 continue;
             }
+        } else if adapter.resource == "user-profile" {
+            if !profile_source_exists(owner, context, record_id, &current_access).await? {
+                continue;
+            }
         } else if exact_source_resource(adapter.resource) {
             if execute_authorized_resource_record(
-                context.client(),
+                source_read_client(owner, context, adapter.resource),
                 adapter.resource,
                 org,
                 company,
@@ -1148,14 +1284,7 @@ pub(super) async fn activity_get(
     Query(query): Query<HistoryQuery>,
     OrgSession { session, .. }: OrgSession,
 ) -> Result<Json<GeneralPage>, ApiError> {
-    let selection = record_adapters()
-        .into_iter()
-        .filter(|adapter| {
-            module == "overview"
-                || adapter.module == module
-                || (module == "tasks" && adapter.table == "activity")
-        })
-        .collect::<Vec<_>>();
+    let selection = activity_adapters(&module);
     if selection.is_empty() {
         return Err(ApiError::NotFound("History module not available".into()));
     }

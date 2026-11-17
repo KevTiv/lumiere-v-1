@@ -164,11 +164,15 @@ async fn process_batch(
                     // requires an operator to reconcile before explicitly rebuilding.
                     let result = stdb
                         .call_reducer(stdb_client::reducer_call!(
-                            "cancel_queue_job",
-                            serde_json::json!([job.organization_id, job.job_id, {
-                                "expected_revision":lease.claimed_revision,
-                                "reason":"metered embedding needs explicit financial reconciliation"
-                            }])
+                            "cancel_ai_embedding_job",
+                            serde_json::json!([
+                                job.organization_id,
+                                job.job_id,
+                                lease.worker_id,
+                                lease.claimed_revision,
+                                lease.token,
+                                "metered embedding needs explicit financial reconciliation"
+                            ])
                         ))
                         .await;
                     if let Err(cancel_error) = result {

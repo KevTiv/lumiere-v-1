@@ -1,5 +1,10 @@
 # Approved Alpha org AI bootstrap
 
+Historical temporary approval record. The later request for persistent access
+has a separate [operator-enrollment plan](../../../docs/plans/persistent-platform-operator-enrollment.md).
+The existing operator is now inactive with an expired lease; do not interpret
+the original status below as fresh production readback or renew this lease.
+
 Status: the user approved this exact temporary operator scope on 2026-10-24.
 No administrator, service binding, runtime profile or certification record has
 been created. The access window has not started. The Mistral key/catalog checks passed without

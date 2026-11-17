@@ -46,7 +46,7 @@ describe("first-org product surface census", () => {
     ).toEqual(currentModuleRouteHrefs())
   })
 
-  it("shows Finance and bounded Product/Warehouse/Fleet alpha navigation while Settings stays in REVIEW", () => {
+  it("shows Finance and admitted operations navigation while Settings stays in REVIEW", () => {
     const memberGroups = buildNavGroups((key) => key, {
       firstOrgProfile: true,
       isAdmin: false,
@@ -65,6 +65,7 @@ describe("first-org product surface census", () => {
       "expenses",
       "products",
       "warehouse",
+      "inventory",
       "fleet",
     ])
 
@@ -82,19 +83,19 @@ describe("first-org product surface census", () => {
       "expenses",
       "products",
       "warehouse",
+      "inventory",
       "fleet",
     ])
   })
 
   it("keeps supporting ERP routes available without adding them to alpha navigation", () => {
-    expect(isFirstOrgSurfaceAdmitted("inventory", true)).toBe(false)
-    expect(isFirstOrgRouteAdmitted("inventory", true)).toBe(true)
     expect(isFirstOrgRouteAdmitted("documents", false)).toBe(true)
     expect(isFirstOrgRouteAdmitted("hr", true)).toBe(false)
     expect(isFirstOrgRouteAdmitted("manufacturing", true)).toBe(false)
     expect(isFirstOrgRouteAdmitted("forensics", true)).toBe(false)
     expect(isFirstOrgRouteAdmitted("map", true)).toBe(false)
     expect(isFirstOrgRouteAdmitted("ai-harness", true)).toBe(false)
+    expect(isFirstOrgRouteAdmitted("ai-skills", true)).toBe(false)
   })
 
   it("keeps every navigation destination aligned with the product surface authority", () => {
@@ -122,7 +123,7 @@ describe("first-org product surface census", () => {
         surface.firstOrgExposure === "hidden"
       ) {
         expect(isFirstOrgSurfaceAdmitted(surface.id, true)).toBe(false)
-        if (surface.boundedAlpha) {
+        if (surface.boundedAlpha && surface.id !== "farm-batches") {
           expect(visibleSurfaceIds).toContain(surface.id)
         } else {
           expect(visibleSurfaceIds).not.toContain(surface.id)
@@ -149,7 +150,7 @@ describe("first-org product surface census", () => {
 
   it("admits only the documented bounded alpha workspaces without awarding U5", () => {
     const alpha = PRODUCT_SURFACES.filter((surface) => surface.boundedAlpha)
-    expect(alpha.map((surface) => surface.id)).toEqual(["products", "warehouse", "fleet"])
+    expect(alpha.map((surface) => surface.id)).toEqual(["products", "warehouse", "inventory", "farm-batches", "fleet"])
 
     for (const surface of alpha) {
       expect(surface).toMatchObject({
@@ -183,8 +184,23 @@ describe("first-org product surface census", () => {
       requiredCapability: "module:inventory",
       canonicalFor: "warehouse-operations",
     })
-    expect(getProductSurface("inventory").boundedAlpha).toBeUndefined()
+    expect(getProductSurface("inventory")).toMatchObject({
+      href: "/inventory",
+      owner: "COV-06",
+      requiredCapability: "module:inventory",
+      boundedAlpha: { scope: "inventory-workspace" },
+    })
     expect(getProductSurfaceForPathname("/products/42")?.id).toBe("products")
+  })
+
+  it("discovers Farm Batches only for an enabled company", () => {
+    const flatten = (farmOperationsEnabled: boolean) => buildNavGroups((key) => key, {
+      firstOrgProfile: true, workspaceProfile: "finance-alpha", farmOperationsEnabled,
+    }).flatMap(({ items }) => items)
+    expect(flatten(false).some(({ surfaceId }) => surfaceId === "farm-batches")).toBe(false)
+    expect(flatten(true).find(({ surfaceId }) => surfaceId === "farm-batches")).toMatchObject({
+      href: "/farm-batches", resource: "farm_batch",
+    })
   })
 
   it("rejects unknown and unrelated routes for members and administrators", () => {

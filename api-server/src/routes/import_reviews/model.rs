@@ -18,6 +18,8 @@ pub(super) struct ReviewField {
     pub label: String,
     pub kind: FieldKind,
     pub source_value: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_column: Option<u16>,
     pub required: bool,
     #[serde(default)]
     pub options: Vec<String>,
@@ -34,6 +36,10 @@ pub(super) struct SourceReference {
     pub file: String,
     pub row: u32,
     pub sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sheet: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub multi_worksheet: bool,
     #[serde(default)]
     pub row_basis: RowBasis,
 }
@@ -236,7 +242,12 @@ pub(super) fn validate_dataset(data: &Dataset) -> Result<(), String> {
     }
     if !matches!(
         data.target_entity.as_str(),
-        "product" | "account_move" | "stock_location" | "contact" | "source_observation"
+        "product"
+            | "account_move"
+            | "stock_location"
+            | "contact"
+            | "source_observation"
+            | "farm_event"
     ) {
         return Err("unsupported review target".into());
     }
@@ -257,6 +268,10 @@ pub(super) fn validate_dataset(data: &Dataset) -> Result<(), String> {
             || item.source.file.is_empty()
             || item.source.file.len() > 300
             || item.source.row == 0
+            || (item.source.multi_worksheet && item.source.sheet.is_none())
+            || item.source.sheet.as_ref().is_some_and(|sheet| {
+                sheet.trim().is_empty() || sheet.len() > 255 || sheet.chars().any(char::is_control)
+            })
             || !sha256(&item.source.sha256)
             || item.fields.is_empty()
             || item.fields.len() > 32
@@ -270,6 +285,9 @@ pub(super) fn validate_dataset(data: &Dataset) -> Result<(), String> {
                 || field.label.is_empty()
                 || field.label.len() > 200
                 || field.source_value.as_ref().is_some_and(|s| s.len() > 2000)
+                || field
+                    .source_column
+                    .is_some_and(|column| !(1..=16_384).contains(&column))
                 || field.options.len() > 40
                 || field.options.iter().any(|v| v.is_empty() || v.len() > 200)
                 || (field.kind == FieldKind::Choice && field.options.is_empty())

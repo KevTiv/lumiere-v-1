@@ -8,6 +8,7 @@ import { LumiereApiProvider } from "@lumiere/api-client"
 import { ErpSessionProvider } from "@lumiere/erp-session"
 import { I18nProvider } from "@lumiere/i18n"
 import { AIChatPanel } from "@lumiere/ui/ai-chat/ai-chat-panel"
+import type { ChatNativeActionOutcome } from "@lumiere/ui/lib/ai-chat-types"
 import { ModuleView } from "@lumiere/ui/pages/module-view"
 import type { ChatMessage } from "@lumiere/ui/lib/ai-chat-types"
 import type { ModuleConfig } from "@lumiere/ui/lib/module-types"
@@ -131,7 +132,8 @@ function NativeWorkspace({
   const onNativeAction = (value: AssistantAction) => {
     const action = decodeAssistantAction(value, scope)
     const capability = action && getAssistantCapability(action.capabilityKey)
-    if (!action || !capability?.tab)
+    const tab = capability && capability.tab
+    if (!action || !capability || !tab)
       throw new Error("The action belongs to an earlier scope")
     if (
       !permissionsReady ||
@@ -141,18 +143,23 @@ function NativeWorkspace({
       ).allowed
     )
       throw new Error("Native creation is unavailable")
-    const status = controller.requestForm({
-      requestId: crypto.randomUUID(),
-      scopeKey,
-      moduleId: capability.module,
-      tabId: capability.tab,
-      prompt: action.prompt,
+    return new Promise<ChatNativeActionOutcome>((resolve) => {
+      const status = controller.requestForm({
+        requestId: crypto.randomUUID(),
+        scopeKey,
+        moduleId: capability.module,
+        tabId: tab,
+        prompt: action.prompt,
+        onPresentationOutcome: resolve,
+      })
+      if (status !== "pending") {
+        resolve(status)
+        return
+      }
+      setRequestCount((count) => count + 1)
+      // The fixture hosts the real Sales module owner under its isolated route.
+      router.push(`/assistant-actions?tab=${encodeURIComponent(tab)}`)
     })
-    if (status !== "pending") throw new Error("Another request is already open")
-    setRequestCount((count) => count + 1)
-    // The fixture hosts the real Sales module owner under its isolated route.
-    // Only this test-host base path differs from the application destination.
-    router.push(`/assistant-actions?tab=${encodeURIComponent(capability.tab)}`)
   }
   return (
     <AssistantNativeFormProvider value={controller}>

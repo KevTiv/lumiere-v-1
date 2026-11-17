@@ -395,6 +395,78 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: include_str!("import_native_requests_expand.sql"),
     },
+    Migration {
+        version: 41,
+        name: "assistant_chat_decisions",
+        change_set: 30,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("assistant_chat_decisions_expand.sql"),
+    },
+    Migration {
+        version: 42,
+        name: "assistant_chat_context",
+        change_set: 31,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("ai_chat_context_expand.sql"),
+    },
+    Migration {
+        version: 43,
+        name: "assistant_chat_turn_identity",
+        change_set: 32,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0043_durable_projection_delta.sql"
+        ),
+    },
+    Migration {
+        version: 44,
+        name: "assistant_widget_receipts",
+        change_set: 33,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("assistant_widget_receipts_expand.sql"),
+    },
+    Migration {
+        version: 45,
+        name: "module_backfill_records",
+        change_set: 34,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("module_backfill_expand.sql"),
+    },
+    Migration {
+        version: 46,
+        name: "farm_batches",
+        change_set: 35,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("farm_batches_expand.sql"),
+    },
+    Migration {
+        version: 47,
+        name: "farm_native_links",
+        change_set: 36,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("farm_native_links_expand.sql"),
+    },
+    Migration {
+        version: 48,
+        name: "farm_import_events",
+        change_set: 37,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("farm_import_events_expand.sql"),
+    },
+    Migration {
+        version: 49,
+        name: "import_task_inspection",
+        change_set: 38,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("import_task_inspection_expand.sql"),
+    },
+    Migration {
+        version: 50,
+        name: "module_backfill_matches",
+        change_set: 39,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("module_backfill_matches_expand.sql"),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

@@ -111,6 +111,10 @@ fn references(resources: &[ActivityReference]) -> Result<Vec<EntityRef>> {
         })
         .collect()
 }
+#[derive(Debug, thiserror::Error)]
+#[error("query embedding failed at {0}")]
+pub(super) struct QueryEmbeddingStage(pub &'static str);
+
 /// Reuses one settled vector for the same actor/model/query, including lost replies.
 /// Callers may reuse it across document and activity ANN, but still reauthorize hits.
 pub(crate) async fn admitted_query_vector(
@@ -121,10 +125,10 @@ pub(crate) async fn admitted_query_vector(
     query: &str,
     _operation_ref: &str,
     agent: Option<&ResolvedAgentConfig>,
-    generation_source_key: Option<&str>,
+    generation_skill_key: Option<&str>,
 ) -> Result<Vec<f32>> {
     if query.trim().is_empty() || query.len() > 8192 || !state.config.embedding_enabled() {
-        anyhow::bail!("query embeddings are disabled or outside their input bound");
+        return Err(QueryEmbeddingStage("configuration_or_input_bound").into());
     }
     let bounds = super::evidence::require_scoped_capability_grant(
         state,
@@ -134,20 +138,21 @@ pub(crate) async fn admitted_query_vector(
         company,
         RETRIEVE_CAPABILITY,
     )
-    .await?;
+    .await
+    .context(QueryEmbeddingStage("evidence_grant"))?;
     if bounds.max_rows == 0 || bounds.max_bytes < query.len() as u64 {
-        anyhow::bail!("query exceeds evidence grant");
+        return Err(QueryEmbeddingStage("evidence_grant_bound").into());
     }
     state
         .vector_store
         .check_ready()
         .await
-        .context("document embedding collection is incompatible")?;
+        .context(QueryEmbeddingStage("document_collection"))?;
     state
         .rig
         .check_ready()
         .await
-        .context("activity embedding collection is incompatible")?;
+        .context(QueryEmbeddingStage("activity_collection"))?;
     let resolved;
     let agent = match agent {
         Some(agent) => agent,
@@ -161,15 +166,16 @@ pub(crate) async fn admitted_query_vector(
                 None,
                 state.config.ollama_supports_tool_calling,
             )
-            .await?;
+            .await
+            .context(QueryEmbeddingStage("embedding_agent"))?;
             &resolved
         }
     };
-    ensure_allowed_action(agent, "embedding_query")?;
+    ensure_allowed_action(agent, "embedding_query").context(QueryEmbeddingStage("agent_action"))?;
     let reader = state
         .spend_read_stdb
         .as_deref()
-        .context("embedding spend reader unavailable")?;
+        .context(QueryEmbeddingStage("spend_reader"))?;
     let model = state.config.embedding_model_name();
     let scope = MeteredScope {
         organization_id: org,
@@ -189,33 +195,46 @@ pub(crate) async fn admitted_query_vector(
         unit: MeteredUnit::Tokens,
         allowance: u32::try_from(query.len() + 128)?,
     };
+    if let Some(key) = generation_skill_key {
+        crate::orchestrator::skill_access::ActorSkillAccess::new(
+            state,
+            org,
+            company,
+            &actor.stdb_token,
+            &actor.identity_hex,
+        )?
+        .require(key)
+        .await?;
+    }
     execute_query_embedding(
         state.stdb.as_ref(),
         reader,
         state.providers.embedder.as_ref(),
         scope,
         query,
-        generation_source_key,
+        generation_skill_key,
     )
     .await
 }
 
-/// The paid embedding boundary; the source key is supplied only by server code.
+/// The paid embedding boundary; the skill key is supplied only by server code.
 async fn execute_query_embedding(
     stdb: &stdb_client::StdbClient,
     reader: &stdb_client::StdbClient,
     embedder: &dyn crate::providers::EmbedProvider,
     scope: MeteredScope,
     query: &str,
-    generation_source_key: Option<&str>,
+    generation_skill_key: Option<&str>,
 ) -> Result<Vec<f32>> {
-    if let Some(key) = generation_source_key {
-        crate::orchestrator::skill_loader::require_generation_source(
+    if let Some(key) = generation_skill_key {
+        crate::orchestrator::skill_loader::require_enabled_skill(
             stdb,
             scope.organization_id,
+            scope.company_id,
             key,
         )
-        .await?;
+        .await
+        .context(QueryEmbeddingStage("skill_recheck"))?;
     }
     execute_metered(stdb, reader, scope, || async {
         let response = embedder.embed_batch_with_usage(&[query.to_owned()]).await?;
@@ -232,6 +251,7 @@ async fn execute_query_embedding(
         })
     })
     .await
+    .context(QueryEmbeddingStage("metered_execution"))
 }
 
 pub async fn post_search(
@@ -576,8 +596,8 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn revoked_or_stale_rag_source_blocks_embedding_before_spend_or_io() {
-        use crate::orchestrator::skill_loader::tests::{generation_source_rows, sats_rows};
+    async fn disabled_rag_skill_blocks_embedding_before_spend_or_io() {
+        use crate::orchestrator::skill_loader::tests::{sats_rows, skill_availability_rows};
         use axum::{extract::State, routing::post, Router};
         use std::sync::{Arc, Mutex};
 
@@ -585,10 +605,10 @@ mod tests {
         #[async_trait::async_trait]
         impl crate::providers::EmbedProvider for NeverEmbed {
             async fn embed(&self, _: &str) -> Result<Vec<f32>> {
-                panic!("revoked source must not embed")
+                panic!("disabled skill must not embed")
             }
             async fn embed_batch(&self, _: &[String]) -> Result<Vec<Vec<f32>>> {
-                panic!("revoked source must not embed")
+                panic!("disabled skill must not embed")
             }
             fn dimensions(&self) -> u64 {
                 1
@@ -602,8 +622,8 @@ mod tests {
             statement: String,
         ) -> Json<serde_json::Value> {
             Json(sats_rows(
-                generation_source_rows(&statement, "rag_generation", *case.lock().unwrap())
-                    .expect("source rejection must precede any spend SQL"),
+                skill_availability_rows(&statement, "rag_generation", *case.lock().unwrap())
+                    .expect("skill availability check must precede any spend SQL"),
             ))
         }
         let case = Arc::new(Mutex::new("active"));
@@ -617,10 +637,10 @@ mod tests {
             .route("/v1/database/fixture/sql", post(sql))
             .with_state(case.clone());
         let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        crate::orchestrator::skill_loader::require_generation_source(&stdb, 1, "rag_generation")
+        crate::orchestrator::skill_loader::require_enabled_skill(&stdb, 1, 3, "rag_generation")
             .await
             .unwrap();
-        for changed in ["missing", "stale"] {
+        for changed in ["missing", "disabled"] {
             *case.lock().unwrap() = changed;
             let error = execute_query_embedding(
                 &stdb,
@@ -642,7 +662,11 @@ mod tests {
             )
             .await
             .unwrap_err();
-            assert!(error.is::<crate::error::GenerationSourceUnavailable>());
+            assert!(error.is::<crate::error::SkillUnavailable>());
+            assert_eq!(
+                error.downcast_ref::<QueryEmbeddingStage>().unwrap().0,
+                "skill_recheck"
+            );
         }
         server.abort();
     }

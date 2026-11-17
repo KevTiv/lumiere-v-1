@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogSkeleton, DialogTitle }
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogTitle } from "../components/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/select"
 import { cn } from "../lib/utils"
+import type { ModuleDataState } from "../lib/module-data-state"
+import { ModuleDataNotice } from "../pages/module-data-notice"
 import { extractGuideHtmlDerivative, isSavedGuide, safeGuideHref } from "../lib/assistant-guide-types"
 import type { GuideDocument, GuideDraft, GuideReference, GuideRevisionSummary } from "../lib/assistant-guide-types"
 import type { GuideReviewInput, GuideVerificationInput, GuideVerificationChoice } from "../lib/assistant-guide-types"
@@ -26,6 +28,7 @@ export interface AssistantGuideViewerProps {
   onRecordReview?: (input: GuideReviewInput) => Promise<void>
   onOpenFullPage?: (reference?: GuideReference) => void
   history?: GuideRevisionSummary[]
+  historyState?: ModuleDataState
   onRevisionChange?: (revision: number) => void | Promise<void>
   onDirtyChange?: (dirty: boolean) => void
   moduleOptions?: readonly { value: string; label: string }[]
@@ -61,7 +64,7 @@ export function buildGuideHtmlPreview(html: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; sandbox"><meta name="referrer" content="no-referrer"><style>body{margin:0;padding:24px;font:15px/1.7 system-ui,sans-serif;color:#202529;background:#fff;overflow-wrap:anywhere}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ddd;padding:8px}pre{white-space:pre-wrap}h1,h2,h3{line-height:1.3}</style></head><body>${safe}</body></html>`
 }
 
-export function AssistantGuideViewer({ document: guide, onSave, onAsk, onLoadVerificationChoices, onRequestVerification, onRecordReview, onOpenFullPage, history, onRevisionChange, onDirtyChange, moduleOptions, busy = false, verificationUnavailable = false, onRetryVerification, error, className }: AssistantGuideViewerProps) {
+export function AssistantGuideViewer({ document: guide, onSave, onAsk, onLoadVerificationChoices, onRequestVerification, onRecordReview, onOpenFullPage, history, historyState, onRevisionChange, onDirtyChange, moduleOptions, busy = false, verificationUnavailable = false, onRetryVerification, error, className }: AssistantGuideViewerProps) {
   const { t } = useTranslation()
   const id = useId()
   const [edit, setEdit] = useState(false)
@@ -187,13 +190,22 @@ export function AssistantGuideViewer({ document: guide, onSave, onAsk, onLoadVer
           <Button variant={format === "markdown" ? "secondary" : "ghost"} size="sm" aria-pressed={format === "markdown"} onClick={() => setFormat("markdown")}>Markdown</Button>
           <Button variant={format === "html" ? "secondary" : "ghost"} size="sm" aria-pressed={format === "html"} onClick={() => setFormat("html")}>{t("aiChat.guide.htmlPreview", { defaultValue: "HTML preview" })}</Button>
         </div> : null}
-        {history && history.length > 0 && onRevisionChange && saved ? <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground"><span>{t("aiChat.guide.history", { defaultValue: "History" })}</span><Select value={String(guide.revision)} disabled={disabled || verificationUnavailable || hasPendingInput} onValueChange={(value) => {
+        {history && history.length > 0 && onRevisionChange && saved && (!historyState || historyState.status === "ready") ? <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground"><span>{t("aiChat.guide.history", { defaultValue: "History" })}</span><Select value={String(guide.revision)} disabled={disabled || verificationUnavailable || hasPendingInput} onValueChange={(value) => {
           setLocalError(null)
           Promise.resolve(onRevisionChange(Number(value))).catch((cause) => setLocalError(cause instanceof Error ? cause.message : t("aiChat.guide.openFailed", { defaultValue: "The document could not be opened. Try again." })))
         }}><SelectTrigger className="max-w-48 text-foreground" aria-label={t("aiChat.guide.history", { defaultValue: "History" })}><SelectValue /></SelectTrigger><SelectContent>{history.map((revision) => <SelectItem key={revision.revision} value={String(revision.revision)}>{t("aiChat.guide.revision", { defaultValue: "Revision {{revision}}", revision: revision.revision })} · {labels[revision.reviewState]}</SelectItem>)}</SelectContent></Select></label> : null}
       </div>
     </header>
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
+      {saved && historyState && historyState.status !== "ready" ? (
+        <div className="mb-4 text-sm" data-testid="assistant-guide-history-status">
+          {historyState.status === "loading" ? (
+            <p role="status">{t("aiChat.guide.historyLoading", { defaultValue: "Loading revision history…" })}</p>
+          ) : (
+            <ModuleDataNotice state={{ ...historyState, message: t("aiChat.guide.historyUnavailable", { defaultValue: "Revision history is unavailable." }) }} />
+          )}
+        </div>
+      ) : null}
       {error || localError ? <p role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error || localError}</p> : null}
       {edit ? <div className="space-y-4">
         <label className="block space-y-1.5 text-sm" htmlFor={`${id}-title`}><span>{t("aiChat.guide.title", { defaultValue: "Title" })}</span><Input id={`${id}-title`} value={title} disabled={disabled} onChange={(event) => setTitle(event.target.value)} maxLength={200} /></label>

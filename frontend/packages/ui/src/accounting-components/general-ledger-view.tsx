@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useRef, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -37,6 +38,10 @@ import {
 } from "../lib/module-url-filters"
 import { useTranslation } from "@lumiere/i18n"
 import type { RowValueMap } from "@lumiere/erp-shared/row-values"
+import {
+  accountMoveBatchSelection,
+  moduleTabHref,
+} from "@lumiere/erp-shared/record-links"
 import { TablePager, usePagedRows } from "../components/table-pager"
 import {
   entityScalarText,
@@ -111,6 +116,15 @@ export function GeneralLedgerView({
       ? currency.money(value, currencyId)
       : "—"
   const urlFilters = useModuleUrlFilters()
+  const searchParams = useSearchParams()
+  const importEntries = useMemo(
+    () =>
+      accountMoveBatchSelection(
+        searchParams?.get("importEntryIds") ?? null,
+        searchParams?.get("importEntryCompany") ?? null,
+      ),
+    [searchParams],
+  )
   const clearUrlFilter = useClearModuleUrlFilter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedMoveId, setSelectedMoveId] = useState<
@@ -169,6 +183,13 @@ export function GeneralLedgerView({
   )
   const query = searchQuery.trim().toLowerCase()
   const filtered = moves.filter((m) => {
+    if (
+      importEntries &&
+      (String(m.companyId) !== importEntries.companyId ||
+        !importEntries.ids.has(String(m.id)))
+    ) {
+      return false
+    }
     const matchesSearch = [m.name, m.ref].some((value) =>
       (value ?? "").toLowerCase().includes(query),
     )
@@ -263,6 +284,23 @@ export function GeneralLedgerView({
               ) : null}
             </div>
           </div>
+          {importEntries ? (
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+              <span>
+                {t("accounting.journalEntries.importedSelection", {
+                  defaultValue: "Journal entries from the saved import",
+                })}
+              </span>
+              <a
+                className="font-medium underline underline-offset-4"
+                href={moduleTabHref("accounting", "journal-entries")}
+              >
+                {t("accounting.journalEntries.clearImportedSelection", {
+                  defaultValue: "Show all journal entries",
+                })}
+              </a>
+            </div>
+          ) : null}
           {activeUrlFilters.length > 0 ? (
             <div
               className="mt-4 flex flex-wrap items-center gap-2"
@@ -399,11 +437,7 @@ export function GeneralLedgerView({
           if (!open) setSelectedMoveId(null)
         }}
       >
-        <DialogContent
-          size="review"
-          layout="bounded"
-          finalFocus={moveTrigger}
-        >
+        <DialogContent size="review" layout="bounded" finalFocus={moveTrigger}>
           {selectedMove && selected && (
             <>
               <DialogHeader>

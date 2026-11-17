@@ -8,7 +8,7 @@ import { workspaceStyles } from "../lib/workspace-styles"
 /** Shared secondary navigation for module views and record pages/drawers. */
 export function ContextTabsList({ className, ...props }: ComponentProps<typeof TabsList>) {
   return <TabsList {...props} variant="line" data-ui="context-tabs" className={cn(
-    "h-auto w-full flex-wrap justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto", className,
+    "h-auto w-full flex-wrap justify-start gap-1 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto", className,
   )} />
 }
 

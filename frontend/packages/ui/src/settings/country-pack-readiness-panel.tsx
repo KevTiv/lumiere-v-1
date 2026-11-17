@@ -16,6 +16,8 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
+import type { ModuleDataState } from "../lib/module-data-state"
+import { ModuleDataNotice } from "../pages/module-data-notice"
 
 import {
   countryPackReadiness,
@@ -26,7 +28,7 @@ export interface CountryPackReadinessPanelProps {
   definitions: CountryPackDefinitionRow[]
   activations: CompanyCountryPackRow[]
   companyCountryCode?: string | null
-  isLoading?: boolean
+  dataState?: ModuleDataState
   isPending?: boolean
   now?: Date
   title?: string
@@ -66,7 +68,7 @@ export function CountryPackReadinessPanel({
   definitions,
   activations,
   companyCountryCode,
-  isLoading = false,
+  dataState = { status: "ready" },
   isPending = false,
   now,
   title,
@@ -93,8 +95,10 @@ export function CountryPackReadinessPanel({
         </CardDescription>
       </CardHeader>
       <CardContent className="max-w-2xl space-y-4">
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        {dataState.status === "loading" ? (
+          <p role="status" className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        ) : dataState.status !== "ready" ? (
+          <ModuleDataNotice state={dataState} />
         ) : rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {t("settings.organization.countryPacks.emptyCatalog")}

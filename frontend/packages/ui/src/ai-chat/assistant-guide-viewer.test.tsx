@@ -15,6 +15,25 @@ afterEach(cleanup)
 beforeAll(()=>{ if(typeof globalThis.PointerEvent==="undefined")Object.defineProperty(globalThis,"PointerEvent",{value:MouseEvent,configurable:true}) })
 
 describe("ERP help document viewer", () => {
+  it("offers revision retry without discarding the open guide or unsaved edits", () => {
+    const retry = vi.fn()
+    const props = { document: saved, history: [saved], onRevisionChange: vi.fn(), onSave: vi.fn() }
+    const { rerender } = render(<AssistantGuideViewer {...props} historyState={{ status: "loading" }} />)
+    expect(screen.getByText("Loading revision history…")).toBeTruthy()
+    expect(screen.queryByRole("combobox", { name: "History" })).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Edit guide" }))
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Still editing" } })
+    rerender(<AssistantGuideViewer {...props} historyState={{ status: "error", onRetry: retry }} />)
+    expect(screen.getByRole("alert").textContent).toContain("Revision history is unavailable.")
+    expect(screen.queryByRole("combobox", { name: "History" })).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }))
+    expect(retry).toHaveBeenCalledOnce()
+    rerender(<AssistantGuideViewer {...props} historyState={{ status: "ready" }} />)
+    expect(screen.getByRole("combobox", { name: "History" })).toBeTruthy()
+    expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("Still editing")
+    expect(screen.queryByRole("alert")).toBeNull()
+  })
+
   it("retains an unsaved draft and its changes when persistence fails", async () => {
     const onSave = vi.fn(async () => { throw new Error("Write permission was revoked") })
     render(<AssistantGuideViewer document={draft} onSave={onSave} />)

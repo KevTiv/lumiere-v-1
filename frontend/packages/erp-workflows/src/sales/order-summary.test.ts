@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import type { RowValueMap } from "@lumiere/erp-shared/row-values"
-import { summarizeOrderToCash, withOrderCashSummary } from "./order-summary"
+import { summarizeOrderToCash, withAvailableOrderCashSummary, withOrderCashSummary } from "./order-summary"
 
 const sale = { id: 5, state: { tag: "Sale" } }
 const line = (ordered: number, delivered: number, extra = {}) => ({
@@ -178,4 +178,33 @@ test("supplier bills on the same order never count as what the customer owes", (
     moves: [invoice("Posted", 100, 100), invoice("Posted", 900, 900, "InInvoice")],
   })
   assert.deepEqual([s.invoice, s.outstanding], ["posted", 100])
+})
+
+test("order rows display unavailable summaries independently from verified empty reads", () => {
+  const rows = withAvailableOrderCashSummary([sale], {
+    lines: [line(10, 6)],
+    pickings: [],
+  })
+  assert.deepEqual(rows, [{
+    ...sale,
+    deliverySummary: "short",
+    invoiceSummary: "unavailable",
+    paymentSummary: "unavailable",
+    outstandingAmount: null,
+  }])
+
+  const [failedDelivery] = withAvailableOrderCashSummary([sale], {
+    lines: [line(10, 6)],
+    moves: [invoice("Posted", 130, 30)],
+  })
+  assert.equal(failedDelivery?.deliverySummary, "unavailable")
+  assert.equal(failedDelivery?.invoiceSummary, "posted")
+  assert.equal(failedDelivery?.paymentSummary, "partial")
+  assert.equal(failedDelivery?.outstandingAmount, 30)
+
+  const [empty] = withAvailableOrderCashSummary([sale], { lines: [], moves: [], pickings: [] })
+  assert.equal(empty?.deliverySummary, "none")
+  assert.equal(empty?.invoiceSummary, "none")
+  assert.equal(empty?.paymentSummary, "none")
+  assert.equal(empty?.outstandingAmount, 0)
 })

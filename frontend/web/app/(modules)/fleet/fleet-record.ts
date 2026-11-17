@@ -1,6 +1,8 @@
+import { fleetVehicleHref } from '@lumiere/erp-shared/record-links';
+
 /** Where a fleet vehicle's page lives. */
 export function fleetVehicleRecordHref(vehicle: Record<string, unknown>): string | undefined {
-  return vehicle.id == null ? undefined : `/fleet/vehicles/${String(vehicle.id)}`;
+  return vehicle.id == null ? undefined : fleetVehicleHref(String(vehicle.id));
 }
 
 /** Lower-cased tag of an enum cell (`{ tag }`, `{ Active: [] }`) or plain string. */

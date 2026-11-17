@@ -160,6 +160,13 @@ jobs:
         with:
           node-version: "26"
 
+      - name: Validate the grounded chat release fixtures
+        if: inputs.enable_ai && vars.RAILWAY_VERIFY_GROUNDED_CHAT == 'true'
+        env:
+          AI_CHAT_ACCEPTANCE_URL: ${{ vars.AI_CHAT_ACCEPTANCE_URL }}
+          AI_CHAT_ACCEPTANCE_JSON: ${{ secrets.AI_CHAT_ACCEPTANCE_JSON }}
+        run: node scripts/verify-grounded-chat.mjs --check-config
+
       - name: Verify production ancestry
         shell: bash
         run: |
@@ -314,6 +321,13 @@ jobs:
         if: env.EDGE_READINESS_URL != ''
         shell: bash
         run: bash scripts/railway-stack-release.sh probe "api-gateway=$EDGE_READINESS_URL"
+
+      - name: Verify grounded chat for fresh and upgraded tenants through the public edge
+        if: inputs.enable_ai && vars.RAILWAY_VERIFY_GROUNDED_CHAT == 'true'
+        env:
+          AI_CHAT_ACCEPTANCE_URL: ${{ vars.AI_CHAT_ACCEPTANCE_URL }}
+          AI_CHAT_ACCEPTANCE_JSON: ${{ secrets.AI_CHAT_ACCEPTANCE_JSON }}
+        run: node scripts/verify-grounded-chat.mjs
 
       - name: Failure diagnostics
         if: failure()

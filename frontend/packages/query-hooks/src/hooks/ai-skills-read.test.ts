@@ -42,7 +42,7 @@ test("skill administration reads canonical registered rows without the runtime c
     assert.equal(JSON.stringify(query.queryKey), JSON.stringify(["ai-skills-stdb", "1"]))
     assert.equal(query.enabled, true)
     const result = await query.queryFn()
-    assert.deepEqual(JSON.parse(JSON.stringify(result)), [{ id: 7, skill_key: "report_analysis", name: "Report Analysis", category: "analytics", description: "Registered pilot", is_system: false, source: "stdb", legacy_run_supported: false }])
+    assert.deepEqual(JSON.parse(JSON.stringify(result)), [{ id: 7, skill_key: "report_analysis", name: "Report Analysis", category: "analytics", description: "Registered pilot", is_system: false, source: "stdb", execution_route: "/api/ai/skills/report-analysis", legacy_run_supported: false }])
     assert.deepEqual(requests, ["http://api.test/api/query/ai-skills"])
     assert.notDeepEqual(query.queryKey, skillQuery(2).queryKey)
   } finally { globalThis.fetch = realFetch; registerLumiereApiClient(null) }

@@ -4,8 +4,6 @@ import { useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 
 import {
-  certificationHasPassingEvidence,
-  latestCertificationFor,
   useAiKnowledgeSkillPromotions,
   useAiSkillCertificationRequests,
   useAiSkillFixtures,
@@ -18,8 +16,9 @@ import {
   useRequestAiSkillCertification,
   useReviewAiKnowledgeSkillPromotion,
   useRollbackAiSkillRelease,
+  useRunPublishedAiSkill,
   versionWorkflowStatus,
-  type AiSkillFixtureRow,
+  type AiSkillCertificationRequestRow,
   type AiSkillReleaseRow,
   type AiSkillVersionRow,
 } from "@lumiere/query-hooks/hooks/ai-skill-registry"
@@ -35,8 +34,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@lumiere/ui/components/dialog"
-import { NativeSkillVersionForm } from "./native-skill-version-form"
-import { nextSkillVersion } from "./native-skill-validation"
 import {
   Select,
   SelectContent,
@@ -44,8 +41,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-
-const DEFAULT_MANIFEST = `{"limits":{"max_steps":8,"max_tool_calls":16},"output_types":["application/json"],"permissions":["report:read"],"resources":["reports.daily_business_summary.v1"],"risk":"green","schema_version":1,"skill_key":"report_composer","source_hash":"sha256:${"a".repeat(64)}","version":"1.0.1"}`
 
 interface SkillRegistryPanelProps {
   organizationId: bigint
@@ -61,40 +56,10 @@ function releaseId(row: AiSkillReleaseRow): number {
   return Number(row.id)
 }
 
-function fixtureRowId(row: AiSkillFixtureRow): number {
-  return Number(row.id)
-}
-
 type Translate = ReturnType<typeof useTranslation>["t"]
 
-function certificationButtonLabel(t: Translate, passed: boolean, requestStatus: string): string {
-  if (passed) return t("aiSkills.registry.certification.passed")
-  if (requestStatus === "queued") return t("aiSkills.registry.certification.queued")
-  if (requestStatus === "running") return t("aiSkills.registry.certification.running")
-  if (requestStatus === "errored" || requestStatus === "completed") {
-    return t("aiSkills.registry.actions.retryCertification")
-  }
-  return t("aiSkills.registry.actions.runCertification")
-}
-
-function versionCertificationHint(
-  t: Translate,
-  status: string,
-  fixtureCount: number,
-  certificationReady: boolean,
-): string {
-  if (status === "promoted") return ""
-  if (fixtureCount === 0) return t("aiSkills.registry.certification.blockedFixtureRequired")
-  if (certificationReady) return t("aiSkills.registry.certification.passedSuffix")
-  return t("aiSkills.registry.certification.pendingSuffix")
-}
-
-function workflowStatusLabel(t: Translate, status: string): string {
-  if (status === "promoted") return t("aiSkills.registry.status.promoted")
-  if (status === "certified") return t("aiSkills.registry.status.certified")
-  if (status === "rolled_back") return t("aiSkills.registry.status.rolledBack")
-  if (status === "draft") return t("aiSkills.registry.status.draft")
-  return status
+function workflowStatusLabel(t: Translate, status: ReturnType<typeof versionWorkflowStatus>): string {
+  return t(`aiSkills.registry.status.${status}`)
 }
 
 function registryStatusLabel(t: Translate, status: string): string {
@@ -111,33 +76,105 @@ function registryStatusLabel(t: Translate, status: string): string {
   return status
 }
 
+function canonicalExample(raw: string): string {
+  const serialize = (value: unknown): string => {
+    if (Array.isArray(value)) return `[${value.map(serialize).join(",")}]`
+    if (value === null || typeof value !== "object") return JSON.stringify(value)
+    const entries = Object.entries(value)
+      .sort(([left], [right]) => compareJsonKeys(left, right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${serialize(entry)}`)
+    return `{${entries.join(",")}}`
+  }
+  return serialize(JSON.parse(raw))
+}
+
+function compareJsonKeys(left: string, right: string): number {
+  const leftChars = Array.from(left)
+  const rightChars = Array.from(right)
+  for (let index = 0; index < Math.min(leftChars.length, rightChars.length); index += 1) {
+    const difference = leftChars[index].codePointAt(0)! - rightChars[index].codePointAt(0)!
+    if (difference !== 0) return difference
+  }
+  return leftChars.length - rightChars.length
+}
+
+function hasProjectionExecutor(version: AiSkillVersionRow) {
+  return (version.executor ?? null) === "json_projection_v1"
+}
+
+function latestDraftTest(
+  versionId: number,
+  fixtureId: number,
+  requests: AiSkillCertificationRequestRow[],
+) {
+  return requests.reduce<AiSkillCertificationRequestRow | undefined>((latest, row) => {
+    if (row.readiness?.code.startsWith("projection_")
+      && Number(row.skillVersionId ?? row.skill_version_id) === versionId
+      && Number(row.fixtureId ?? row.fixture_id) === fixtureId
+      && (!latest || Number(row.id) > Number(latest.id))) return row
+    return latest
+  }, undefined)
+}
+
+function draftVersionFromFixture(metadata: string | undefined): number | undefined {
+  try {
+    return JSON.parse(metadata ?? "{}")?.draftVersionId
+  } catch {
+    return undefined
+  }
+}
+
+function projectionStarter(skillKey: string) {
+  return JSON.stringify({
+    executor: "json_projection_v1",
+    fields: { name: "/customer/name" },
+    limits: { max_steps: 1, max_tool_calls: 1 },
+    output_types: ["application/json"],
+    permissions: [],
+    resources: [],
+    risk: "green",
+    schema_version: 1,
+    skill_key: skillKey,
+    version: "1.0.0",
+  }, null, 2)
+}
+
+async function versionManifest(rawManifest: string): Promise<string> {
+  const manifest = JSON.parse(rawManifest)
+  if (manifest?.executor !== "json_projection_v1") return rawManifest
+  const source = canonicalExample(JSON.stringify(manifest.fields ?? {}))
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(source))
+  manifest.source_hash = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("")
+  return canonicalExample(JSON.stringify(manifest))
+}
+
 export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillRegistryPanelProps) {
   const { t } = useTranslation()
   const orgNumber = Number(organizationId)
-  const versions = useAiSkillVersions(organizationId)
-  const releases = useAiSkillReleases(organizationId)
-  const fixtures = useAiSkillFixtures(organizationId)
-  const certifications = useAiSkillCertificationRequests(organizationId)
+  const versions = useAiSkillVersions(organizationId, skills.length > 0)
+  const releases = useAiSkillReleases(organizationId, skills.length > 0)
   const knowledgePromotions = useAiKnowledgeSkillPromotions(organizationId, companyId)
 
-  const createVersion = useCreateAiSkillVersion(orgNumber)
   const createFixture = useCreateAiSkillFixture(orgNumber)
-  const requestCertification = useRequestAiSkillCertification(orgNumber)
+  const createVersion = useCreateAiSkillVersion(orgNumber)
+  const requestDraftTest = useRequestAiSkillCertification(orgNumber)
+  const runPublishedSkill = useRunPublishedAiSkill()
   const promoteVersion = usePromoteAiSkillVersion(orgNumber)
   const rollbackRelease = useRollbackAiSkillRelease(orgNumber)
   const proposeKnowledge = useProposeAiKnowledgeSkillPromotion(orgNumber, companyId)
   const reviewKnowledge = useReviewAiKnowledgeSkillPromotion(orgNumber, companyId)
 
   const [selectedSkillId, setSelectedSkillId] = useState<number>(() => skills[0]?.id ?? 0)
-  const [manifestJson, setManifestJson] = useState(DEFAULT_MANIFEST)
-  const [fixtureKey, setFixtureKey] = useState("smoke-001")
-  const [fixtureName, setFixtureName] = useState("Smoke fixture")
-  const [fixtureInputJson, setFixtureInputJson] = useState(
-    '{"reportKey":"daily_business_summary_v1","companyId":1,"date":"2026-07-10","timezone":"UTC"}',
-  )
-  const [fixtureExpectedJson, setFixtureExpectedJson] = useState(
-    '{"items":[],"reportKey":"daily_business_summary_v1","title":"Daily Business Summary"}',
-  )
+  const [manifestJson, setManifestJson] = useState("")
+  const [draftTestVersionId, setDraftTestVersionId] = useState<number | null>(null)
+  const [testingDraft, setTestingDraft] = useState(false)
+  const [exampleName, setExampleName] = useState("")
+  const [exampleInput, setExampleInput] = useState('{"customer":{"name":"Sample Customer"}}')
+  const [exampleExpected, setExampleExpected] = useState('{"name":"Sample Customer"}')
+  const [runInput, setRunInput] = useState('{"customer":{"name":"Sample Customer"}}')
+  const [runResult, setRunResult] = useState<{ skillVersionId: number; output: unknown } | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [knowledgeVersionId, setKnowledgeVersionId] = useState("")
   const [promotionReviewNote, setPromotionReviewNote] = useState("")
@@ -166,12 +203,15 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
     [releases.data, effectiveSkillId],
   )
 
-  const skillFixtures = useMemo(
-    () =>
-      (fixtures.data ?? []).filter(
-        (row) => Number(row.skillId ?? row.skill_id) === effectiveSkillId,
-      ),
-    [fixtures.data, effectiveSkillId],
+  const fixtures = useAiSkillFixtures(organizationId, draftTestVersionId != null)
+  const draftTests = useAiSkillCertificationRequests(
+    organizationId,
+    draftTestVersionId != null,
+    draftTestVersionId,
+  )
+  const skillFixtures = (fixtures.data ?? []).filter((fixture) =>
+    Number(fixture.skillId ?? fixture.skill_id) === effectiveSkillId
+    && draftVersionFromFixture(fixture.metadata) === draftTestVersionId,
   )
 
   const activeRelease = skillReleases.find(
@@ -179,38 +219,22 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
   )
 
   const selectedSkill = skills.find((skill) => skill.id === effectiveSkillId)
+  const publishedVersionId = Number(activeRelease?.skillVersionId ?? activeRelease?.skill_version_id)
+  const publishedProjection = skillVersions.some((version) =>
+    versionId(version) === publishedVersionId && hasProjectionExecutor(version),
+  )
   const activationVersion = skillVersions.find((version) => versionId(version) === activationVersionId)
-  const activationReady = activationVersionId != null && skillFixtures.length > 0
-    && skillFixtures.every((fixture) => certificationHasPassingEvidence(
-      fixtureRowId(fixture), activationVersionId, certifications.data ?? [], [],
-    ))
-
-  const registryLoading =
-    versions.isLoading || releases.isLoading || fixtures.isLoading || certifications.isLoading
-  const registryError =
-    versions.error ?? releases.error ?? fixtures.error ?? certifications.error ?? null
+  const activationTested = !activationVersion || !hasProjectionExecutor(activationVersion)
+    || (draftTestVersionId === activationVersionId && skillFixtures.length > 0
+      && skillFixtures.every((fixture) =>
+        latestDraftTest(activationVersionId!, Number(fixture.id), draftTests.data ?? [])?.readiness?.ready,
+      ))
+  const registryLoading = versions.isLoading || releases.isLoading
+  const registryError = versions.error ?? releases.error ?? null
 
   async function retryRegistry() {
     setActionError(null)
-    await Promise.all([
-      versions.refetch(),
-      releases.refetch(),
-      fixtures.refetch(),
-      certifications.refetch(),
-    ])
-  }
-
-  function certificationRequestKey(fixtureId: number, versionId: number): string {
-    const tuple = `${organizationId}:${companyId ?? 0}:${versionId}:${fixtureId}`
-    const existing = requestKeys.current.get(tuple)
-    if (existing) return existing
-    const created = globalThis.crypto.randomUUID()
-    requestKeys.current.set(tuple, created)
-    return created
-  }
-
-  function clearCertificationRequestKey(fixtureId: number, versionId: number) {
-    requestKeys.current.delete(`${organizationId}:${companyId ?? 0}:${versionId}:${fixtureId}`)
+    await Promise.all([versions.refetch(), releases.refetch()])
   }
 
   async function runAction(action: () => Promise<void>) {
@@ -220,6 +244,49 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
     } catch (error) {
       setActionError(error instanceof Error ? error.message : String(error))
     }
+  }
+
+  async function saveExample() {
+    if (draftTestVersionId == null) return
+    await createFixture.mutateAsync({
+      skillId: BigInt(effectiveSkillId),
+      fixtureKey: globalThis.crypto.randomUUID(),
+      name: exampleName.trim(),
+      description: undefined,
+      inputJson: canonicalExample(exampleInput),
+      expectedOutputJson: canonicalExample(exampleExpected),
+      metadata: JSON.stringify({ draftVersionId: draftTestVersionId }),
+    })
+    setExampleName("")
+    await fixtures.refetch()
+  }
+
+  async function testDraft() {
+    if (companyId == null || draftTestVersionId == null || !skillFixtures.length) return
+    setTestingDraft(true)
+    try {
+      for (const fixture of skillFixtures) {
+        await requestDraftTest.mutateAsync({
+          companyId,
+          skillVersionId: draftTestVersionId,
+          fixtureId: Number(fixture.id),
+          idempotencyKey: `projection:${companyId}:${draftTestVersionId}:${fixture.id}`,
+        })
+      }
+    } finally {
+      await draftTests.refetch()
+      setTestingDraft(false)
+    }
+  }
+
+  async function executePublishedSkill() {
+    if (companyId == null) return
+    setRunResult(null)
+    setRunResult(await runPublishedSkill.mutateAsync({
+      skillId: effectiveSkillId,
+      companyId,
+      input: JSON.parse(runInput),
+    }))
   }
 
   async function proposeSelectedKnowledge() {
@@ -252,10 +319,16 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
       </div>
 
       <div className="flex flex-col gap-6 p-4">
-        <div className="flex flex-wrap items-end gap-3">
+        {skills.length > 0 ? <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-muted-foreground">{t("aiSkills.registry.fields.skill")}</span>
-            <Select value={String(effectiveSkillId)} onValueChange={(value) => setSelectedSkillId(Number(value))}>
+            <Select value={String(effectiveSkillId)} onValueChange={(value) => {
+              setSelectedSkillId(Number(value))
+              setDraftTestVersionId(null)
+              setRunInput('{"customer":{"name":"Sample Customer"}}')
+              setRunResult(null)
+              setActionError(null)
+            }}>
               <SelectTrigger className="min-w-[220px]">
                 <SelectValue />
               </SelectTrigger>
@@ -278,7 +351,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
           ) : (
             <p className="text-sm text-amber-600 dark:text-amber-400">{t("aiSkills.registry.noActiveRelease")}</p>
           )}
-        </div>
+        </div> : null}
 
         {actionError ? (
           <p className="text-sm text-destructive" role="alert">
@@ -288,7 +361,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
 
         {registryLoading ? (
           <p className="text-sm text-muted-foreground" role="status">
-            {t("aiSkills.registry.states.loadingCertification")}
+            {t("aiSkills.registry.states.loadingVersions")}
           </p>
         ) : null}
 
@@ -297,7 +370,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
             <p className="text-sm text-destructive">
               {registryError instanceof Error
                 ? registryError.message
-                : t("aiSkills.registry.errors.loadCertification")}
+                : t("aiSkills.registry.errors.loadVersions")}
             </p>
             <Button size="sm" variant="outline" onClick={() => void retryRegistry()}>
               {t("aiSkills.registry.actions.retry")}
@@ -307,12 +380,11 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
 
         {!registryLoading && !registryError && skills.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            {t("aiSkills.registry.empty.noSkillsForCertification")}
+            {t("aiSkills.registry.empty.noSkillVersionsAvailable")}
           </p>
         ) : null}
 
         {!registryLoading && !registryError && skills.length > 0 ? (
-        <div className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-3 rounded-lg border border-border p-4">
             <h3 className="text-sm font-medium">{t("aiSkills.registry.sections.versions")}</h3>
             {skillVersions.length === 0 ? (
@@ -322,16 +394,6 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                 {skillVersions.map((version) => {
                   const id = versionId(version)
                   const status = versionWorkflowStatus(id, skillReleases)
-                  const certificationReady =
-                    skillFixtures.length > 0 &&
-                    skillFixtures.every((fixture) =>
-                      certificationHasPassingEvidence(
-                        fixtureRowId(fixture),
-                        id,
-                        certifications.data ?? [],
-                        [],
-                      ),
-                    )
                   return (
                     <li
                       key={id}
@@ -343,16 +405,27 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {workflowStatusLabel(t, status)}
-                          {versionCertificationHint(t, status, skillFixtures.length, certificationReady)}
                         </p>
                       </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                      {hasProjectionExecutor(version) && status === "reviewed" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setDraftTestVersionId(id)
+                            setActionError(null)
+                          }}
+                        >
+                          {t("aiSkills.registry.draftTest.title", { defaultValue: "Test draft" })}
+                        </Button>
+                      ) : null}
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={
-                          promoteVersion.isPending || status === "promoted" || !certificationReady
-                        }
+                        disabled={promoteVersion.isPending || status === "promoted"}
                         onClick={() => {
+                          if (hasProjectionExecutor(version)) setDraftTestVersionId(id)
                           setActivationVersionId(id)
                           setActivationNote("")
                           setActivationConfirmed(false)
@@ -361,28 +434,98 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                       >
                         {t("aiSkills.registry.validation.reviewActivate", { defaultValue: "Review and activate" })}
                       </Button>
+                      </div>
                     </li>
                   )
                 })}
               </ul>
             )}
 
-            {selectedSkill ? <NativeSkillVersionForm
-              key={`${organizationId}:${effectiveSkillId}:${skillVersions.map((version) => version.version).join(",")}`}
-              skillKey={selectedSkill.skill_key}
-              initialVersion={nextSkillVersion(skillVersions.map((version) => version.version))}
-              pending={createVersion.isPending}
-              onCreate={(manifestJson, reviewNotes, metadata) => createVersion.mutateAsync({
-                skillId: BigInt(effectiveSkillId), manifestJson, reviewNotes, metadata,
-              })}
-            /> : null}
+            {draftTestVersionId != null ? (
+              <div className="space-y-3 rounded-md border border-border p-3">
+                <h4 className="font-medium">{t("aiSkills.registry.draftTest.examples", { defaultValue: "Test examples" })} · v{skillVersions.find((version) => versionId(version) === draftTestVersionId)?.version}</h4>
+                <p className="text-sm text-muted-foreground">{t("aiSkills.registry.draftTest.exampleHelp", { defaultValue: "Use sample data. Every saved example must pass before this skill version can be published." })}</p>
+                <label className="grid gap-1 text-sm">
+                  <span>{t("aiSkills.registry.draftTest.name", { defaultValue: "Example name" })}</span>
+                  <Input value={exampleName} maxLength={120} onChange={(event) => setExampleName(event.target.value)} />
+                </label>
+                <label className="grid gap-1 text-sm">
+                  <span>{t("aiSkills.registry.draftTest.input", { defaultValue: "Sample input JSON" })}</span>
+                  <Textarea variant="plain" rows={3} value={exampleInput} onChange={(event) => setExampleInput(event.target.value)} />
+                </label>
+                <label className="grid gap-1 text-sm">
+                  <span>{t("aiSkills.registry.draftTest.expected", { defaultValue: "Expected output JSON" })}</span>
+                  <Textarea variant="plain" rows={3} value={exampleExpected} onChange={(event) => setExampleExpected(event.target.value)} />
+                </label>
+                <Button size="sm" variant="outline" disabled={!exampleName.trim() || createFixture.isPending} onClick={() => void runAction(saveExample)}>
+                  {t("aiSkills.registry.draftTest.saveExample", { defaultValue: "Save example" })}
+                </Button>
+                {fixtures.isError || draftTests.isError ? (
+                  <p className="text-sm text-destructive" role="alert">{t("aiSkills.registry.draftTest.loadError", { defaultValue: "Could not load test examples or results." })}</p>
+                ) : null}
+                {companyId == null ? (
+                  <p className="text-sm text-muted-foreground">{t("aiSkills.registry.draftTest.companyRequired", { defaultValue: "Select a company to run draft tests." })}</p>
+                ) : null}
+                {skillFixtures.length > 0 ? (
+                  <ul className="space-y-2" aria-label={t("aiSkills.registry.draftTest.results", { defaultValue: "Draft test results" })}>
+                    {skillFixtures.map((fixture) => {
+                      const latest = latestDraftTest(draftTestVersionId, Number(fixture.id), draftTests.data ?? [])
+                      return (
+                        <li key={String(fixture.id)} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                          <span>{fixture.name}</span>
+                          <span>
+                            {latest?.readiness?.ready
+                              ? t("aiSkills.registry.draftTest.pass", { defaultValue: "Passed" })
+                              : latest
+                                ? t(latest.readiness?.code === "projection_input_invalid"
+                                  ? "aiSkills.registry.draftTest.badInput"
+                                  : "aiSkills.registry.draftTest.mismatch",
+                                { defaultValue: latest.readiness?.code === "projection_input_invalid" ? "Input could not be evaluated" : "Output differed from expected" })
+                                : t("aiSkills.registry.draftTest.pending", { defaultValue: "Awaiting test" })}
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                ) : null}
+                <Button size="sm" disabled={!companyId || !skillFixtures.length || testingDraft} onClick={() => void runAction(testDraft)}>
+                  {t("aiSkills.registry.draftTest.runAll", { defaultValue: "Run all examples" })}
+                </Button>
+              </div>
+            ) : null}
+
+            {publishedProjection && companyId != null ? (
+              <details className="space-y-2 rounded-md border border-border p-3">
+                <summary className="cursor-pointer text-sm font-medium">
+                  {t("aiSkills.registry.draftTest.runPublished", { defaultValue: "Run published skill" })}
+                </summary>
+                <label className="grid gap-1 text-sm">
+                  <span>{t("aiSkills.registry.draftTest.runInput", { defaultValue: "Input JSON" })}</span>
+                  <Textarea variant="plain" rows={3} value={runInput} onChange={(event) => setRunInput(event.target.value)} />
+                </label>
+                <Button size="sm" disabled={runPublishedSkill.isPending} onClick={() => void runAction(executePublishedSkill)}>
+                  {t("aiSkills.registry.draftTest.run", { defaultValue: "Run skill" })}
+                </Button>
+                {runResult && runResult.skillVersionId === publishedVersionId ? (
+                  <pre className="overflow-auto rounded-md bg-muted p-3 text-xs" role="status">
+                    {JSON.stringify(runResult.output, null, 2)}
+                  </pre>
+                ) : null}
+              </details>
+            ) : null}
 
             <details className="space-y-2 border-t border-border pt-3">
               <summary className="cursor-pointer text-sm text-muted-foreground">{t("aiSkills.registry.validation.advanced", { defaultValue: "Advanced manifest" })}</summary>
               <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {t("aiSkills.registry.sections.createVersion")}
               </h4>
+              {selectedSkill?.is_system === false ? (
+                <Button size="sm" variant="outline" onClick={() => setManifestJson(projectionStarter(selectedSkill.skill_key))}>
+                  {t("aiSkills.registry.draftTest.starter", { defaultValue: "Use JSON projection template" })}
+                </Button>
+              ) : null}
               <Textarea
+                aria-label={t("aiSkills.registry.validation.advanced")}
                 variant="plain"
                 rows={6}
                 value={manifestJson}
@@ -391,17 +534,12 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
               />
               <Button
                 size="sm"
-                disabled={!effectiveSkillId || createVersion.isPending}
+                disabled={!selectedSkill || !manifestJson.trim() || createVersion.isPending}
                 onClick={() =>
                   void runAction(async () => {
-                    const skillKey = selectedSkill?.skill_key ?? "report_composer"
-                    const normalized = manifestJson.replace(
-                      /"skill_key":"[^"]+"/,
-                      `"skill_key":"${skillKey}"`,
-                    )
                     await createVersion.mutateAsync({
                       skillId: BigInt(effectiveSkillId),
-                      manifestJson: normalized,
+                      manifestJson: await versionManifest(manifestJson),
                       reviewNotes: "Created from AI Skills admin",
                       metadata: undefined,
                     })
@@ -412,153 +550,6 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
               </Button>
             </details>
           </div>
-
-          <div className="space-y-3 rounded-lg border border-border p-4">
-            <h3 className="text-sm font-medium">{t("aiSkills.registry.sections.fixturesAndRuns")}</h3>
-            {!companyId ? (
-              <p className="text-sm text-amber-600 dark:text-amber-400" role="status">
-                {t("aiSkills.registry.messages.selectCompanyForCertification")}
-              </p>
-            ) : null}
-            {skillFixtures.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("aiSkills.registry.empty.noFixtures")}</p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {skillFixtures.map((fixture) => {
-                  const fixtureId = fixtureRowId(fixture)
-                  return (
-                    <li key={fixtureId} className="rounded border border-border px-3 py-2">
-                      <p className="font-medium">{fixture.name}</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {skillVersions.map((version) => {
-                          const vid = versionId(version)
-                          const request = latestCertificationFor(
-                            fixtureId,
-                            vid,
-                            certifications.data ?? [],
-                          )
-                          const requestStatus = String(request?.status ?? "").toLowerCase()
-                          const passed = certificationHasPassingEvidence(
-                            fixtureId,
-                            vid,
-                            certifications.data ?? [],
-                            [],
-                          )
-                          const active = requestStatus === "queued" || requestStatus === "running"
-                          const label = certificationButtonLabel(t, passed, requestStatus)
-                          return (
-                            <Button
-                              key={`${fixtureId}-${vid}`}
-                              size="sm"
-                              variant={passed ? "secondary" : "outline"}
-                              disabled={
-                                !companyId ||
-                                active ||
-                                passed ||
-                                requestCertification.isPending
-                              }
-                              onClick={() =>
-                                void runAction(async () => {
-                                  await requestCertification.mutateAsync({
-                                    companyId: companyId ?? 0,
-                                    skillVersionId: vid,
-                                    fixtureId,
-                                    idempotencyKey: certificationRequestKey(fixtureId, vid),
-                                  })
-                                  clearCertificationRequestKey(fixtureId, vid)
-                                })
-                              }
-                            >
-                              {label} · v{version.version}
-                            </Button>
-                          )
-                        })}
-                      </div>
-                      {skillVersions.map((version) => {
-                        const vid = versionId(version)
-                        const request = latestCertificationFor(
-                          fixtureId,
-                          vid,
-                          certifications.data ?? [],
-                        )
-                        if (!request) return null
-                        const readinessCode = request.readiness?.code ?? "readiness_unknown"
-                        const evidence = request.evidence
-                        return (
-                          <div
-                            key={`evidence-${fixtureId}-${vid}`}
-                            className="mt-2 rounded bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground"
-                          >
-                            <p>
-                              {t("aiSkills.registry.certification.requestSummary", {
-                                version: version.version,
-                                requestId: Number(request.id),
-                                status: registryStatusLabel(t, String(request.status ?? "unknown")),
-                                readinessCode,
-                              })}
-                            </p>
-                            {evidence ? (
-                              <p className="mt-1 font-mono text-[10px] break-all">
-                                {t("aiSkills.registry.certification.evidenceSummary", {
-                                  evidenceId: Number(evidence.id),
-                                  status: registryStatusLabel(t, String(evidence.status ?? "unknown")),
-                                  hash: String(evidence.executionEvidenceHash ?? evidence.execution_evidence_hash ?? t("aiSkills.registry.certification.noExecutionHash")),
-                                })}
-                              </p>
-                            ) : (
-                              <p className="mt-1">{t("aiSkills.registry.empty.noTerminalEvidence")}</p>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-
-            <div className="space-y-2 border-t border-border pt-3">
-              <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {t("aiSkills.registry.sections.addFixture")}
-              </h4>
-              <Input value={fixtureKey} onChange={(event) => setFixtureKey(event.target.value)} placeholder={t("aiSkills.registry.placeholders.fixtureKey")} />
-              <Input value={fixtureName} onChange={(event) => setFixtureName(event.target.value)} placeholder={t("aiSkills.registry.placeholders.name")} />
-              <Textarea
-                variant="plain"
-                rows={3}
-                className="font-mono text-xs"
-                value={fixtureInputJson}
-                onChange={(event) => setFixtureInputJson(event.target.value)}
-              />
-              <Textarea
-                variant="plain"
-                rows={3}
-                className="font-mono text-xs"
-                value={fixtureExpectedJson}
-                onChange={(event) => setFixtureExpectedJson(event.target.value)}
-              />
-              <Button
-                size="sm"
-                disabled={!effectiveSkillId || createFixture.isPending}
-                onClick={() =>
-                  void runAction(() =>
-                    createFixture.mutateAsync({
-                      skillId: BigInt(effectiveSkillId),
-                      fixtureKey,
-                      name: fixtureName,
-                      description: "Created from AI Skills admin",
-                      inputJson: fixtureInputJson,
-                      expectedOutputJson: fixtureExpectedJson,
-                      metadata: undefined,
-                    }),
-                  )
-                }
-              >
-                {t("aiSkills.registry.actions.createFixture")}
-              </Button>
-            </div>
-          </div>
-        </div>
         ) : null}
 
         {!registryLoading && !registryError && skills.length > 0 ? (
@@ -610,7 +601,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
         </div>
         ) : null}
 
-        <div className="space-y-3 rounded-lg border border-border p-4">
+        {skills.length > 0 ? <div className="space-y-3 rounded-lg border border-border p-4">
           <div>
             <h3 className="text-sm font-medium">{t("aiSkills.registry.knowledge.title")}</h3>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -628,7 +619,7 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
             </label>
             <Button
               size="sm"
-              disabled={!companyId || !selectedSkill || proposeKnowledge.isPending}
+              disabled={!companyId || !selectedSkill || !manifestJson.trim() || proposeKnowledge.isPending}
               onClick={() => void runAction(proposeSelectedKnowledge)}
             >
               {proposeKnowledge.isPending
@@ -658,12 +649,8 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
                       })}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {t("aiSkills.registry.knowledge.statusSummary", {
+                      {t("aiSkills.registry.knowledge.reviewStatus", {
                         status: registryStatusLabel(t, status),
-                        certification: registryStatusLabel(
-                          t,
-                          String(promotion.certificationState ?? promotion.certification_state ?? "not_requested"),
-                        ),
                       })}
                     </p>
                     {status === "proposed" ? (
@@ -689,39 +676,39 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
               })}
             </ul>
           )}
-        </div>
+        </div> : null}
       </div>
       <Dialog open={activationVersionId != null} onOpenChange={(open) => { if (!open) setActivationVersionId(null) }}>
         <DialogContent size="form" layout="bounded">
           <DialogHeader>
             <DialogTitle>{t("aiSkills.registry.validation.reviewActivate", { defaultValue: "Review and activate" })}</DialogTitle>
-            <DialogDescription>{t("aiSkills.registry.validation.approvalPolicy", { defaultValue: "Owners and organization administrators can approve their own certified skills. Other authors and reviewers need an independent approver. The decision and validation note are recorded." })}</DialogDescription>
+            <DialogDescription>{t("aiSkills.registry.validation.releaseApprovalPolicy", { defaultValue: "Owners and organization administrators can approve their own skill versions. Other authors and reviewers need an independent approver. The decision and approval note are recorded." })}</DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
             <p className="text-sm">{selectedSkill?.name} · v{activationVersion?.version} · {activationVersion?.risk}</p>
-            <ul className="space-y-2 text-sm">
-              {skillFixtures.map((fixture) => {
-                const request = latestCertificationFor(fixtureRowId(fixture), activationVersionId ?? 0, certifications.data ?? [])
-                return <li key={fixtureRowId(fixture)}>{fixture.name} · {request?.readiness?.ready ? t("aiSkills.registry.certification.passed") : t("aiSkills.registry.certification.pendingSuffix")} · #{request?.id ?? "—"}</li>
-              })}
-            </ul>
+            {!activationTested ? (
+              <p className="text-sm text-muted-foreground">
+                {t("aiSkills.registry.draftTest.required", { defaultValue: "Every saved example must pass before activation. Close this dialog to run the draft tests." })}
+              </p>
+            ) : null}
             <label className="grid gap-1 text-sm">
-              <span>{t("aiSkills.registry.validation.note", { defaultValue: "Validation note" })}</span>
+              <span>{t("aiSkills.registry.validation.approvalNote")}</span>
               <Textarea variant="plain" rows={3} value={activationNote} maxLength={8000} onChange={(event) => setActivationNote(event.target.value)} />
             </label>
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" checked={activationConfirmed} onChange={(event) => setActivationConfirmed(event.target.checked)} />
-              {t("aiSkills.registry.validation.confirm", { defaultValue: "I reviewed the skill and its passing fixture evidence and approve activation for this organization." })}
+              {t("aiSkills.registry.validation.confirmRelease", { defaultValue: "I reviewed this skill version and approve activation for this organization." })}
             </label>
             {actionError ? <p role="alert" className="text-sm text-destructive">{actionError}</p> : null}
           </DialogBody>
           <DialogFooter>
             <Button variant="outline" disabled={promoteVersion.isPending} onClick={() => setActivationVersionId(null)}>{t("common.cancel")}</Button>
-            <Button disabled={!activationReady || !activationNote.trim() || !activationConfirmed || promoteVersion.isPending} onClick={() => void runAction(async () => {
-              if (activationVersionId == null || !activationReady) return
+            <Button disabled={!activationVersion || !activationTested || !activationNote.trim() || !activationConfirmed || promoteVersion.isPending} onClick={() => void runAction(async () => {
+              if (activationVersionId == null || !activationVersion) return
               await promoteVersion.mutateAsync({ skillVersionId: activationVersionId, reason: activationNote.trim() })
               setActivationVersionId(null)
-            })}>{t("aiSkills.registry.validation.activate", { defaultValue: "Activate certified skill" })}</Button>
+              if (draftTestVersionId === activationVersionId) setDraftTestVersionId(null)
+            })}>{t("aiSkills.registry.validation.activateVersion", { defaultValue: "Activate skill version" })}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

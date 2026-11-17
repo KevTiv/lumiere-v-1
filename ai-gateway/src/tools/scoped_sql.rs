@@ -81,7 +81,11 @@ pub fn execute_low_stock(
         validate_row_scope(row, scope.organization_id, scope.company_id)?;
     }
     for row in products {
-        validate_row_scope(row, scope.organization_id, scope.company_id)?;
+        // The product catalog is organization-shared; only quants own company
+        // scope. Keep certification aligned with the native table relationship.
+        if row_u64(row, "organizationId", "organization_id") != Some(scope.organization_id) {
+            return Err(ScopedSqlError::RowScopeMismatch);
+        }
     }
 
     let input_value = serde_json::to_value(input)
@@ -167,11 +171,9 @@ mod tests {
                 "data": {
                     "products": [{
                         "organizationId": 7,
-                        "companyId": 9,
                         "id": 20,
                         "defaultCode": "W-20",
-                        "name": "Widget",
-                        "reorderingMinQty": 5.0
+                        "name": "Widget"
                     }],
                     "stockQuants": [{
                         "organizationId": 7,

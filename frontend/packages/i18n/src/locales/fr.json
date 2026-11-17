@@ -1,4 +1,53 @@
 {
+  "aiChat": {
+    "draft": {
+      "applied": "Appliqué",
+      "proposedValue": "Valeur proposée",
+      "beforeProposal": "Avant la proposition",
+      "proposedAt": "Proposé",
+      "reviewedAt": "Examiné",
+      "appliedAt": "Appliqué"
+    }
+  },
+  "moduleRecords": {
+    "shopSales": "Ventes en boutique",
+    "saleDate": "Date de vente",
+    "savedShopSale": "Vente en boutique enregistrée",
+    "shop": "Boutique",
+    "emptyShopSales": "Aucune vente en boutique enregistrée.",
+    "sales": "Récapitulatifs des ventes clients",
+    "warehouse": "Comptages enregistrés",
+    "period": "Période de vente",
+    "countDate": "Date du comptage",
+    "customer": "Client",
+    "product": "Produit",
+    "quantity": "Quantité",
+    "unitPrice": "Prix unitaire",
+    "reportedTotal": "Total déclaré",
+    "paymentComment": "Note de paiement",
+    "pieces": "Pièces",
+    "kilograms": "Kilogrammes",
+    "location": "Emplacement",
+    "source": "Source",
+    "sourceRow": "{{file}} · ligne {{row}}",
+    "showAll": "Afficher tous les enregistrements",
+    "loadMore": "Charger plus",
+    "emptySales": "Aucun récapitulatif des ventes clients enregistré.",
+    "emptyCounts": "Aucun comptage enregistré.",
+    "emptyFiltered": "Aucun enregistrement ne correspond aux dates ou à l’import sélectionné.",
+    "otherCompany": "Sélectionnez la société utilisée pour cet import afin de consulter ses enregistrements.",
+    "loadError": "Impossible de charger les enregistrements.",
+    "recordHistory": "Voir l’historique",
+    "recordHistoryLabel": "Voir l’historique de la ligne {{row}} de {{file}}",
+    "savedSale": "Récapitulatif des ventes client enregistré",
+    "savedCount": "Comptage physique enregistré",
+    "recordUnavailable": "Cet enregistrement est indisponible dans votre espace de travail actuel.",
+    "sourceCustomer": "Nom du client dans la source",
+    "unit": "Unité dans la source",
+    "currency": "Devise",
+    "savedAt": "Enregistré le",
+    "sourceRevision": "Révision {{revision}}"
+  },
   "aiHarness": {
     "platformProfile": {
       "tab": "Profil IA",
@@ -41,6 +90,31 @@
     }
   },
   "aiSkills": {
+    "userAccess": {
+      "title": "Accès des utilisateurs",
+      "description": "Gérez l’accès individuel aux compétences intégrées dans cette organisation.",
+      "catalogError": "Impossible de charger les compétences intégrées.",
+      "loadingSkills": "Chargement des compétences intégrées…",
+      "noSkills": "Aucune compétence intégrée disponible.",
+      "skill": "Compétence intégrée",
+      "chooseSkill": "Choisir une compétence",
+      "searchSkills": "Rechercher des compétences",
+      "person": "Membre de l’organisation",
+      "choosePerson": "Choisir un membre",
+      "searchPeople": "Rechercher des membres",
+      "noPeople": "Aucun membre actif disponible.",
+      "peopleDenied": "L’accès à l’annuaire de l’organisation est requis.",
+      "peopleError": "Impossible de charger l’annuaire des membres.",
+      "accessError": "Impossible de vérifier l’accès du membre à cette compétence.",
+      "saving": "Enregistrement de l’accès…",
+      "revoked": "L’accès de ce membre a été révoqué.",
+      "revokedLabel": "Révoqué",
+      "defaultAccess": "Ce membre hérite de l’accès par défaut de l’organisation.",
+      "loadingAccess": "Vérification de l’accès…",
+      "restore": "Rétablir l’accès par défaut",
+      "revoke": "Révoquer l’accès",
+      "saveError": "Impossible de confirmer la modification. Vérifiez l’accès actuel avant de réessayer."
+    },
     "setup": {
       "title": "Configuration des fonctions d’IA",
       "action": "Configurer les fonctions d’IA",
@@ -68,6 +142,10 @@
     }
   },
   "recordChanges": {
+    "valueAbsent": "Champ absent",
+    "valueRestricted": "Accès restreint",
+    "valueUnavailable": "Valeur non enregistrée",
+    "savedChange": "Modification enregistrée",
     "fields": {
       "name": "Description",
       "debit": "Débit",
@@ -545,6 +623,7 @@
     "manufacturing": "Fabrication",
     "map": "Carte",
     "fleet": "Parc automobile",
+    "farmBatches": "Lots d’élevage",
     "helpdesk": "Assistance",
     "workflows": "Circuits de traitement",
     "documents": "Documents",
@@ -1967,6 +2046,56 @@
     }
   },
   "crm": {
+    "dashboard": {
+      "forecastSnapshot": "Dernière prévision",
+      "forecastCaptured": "Date de capture",
+      "forecastEmpty": "Aucune prévision enregistrée pour cette société.",
+      "forecastPeriod": "Période de la prévision",
+      "forecastSaved": "Prévision enregistrée",
+      "forecastSaving": "Enregistrement de la prévision…",
+      "forecastStoredWeight": "Portefeuille pondéré (devise non précisée)"
+    },
+    "segments": {
+      "rulesTitle": "Règles des segments dynamiques",
+      "rulesDescription": "Les contacts doivent respecter toutes les règles. Lancez une évaluation pour actualiser les membres.",
+      "select": "Segment dynamique",
+      "selectPlaceholder": "Choisissez un segment",
+      "noRules": "Aucune règle pour le moment.",
+      "evaluate": "Évaluer",
+      "addRule": "Ajouter une règle",
+      "evaluated": "Membres actualisés.",
+      "existingMembers": "Nombre actuel de membres : {{count}}",
+      "removeAllImpact": "Toutes les règles seront supprimées. Les membres actuels seront conservés et une nouvelle évaluation nécessitera au moins une règle.",
+      "removeRule": "Retirer la règle",
+      "replacementImpact": "Ces règles remplacent les règles actuelles. Les membres du segment sont mis à jour lors de la prochaine évaluation.",
+      "replacementTitle": "Règles après enregistrement",
+      "resetRules": "Recharger les règles enregistrées",
+      "reviewRules": "Vérifier les modifications",
+      "ruleField": "Champ de la règle {{number}}",
+      "ruleOperator": "Opérateur de la règle {{number}}",
+      "rulesCannotEdit": "Ces règles contiennent des paramètres que cet éditeur ne peut pas conserver.",
+      "rulesChanged": "Les règles enregistrées ont changé pendant la modification.",
+      "rulesRefreshConflict": "Impossible de vérifier les règles enregistrées. Rechargez-les avant de les remplacer.",
+      "rulesSaved": "Règles enregistrées. Lancez une évaluation pour actualiser les membres.",
+      "ruleValue": "Valeur de la règle {{number}}",
+      "saveRules": "Enregistrer les nouvelles règles",
+      "fields": {
+        "CountryCode": "Code du pays",
+        "City": "Ville",
+        "Industry": "Secteur",
+        "IsCustomer": "Client",
+        "IsProspect": "Prospect",
+        "IsVendor": "Fournisseur",
+        "TagId": "Étiquette de contact"
+      },
+      "operators": {
+        "Eq": "Est égal à",
+        "Neq": "Est différent de",
+        "Contains": "Contient",
+        "IsTrue": "Oui",
+        "IsFalse": "Non"
+      }
+    },
     "attribution": {
       "title": "Attribution UTM",
       "nameLabel": "Nom"
@@ -2780,6 +2909,8 @@
     "order": {
       "attachments": "Pièces jointes",
       "bills": "Factures fournisseurs",
+      "relatedAccessRestricted": "Accès restreint",
+      "relatedUnavailable": "Indisponible",
       "discussion": "Discussion",
       "receipts": "Reçus",
       "status": {
@@ -4325,6 +4456,14 @@
     }
   },
   "settings": {
+    "importReview": {
+      "grouped": {
+        "rowStatus": "Statut de la ligne",
+        "fieldConfirmation": "Confirmation de {{field}}",
+        "noDecisionChanges": "Aucune valeur enregistrée ni aucun statut de vérification n’a changé.",
+        "proposedAfter": "Après cette décision"
+      }
+    },
     "page": {
       "title": "Paramètres",
       "description": "Gérez votre compte et la configuration du système"
@@ -4342,6 +4481,11 @@
       "status": "Statut",
       "importedRows": "Importé",
       "errorRows": "Erreurs"
+    },
+    "importPreparation": {
+      "worksheet": "Feuille de calcul",
+      "worksheetHint": "Sélectionnez les feuilles à inclure. Chaque feuille conserve ses lignes d’origine et peut avoir sa propre correspondance de colonnes.",
+      "worksheets": "Feuilles à préparer"
     },
     "backToSettings": "Retour aux paramètres",
     "adminAccess": "Accès administrateur",
@@ -5091,6 +5235,9 @@
     }
   },
   "businessHistory": {
+    "allActivity": "Toute l’activité",
+    "openChange": "Ouvrir la modification",
+    "eventUnavailable": "Cette modification est indisponible pour la société actuelle ou selon vos droits d’accès.",
     "title": "Historique et sources",
     "changes": "Modifications",
     "activity": "Activité",

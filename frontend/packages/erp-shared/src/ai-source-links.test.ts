@@ -50,7 +50,7 @@ test("all ten Alpha modules have exact destinations using existing bounded works
   const destinations = [
     ["account_move", "/accounting?tab=journal-entries&filter=id%3A42"],
     ["hr_expense", "/expenses?tab=expenses&filter=id%3A42"],
-    ["financial_report", "/reports?tab=reports&filter=id%3A42"],
+    ["financial_report", "/reports?tab=reports&report=42"],
     ["sale_order", "/sales?tab=orders&filter=id%3A42"],
     ["contact", "/crm?tab=contacts&filter=id%3A42"],
     ["purchase_order", "/purchasing?tab=orders&filter=id%3A42"],

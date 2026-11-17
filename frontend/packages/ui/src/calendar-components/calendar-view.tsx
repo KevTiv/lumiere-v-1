@@ -9,8 +9,9 @@ import { Skeleton } from "../components/skeleton"
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { CalendarEvent, ViewMode } from "../lib/calendar-types"
-import { calendarDayKey, calendarEventsForDay, calendarPeriodDays } from "../lib/calendar-dates"
+import { calendarDayKey, calendarEventsForDay, calendarPeriodDays, shiftCalendarDate } from "../lib/calendar-dates"
 import { zonedCalendarParts, resolveCalendarTimezone } from "@lumiere/erp-shared/calendar-timezone"
+import { visibleCalendarOccurrences } from "../lib/calendar-recurrence"
 import { EventDetailPanel } from "./event-detail-panel"
 
 const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const
@@ -49,19 +50,23 @@ export function CalendarView({
   const [browserReady, setBrowserReady] = useState(false)
   useEffect(() => { setBrowserReady(true) }, [])
   const locale = i18n.language
-  const filteredEvents = useMemo(() => {
-    const term = searchTerm.trim().toLocaleLowerCase(locale)
-    return events.filter((event) => !term || `${event.title} ${event.description ?? ""} ${event.location ?? ""}`.toLocaleLowerCase(locale).includes(term))
-  }, [events, searchTerm, locale])
-  // Explicit account timezone owns grouping/display; browser fallback remains deterministic. Server and
-  // first-client render must agree before those browser-specific values exist.
-  if (!browserReady || !timezoneReady) return <div className={cn("min-w-0 space-y-4", className)} aria-busy="true" aria-label={t("common.loading", { defaultValue: "Loading" })} data-testid="calendar-workspace-loading"><Skeleton className="h-16 w-full" /><Skeleton className="h-64 w-full" /></div>
   const fallback = resolveCalendarTimezone(undefined, Intl.DateTimeFormat().resolvedOptions().timeZone)
   const timezone = timeZone ?? fallback.timeZone
   const source = timezoneSource ?? fallback.source
+  const days = useMemo(() => calendarPeriodDays(viewMode, currentDate, timezone), [viewMode, currentDate, timezone])
+  const occurrences = useMemo(
+    () => visibleCalendarOccurrences(events, days[0]!, shiftCalendarDate(days[days.length - 1]!, 1, timezone), timezone),
+    [events, days, timezone],
+  )
+  const filteredEvents = useMemo(() => {
+    const term = searchTerm.trim().toLocaleLowerCase(locale)
+    return occurrences.events.filter((event) => !term || `${event.title} ${event.description ?? ""} ${event.location ?? ""}`.toLocaleLowerCase(locale).includes(term))
+  }, [occurrences, searchTerm, locale])
+  // Explicit account timezone owns grouping/display; browser fallback remains deterministic. Server and
+  // first-client render must agree before those browser-specific values exist.
+  if (!browserReady || !timezoneReady) return <div className={cn("min-w-0 space-y-4", className)} aria-busy="true" aria-label={t("common.loading", { defaultValue: "Loading" })} data-testid="calendar-workspace-loading"><Skeleton className="h-16 w-full" /><Skeleton className="h-64 w-full" /></div>
   const dayKey = (date: Date) => calendarDayKey(date, timezone)
-  const days = calendarPeriodDays(viewMode, currentDate, timezone)
-  const selectedEvent = events.find((event) => event.id === selectedEventId)
+  const selectedEvent = occurrences.events.find((event) => event.id === selectedEventId)
   const labelDate = (date: Date) => date.toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric", timeZone: timezone })
   const monthYear = currentDate.toLocaleDateString(locale, { month: "long", year: "numeric", timeZone: timezone })
   const modes: Array<{ mode: ViewMode; label: string }> = [
@@ -103,6 +108,7 @@ export function CalendarView({
         <div>
           <h2 className="text-xl font-semibold">{monthYear}</h2>
           <p data-testid="calendar-timezone" className="mt-1 break-words text-xs text-muted-foreground">{t(`calendar.workspace.timezoneSource.${source}`, { defaultValue: source === "account" ? "Times shown in {{timezone}} (account setting)" : source === "browser" ? "Times shown in {{timezone}} (browser fallback)" : "Times shown in {{timezone}} (UTC fallback)", timezone })}</p>
+          {occurrences.incomplete && <p role="status" className="mt-1 text-xs text-muted-foreground">{t("calendar.workspace.recurrenceUnavailable", { defaultValue: "Some recurring dates could not be displayed. Open the original event to check its recurrence." })}</p>}
           {timezoneNotice && <p role="status" className="mt-1 max-w-lg break-words text-xs text-muted-foreground">{timezoneNotice}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -146,7 +152,7 @@ export function CalendarView({
           {agendaDays.map(({ day, events: dayEvents }) => <section key={dayKey(day)} className="space-y-2" aria-label={labelDate(day)}><h3 className="text-sm font-semibold">{labelDate(day)}</h3>{dayEvents.length ? dayEvents.map(eventButton) : <p className="text-sm text-muted-foreground">{t("calendar.view.noEventsScheduled")}</p>}</section>)}
         </div>
       ) : <div className="flex min-h-48 flex-col items-center justify-center gap-2 rounded-lg border bg-card p-4 text-center text-muted-foreground"><CalendarIcon className="size-6" /><p className="text-sm">{t("calendar.view.noEventsScheduled")}</p></div>}
-      {selectedEvent && <EventDetailPanel event={selectedEvent} timeZone={timezone} onClose={() => onSelectEvent(null)} onEdit={onEditEvent ? () => onEditEvent(selectedEvent.id) : undefined} onDelete={onDeleteEvent ? () => onDeleteEvent(selectedEvent.id) : undefined} openHref={eventHref?.(selectedEvent.id)} />}
+      {selectedEvent && <EventDetailPanel event={selectedEvent} timeZone={timezone} onClose={() => onSelectEvent(null)} onEdit={onEditEvent && !selectedEvent.seriesId ? () => onEditEvent(selectedEvent.id) : undefined} onDelete={onDeleteEvent && !selectedEvent.seriesId ? () => onDeleteEvent(selectedEvent.id) : undefined} openHref={eventHref?.(selectedEvent.seriesId ?? selectedEvent.id)} />}
     </div>
   )
 }

@@ -30,6 +30,12 @@
       "reason": "Reviewed managed AI setup; native authorization enforces organization configuration permissions or platform superuser authority."
     },
     {
+      "name": "enroll_persistent_platform_operator",
+      "exposure": "denied",
+      "reason": "private operator enrollment; the deployment-compiled exact principal and existing scoped binding are enforced by native authorization",
+      "unscoped_reason": "identity, organization, company and approval reference derive from deployment policy; no caller-supplied enrollment target"
+    },
+    {
       "name": "provision_ai_company_defaults",
       "exposure": "session",
       "reason": "Authenticated organization AI setup; native reducer enforces agent/skill configuration permission, company ownership, funded agent/profile compatibility, and preserves existing overrides."
@@ -513,6 +519,11 @@
       "name": "cancel_ai_agent_run",
       "exposure": "session",
       "reason": "AI Skills UI action guarded by reducer-side write permission and organization/company ownership checks"
+    },
+    {
+      "name": "cancel_ai_embedding_job",
+      "exposure": "denied",
+      "reason": "Private embedding-runtime recovery; exact active AI writer and current worker/token/revision proof, no generic queue grant or financial settlement"
     },
     {
       "name": "cancel_budget",
@@ -4351,6 +4362,11 @@
       "name": "update_ai_agent",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "update_ai_chat_session_title",
+      "exposure": "session",
+      "reason": "interactive chat rename requires active company access and authenticated session ownership"
     },
     {
       "name": "update_ai_reducer_allowlist",

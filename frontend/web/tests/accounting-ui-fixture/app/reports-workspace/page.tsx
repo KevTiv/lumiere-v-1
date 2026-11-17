@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { LumiereApiProvider } from "@lumiere/api-client"
+import { webApi } from "../../../../lib/lumiere-web-http"
 import { ErpSessionProvider } from "@lumiere/erp-session"
 import { I18nProvider, useTranslation } from "@lumiere/i18n"
 import { ThemeProvider } from "@lumiere/ui/components/theme-provider"
@@ -16,6 +18,8 @@ import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 import { businessWorkspaceNavigation } from "../../../../lib/business-workspace-navigation"
 import type { ModuleConfig } from "@lumiere/ui/lib/module-types"
 import { ModuleInsights } from "../../../../components/module-insights"
+import { PivotExplorer } from "../../../../app/(modules)/reports/pivot-explorer"
+import { OwnerReportsPanel } from "../../../../app/(modules)/reports/owner-reports-panel"
 import { ReportStart, ReportResult } from "../../../../app/(modules)/reports/report-workspace"
 import { selectedReport, reportCanDownload, type ReportRow } from "../../../../app/(modules)/reports/report-workspace-model"
 
@@ -31,6 +35,7 @@ function Preview() {
   const [formType, setFormType] = useState<string | null>(null)
   const [reject, setReject] = useState(false)
   const [source, setSource] = useState<ModuleDataState["status"]>("ready")
+  const [balanceFailed, setBalanceFailed] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
   useEffect(() => { const raw = sessionStorage.getItem(storageKey); if (raw) setRows(JSON.parse(raw) as ReportRow[]); setHydrated(true) }, [])
   const state: ModuleDataState = source === "error" ? { status: "error", onRetry: () => setSource("ready") } : { status: source }
@@ -58,7 +63,15 @@ function Preview() {
     ? <ReportResult report={report} sourceState={state} companyLabel="Synthetic Alpha Ltd" currencyLabel="Euro (EUR)" onBack={() => router.push("/reports-workspace?tab=reports")} actions={report && !readOnly && reportCanDownload(report) ? <Button onClick={() => setDownloaded(true)}>Export CSV</Button> : undefined}>
         <p data-testid="synthetic-report-output">Saved output for {String(report?.name)}: 125.00 EUR</p>
       </ReportResult>
-    : <section className="space-y-3"><h2 className="text-xl font-semibold">Saved reports</h2>{rows.map((row) => <div key={String(row.id)}><Button variant="link" onClick={() => open(String(row.id))}>{String(row.name)}</Button></div>)}</section> } : tab) }
+    : <section className="space-y-3"><h2 className="text-xl font-semibold">Saved reports</h2>{rows.map((row) => <div key={String(row.id)}><Button variant="link" onClick={() => open(String(row.id))}>{String(row.name)}</Button></div>)}</section> }
+    : tab.id === "pivot-explorer" ? { ...tab, type: "custom" as const, customContent: (
+      <PivotExplorer organizationId={1n} companyId={1n} financialReports={[first]} reportsState={state}
+        trialBalances={[{ reportId: first.id, accountCode: "9000", accountType: "Expense", closingDebit: 125 }]}
+        balancesState={balanceFailed ? { status: "error", onRetry: () => setBalanceFailed(false) } : { status: "ready" }} />
+    ) }
+    : tab.id === "owner-reports" ? { ...tab, type: "custom" as const, customContent: (
+      <OwnerReportsPanel organizationId={1n} defaultCompanyId={1} companies={[{ id: 1, name: "Synthetic Alpha Ltd" }]} />
+    ) } : tab) }
   if (before) config.workspaceNav = { label: "Workspace", overflowLabel: "Advanced", workspaces: [
     { id: "overview", label: "Overview", tabIds: ["dashboard", "owner-reports"] },
     { id: "financial", label: "Financial", tabIds: ["reports", "statements", "trial-balance", "vat-report"] },
@@ -69,6 +82,7 @@ function Preview() {
   return <main className="mx-auto min-w-0 max-w-7xl space-y-5 p-4 sm:p-6">
     <p data-testid="reports-fixture-disclosure" data-hydrated={hydrated} className="text-xs text-muted-foreground">Synthetic Reports UI preview. Saves use session storage; no ERP operations or authentication.</p>
     <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setReject((value) => !value)}>{reject ? "Allow synthetic save" : "Reject synthetic save"}</Button><Button variant="outline" onClick={() => setSource("error")}>Fail synthetic source</Button><Button variant="outline" onClick={() => setSource("denied")}>Deny synthetic source</Button><Button variant="outline" onClick={() => setSource("loading")}>Load synthetic source</Button></div>
+    {params.get("tab") === "pivot-explorer" ? <Button onClick={() => setBalanceFailed(true)}>Fail pivot balances</Button> : null}
     {downloaded && <p role="status">Synthetic CSV requested</p>}
     <ModuleView config={config} dashboardContent={before
       ? <ModuleInsights input={{ module: "reports", organizationId: 1, companyId: 1n, records: { rows, state }, currencies: { rows: [{ id: 1, code: "EUR", decimalPlaces: 2 }], state: { status: "ready" } } }} sections={base.tabs[0]!.sections ?? []} now={new Date("2026-10-28T12:00:00Z")} />
@@ -84,5 +98,5 @@ function Preview() {
 
 export default function Page() {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }))
-  return <QueryClientProvider client={client}><I18nProvider language="en"><RBACProvider useDefaultFixtures><ErpSessionProvider value={{ identity: null, connected: false }}><ThemeProvider defaultTheme="light"><Preview /></ThemeProvider></ErpSessionProvider></RBACProvider></I18nProvider></QueryClientProvider>
+  return <LumiereApiProvider client={webApi}><QueryClientProvider client={client}><I18nProvider language="en"><RBACProvider useDefaultFixtures><ErpSessionProvider value={{ identity: null, connected: false }}><ThemeProvider defaultTheme="light"><Preview /></ThemeProvider></ErpSessionProvider></RBACProvider></I18nProvider></QueryClientProvider></LumiereApiProvider>
 }

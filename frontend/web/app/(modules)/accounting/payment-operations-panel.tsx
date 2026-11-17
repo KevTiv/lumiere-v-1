@@ -13,6 +13,8 @@ import {
   stageBankStatementImportForm,
 } from "@lumiere/ui/lib/accounting-form-configs"
 import { mergeFieldDefaultValues, mergeSelectOptionsForFields } from "@lumiere/ui/lib/form-config-merge"
+import { mergeModuleStates, moduleQueryState, type ModuleDataState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
 import { RuntimeFormModal } from "../../../../packages/ui/src/forms/runtime-form-modal"
 import {
   useAllocatePaymentTransaction,
@@ -46,6 +48,16 @@ import { allocationReadback, allocationSource, paymentId, paymentInputAmount, pr
 import { PaymentAllocationReview, StatementImportReview, type SubmittedAllocation } from "./payment-workflow-previews"
 
 type Row = Record<string, unknown>
+
+const NO_ROWS: Row[] = []
+const NO_STATEMENT_IMPORTS = { imports: NO_ROWS, lines: NO_ROWS }
+
+function PaymentSourceNotice({ state }: { state: ModuleDataState }) {
+  const { t } = useTranslation()
+  return state.status === "loading"
+    ? <p role="status">{t("common.loading")}</p>
+    : <ModuleDataNotice state={mergeModuleStates([state])} />
+}
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -118,16 +130,29 @@ export function PaymentOperationsPanel({
   const { t } = useTranslation()
   const organization = BigInt(organizationId)
   const accountsRead = usePaymentAccounts(organization)
-  const { data: accounts = [], isLoading: accountsLoading } = accountsRead
+  const accountsState = moduleQueryState({ ...accountsRead, isLoading: accountsRead.isPending })
+  const accounts = accountsState.status === "ready" ? accountsRead.data ?? NO_ROWS : NO_ROWS
   const transactionsRead = usePaymentTransactions(organization)
-  const { data: transactions = [], isLoading: transactionsLoading } = transactionsRead
+  const transactionsState = moduleQueryState({ ...transactionsRead, isLoading: transactionsRead.isPending })
+  const transactions = transactionsState.status === "ready" ? transactionsRead.data ?? NO_ROWS : NO_ROWS
   const reconciliationsRead = usePaymentReconciliations(organization)
   const { data: reconciliations = [] } = reconciliationsRead
   const allocationBalances = usePaymentAllocationBalances(organization, companyId)
   const { data: reversals = [] } = usePaymentReversals(organization)
   const { data: fees = [] } = usePaymentFees(organization)
   const statementImportsRead = useBankStatementImports(organization, companyId)
-  const { data: statementImportWorkspace = { imports: [], lines: [] }, isLoading: statementImportsLoading } = statementImportsRead
+  // A successful response carries both the import headers and their validation lines.
+  const statementImportsState = moduleQueryState({
+    ...statementImportsRead,
+    isLoading: statementImportsRead.isPending,
+    data: statementImportsRead.data?.imports,
+  })
+  const statementImportWorkspace = statementImportsState.status === "ready"
+    ? statementImportsRead.data ?? NO_STATEMENT_IMPORTS
+    : NO_STATEMENT_IMPORTS
+  const canAddAccount = scopeAvailable && accountsState.status === "ready"
+  const canRecordPayment = canAddAccount && transactionsState.status === "ready"
+  const canStageStatement = scopeAvailable && statementImportsState.status === "ready"
   const createAccount = useCreatePaymentAccount(organization)
   const createTransaction = useCreatePaymentTransaction(organization)
   const postTransaction = usePostPaymentTransaction(organization)
@@ -263,7 +288,7 @@ export function PaymentOperationsPanel({
   const saveAccount = async (data: Row) => {
     try {
       setFormError(null)
-      if (!scopeAvailable) throw new Error("Select a company before creating a payment account.")
+      if (!canAddAccount) throw new Error("Refresh payment accounts before creating an account.")
       const currencyId = asId(data.currencyId)
       const accountJournalId = asId(data.accountJournalId)
       const providerCode = stringValue(data.providerCode) || "Other"
@@ -294,7 +319,7 @@ export function PaymentOperationsPanel({
   const saveTransaction = async (data: Row) => {
     try {
       setFormError(null)
-      if (!scopeAvailable) throw new Error("Select a company before recording a payment.")
+      if (!canRecordPayment) throw new Error("Refresh payment accounts and transactions before recording a payment.")
       const paymentAccountId = asId(data.paymentAccountId)
       const partnerId = asId(data.partnerId)
       const currencyId = asId(data.currencyId)
@@ -483,7 +508,7 @@ export function PaymentOperationsPanel({
     if (submittedStatement || statementPreparing) return
     try {
       setFormError(null)
-      if (!scopeAvailable) throw new Error("Select a company before importing a statement.")
+      if (!canStageStatement) throw new Error("Refresh bank statement imports before reviewing a statement.")
       setStatementPreparing(true)
       const values = statementValues.current
       if (!values) throw new Error(t("accounting.workflowTools.reviewFirst", { defaultValue: "Choose a CSV file and statement setup, then select Review CSV. No rows are sent to the server during this review." }))
@@ -512,7 +537,7 @@ export function PaymentOperationsPanel({
     let submitted = false
     try {
       setFormError(null)
-      if (!scopeAvailable) throw new Error("Select the original company before importing a statement.")
+      if (!canStageStatement) throw new Error("Refresh bank statement imports before importing a statement.")
       const review = statementReview
       if (!review || !statementReviewMatches(review, data, companyId) || !statementBalanceReview(review).withinEnvelope) {
         throw new Error(t("accounting.workflowTools.reviewAgain", { defaultValue: "Review the current file and setup before staging." }))
@@ -540,7 +565,7 @@ export function PaymentOperationsPanel({
     if (importId == null) return
     try {
       setActionError(null)
-      if (!scopeAvailable) throw new Error("Select the original company before approving the statement import.")
+      if (!canStageStatement) throw new Error("Refresh bank statement imports before approving the statement import.")
       await approveStatementImport.mutateAsync(importId)
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Unable to approve the statement import")
@@ -577,21 +602,23 @@ export function PaymentOperationsPanel({
     <div className="space-y-4">
       {actionError ? <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{actionError}</p> : null}
       {unresolvedAllocation && !allocateTransaction.isPending ? <div role="alert" className="space-y-2 rounded-md border border-amber-500/40 p-3 text-sm"><p>The allocation response is unresolved. Retry the original allocation with the same values to recover its result.</p>{!allocationScopeMatches ? <p>{t("accounting.paymentOperations.returnToAllocationCompany", { defaultValue: "Return to company #{{companyId}} to recover the original allocation.", companyId: String(unresolvedAllocation.params.companyId) })}</p> : null}<Button size="sm" variant="outline" disabled={!scopeAvailable || mutationPending || !allocationScopeMatches} onClick={() => void retryAllocation()}>Retry original allocation</Button></div> : null}
+      {scopeAvailable ? <>
       <Card>
         <CardHeader>
           <div>
             <CardTitle>Payment accounts</CardTitle>
             <CardDescription>Cash drawers, bank accounts, and mobile-money wallets that post through accounting journals.</CardDescription>
           </div>
-          <CardAction><Button size="sm" onClick={() => { setFormError(null); setAccountDialogOpen(true) }}><PlusIcon data-icon="inline-start" />Add account</Button></CardAction>
+          {canAddAccount ? <CardAction><Button size="sm" onClick={() => { setFormError(null); setAccountDialogOpen(true) }}><PlusIcon data-icon="inline-start" />Add account</Button></CardAction> : null}
         </CardHeader>
         <CardContent>
-          {activeAccounts.length > 0 ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{activeAccounts.map((account) => (
+          {accountsState.status !== "ready" ? <PaymentSourceNotice state={accountsState} />
+          : activeAccounts.length > 0 ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{activeAccounts.map((account) => (
             <div key={String(account.id)} className="rounded-lg border p-3">
               <div className="flex items-center justify-between gap-2"><p className="font-medium">{String(account.name ?? account.id)}</p>{account.isPrimary ? <Badge>Primary</Badge> : null}</div>
               <p className="mt-1 text-sm text-muted-foreground">{enumName(account.providerCode)} · {String(optionValue(account.referenceMasked) ?? "No reference")}</p>
             </div>
-          ))}</div> : <Empty><EmptyHeader><EmptyMedia variant="icon"><Building2Icon /></EmptyMedia><EmptyTitle>{accountsLoading ? "Loading payment accounts" : "No payment accounts"}</EmptyTitle><EmptyDescription>Create the wallet, cash, or bank account that will receive operational payments.</EmptyDescription></EmptyHeader><EmptyContent><Button size="sm" onClick={() => setAccountDialogOpen(true)}><PlusIcon data-icon="inline-start" />Add account</Button></EmptyContent></Empty>}
+          ))}</div> : <Empty><EmptyHeader><EmptyMedia variant="icon"><Building2Icon /></EmptyMedia><EmptyTitle>No payment accounts</EmptyTitle><EmptyDescription>Create the wallet, cash, or bank account that will receive operational payments.</EmptyDescription></EmptyHeader>{canAddAccount ? <EmptyContent><Button size="sm" onClick={() => setAccountDialogOpen(true)}><PlusIcon data-icon="inline-start" />Add account</Button></EmptyContent> : null}</Empty>}
         </CardContent>
       </Card>
 
@@ -601,10 +628,11 @@ export function PaymentOperationsPanel({
             <CardTitle>Bank statement imports</CardTitle>
             <CardDescription>Stage a CSV for validation first. Approval creates bank-statement lines for the existing manual matching workspace.</CardDescription>
           </div>
-          <CardAction><Button size="sm" onClick={() => { setFormError(null); setStatementImportDialogOpen(true) }}><FileUpIcon data-icon="inline-start" />{t("accounting.workflowTools.importCsv", { defaultValue: "Import CSV" })}</Button></CardAction>
+          {canStageStatement ? <CardAction><Button size="sm" onClick={() => { setFormError(null); setStatementImportDialogOpen(true) }}><FileUpIcon data-icon="inline-start" />{t("accounting.workflowTools.importCsv", { defaultValue: "Import CSV" })}</Button></CardAction> : null}
         </CardHeader>
         <CardContent className="space-y-3">
-          {statementImports.length > 0 ? statementImports.map((statementImport) => {
+          {statementImportsState.status !== "ready" ? <PaymentSourceNotice state={statementImportsState} />
+          : statementImports.length > 0 ? statementImports.map((statementImport) => {
             const state = stringValue(statementImport.state).toLowerCase()
             const importLines = statementImportLines.filter((line) => String(line.importId) === String(statementImport.id))
             const failedLines = importLines.filter((line) => stringValue(optionValue(line.validationError))).length
@@ -621,18 +649,19 @@ export function PaymentOperationsPanel({
                 {canApprove ? <Button size="sm" variant="outline" disabled={mutationBusy} onClick={() => void approveImport(statementImport)}><SendIcon data-icon="inline-start" />Approve to reconcile</Button> : null}
               </div>
             </div>
-          }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><FileUpIcon /></EmptyMedia><EmptyTitle>{statementImportsLoading ? "Loading statement imports" : "No statement imports"}</EmptyTitle><EmptyDescription>{t("accounting.workflowTools.importEmpty", { defaultValue: "Upload a bank CSV to review its rows and balances before staging." })}</EmptyDescription></EmptyHeader><EmptyContent><Button size="sm" onClick={() => setStatementImportDialogOpen(true)}><FileUpIcon data-icon="inline-start" />{t("accounting.workflowTools.importCsv", { defaultValue: "Import CSV" })}</Button></EmptyContent></Empty>}
+          }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><FileUpIcon /></EmptyMedia><EmptyTitle>No statement imports</EmptyTitle><EmptyDescription>{t("accounting.workflowTools.importEmpty", { defaultValue: "Upload a bank CSV to review its rows and balances before staging." })}</EmptyDescription></EmptyHeader>{canStageStatement ? <EmptyContent><Button size="sm" onClick={() => setStatementImportDialogOpen(true)}><FileUpIcon data-icon="inline-start" />{t("accounting.workflowTools.importCsv", { defaultValue: "Import CSV" })}</Button></EmptyContent> : null}</Empty>}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <div><CardTitle>Transactions & reconciliation</CardTitle><CardDescription>Record provider events, post them to the ledger, then match them to invoice or bill lines. Original-total history imports use the internal transaction ID shown below. Eligible migration payments must use source historical_accounting_import and an operator-supplied positive numeric migration batch reference.</CardDescription></div>
-          <CardAction><Button size="sm" disabled={activeAccounts.length === 0} onClick={() => { setFormError(null); setTransactionDialogOpen(true) }}><PlusIcon data-icon="inline-start" />Record payment</Button></CardAction>
+          <CardAction><Button size="sm" disabled={!canRecordPayment || activeAccounts.length === 0} onClick={() => { setFormError(null); setTransactionDialogOpen(true) }}><PlusIcon data-icon="inline-start" />Record payment</Button></CardAction>
         </CardHeader>
         <CardContent className="space-y-3">
           {allocationBalances.state.status !== "ready" ? <div role="status" className="rounded-md border border-dashed p-3 text-sm text-muted-foreground"><p>{allocationBalances.state.status === "loading" ? "Loading payment allocation balances…" : allocationBalances.state.status === "denied" ? "Access to payment allocation balances is restricted." : "Complete payment allocation balances are unavailable. Allocation is paused until the ledger sources can be verified."}</p>{"onRetry" in allocationBalances.state && allocationBalances.state.onRetry ? <Button size="sm" variant="outline" className="mt-2" disabled={!scopeAvailable} onClick={allocationBalances.state.onRetry}>Retry balances</Button> : null}</div> : null}
-          {companyTransactions.length > 0 ? companyTransactions.map((transaction) => {
+          {transactionsState.status !== "ready" ? <PaymentSourceNotice state={transactionsState} />
+          : companyTransactions.length > 0 ? companyTransactions.map((transaction) => {
             const id = rowId(transaction)
             const status = enumName(transaction.status)
             const balance = balancesByTransaction.get(String(transaction.id))
@@ -657,20 +686,21 @@ export function PaymentOperationsPanel({
                 </div>
               </div>
             </div>
-          }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><CircleDollarSignIcon /></EmptyMedia><EmptyTitle>{transactionsLoading ? "Loading transactions" : "No payment transactions"}</EmptyTitle><EmptyDescription>Record a provider event, post it, and allocate it to an open invoice or bill.</EmptyDescription></EmptyHeader></Empty>}
+          }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><CircleDollarSignIcon /></EmptyMedia><EmptyTitle>No payment transactions</EmptyTitle><EmptyDescription>Record a provider event, post it, and allocate it to an open invoice or bill.</EmptyDescription></EmptyHeader></Empty>}
         </CardContent>
       </Card>
+      </> : <p role="status" className="text-sm text-muted-foreground">Select a company to view payment operations.</p>}
 
-      <RuntimeFormModal open={accountDialogOpen} onOpenChange={(open) => !open && setAccountDialogOpen(false)} staticConfig={paymentAccountForm} moduleId="accounting" organizationId={organizationId} isPending={createAccount.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveAccount} />
-      <RuntimeFormModal open={transactionDialogOpen} onOpenChange={(open) => !open && setTransactionDialogOpen(false)} staticConfig={paymentTransactionForm} moduleId="accounting" organizationId={organizationId} isPending={createTransaction.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveTransaction} />
+      <RuntimeFormModal open={accountDialogOpen} onOpenChange={(open) => !open && setAccountDialogOpen(false)} staticConfig={paymentAccountForm} moduleId="accounting" organizationId={organizationId} isPending={createAccount.isPending} submissionDisabled={!canAddAccount} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveAccount} />
+      <RuntimeFormModal open={transactionDialogOpen} onOpenChange={(open) => !open && setTransactionDialogOpen(false)} staticConfig={paymentTransactionForm} moduleId="accounting" organizationId={organizationId} isPending={createTransaction.isPending} submissionDisabled={!canRecordPayment} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveTransaction} />
       <RuntimeFormModal
         open={statementImportDialogOpen} onOpenChange={closeStatementImport} staticConfig={statementImportForm}
         moduleId="accounting" organizationId={organizationId} closeOnSubmit={false} submitError={formError}
         isPending={stageStatementImport.isPending || statementPreparing}
-        submissionDisabled={!scopeAvailable || !statementReview || !statementBalanceReview(statementReview).withinEnvelope || submittedStatement != null}
+        submissionDisabled={!canStageStatement || !statementReview || !statementBalanceReview(statementReview).withinEnvelope || submittedStatement != null}
         transformConfig={(config) => ({ ...config, sections: config.sections.map((section) => ({ ...section, fields: section.fields.map((field) => ({ ...field, disabled: field.disabled || submittedStatement != null || statementPreparing })) })) })}
         onValuesChange={(values) => { statementValues.current = values; if (!submittedStatement) setStatementReview(null) }}
-        formLeadingActions={<Button type="button" variant="outline" disabled={stageStatementImport.isPending || statementPreparing || submittedStatement != null} onClick={() => void reviewStatementImport()}>{t("accounting.workflowTools.reviewCsv", { defaultValue: "Review CSV" })}</Button>}
+        formLeadingActions={<Button type="button" variant="outline" disabled={!canStageStatement || stageStatementImport.isPending || statementPreparing || submittedStatement != null} onClick={() => void reviewStatementImport()}>{t("accounting.workflowTools.reviewCsv", { defaultValue: "Review CSV" })}</Button>}
         renderPreview={(values) => <StatementImportReview review={submittedStatement ?? (statementReview && statementReviewMatches(statementReview, values, companyId) ? statementReview : null)} submitted={submittedStatement != null} result={statementResult} requestState={statementRequestState}
           onCheck={() => { void statementImportsRead.refetch() }} checking={statementImportsRead.isFetching}
           journalLabel={journalOptions.find((option) => option.value === String((submittedStatement ?? statementReview)?.journalId))?.label ?? "—"}

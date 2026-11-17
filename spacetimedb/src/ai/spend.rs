@@ -473,7 +473,7 @@ pub fn reserve_ai_spend(
         organization_id,
         params.agent_id,
         &params.billing_period,
-        &params.currency,
+        Some(&params.currency),
     )?;
     let reserved_units = allowance_cost(
         &snapshot,

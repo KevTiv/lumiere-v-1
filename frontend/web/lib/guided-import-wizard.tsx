@@ -5,6 +5,8 @@ import { FileUploadField } from "@lumiere/ui/components/file-upload-field"
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useReducer, useState } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
+import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
 import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
 import { isWorkspaceImportTargetVisible } from "@lumiere/ui/lib/workspace-profile"
 import { useTranslation } from "@lumiere/i18n"
@@ -44,10 +46,11 @@ import {
 } from "@lumiere/query-hooks/hooks/import-mapping-templates"
 import {
   jobsForEntity,
-  useImportJobErrors,
+  useExactImportJob,
+  useExactImportJobErrors,
   useImportJobs,
   useRollbackImportJob,
-  type ImportJobErrorRow,
+  canRollbackImportJob,
   type ImportJobRow,
 } from "@lumiere/query-hooks/hooks/import-jobs"
 import {
@@ -151,7 +154,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
   const finalizeImport = useFinalizeImportAssistantJob(orgId)
   const rollbackImport = useRollbackImportJob(orgId)
   const templatesQuery = useImportMappingTemplates(orgId)
-  const importJobsQuery = useImportJobs(orgId)
+  const importJobsQuery = useImportJobs(orgId, true, companyId)
   const contactsQuery = useContacts(orgId)
   const productsQuery = useProducts(orgId)
 
@@ -198,7 +201,6 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
   const [recoveryReady, setRecoveryReady] = useState(false)
   const [recoveryError, setRecoveryError] = useState<string | null>(null)
   const [rollbackConfirmId, setRollbackConfirmId] = useState<string | null>(null)
-  const importErrorsQuery = useImportJobErrors(orgId, importedJobId != null)
   const { confirm, dialog: discardDialog } = useConfirmDialog()
   const operationBusy = !recoveryReady || !!recoveryError || busy || readingFile || analyze.isPending || preview.isPending || saveTemplate.isPending
     || deleteTemplate.isPending || finalizeImport.isPending || rollbackImport.isPending || trackedImport.isPending
@@ -243,24 +245,19 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
     targetEntity,
   )
   const selectedTemplate = selectedTemplateRow(entityTemplates, selectedTemplateId)
-  const entityJobs = useMemo(
-    () =>
-      jobsForEntity(
-        (importJobsQuery.data ?? []) as unknown as ImportJobRow[],
-        trackedImportEntity(targetEntity),
-        5,
-      ),
-    [importJobsQuery.data, targetEntity],
-  )
-  const activeJob = useMemo(
-    () =>
-      importedJobId
-        ? ((importJobsQuery.data ?? []) as unknown as ImportJobRow[]).find(
-            (job) => String(job.id ?? "") === importedJobId,
-          )
-        : undefined,
-    [importJobsQuery.data, importedJobId],
-  )
+  const historyState = moduleQueryState(importJobsQuery)
+  const entityJobs = historyState.status === "ready"
+    ? jobsForEntity(importJobsQuery.data as unknown as ImportJobRow[], trackedImportEntity(targetEntity), 5)
+    : []
+  const exactJobQuery = useExactImportJob(orgId, companyId, importedJobId)
+  const exactJobState = moduleQueryState(exactJobQuery)
+  const activeJob = exactJobState.status === "ready"
+    ? exactJobQuery.data?.find(job => String(job.id ?? "") === importedJobId)
+    : undefined
+  const importErrorsQuery = useExactImportJobErrors(orgId, companyId, importedJobId, !!activeJob)
+  const importErrorRows = importErrorsQuery.data?.pages.flatMap(page => page.data) ?? []
+  const errorsState = moduleQueryState({ ...importErrorsQuery, data: importErrorRows })
+  const canReviewRollback = errorsState.status === "ready" && !importErrorsQuery.hasNextPage
 
   const stepLabel = useMemo(() => {
     const labels: Record<WizardStep, string> = {
@@ -770,7 +767,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
   }, [])
 
   const handleRollback = useCallback(async () => {
-    if (!activeJob?.id) return
+    if (!activeJob?.id || !canReviewRollback || !canRollbackImportJob(activeJob)) return
     const jobId = String(activeJob.id)
     if (rollbackConfirmId !== jobId) {
       setRollbackConfirmId(jobId)
@@ -778,6 +775,15 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
     }
     setError(null)
     try {
+      const refreshed = await exactJobQuery.refetch()
+      const currentJob = refreshed.data?.find(job => String(job.id ?? "") === jobId)
+      if (!mounted.current) return
+      if (refreshed.isError || !canRollbackImportJob(currentJob) || currentJob?.status !== activeJob.status
+        || currentJob?.metadata !== activeJob.metadata || currentJob?.importedRows !== activeJob.importedRows
+        || currentJob?.tableName !== activeJob.tableName || currentJob?.fileName !== activeJob.fileName) {
+        setRollbackConfirmId(null)
+        throw new Error(t("settings.importJob.rollbackChanged", { defaultValue: "The import changed or is no longer eligible. Review its current status before requesting rollback again." }))
+      }
       await rollbackImport.mutateAsync(BigInt(jobId))
       setRollbackConfirmId(null)
       setStatus(t("settings.import.rollbackComplete", "Import rolled back."))
@@ -785,7 +791,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
     } catch (rollbackError) {
       setError(rollbackError instanceof Error ? rollbackError.message : String(rollbackError))
     }
-  }, [activeJob, importErrorsQuery, importJobsQuery, rollbackConfirmId, rollbackImport, t])
+  }, [activeJob, canReviewRollback, exactJobQuery, importErrorsQuery, importJobsQuery, rollbackConfirmId, rollbackImport, t])
 
   return (
     <div className="rounded-lg border p-4 space-y-4" data-testid="guided-import-wizard">
@@ -1093,29 +1099,31 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
 
       {importedJobId ? (
         <div className="space-y-2" data-testid="guided-import-result">
-          {activeJob ? (
-            <ImportJobStatusPanel
-              job={activeJob}
-              errors={(importErrorsQuery.data ?? []) as ImportJobErrorRow[]}
-              isLoading={importJobsQuery.isLoading || importErrorsQuery.isLoading}
-              fileName={
-                String(activeJob.fileName ?? activeJob.file_name ?? "") ||
-                sourceFileName ||
-                undefined
-              }
-              onRollback={() => void handleRollback()}
-              isRollbackPending={rollbackImport.isPending}
-            />
-          ) : (
-            <p className="rounded border p-3 text-sm text-muted-foreground">
-              {t(
-                "settings.import.jobRefreshing",
-                "Import job #{{id}} is complete. Refreshing its reconciliation record…",
-                { id: importedJobId },
-              )}
-            </p>
-          )}
-          {rollbackConfirmId ? (
+          <ModuleDataNotice state={exactJobState} />
+          {exactJobState.status === "loading" ? <p role="status">{t("common.importAssistant.jobPending")}</p> : null}
+          {exactJobState.status === "ready" ? (
+            <>
+              <ModuleDataNotice state={errorsState} />
+              {errorsState.status === "loading" ? (
+                <p role="status">{t("settings.importJob.errorsLoading", { defaultValue: "Loading import row errors…" })}</p>
+              ) : null}
+              <ImportJobStatusPanel
+                job={activeJob}
+                errors={errorsState.status === "ready" ? importErrorRows : []}
+                fileName={String(activeJob?.fileName ?? activeJob?.file_name ?? "") || sourceFileName || undefined}
+                onRollback={canReviewRollback ? () => void handleRollback() : undefined}
+                isRollbackPending={rollbackImport.isPending}
+                onLoadMoreErrors={errorsState.status === "ready" && importErrorsQuery.hasNextPage ? () => void importErrorsQuery.fetchNextPage() : undefined}
+                isLoadingMoreErrors={importErrorsQuery.isFetchingNextPage}
+              />
+              {!activeJob ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => void exactJobQuery.refetch()}>
+                  {t("common.refresh", "Refresh")}
+                </Button>
+              ) : null}
+            </>
+          ) : null}
+          {rollbackConfirmId && canReviewRollback && String(activeJob?.id ?? "") === rollbackConfirmId ? (
             <div className="flex flex-wrap items-center gap-2 rounded border border-destructive/40 p-3 text-sm">
               <span>
                 {t(
@@ -1160,6 +1168,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
             {t("common.refresh", "Refresh")}
           </Button>
         </div>
+        <ModuleDataNotice state={historyState} />
         {entityJobs.length > 0 ? (
           <div className="overflow-x-auto rounded border text-xs">
             <table className="w-full">
@@ -1189,7 +1198,10 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => setImportedJobId(jobId)}
+                          onClick={() => {
+                            setRollbackConfirmId(null)
+                            setImportedJobId(jobId)
+                          }}
                         >
                           {t("settings.import.reviewJob", "Review")}
                         </Button>
@@ -1200,13 +1212,11 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
               </tbody>
             </table>
           </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            {importJobsQuery.isLoading
-              ? t("common.loading", "Loading…")
-              : t("settings.import.noRecentImports", "No tracked imports for this entity yet.")}
-          </p>
-        )}
+        ) : historyState.status === "loading" ? (
+          <p role="status" className="text-xs text-muted-foreground">{t("common.loading", "Loading…")}</p>
+        ) : historyState.status === "ready" ? (
+          <p className="text-xs text-muted-foreground">{t("settings.import.noRecentImports", "No tracked imports for this entity yet.")}</p>
+        ) : null}
       </div>
 
       <FormModal

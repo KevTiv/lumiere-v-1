@@ -22,6 +22,9 @@ export interface CalendarEvent {
     id: string
   }
   isRecurring?: boolean
+  recurrenceRule?: string
+  /** Generated occurrences link to the persisted series record. */
+  seriesId?: string
   recurringPattern?: "daily" | "weekly" | "monthly" | "yearly"
   reminders?: number[] // minutes before event
   notes?: string

@@ -6,10 +6,9 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { resolveAiGatewayBaseUrl } from '@/lib/ai-gateway-server'
 
 import {
-  parseJsonBody,
   requireAiRouteContext,
 } from '../../_lib/route-helpers'
-import { prepareRagPayload } from '../../_lib/rag-request'
+import { parseRagRequest, prepareRagPayload } from '../../_lib/rag-request'
 
 export async function POST(request: NextRequest) {
   const contextResult = await requireAiRouteContext(request)
@@ -17,7 +16,7 @@ export async function POST(request: NextRequest) {
   const { session, orgId } = contextResult.context
   const gatewayBase = resolveAiGatewayBaseUrl()!
 
-  const bodyResult = await parseJsonBody(request)
+  const bodyResult = await parseRagRequest(request)
   if (!bodyResult.ok) return bodyResult.response
   const body = bodyResult.body
 
@@ -35,6 +34,7 @@ export async function POST(request: NextRequest) {
     headers,
     body: JSON.stringify(gwPayload),
     cache: 'no-store',
+    signal: request.signal,
   })
 
   if (!gw.ok || !gw.body) {

@@ -8,15 +8,19 @@ import base64
 import binascii
 import csv
 from collections import Counter, defaultdict
+from dataclasses import replace
 from datetime import date, timedelta
-from decimal import DecimalException
+from decimal import Decimal, DecimalException
+from fractions import Fraction
 import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import posixpath
 import re
+import subprocess
 import sys
 import zipfile
 import zlib
@@ -48,6 +52,14 @@ sys.modules[_rule_spec.name] = rules
 _rule_spec.loader.exec_module(rules)
 
 PreparationError = rules.PreparationError
+
+
+class WorksheetSelectionRequired(PreparationError):
+    """A saved workbook needs an explicit worksheet selection."""
+
+
+class SelectedWorksheetMissing(PreparationError):
+    """A saved selection refers to a worksheet absent from a new version."""
 
 
 def fail(message):
@@ -217,8 +229,10 @@ def xlsx_rows(data, selection=None):
         if selection:
             sheets = [sheet for sheet in sheets if sheet.attrib.get("name") == selection.sheet_name]
         if len(sheets) != 1:
+            if not selection and len(sheets) > 1:
+                raise WorksheetSelectionRequired("Choose which visible worksheets to prepare.")
             fail("The selected worksheet is missing or ambiguous." if selection else
-                 "Import one worksheet at a time. Save each worksheet as its own XLSX or CSV file.")
+                 "The workbook needs an importable worksheet.")
         sheet = sheets[0]
         relationship = next((value for key, value in sheet.attrib.items() if key.endswith("}id")), None)
         relationships = xml_document(archive, "xl/_rels/workbook.xml.rels")
@@ -287,6 +301,33 @@ def xlsx_rows(data, selection=None):
         return rows, checked_value(sheet.attrib.get("name", "Worksheet"))
 
 
+def import_workbook(data, worksheets=()):
+    """Inspect original bytes in the same isolated worker used for workbook admission."""
+    worker = os.environ.get("LUMIERE_WORKBOOK_EXTRACT_SCRIPT") or str(Path(__file__).resolve().with_name("workbook-extract.py"))
+    try:
+        result = subprocess.run(
+            ["/usr/bin/python3", "-I", "-S", worker, "--import-worksheets", *worksheets],
+            input=data, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            env={}, cwd="/", timeout=8, check=False,
+        )
+        extraction = json.loads(result.stdout)
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        fail("Workbook inspection could not complete. Retry this file or upload a CSV export.")
+    if not isinstance(extraction, dict):
+        fail("Workbook inspection returned unsupported data. Retry this file or upload a CSV export.")
+    if result.returncode:
+        error = extraction.get("error")
+        if error == "workbook_formula_requires_values_only_copy":
+            fail("Workbook formulas require a values-only copy. Save calculated values as XLSX or CSV and retry.")
+        if error == "workbook_import_worksheet_selection":
+            raise SelectedWorksheetMissing("A selected worksheet is missing. Review the worksheets in this workbook and choose again.")
+        fail("The workbook exceeds supported worksheet limits or contains unsupported content. Upload a visible values-only XLSX or CSV.")
+    if (extraction.get("sourceSha256") != hashlib.sha256(data).hexdigest()
+            or extraction.get("policyVersion") != "xlsx-static-seccomp-v1"):
+        fail("Workbook inspection did not match the saved original file.")
+    return extraction
+
+
 def field(key, value, *, kind="text", required=False, export=False, label=None):
     return {"key": key, "label": label or key.replace("_", " "), "kind": kind,
             "sourceValue": value, "required": required, "export": export}
@@ -304,6 +345,63 @@ TARGET_FIELDS = {
     "product": {"name", "internal_reference", "barcode", "sale_price", "cost_price", "uom_id", "uom_po_id", "category_id", "description", "active", "can_be_sold", "can_be_purchased", "type_field", "weight", "volume"},
     "contact": {"name", "first_name", "last_name", "title", "email", "email_secondary", "phone", "mobile", "fax", "website", "street", "street2", "city", "state_code", "zip", "country_code", "tax_id", "company_registry", "industry", "employees_count", "annual_revenue", "notes", "color", "is_customer", "is_vendor", "is_employee", "is_prospect", "is_partner", "type_", "company_id"},
     "stock_location": {"name", "usage", "complete_name", "barcode", "active", "is_scrap"},
+    "farm_event": {"flock_reference", "event_reference", "event_kind", "business_date", "species", "location",
+                   "count", "sample_count", "total_weight_kg", "feed_product", "quantity_kg",
+                   "live_weight_kg", "sellable_weight_kg", "from_exclusive", "journal_line_id",
+                   "cost_kind", "expense_report_id", "allocation_basis"},
+}
+FARM_IDENTITY_FIELDS = {"flock_reference", "event_reference", "event_kind", "business_date"}
+FARM_EVENT_FIELDS = {
+    "intake": {"count", "species", "location"},
+    "mortality": {"count"},
+    "transferIn": {"count"},
+    "transferOut": {"count"},
+    "internalTransfer": {"count"},
+    "liveSale": {"count"},
+    "processing": {"count"},
+    "weighIn": {"sample_count", "total_weight_kg"},
+    "feedUsage": {"feed_product", "quantity_kg"},
+    "feedCoverage": {"from_exclusive"},
+    "costLink": {"journal_line_id", "cost_kind", "allocation_basis"},
+}
+FARM_DECIMALS = {"count", "sample_count", "total_weight_kg", "quantity_kg", "live_weight_kg", "sellable_weight_kg"}
+FARM_HEADER_ALIASES = {
+    "flock_reference": {"flock_ref", "batch_reference", "référence_du_lot", "reference_du_lot", "nimero_y_icyiciro"},
+    "event_reference": {"event_id", "référence_de_l_événement", "reference_de_l_evenement", "nimero_y_igikorwa"},
+    "event_kind": {"event_type", "type_d_événement", "type_d_evenement", "ubwoko_bw_igikorwa"},
+    "business_date": {"event_date", "date", "date_de_l_événement", "itariki"},
+    "species": {"espèce", "espece", "ubwoko_bw_amatungo"},
+    "location": {"house", "emplacement", "aho_bari"},
+    "count": {"nombre", "umubare"},
+    "sample_count": {"nombre_pesé", "umubare_wapimwe"},
+    "total_weight_kg": {"poids_total_kg", "ibiro_byose_kg"},
+    "feed_product": {"aliment", "ibiryo"},
+    "quantity_kg": {"quantité_kg", "quantite_kg", "ingano_kg"},
+    "live_weight_kg": {"poids_vif_kg", "ibiro_mbere_yo_kubaga_kg"},
+    "sellable_weight_kg": {"poids_vendable_kg", "ibiro_bigenewe_kugurishwa_kg"},
+    "from_exclusive": {"feed_period_start_exclusive", "début_exclusif", "debut_exclusif"},
+    "journal_line_id": {"identifiant_ligne_comptable", "posted_journal_line_id"},
+    "cost_kind": {"type_de_coût", "type_de_cout"},
+    "expense_report_id": {"identifiant_note_de_frais"},
+    "allocation_basis": {"base_d_affectation"},
+}
+FARM_KIND_ALIASES = {
+    "intake": "intake", "arrivée": "intake", "arrivee": "intake", "kwakira": "intake",
+    "mortality": "mortality", "mortalité": "mortality", "mortalite": "mortality", "impfu": "mortality",
+    "transferin": "transferIn", "transfer_in": "transferIn", "transfert_entrant": "transferIn",
+    "transferout": "transferOut", "transfer_out": "transferOut", "transfert_sortant": "transferOut",
+    "internaltransfer": "internalTransfer", "internal_transfer": "internalTransfer", "transfert_interne": "internalTransfer",
+    "livesale": "liveSale", "live_sale": "liveSale", "vente_en_vif": "liveSale",
+    "processing": "processing", "transformation": "processing", "kubaga": "processing",
+    "weighin": "weighIn", "weigh_in": "weighIn", "pesée": "weighIn", "pesee": "weighIn", "gupima": "weighIn",
+    "feedusage": "feedUsage", "feed_usage": "feedUsage", "consommation_d_aliment": "feedUsage", "ibiryo_byakoreshejwe": "feedUsage",
+    "feedcoverage": "feedCoverage", "feed_coverage": "feedCoverage", "période_de_relevé_d_aliment": "feedCoverage",
+    "costlink": "costLink", "cost_link": "costLink", "affectation_de_coût": "costLink",
+}
+FARM_COST_KIND_ALIASES = {
+    "vendor_bill": "vendor_bill", "facture_fournisseur": "vendor_bill",
+    "expense_report": "expense_report", "note_de_frais": "expense_report",
+    "journal": "journal", "journal_entry": "journal", "écriture_comptable": "journal",
 }
 DECIMALS = {"sale_price", "cost_price", "weight", "volume"}
 CHOICES = {"active": ["true", "false"], "is_scrap": ["true", "false"],
@@ -333,6 +431,13 @@ AUDIT_ISSUES = {
     "unlabeled_primary_subtotal": "An unlabeled subtotal was detected and needs review.",
     "settlement_section_without_primary_subtotal": "Settlement entries start before a product subtotal can be identified.",
 }
+SHOP_SALE_AMOUNT_FIELDS = ("sold_quantity", "sale_unit_price", "sale_amount")
+SHOP_SALE_HEADERS = (
+    {"qte s", "qtes s", "quantite vendue", "quantites vendues", "sold quantity"},
+    {"pu", "p u", "prix unitaire", "unit price"},
+    {"total", "montant", "montant total", "sale amount", "sales total"},
+)
+REPORT_CURRENCY = re.compile(r"\b(?:RWF|FRW|BIF|CDF|EUR|GBP|KES|TZS|UGX|USD)\b", re.IGNORECASE)
 
 
 def mapped_field(key, value, required=False):
@@ -350,6 +455,9 @@ def field_proposal(value, options=None):
 
 
 def structured_target(name, headers):
+    farm_headers = farm_header_keys(headers)
+    if FARM_IDENTITY_FIELDS <= set(farm_headers) and len(set(farm_headers)) == len(headers):
+        return "farm_event"
     if "name" not in headers or len(set(headers)) != len(headers):
         return None
     # Sales, balances, snapshots and staff lists must not become current master data.
@@ -366,11 +474,18 @@ def structured_target(name, headers):
 
 
 def source_ref(file, row):
-    return {"file": file["name"], "row": row, "sha256": file["sha256"],
-            "rowBasis": "import_row" if file["sheet"] else "source_line"}
+    source = {"file": file["name"], "row": row, "sha256": file["sha256"],
+              "rowBasis": "import_row" if file["sheet"] else "source_line"}
+    if file["sheet"]:
+        source["sheet"] = file["sheet"]
+    if file.get("multi_worksheet"):
+        source["multiWorksheet"] = True
+    return source
 
 
 def standard_items(file, headers, target, data_rows, section=None):
+    if target == "farm_event":
+        return farm_items(file, farm_header_keys(headers), data_rows, section)
     items = []
     for row_number, cells in data_rows:
         fields = []
@@ -425,6 +540,58 @@ def standard_items(file, headers, target, data_rows, section=None):
 
 def header_keys(cells):
     return [re.sub(r"[\s-]+", "_", value.strip().lower()) for value in cells]
+
+
+def farm_header_keys(headers):
+    aliases = {alias: key for key, equivalents in FARM_HEADER_ALIASES.items() for alias in equivalents}
+    return [aliases.get(re.sub(r"['’]", "_", header), header) for header in headers]
+
+
+def farm_items(file, headers, rows, section=None):
+    options = file.get("options")
+    selection = options.managed_selection if options else None
+    first_column = section.first_column if section else selection.first_column if selection else 1
+    items = []
+    for row, cells in rows:
+        source = {key: (cells[index] if index < len(cells) else "", first_column + index)
+                  for index, key in enumerate(headers)}
+        raw_kind = source.get("event_kind", ("", None))[0]
+        event_kind = FARM_KIND_ALIASES.get(re.sub(r"[\s'’-]+", "_", raw_kind.strip().casefold()))
+        required = FARM_IDENTITY_FIELDS | FARM_EVENT_FIELDS.get(event_kind, set())
+        fields = []
+        proposed = {}
+        for key in [*headers, *sorted(TARGET_FIELDS["farm_event"] - set(headers))]:
+            raw, column = source.get(key, (None, None))
+            known = key in TARGET_FIELDS["farm_event"]
+            safe_key = key if known else f"source_column_{column}"
+            kind = "decimal" if key in FARM_DECIMALS else "date" if key in {"business_date", "from_exclusive"} else "text"
+            if key in {"event_kind", "cost_kind"}:
+                kind = "choice"
+            item_field = field(safe_key, raw, kind=kind, required=key in FARM_IDENTITY_FIELDS, label=key.replace("_", " "))
+            if column is not None:
+                item_field["sourceColumn"] = column
+            if kind == "choice":
+                item_field["options"] = list(FARM_EVENT_FIELDS) if key == "event_kind" else ["vendor_bill", "expense_report", "journal"]
+            fields.append(item_field)
+            if not known or not raw or not raw.strip():
+                proposed[safe_key] = None
+            elif key == "event_kind":
+                proposed[safe_key] = event_kind
+            elif key == "cost_kind":
+                proposed[safe_key] = FARM_COST_KIND_ALIASES.get(re.sub(r"[\s'’-]+", "_", raw.strip().casefold()))
+            elif kind == "date":
+                proposed[safe_key] = rules.parse_date(raw, options.date_order if options else "iso").get("from")
+            else:
+                proposed[safe_key] = rules.parse_decimal(raw, options) if kind == "decimal" else raw.strip()
+        if len(fields) > 32:
+            fail("The farm table exceeds the 32-field review limit. Split its columns and retry.")
+        label = proposed["event_reference"] or f"Row {row}"
+        missing = [key.replace("_", " ") for key in sorted(required) if proposed[key] is None]
+        issue = ("Confirm missing or ambiguous farm facts: " + ", ".join(missing) + "." if missing else
+                 "Verify the flock, stable event reference, business date and measurements before saving farm activity.")
+        items.append({"key": f"row-{row}", "label": clipped(label, 300), "source": source_ref(file, row),
+                      "fields": fields, "proposed": proposed, "issue": issue})
+    return items
 
 
 def structured_sections(rows, headers, target):
@@ -527,6 +694,8 @@ def prepare_sections(file, mode, duplicate):
             fail("A section header differs from the approved layout. Review its mapping before reusing the recipe.")
         normalized = header_keys(actual)
         headers = [section.header_map.get(original, normalized[index]) for index, original in enumerate(actual)]
+        if section.target_entity == "farm_event":
+            headers = farm_header_keys(headers)
         if len(set(headers)) != len(headers):
             fail("A section has duplicate mapped headers. Select distinct columns before continuing.")
         known_fields = rules.OBSERVATION_FIELDS if section.target_entity == "source_observation" else TARGET_FIELDS[section.target_entity]
@@ -536,7 +705,9 @@ def prepare_sections(file, mode, duplicate):
             fail("A text rule refers to a field outside its selected source section.")
         if any(key not in headers or key not in known_fields for key in section.identity_fields):
             fail("Business identity fields must be explicitly mapped in the source section.")
-        if section.target_entity != "source_observation" and "name" not in headers:
+        if section.target_entity == "farm_event" and not FARM_IDENTITY_FIELDS <= set(farm_header_keys(headers)):
+            fail("A farm section requires a flock reference, event reference, event type and business date.")
+        if section.target_entity not in {"source_observation", "farm_event"} and "name" not in headers:
             fail("The selected master-data section needs an explicit name column.")
         if ((section.target_entity == "stock_location" and set(headers) & {"parent_id", "location_id", "warehouse_id"})
                 or (section.target_entity == "contact" and "parent_id" in headers)):
@@ -578,7 +749,8 @@ def prepare_sections(file, mode, duplicate):
                               if key not in {"source_cells", "source_worksheet"}},
                     "source": {"fileName": file["name"], "sourceSha256": file["sha256"],
                                "record": record, "rowStart": start, "rowEnd": end,
-                               "sectionKey": section.key, "itemKey": item["key"]},
+                               "sectionKey": section.key, "itemKey": item["key"],
+                               **({"worksheet": file["sheet"]} if file["sheet"] else {})},
                 })
         if items:
             batches.append((target, items))
@@ -664,7 +836,8 @@ def reconcile_report_periods(files):
                 start, end = selected_file["coordinates"][record - 1]
                 sources.append({"fileName": selected_file["name"], "sourceSha256": selected_file["sha256"],
                                 "record": record, "rowStart": start, "rowEnd": end,
-                                "sectionKey": "table-1", "itemKey": f"row-{start}"})
+                                "sectionKey": "table-1", "itemKey": f"row-{start}",
+                                **({"worksheet": selected_file["sheet"]} if selected_file["sheet"] else {})})
             result.append({"status": status,
                            "identitySha256": rules.fingerprint({"kind": "report_coverage", "shop": block["shop"],
                                                                 "sources": sources}), "sources": sources})
@@ -730,7 +903,9 @@ def prepare_file(file, mode, duplicate):
         else:
             fail("A selected structured table has no data rows to review.")
     else:
-        batches = [("source_observation", observation_items(file, file["blocks"], inspection_only=mode == "inspect_only"))]
+        batches = [("source_observation", observation_items(
+            file, file["blocks"], inspection_only=mode == "inspect_only", duplicate=duplicate
+        ))]
     if not file["sections"]:
         file["sections"] = [automatic_section(file, f"table-{index}", target, items)
                             for index, (target, items) in enumerate(batches, 1) if items]
@@ -760,6 +935,86 @@ DATE_HEADERS = {"date", "as_of", "invoice_date", "business_date", "count_date", 
 def source_day(raw, *, day_first=False, order="iso"):
     """Locale dates require a reviewed option or an already verified farm layout."""
     return rules.parse_date(raw, "dmy" if day_first else order)
+
+
+def shop_sale_report(file, block):
+    """Bind a dated sales proposal to the recognizable sales columns of an audit."""
+    day = business_date(block)
+    if (day["precision"] != "day" or block["shop_basis"] != "explicit_report_heading"
+            or set(block["issues"]) & {"file_and_title_shop_disagree", "duplicate_audit_dataset",
+                                       "conflicting_same_title_audits"}):
+        return None
+    column = block["sale_first_column"]
+    header = file["rows"][block["header_row"] - 1][1][column:column + 3]
+    labels = [farm.source_notes.normalized(REPORT_CURRENCY.sub("", value)) for value in header]
+    if len(labels) != 3 or not all(label in choices for label, choices in zip(labels, SHOP_SALE_HEADERS)):
+        return None
+    currencies = {}
+    for text in (block["title"], *header):
+        for raw in REPORT_CURRENCY.findall(text):
+            code = raw.upper()
+            currencies["RWF" if code == "FRW" else code] = raw
+    currency, raw_currency = next(iter(currencies.items())) if len(currencies) == 1 else (None, None)
+    return column, currency, raw_currency
+
+
+def shop_sale_amounts(line, raw_amounts):
+    # The source parser also supports loose historical observations. Require
+    # ordinary fixed-point source cells and the native operation's value bounds.
+    if len(raw_amounts) != 3 or not all(re.fullmatch(r"[+]?[0-9][0-9., ]*", raw.strip()) for raw in raw_amounts):
+        return None
+    values = [proposed_value(line[key] or "", "decimal") for key in SHOP_SALE_AMOUNT_FIELDS]
+    if not all(values):
+        return None
+    quantity, price, amount = map(Fraction, values)
+    if min(quantity, price, amount) <= 0 or quantity * price != amount:
+        return None
+    return dict(zip(SHOP_SALE_AMOUNT_FIELDS, zip(raw_amounts, values)))
+
+
+def audit_observation(block, line, cells, sale_report, inspection_only):
+    date_evidence = business_date(block)
+    line_issues = set(block["issues"] + line["issues"])
+    sale_amounts = None
+    if sale_report and line["raw_product_label"]:
+        column, currency, raw_currency = sale_report
+        sale_amounts = shop_sale_amounts(line, cells[column:column + 3])
+    fields = [field("product_label", line["raw_product_label"], required=sale_amounts is not None)]
+    proposed = {"product_label": line["product_label"]}
+    issues = []
+    if sale_amounts is None:
+        fields.append(field("unit", None, required=not inspection_only))
+        proposed["unit"] = None
+    else:
+        sale_date = date_evidence["from"]
+        fields.extend([
+            field("observation_kind", "historical_shop_sale"),
+            field("shop", block["shop"], required=True),
+            field("sale_date", sale_date, kind="date", required=True),
+            field("currency_code", raw_currency, required=True),
+            field("source_unit", None),
+        ])
+        proposed.update({"observation_kind": "historical_shop_sale", "shop": block["shop"],
+                         "sale_date": sale_date, "currency_code": currency, "source_unit": None})
+        issues.append("Verify the dated shop sale before saving it in Sales.")
+        if currency is None:
+            issues.append("Confirm the sales currency from the source or company records.")
+        subtotal = block["totals"].get("sale_amount", {})
+        declared = subtotal.get("declared")
+        if declared is not None and Decimal(declared) != Decimal(subtotal["sum_of_nonblank_lines"]):
+            line_issues.add("sale_amount_subtotal_mismatch")
+    issues.extend(AUDIT_ISSUES.get(issue, issue.replace("_", " ")) for issue in sorted(line_issues))
+    for key in ["opening_quantity", "received_quantity", "available_quantity", "closing_quantity",
+                "consumed_quantity", "cost_unit_price", "consumed_cost", *SHOP_SALE_AMOUNT_FIELDS]:
+        required = sale_amounts is not None and key in sale_amounts
+        if required:
+            original, value = sale_amounts[key]
+        else:
+            original = line[key]
+            value = proposed_value(original or "", "decimal")
+        fields.append(field(key, original, kind="decimal", required=required))
+        proposed[key] = value
+    return date_evidence, fields, proposed, issues
 
 
 def supplementary_date_facts(file):
@@ -804,8 +1059,11 @@ def supplementary_date_facts(file):
     return facts
 
 
-def observation_items(file, blocks, *, inspection_only=False):
+def observation_items(file, blocks, *, inspection_only=False, duplicate=False):
     by_record = {line["source"]["row"]: (block, line) for block in blocks for line in block["lines"]}
+    sale_reports = {} if inspection_only or duplicate else {
+        block["source"]["row"]: shop_sale_report(file, block) for block in blocks
+    }
     items = []
     supplementary = supplementary_date_facts(file)
     # Use the same tail interpretation as offline recovery, retaining every raw
@@ -855,20 +1113,44 @@ def observation_items(file, blocks, *, inspection_only=False):
             item["businessDate"], kind = supplementary[record_index]
             fields.append(field("observation_kind", kind))
             proposed["observation_kind"] = kind
+            structured = []
+            if kind == "historical_customer_sales_summary":
+                period_start = item["businessDate"].get("from")
+                exclusive_end = item["businessDate"].get("toExclusive")
+                period_end = (date.fromisoformat(exclusive_end) - timedelta(days=1)).isoformat() if exclusive_end else None
+                structured = [
+                    ("customer_label", "Source customer label", cells[2], "text"),
+                    ("period_start", "Period start (YYYY-MM-DD)", period_start, "date"),
+                    ("period_end", "Period end (YYYY-MM-DD)", period_end, "date"),
+                    ("quantity", "Recorded quantity (unit to confirm)", cells[3], "decimal"),
+                    ("unit_price", "Recorded price per source unit (RWF)", cells[4], "decimal"),
+                    ("sales_total", "Recorded sales total (RWF)", cells[5], "decimal"),
+                    ("source_unit", "Source quantity unit", None, "text"),
+                    ("product_scope", "Product or summary scope", None, "text"),
+                    ("payment_comment", "Source payment comment", cells[6], "text"),
+                ]
+                label = cells[2].strip()
+            elif kind == "historical_inventory_count":
+                structured = [
+                    ("count_date", "Count date (YYYY-MM-DD)", item["businessDate"].get("from"), "date"),
+                    ("product_label", "Source product label", cells[2], "text"),
+                    ("pieces", "Recorded piece count", cells[3], "decimal"),
+                    ("kilograms", "Recorded weight (kg)", cells[4], "decimal"),
+                    ("business_location", "Business location", None, "text"),
+                ]
+                label = cells[2].strip()
+            for key, field_label, value, field_kind in structured:
+                fields.append(field(key, value, kind=field_kind, label=field_label))
+                proposed[key] = proposed_value(value or "", field_kind)
         if record_index in by_record:
             block, line = by_record[record_index]
             label = line["product_label"]
-            issues.extend(AUDIT_ISSUES.get(issue, issue.replace("_", " "))
-                          for issue in sorted(set(block["issues"] + line["issues"])))
-            fields.extend([field("product_label", line["raw_product_label"]), field("unit", None, required=not inspection_only)])
-            proposed.update({"product_label": line["product_label"], "unit": None})
-            for key in ["opening_quantity", "received_quantity", "available_quantity", "closing_quantity",
-                        "consumed_quantity", "cost_unit_price", "consumed_cost", "sold_quantity", "sale_unit_price", "sale_amount"]:
-                # The raw row keeps the original spelling, including invalid numerics.
-                value = line[key]
-                fields.append(field(key, value, kind="decimal"))
-                proposed[key] = proposed_value(value or "", "decimal")
-            item["businessDate"] = business_date(block)
+            item["businessDate"], audit_fields, audit_proposed, audit_issues = audit_observation(
+                block, line, cells, sale_reports.get(block["source"]["row"]), inspection_only
+            )
+            fields.extend(audit_fields)
+            proposed.update(audit_proposed)
+            issues.extend(audit_issues)
         if record_index in tail_items:
             tail = tail_items[record_index]
             issues.append(tail["issue"])
@@ -922,12 +1204,58 @@ def source_rows(name, data, options=None):
         start, end = selection.first_column - 1, selection.last_column
         rows = [(number, (cells[start:end] + [""] * (end - start))[:end - start])
                 for number, cells in rows]
+    validate_source_rows(rows)
+    return rows, sheet, coordinates, selection_header
+
+
+def validate_source_rows(rows):
     for number, cells in rows:
         if len(cells) > MAX_COLUMNS:
             fail(f"Source row {number} exceeds the 200-column preparation limit.")
         for value in cells:
             checked_value(value)
-    return rows, sheet, coordinates, selection_header
+
+
+def prepared_source(name, digest, byte_count, rows, sheet, coordinates, options, selection_header=None):
+    return {"name": name, "sha256": digest, "byte_count": byte_count, "rows": rows,
+            "sheet": sheet, "coordinates": coordinates, "options": options,
+            "selection_header": selection_header,
+            "record_numbers": {number: index for index, (number, _) in enumerate(rows, 1)},
+            "sections": [], "identities": []}
+
+
+def read_original_sources(name, data, digest, options, available_worksheets):
+    if options and options.worksheet_names:
+        try:
+            workbook = import_workbook(data, options.worksheet_names)
+        except SelectedWorksheetMissing:
+            available_worksheets[name] = import_workbook(data)["worksheetNames"]
+            raise
+        available_worksheets[name] = workbook["worksheetNames"]
+        sources = []
+        for sheet in workbook["worksheets"]:
+            rows = sheet["rows"]
+            validate_source_rows(rows)
+            selected_options = replace(options, sections=tuple(
+                section for section in options.sections if section.worksheet_name in {None, sheet["name"]}
+            ))
+            source = prepared_source(name, digest, len(data), rows, sheet["name"],
+                                     [(number, number) for number, _ in rows], selected_options)
+            source["multi_worksheet"] = workbook["multiWorksheet"]
+            sources.append(source)
+        return sources
+    try:
+        rows, sheet, coordinates, selection_header = source_rows(name, data, options)
+    except WorksheetSelectionRequired:
+        available_worksheets[name] = import_workbook(data)["worksheetNames"]
+        raise
+    return [prepared_source(name, digest, len(data), rows, sheet, coordinates, options, selection_header)]
+
+
+def coverage_held(original, message, worksheet=None):
+    return {**original, "status": "held", "worksheet": worksheet, "recordCount": None,
+            "reviewRecords": 0, "blankRecords": 0, "headerRecords": 0,
+            "records": [], "sections": [], "layoutSha256": None, "error": message}
 
 
 def prepare(payload):
@@ -940,7 +1268,7 @@ def prepare(payload):
     rules.object_keys(payload, {"mode", "files", "preparation"}, {"mode", "files"}, "Preparation request")
     preparation = payload.get("preparation")
     file_options = rules.parse_preparation(preparation)
-    decoded, names, errors = [], set(), {}
+    decoded, names, errors, available_worksheets = [], set(), {}, {}
     originals = []
     total_bytes = total_rows = total_cells = 0
     for file in files:
@@ -968,25 +1296,24 @@ def prepare(payload):
             fail("Preparation options refer to different source bytes. Review this version before continuing.")
         originals.append({"fileName": name, "sourceSha256": digest, "byteCount": len(data)})
         try:
-            rows, sheet, coordinates, selection_header = source_rows(name, data, options)
+            sources = read_original_sources(name, data, digest, options, available_worksheets)
         except PreparationError as error:
-            errors[name] = str(error)
+            errors[(name, None)] = str(error)
             continue
-        total_rows += sum(any(value.strip() for value in cells) for _, cells in rows)
-        total_cells += sum(len(cells) for _, cells in rows)
+        total_rows += sum(len(file["rows"]) for file in sources)
+        total_cells += sum(len(cells) for file in sources for _, cells in file["rows"])
         if total_rows > MAX_ROWS or total_cells > MAX_CELLS:
             fail("The source selection exceeds 25,000 rows or 100,000 cells. Split the selection and retry.")
-        decoded.append({"name": name, "sha256": digest, "byte_count": len(data), "rows": rows,
-                        "sheet": sheet, "coordinates": coordinates, "options": options, "selection_header": selection_header,
-                        "record_numbers": {number: index for index, (number, _) in enumerate(rows, 1)},
-                        "sections": [], "identities": []})
+        decoded.extend(sources)
     if set(file_options) - names:
         fail("Preparation options refer to a source outside this selection.")
 
     all_blocks = []
     for file in decoded:
-        file["blocks"] = ([] if file["options"] and file["options"].managed_selection else
-                          farm.audit_blocks(file["name"], [cells for _, cells in file["rows"]]))
+        options = file["options"]
+        parse_number = (lambda value: rules.parse_decimal(value, options)) if options and options.decimal_separator else farm.number
+        file["blocks"] = ([] if options and options.managed_selection else
+                          farm.audit_blocks(file["name"], [cells for _, cells in file["rows"]], parse_number))
         all_blocks.extend(file["blocks"])
     warnings = set()
     for index, block in enumerate(all_blocks):
@@ -1005,26 +1332,43 @@ def prepare(payload):
                 other["issues"].append(issue)
                 warnings.add(AUDIT_ISSUES[issue])
     prepared_files = []
-    hashes = Counter(file["sha256"] for file in decoded)
+    selected_layouts = defaultdict(list)
+    hashes = Counter(original["sourceSha256"] for original in originals)
     for file in decoded:
         try:
             batches, notes, blanks, headers = prepare_file(file, mode, hashes[file["sha256"]] > 1)
-            expected_layout = file["options"].expected_layout_sha256 if file["options"] else None
-            if expected_layout is not None and layout_fingerprint(file) != expected_layout:
+            options = file["options"]
+            expected_layout = options.expected_layout_sha256 if options else None
+            if options and options.worksheet_names:
+                selected_layouts[file["name"]].append([file["sheet"], layout_fingerprint(file)])
+            elif expected_layout is not None and layout_fingerprint(file) != expected_layout:
                 fail("The source headers or section layout differ from this recipe. Review the changed layout before reusing its rules.")
         except PreparationError as error:
-            errors[file["name"]] = str(error)
+            errors[(file["name"], file["sheet"])] = str(error)
             continue
+        label = f'{file["name"]} · {file["sheet"]}' if file["sheet"] and file["name"] in available_worksheets else file["name"]
         for note in notes:
-            warnings.add(f'{file["name"]} — {note}')
-        warnings.add(f'{file["name"]} — {len(file["rows"])} source records: '
+            warnings.add(f'{label} — {note}')
+        warnings.add(f'{label} — {len(file["rows"])} source records: '
                      f'{sum(len(items) for _, items in batches)} for review, {blanks} blank, {headers} headers.')
         prepared_files.append((file, batches))
+
+    workbook_layouts = {name: rules.fingerprint(layouts) for name, layouts in selected_layouts.items()
+                        if len(layouts) == len(file_options[name].worksheet_names)}
+    changed_workbooks = {name for name in selected_layouts if file_options[name].expected_layout_sha256 is not None
+                         and workbook_layouts.get(name) != file_options[name].expected_layout_sha256}
+    if changed_workbooks:
+        for file, _ in prepared_files:
+            if file["name"] in changed_workbooks:
+                errors[(file["name"], file["sheet"])] = (
+                    "A selected worksheet layout changed. Review the changed headers before reusing this recipe."
+                )
+        prepared_files = [(file, batches) for file, batches in prepared_files if file["name"] not in changed_workbooks]
 
     reconciliation = rules.reconcile_identities([record for file, _ in prepared_files for record in file["identities"]])
     if mode != "inspect_only":
         reconciliation.extend(reconcile_report_periods([file for file, _ in prepared_files if not (file.get("options") and file["options"].sections)]))
-    uncertain_identities = {(source["fileName"], source["itemKey"])
+    uncertain_identities = {(source["fileName"], source.get("worksheet"), source["itemKey"])
                             for decision in reconciliation for source in decision["sources"]}
     if reconciliation:
         counts = Counter(decision["status"] for decision in reconciliation)
@@ -1036,7 +1380,7 @@ def prepare(payload):
         for target, items in prepared_batches:
             ready, held = [], []
             for item in items:
-                if (file["name"], item["key"]) in uncertain_identities:
+                if (file["name"], file["sheet"], item["key"]) in uncertain_identities:
                     item["issue"] = clipped("Resolve the repeated, conflicting or missing business identity before creating records. " + item["issue"], 2000)
                     for value in item["fields"]:
                         value["export"] = False
@@ -1047,27 +1391,41 @@ def prepare(payload):
                 batches.append((target, ready))
             if held:
                 batches.append(("source_observation", held))
-        coverage_files[file["name"]] = file_coverage(file, batches)
+        coverage_files[(file["name"], file["sheet"])] = file_coverage(file, batches)
         for section, (target, items) in enumerate(batches, 1):
             for offset in range(0, len(items), 1000):
                 title = clipped(file["name"], 130 if len(batches) > 1 else 160)
+                if file["name"] in available_worksheets:
+                    title = clipped(f'{clipped(file["name"], 85)} · {file["sheet"]}', 130)
                 if len(batches) > 1:
                     title += f" · table {section}"
                 if len(items) > 1000:
                     title += f" · rows {offset + 1}–{min(offset + 1000, len(items))}"
                 datasets.append({"format": "lumiere-import-review/v1", "title": title, "targetEntity": target,
                                  "sourceFile": file["name"], "items": items[offset:offset + 1000]})
-    if not datasets and not decoded:
-        fail("; ".join(f"{name} — {error}" for name, error in errors.items())[:1000])
-    warnings.update(f"{name} — held. {error}" for name, error in errors.items())
+    if not datasets and not decoded and not available_worksheets:
+        fail("; ".join(f"{name} — {error}" for (name, _), error in errors.items())[:1000])
+    warnings.update(f"{name}{f' · {sheet}' if sheet else ''} — held. {error}"
+                    for (name, sheet), error in errors.items())
     coverage = {"version": 1, "complete": not errors, "files": [], "reconciliation": reconciliation}
     for original in originals:
         name = original["fileName"]
-        coverage["files"].append(coverage_files.get(name) or {
-            **original, "status": "held", "worksheet": None, "recordCount": None,
-            "reviewRecords": 0, "blankRecords": 0, "headerRecords": 0,
-            "records": [], "sections": [], "layoutSha256": None, "error": errors[name],
-        })
+        worksheets = available_worksheets.get(name)
+        if (name, None) in errors:
+            entries = [coverage_held(original, errors[(name, None)])]
+        elif worksheets:
+            entries = [coverage_files.get((name, sheet)) or coverage_held(original, errors[(name, sheet)], sheet)
+                       for sheet in worksheets if (name, sheet) in coverage_files or (name, sheet) in errors]
+        else:
+            entries = [entry for (file_name, _), entry in coverage_files.items() if file_name == name]
+            entries += [coverage_held(original, error, sheet)
+                        for (file_name, sheet), error in errors.items() if file_name == name]
+        for entry in entries:
+            if worksheets:
+                entry["availableWorksheets"] = worksheets
+            if name in workbook_layouts:
+                entry["workbookLayoutSha256"] = workbook_layouts[name]
+        coverage["files"].extend(entries)
     receipt = {"version": 1, "engineVersion": "lumiere-import-preparation/2",
                "sourceFingerprint": rules.fingerprint([{key: source[key] for key in ("fileName", "sourceSha256")} for source in originals]),
                "optionsSha256": rules.fingerprint(preparation),

@@ -1,5 +1,13 @@
 export type AssistantHistoryResult = "saved" | "failed" | "scope-changed"
 
+function assistantSessionStorageKey(scope: string) {
+  return `lumiere:erp-ai-chat-session-key:v2:${scope}`
+}
+
+export function rememberAssistantSession(storage: Pick<Storage, "setItem">, scope: string, sessionKey: string) {
+  storage.setItem(assistantSessionStorageKey(scope), sessionKey)
+}
+
 /** Never assign an old browser-wide conversation key to a different actor or company. */
 export function assistantHistoryScope(identity: string | null, organizationId: number | undefined, companyId: number | null): string | null {
   if (!identity || !Number.isSafeInteger(organizationId) || !organizationId || organizationId < 1
@@ -8,11 +16,10 @@ export function assistantHistoryScope(identity: string | null, organizationId: n
 }
 
 export function scopedAssistantSession(storage: Pick<Storage, "getItem" | "setItem">, scope: string, createKey: () => string): string {
-  const storageKey = `lumiere:erp-ai-chat-session-key:v2:${scope}`
-  const existing = storage.getItem(storageKey)
+  const existing = storage.getItem(assistantSessionStorageKey(scope))
   if (existing && /^[a-zA-Z0-9_-]{1,150}$/.test(existing)) return existing
   const next = createKey()
-  storage.setItem(storageKey, next)
+  rememberAssistantSession(storage, scope, next)
   return next
 }
 

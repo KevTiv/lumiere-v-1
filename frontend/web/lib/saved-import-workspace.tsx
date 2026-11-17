@@ -34,15 +34,17 @@ import {
   type SavedImportScope,
 } from "./use-saved-import-task"
 import type { ReviewedImportSource } from "./import-review-model"
-import type { ChatImportTask } from "./chat-import-task"
+import { canPrepareInspectedImport, type ChatImportTask } from "./chat-import-task"
 import { DocumentViewerDialog } from "../components/document-viewer-dialog"
 import { ImportPreparationPanel } from "./import-preparation-panel"
+import type { ImportPreparationSection } from "./import-preparation"
 
 export function SavedImportWorkspace({
   scope,
   taskId,
   view,
   initialReviewId,
+  preparationTarget,
   inspectionOnly = false,
   onNavigate,
   onBack,
@@ -53,6 +55,7 @@ export function SavedImportWorkspace({
   taskId: string
   view: ImportTaskView
   initialReviewId?: string
+  preparationTarget?: ImportPreparationSection["targetEntity"]
   inspectionOnly?: boolean
   onNavigate: (view: ImportTaskView, reviewId?: string) => void
   onBack: () => void
@@ -207,6 +210,7 @@ export function SavedImportWorkspace({
         : hasSavedExecution
           ? "results"
           : "preview"
+  const canPrepare = !inspectionOnly && !saved.pointer && canPrepareInspectedImport(task)
   const nextLabel =
     nextView === "sources"
       ? t("settings.importTask.nextSources", {
@@ -282,13 +286,31 @@ export function SavedImportWorkspace({
           >
             {t("common.refresh", { defaultValue: "Refresh" })}
           </Button>
-          <Button
-            type="button"
-            disabled={saved.busy}
-            onClick={() => navigate(nextView, selectedReviewId, true)}
-          >
-            {nextLabel}
-          </Button>
+          {canPrepare ? (
+            <Button
+              type="button"
+              disabled={saved.busy}
+              onClick={() => {
+                void saved.answer({
+                  requestId: task.decision.id,
+                  expectedRevision: task.decision.revision,
+                  optionId: "prepare_import",
+                }).catch(() => undefined)
+              }}
+            >
+              {t("aiChat.import.approvePreparation", {
+                defaultValue: "Approve preparation",
+              })}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              disabled={saved.busy}
+              onClick={() => navigate(nextView, selectedReviewId, true)}
+            >
+              {nextLabel}
+            </Button>
+          )}
         </div>
       </header>
       <ImportTaskProgress
@@ -566,6 +588,7 @@ export function SavedImportWorkspace({
           {allowImport && !managedSelection ? (
             <ImportPreparationPanel
               task={task}
+              defaultDestination={preparationTarget}
               organizationId={scope.organizationId}
               companyId={scope.companyId}
               onPrepared={onTaskChange}
@@ -578,6 +601,7 @@ export function SavedImportWorkspace({
               organizationId={scope.organizationId}
               selectedId={selectedReviewId}
               allowedReviewIds={allowedReviewIds}
+              historySource={task ? { taskId: task.requestId, sessionKey: task.conversationKey } : undefined}
               allowUpload={false}
               syncUrl={false}
               allowImport={allowImport}

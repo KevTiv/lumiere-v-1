@@ -23,6 +23,7 @@ use super::{scope, Scope, StorageScope};
 use crate::{
     cold_tier::pg_pool,
     error::ApiError,
+    routes::farm_batches::{authorize as authorize_farm, FarmAccess},
     routes::import::{read_workflow_import, submit_workflow_import, WorkflowImportRequest},
     session::ApiSession,
     state::AppState,
@@ -45,11 +46,23 @@ async fn read(
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
     let proposals = storage::list(&tx, scoped, &task).await?;
+    let backfilled_records = super::module_backfill::task_results(&tx, scoped, &task).await?;
+    let farm_enabled =
+        match authorize_farm(&state, &session, query.company_id, FarmAccess::Read).await {
+            Ok(_) => true,
+            Err(ApiError::Forbidden(_)) => false,
+            Err(error) => return Err(error),
+        };
+    let (farm_results, farm_results_more) = if farm_enabled {
+        super::farm_import::task_results(&tx, scoped, &task).await?
+    } else {
+        (Vec::new(), false)
+    };
     tx.commit().await.map_err(ApiError::internal)?;
     let (native_results, native_results_more) =
         super::native_requests::list(&context, query.company_id, &task).await?;
     Ok(Json(
-        json!({"version":1,"organizationId":context.organization_id().to_string(),"requestId":task,"companyId":query.company_id.to_string(),"capabilities":super::capabilities::catalog(),"proposals":proposals,"nativeResults":native_results,"nativeResultsMore":native_results_more}),
+        json!({"version":1,"organizationId":context.organization_id().to_string(),"requestId":task,"companyId":query.company_id.to_string(),"capabilities":super::capabilities::catalog(farm_enabled),"proposals":proposals,"nativeResults":native_results,"nativeResultsMore":native_results_more,"backfilledRecords":backfilled_records,"farmResults":farm_results,"farmResultsMore":farm_results_more}),
     ))
 }
 
@@ -100,6 +113,41 @@ async fn read_request(
     let proposal = storage::read_request(&tx, scoped, &task, &request).await?;
     tx.commit().await.map_err(ApiError::internal)?;
     Ok(Json(proposal.view()))
+}
+
+async fn read_posting_status(
+    State(state): State<Arc<AppState>>,
+    OrgSession { session, .. }: OrgSession,
+    Path((task, id)): Path<(String, i64)>,
+    Query(query): Query<Scope>,
+) -> Result<Json<Value>, ApiError> {
+    let context = scope(&state, &session, query.company_id).await?;
+    let access = Some(context.field_access());
+    if ["state", "move_type", "metadata"]
+        .into_iter()
+        .any(|field| !stdb_auth::has_resource_field_read_permission(access, "account-moves", field))
+    {
+        return Err(ApiError::NotFound(
+            "verified journal entry receipt not found".into(),
+        ));
+    }
+    let scoped = storage_scope(&context, query.company_id);
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let mut client = pool.get().await.map_err(ApiError::internal)?;
+    let tx = client.transaction().await.map_err(ApiError::internal)?;
+    storage::require_task(&tx, scoped, &task, false).await?;
+    let proposal = storage::read_proposal(&tx, scoped, &task, id, false).await?;
+    tx.commit().await.map_err(ApiError::internal)?;
+    let result = proposal
+        .result
+        .as_ref()
+        .filter(|_| proposal.state == "verified")
+        .ok_or_else(|| ApiError::NotFound("verified journal entry receipt not found".into()))?;
+    let mut status =
+        native::read_posting_status(&context, scoped, &task, &proposal, result).await?;
+    status["taskId"] = json!(task);
+    status["organizationId"] = json!(scoped.organization.to_string());
+    Ok(Json(status))
 }
 
 async fn approve(
@@ -359,6 +407,10 @@ pub(super) fn router() -> Router<Arc<AppState>> {
         .route(
             "/import-tasks/:task/workflow/proposals/:proposal/verify",
             post(verify),
+        )
+        .route(
+            "/import-tasks/:task/workflow/proposals/:proposal/posting-status",
+            get(read_posting_status),
         )
         .layer(DefaultBodyLimit::max(500_000))
 }

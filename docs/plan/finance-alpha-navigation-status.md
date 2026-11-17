@@ -6,7 +6,7 @@ This change is a UI discovery profile based on `codex/finance-workflow-tools` (P
 
 Visible Finance modules: Accounting, Sales, CRM, Purchasing, Reports, Subscriptions, Expenses.
 
-The 2026-10-31 alpha decision additionally exposes **Products** (`/products`), **Warehouse** (`/warehouse`) and **Fleet** (`/fleet`). Products and Warehouse use bounded catalog/operational projections of Inventory's existing owners. The broad legacy Inventory workspace remains separate and hidden from alpha global navigation. The full profile exposes Products, Warehouse and Inventory for their separate jobs. See [Product, Warehouse and Fleet alpha scope and acceptance](../plans/product-fleet-alpha-2026-10-31.md).
+The 2026-10-31 alpha decision additionally exposes **Products** (`/products`), **Warehouse** (`/warehouse`) and **Fleet** (`/fleet`). Products and Warehouse use bounded catalog/operational projections of Inventory's existing owners. As of November 14, both profiles expose the broader Inventory workspace alongside Products and Warehouse. See [Product, Warehouse and Fleet alpha scope and acceptance](../plans/product-fleet-alpha-2026-10-31.md).
 
 Visible support: Overview, Tasks, Approvals, Documents, Calendar, Settings. ERP Assistant remains available under its own gate; the current profile hides Messages, Journal and Notebook discovery. Standalone AI, other operations, workforce, project, proposal, and device module entries remain hidden from global navigation.
 
@@ -14,7 +14,7 @@ The sidebar and command palette use the same filtered navigation catalog. Record
 
 ## Supporting Settings
 
-Profile/preferences, company and country/currency setup, users, roles, SSO, audit, and document/message integrations retain their existing role gates. Form configuration and custom-field target pickers show the registered Finance, Documents and Calendar modules. The profile permits bounded module IDs where registered, but Fleet currently uses static forms and Product/Warehouse forms retain their Inventory owner; these routes do not register new form modules or admit the whole Inventory configuration catalog. The runtime form registry remains complete.
+Profile/preferences, company and country/currency setup, users, roles, SSO, audit, and document/message integrations retain their existing role gates. Form configuration and custom-field target pickers show registered Finance, Inventory, Documents and Calendar forms. Product and Warehouse forms use the Inventory owner. Fleet uses static forms. The runtime form registry remains complete.
 
 The guided import picker retains contacts/vendors, leads/opportunities, products, sales and purchase orders/lines, supplier information, ledger accounts/entries, tax rates, budgets, employee/department reference data, expenses, and subscriptions. Stock quantities, warehouses/locations/lots, projects/tasks/timesheets, payroll/leave/contracts, Helpdesk, and Manufacturing imports are hidden there. The AI-agent import and AI-chat archive action are hidden.
 
@@ -26,7 +26,7 @@ Global stock-alert and time-entry entry points are hidden. Project progress is o
 
 ## Access boundaries
 
-This profile does not authorize an operation. It intersects with the product-surface authority. Products, Warehouse and Fleet have an explicit bounded-alpha admission for navigation and routes, recorded separately from their owning lifecycles' `firstOrgExposure: "review"`. The strict lifecycle evidence helper and D/A/O/E calibration remain unchanged. Every other review surface retains its existing decision. Existing destination permissions still apply when following a Finance handoff or direct URL; no RBAC rule, server query policy or generated contract is changed by discovery.
+This profile does not authorize an operation. It intersects with the product-surface authority. Products, Warehouse, Inventory and Fleet have an explicit bounded-alpha admission for navigation and routes, recorded separately from their owning lifecycles' `firstOrgExposure: "review"`. The strict lifecycle evidence helper and D/A/O/E calibration remain unchanged. Every other review surface retains its existing decision. Existing destination permissions still apply when following a Finance handoff or direct URL; no RBAC rule, server query policy or generated contract is changed by discovery.
 
 The verification below records the original Finance navigation change. Product/Warehouse/Fleet current-head results belong in the dated acceptance record linked above; they are not implied by the earlier counts.
 

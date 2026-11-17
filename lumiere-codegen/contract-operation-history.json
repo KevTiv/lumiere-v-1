@@ -590,6 +590,10 @@
       "name": "cancel_ai_agent_run",
       "shape_fingerprint": "sha256:e206d5d7e8ddc3f6b88c1619b5d0a529f526fff6bf0d8d2363375e980f55ec98"
     },
+    "erp.cancel_ai_embedding_job": {
+      "name": "cancel_ai_embedding_job",
+      "shape_fingerprint": "sha256:61f80ab3d154bd33891b5b4739ce5592b963dc41700648c5f69209ce22465413"
+    },
     "erp.cancel_budget": {
       "name": "cancel_budget",
       "shape_fingerprint": "sha256:489a0d7d4383c4bdbb8939cb077943a5ca66b98989952a0a0e89564e9da6a195"
@@ -2429,6 +2433,10 @@
     "erp.enroll_ai_company_defaults": {
       "name": "enroll_ai_company_defaults",
       "shape_fingerprint": "sha256:e36f1b0a57db537789d543659726ea97de76921cb5c513608707de89dd6cd2c1"
+    },
+    "erp.enroll_persistent_platform_operator": {
+      "name": "enroll_persistent_platform_operator",
+      "shape_fingerprint": "sha256:4b6eab3d00017d741b9cf9448dc396e93ba5f7902e1450b9b837825f21f553c6"
     },
     "erp.ensure_ai_managed_allowance": {
       "name": "ensure_ai_managed_allowance",
@@ -5408,7 +5416,7 @@
     },
     "erp.update_ai_chat_session_title": {
       "name": "update_ai_chat_session_title",
-      "shape_fingerprint": "sha256:3f698b057a074fd7d2917d1e04b6c9eced61b28ebea24a026b013995b43365af"
+      "shape_fingerprint": "sha256:6b9ce2f52ac94855a321e8484c0bc2e91e3aaec289f1223c4358b1f5229dabf4"
     },
     "erp.update_ai_reducer_allowlist": {
       "name": "update_ai_reducer_allowlist",
@@ -6520,6 +6528,30 @@
       "current_operations_fingerprint": "sha256:a24a818d98b80c6a9b9a2c8603b4d8c209a870fc06068dd7be92cc741350e79a",
       "operation_count": 1530,
       "reason": "Add same-agent model capability repair and a no-mutation native activation authority probe; preserve tenant scope and spend history"
+    },
+    {
+      "previous_release": "v0.3.179",
+      "previous_ir_sha256": "sha256:8a84c022af77ea62f73c805d07e29fb26685deda6e5129aa591096a003520c3d",
+      "previous_operations_fingerprint": "sha256:a24a818d98b80c6a9b9a2c8603b4d8c209a870fc06068dd7be92cc741350e79a",
+      "current_operations_fingerprint": "sha256:f93aaef84c3abb0e0fc2e9943bbe015a641385699900492660469658b5e19a7c",
+      "operation_count": 1531,
+      "reason": "Add deployment-bound persistent nonhuman operator enrollment; preserve lease checks, tenant ownership and monetary history"
+    },
+    {
+      "previous_release": "v0.3.180",
+      "previous_ir_sha256": "sha256:127179da29bc9dda4f3eba38fb0511bed8ff14bfdadc9f20a9c4b7af345465ec",
+      "previous_operations_fingerprint": "sha256:f93aaef84c3abb0e0fc2e9943bbe015a641385699900492660469658b5e19a7c",
+      "current_operations_fingerprint": "sha256:a764569d9d1ed3daa08801c2d6d78551a3c4315e779a174bccf4b070bcb43d2c",
+      "operation_count": 1532,
+      "reason": "Add private embedding lease-proof cancellation; preserve generic queue authority and monetary holds"
+    },
+    {
+      "previous_release": "v0.3.183",
+      "previous_ir_sha256": "sha256:e3cca665e99811dfedd12a3967d50a6b21ab657c85f94194169c6b6b0798006d",
+      "previous_operations_fingerprint": "sha256:a764569d9d1ed3daa08801c2d6d78551a3c4315e779a174bccf4b070bcb43d2c",
+      "current_operations_fingerprint": "sha256:a980137af154cfbbb8e8f13fb71e1ea32e5175df4a1b3f1f6d3e66e36885168a",
+      "operation_count": 1532,
+      "reason": "release on top of v0.3.183: add none; change the shape of update_ai_chat_session_title"
     }
   ]
 }

@@ -10,6 +10,7 @@ import sys
 import unittest
 from unittest import mock
 import zipfile
+from xml.sax.saxutils import escape
 
 
 SCRIPT = Path(__file__).parents[1] / "import-task-prepare.py"
@@ -42,9 +43,61 @@ def workbook(rows_xml, *, sheet_count=1, shared_strings=None):
     return output.getvalue()
 
 
+def daily_shop_report(title="AUDIT KIMIRONKO 12/4/2024 Frw", *, amount="32,500", subtotal="32500.01"):
+    return [
+        [title],
+        ["N/S", "Description", "S I", "ENTRÉE", "TOTAL", "SF", "QTES S", "PU", "TOTAL", "Qtés s", "Prix unitaire", "Montant"],
+        ["1", "INKOKO", "", "", "", "", "", "", "", "8.125", "4,000", amount],
+        ["", "TOTAL", "", "", "", "", "", "", "", "", "", subtotal],
+    ]
+
+
 class PreparationTests(unittest.TestCase):
     def prepare(self, *files):
         return module.prepare({"mode": "prepare_import", "files": list(files)})
+
+    def test_farm_event_import_preserves_identity_coordinates_and_locale(self):
+        contents = ("Référence du lot;Référence de l’événement;Type d’événement;Date;Nombre;Espèce;Emplacement;Poids total kg;Nombre pesé\n"
+                    "LOT-05;E-100;arrivée;08/11/2026;100;Poule;Maison A;;\n"
+                    "LOT-05;E-101;gupima;10/11/2026;;;;6,75;10\n"
+                    "LOT-05;E-102;impfu;11/11/2026;;;;;\n")
+        result = module.prepare({
+            "mode": "prepare_import",
+            "files": [source("flock.csv", contents)],
+            "preparation": {"version": 1, "files": [{
+                "fileName": "flock.csv", "sourceSha256": hashlib.sha256(contents.encode()).hexdigest(),
+                "delimiter": ";", "decimalSeparator": ",", "dateOrder": "dmy",
+            }]},
+        })
+        batch = result["datasets"][0]
+        self.assertEqual(batch["targetEntity"], "farm_event")
+        intake, weight, mortality = batch["items"]
+        self.assertEqual(intake["proposed"]["event_kind"], "intake")
+        self.assertEqual(intake["source"]["row"], 2)
+        self.assertEqual(intake["proposed"]["business_date"], "2026-11-08")
+        self.assertEqual(intake["proposed"]["event_reference"], "E-100")
+        self.assertEqual(weight["proposed"]["event_kind"], "weighIn")
+        self.assertEqual(weight["proposed"]["total_weight_kg"], "6.75")
+        self.assertEqual(weight["fields"][7]["sourceColumn"], 8)
+        self.assertEqual(weight["fields"][7]["sourceValue"], "6,75")
+        self.assertEqual(mortality["proposed"]["event_kind"], "mortality")
+        self.assertIn("count", mortality["issue"])
+
+    def test_farm_inspection_held_rows_are_evidence_only(self):
+        upload = source("flock.csv", "flock_reference,event_reference,event_kind,business_date,count\nLOT-05,E-102,mortality,2026-11-11,4\n")
+        result = module.prepare({"mode": "inspect_only", "files": [upload]})
+        self.assertTrue(result["datasets"])
+        self.assertTrue(all(batch["targetEntity"] == "source_observation" for batch in result["datasets"]))
+
+    def test_farm_cost_import_keeps_exact_posted_ids_and_allocation_basis(self):
+        upload = source("costs.csv", "flock_reference,event_reference,event_kind,business_date,journal_line_id,cost_kind,expense_report_id,allocation_basis\nLOT-05,GL-41,costLink,2026-11-11,9007199254740993,note de frais,4001,Feed for this flock only\n")
+        batch = self.prepare(upload)["datasets"][0]
+        self.assertEqual(batch["targetEntity"], "farm_event")
+        result = batch["items"][0]["proposed"]
+        self.assertEqual(result["journal_line_id"], "9007199254740993")
+        self.assertEqual(result["cost_kind"], "expense_report")
+        self.assertEqual(result["expense_report_id"], "4001")
+        self.assertEqual(result["allocation_basis"], "Feed for this flock only")
 
     def test_inspection_mode_never_emits_business_import_proposals(self):
         contents = "name,sale_price,cost_price\nSausage,4800,3000\n"
@@ -226,6 +279,86 @@ class PreparationTests(unittest.TestCase):
         self.assertIsNone(item["proposed"]["unit"])
         self.assertIsNone(item["proposed"]["cost_unit_price"])
         self.assertEqual(json.loads(item["proposed"]["source_cells"]), rows[2])
+
+    def test_dated_shop_sale_keeps_native_fields_and_control_total_evidence(self):
+        rows = daily_shop_report()
+        selected = csv_source("KIMIRONKO.csv", rows)
+        result = self.prepare(selected)
+        batch = result["datasets"][0]
+        _, _, line, subtotal = batch["items"]
+        self.assertEqual(batch["targetEntity"], "source_observation")
+        self.assertEqual(line["source"], {"file": "KIMIRONKO.csv", "row": 3,
+                                          "sha256": hashlib.sha256(base64.b64decode(selected["contentBase64"])).hexdigest(),
+                                          "rowBasis": "source_line"})
+        self.assertEqual(line["businessDate"], {"precision": "day", "from": "2024-04-12", "toExclusive": "2024-04-13", "raw": rows[0][0]})
+        expected = {"observation_kind": "historical_shop_sale", "shop": "KIMIRONKO", "sale_date": "2024-04-12",
+                    "product_label": "INKOKO", "sold_quantity": "8.125", "sale_unit_price": "4000",
+                    "sale_amount": "32500", "currency_code": "RWF", "source_unit": None}
+        self.assertEqual({key: line["proposed"][key] for key in expected}, expected)
+        fields = {field["key"]: field for field in line["fields"]}
+        self.assertEqual(fields["currency_code"]["sourceValue"], "Frw")
+        self.assertEqual(fields["sale_amount"]["sourceValue"], "32,500")
+        self.assertFalse(fields["source_unit"]["required"])
+        self.assertTrue(all(not field["export"] for field in fields.values()))
+        self.assertIn("reported sales subtotal differs", line["issue"])
+        self.assertNotIn("observation_kind", subtotal["proposed"])
+        self.assertEqual(json.loads(subtotal["proposed"]["source_cells"]), rows[-1])
+        self.assertEqual(result, self.prepare(selected))
+
+    def test_shop_sale_holds_missing_currency_for_review(self):
+        rows = daily_shop_report("AUDIT KIMIRONKO 12/4/2024")
+        line = self.prepare(csv_source("sales.csv", rows))["datasets"][0]["items"][2]
+        self.assertEqual(line["proposed"]["observation_kind"], "historical_shop_sale")
+        self.assertIsNone(line["proposed"]["currency_code"])
+        self.assertTrue(next(field for field in line["fields"] if field["key"] == "currency_code")["required"])
+        self.assertIn("Confirm the sales currency", line["issue"])
+
+    def test_incomplete_conflicting_and_inspection_rows_stay_source_evidence(self):
+        ranges = daily_shop_report("AUDIT KIMIRONKO 12/4/2024-13/4/2024 RWF")
+        unknown_product = daily_shop_report()
+        unknown_product[2][1] = ""
+        reversed_headers = daily_shop_report()
+        reversed_headers[1][10], reversed_headers[1][11] = reversed_headers[1][11], reversed_headers[1][10]
+        cases = [("KIMIRONKO.csv", ranges), ("KIMIRONKO.csv", unknown_product),
+                 ("KIMIRONKO.csv", reversed_headers), ("KICUKIRO.csv", daily_shop_report()),
+                 ("KIMIRONKO.csv", daily_shop_report(amount="32500.01")),
+                 ("KIMIRONKO.csv", daily_shop_report(amount="325_00"))]
+        for name, rows in cases:
+            with self.subTest(name=name, rows=rows):
+                items = self.prepare(csv_source(name, rows))["datasets"][0]["items"]
+                self.assertTrue(all("observation_kind" not in item["proposed"] for item in items))
+        rows = daily_shop_report()
+        inspect = module.prepare({"mode": "inspect_only", "files": [csv_source("KIMIRONKO.csv", rows)]})
+        repeated = self.prepare(csv_source("KIMIRONKO.csv", rows), csv_source("KIMIRONKO copy.csv", rows))
+        for result in (inspect, repeated):
+            self.assertTrue(all("observation_kind" not in item["proposed"]
+                                for batch in result["datasets"] for item in batch["items"]))
+
+    def test_approved_decimal_convention_applies_to_daily_report(self):
+        rows = daily_shop_report(amount="32 500,00", subtotal="32 500,00")
+        rows[2][9:11] = ["8,125", "4 000"]
+        selected = csv_source("KIMIRONKO.csv", rows)
+        rule = {"fileName": selected["fileName"], "sourceSha256": hashlib.sha256(base64.b64decode(selected["contentBase64"])).hexdigest(),
+                "delimiter": ",", "decimalSeparator": ",", "groupingSeparator": " "}
+        result = module.prepare({"mode": "prepare_import", "files": [selected], "preparation": {"version": 1, "files": [rule]}})
+        line = result["datasets"][0]["items"][2]
+        self.assertEqual(line["proposed"]["observation_kind"], "historical_shop_sale")
+        self.assertEqual(line["proposed"]["sold_quantity"], "8.125")
+        self.assertEqual(line["proposed"]["sale_amount"], "32500")
+
+    def test_dated_shop_sale_keeps_sparse_workbook_coordinates(self):
+        xml = []
+        for number, cells in zip([2, 6, 11, 16], daily_shop_report()):
+            values = [f'<c r="{chr(65 + column)}{number}" t="inlineStr"><is><t>{escape(value)}</t></is></c>'
+                      for column, value in enumerate(cells) if value]
+            xml.append(f'<row r="{number}">{"".join(values)}</row>')
+        result = self.prepare(source("shop report.xlsx", workbook("".join(xml))))
+        line = result["datasets"][0]["items"][2]
+        self.assertEqual(line["proposed"]["observation_kind"], "historical_shop_sale")
+        self.assertEqual(line["source"]["row"], 11)
+        self.assertEqual(line["proposed"]["source_worksheet"], "Sheet 1")
+        self.assertEqual(result["coverage"]["files"][0]["worksheet"], "Sheet 1")
+        self.assertEqual(line["source"]["rowBasis"], "import_row")
 
     def test_farm_tail_notes_are_reviewable_in_live_preparation_and_isolated_cli(self):
         rows = [["AUDIT ZINIA 1/1/2023-7/1/2023"],

@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test"
 import { activeTabEntityTable, gotoModule, scalarQueryId } from "./helpers"
 
-const VISIBLE = ["overview", "tasks", "approvals", "accounting", "sales", "crm", "purchasing", "products", "warehouse", "fleet", "reports", "subscriptions", "expenses", "documents", "calendar", "settings"]
-const HIDDEN = ["messages", "inventory", "distributor", "pos", "manufacturing", "map", "helpdesk", "workflows", "hr", "projects", "proposals", "forensics", "trackers", "ai-skills", "ai-action-drafts", "iot"]
+const VISIBLE = ["overview", "tasks", "approvals", "accounting", "sales", "crm", "purchasing", "products", "warehouse", "inventory", "fleet", "reports", "subscriptions", "expenses", "documents", "calendar", "settings"]
+const HIDDEN = ["messages", "distributor", "pos", "manufacturing", "map", "helpdesk", "workflows", "hr", "projects", "proposals", "forensics", "trackers", "ai-skills", "ai-action-drafts", "iot"]
 const sidebar = (page: Page) => page.locator('[data-testid="dashboard-sidebar"]:visible')
 
 async function expectFinanceNavigation(page: Page) {
@@ -67,10 +67,10 @@ test.describe("Finance Alpha discovery", { tag: ["@p0", "@finance-alpha"] }, () 
       await page.keyboard.press("Control+k")
       const palette = page.getByRole("dialog", { name: "Command Palette", exact: true })
       await expect(palette).toBeVisible()
-      for (const name of ["Accounting", "Sales", "Purchasing", "Products", "Warehouse", "Fleet", "Reports", "Expenses", "Settings"]) {
+      for (const name of ["Accounting", "Sales", "Purchasing", "Products", "Warehouse", "Inventory", "Fleet", "Reports", "Expenses", "Settings"]) {
         await expect(palette.getByRole("option", { name, exact: true })).toBeVisible()
       }
-      for (const name of ["Messages", "Journal", "Notebook", "Inventory", "Manufacturing", "Projects", "Human Resources", "AI Skills", "IoT"]) {
+      for (const name of ["Messages", "Journal", "Notebook", "Manufacturing", "Projects", "Human Resources", "AI Skills", "IoT"]) {
         await expect(palette.getByRole("option", { name, exact: true })).toHaveCount(0)
       }
       const box = await palette.boundingBox()
@@ -78,9 +78,12 @@ test.describe("Finance Alpha discovery", { tag: ["@p0", "@finance-alpha"] }, () 
       expect(box!.x).toBeGreaterThanOrEqual(0)
       expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1)
       await palette.getByRole("combobox").fill("Inventory")
-      await expect(palette.getByRole("option", { name: "Inventory", exact: true })).toHaveCount(0)
-      await page.keyboard.press("Escape")
+      await palette.getByRole("option", { name: "Inventory", exact: true }).click()
       await expect(palette).toBeHidden()
+      await expect(page).toHaveURL(/\/inventory$/)
+      await expect(page.getByTestId("module-view-inventory")).toBeVisible()
+      await page.goBack()
+      await expect(page).toHaveURL(/\/reports$/)
       await expectFinanceNavigation(page)
       await sidebar(page).getByTestId("sidebar-link-accounting").click()
       await expect(page).toHaveURL(/\/accounting$/)
@@ -110,12 +113,12 @@ test.describe("Finance Alpha discovery", { tag: ["@p0", "@finance-alpha"] }, () 
     await page.keyboard.press("Escape")
     await page.getByTestId("settings-section-form-config").click()
     const cards = page.locator('[data-testid^="form-config-module-"]:visible')
-    await expect(cards).toHaveCount(9)
-    for (const id of ["accounting", "sales", "crm", "purchasing", "reports", "subscriptions", "expenses", "documents", "calendar"]) {
+    await expect(cards).toHaveCount(10)
+    for (const id of ["accounting", "sales", "crm", "purchasing", "reports", "subscriptions", "expenses", "documents", "calendar", "inventory"]) {
       await expect(page.getByTestId(`form-config-module-${id}`)).toBeVisible()
     }
     await expect(page.getByTestId("form-config-module-journal")).toHaveCount(0)
-    for (const id of ["inventory", "hr", "projects", "manufacturing", "helpdesk", "proposals", "forensic"]) {
+    for (const id of ["hr", "projects", "manufacturing", "helpdesk", "proposals", "forensic"]) {
       await expect(page.getByTestId(`form-config-module-${id}`)).toHaveCount(0)
     }
     await page.reload()
@@ -139,7 +142,7 @@ test.describe("Finance Alpha discovery", { tag: ["@p0", "@finance-alpha"] }, () 
     expect(writes).toEqual([])
   })
 
-  test("opens an existing purchase receipt without exposing Inventory in global navigation", async ({ page }) => {
+  test("opens the linked purchase receipt in the visible Inventory workspace", async ({ page }) => {
     const writes = observeWrites(page)
     // Select an existing explicit PO/receipt relation; do not infer a handoff by dates or names.
     const response = await page.request.get("/api/query/stock-pickings")

@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::json;
 
 use crate::config::{Config, MistralReasoningEffort};
@@ -45,6 +45,39 @@ impl std::fmt::Debug for MistralAssistantReplay {
 }
 
 const MAX_MISTRAL_REPLAY_BYTES: usize = 1024 * 1024;
+const MAX_COMPLETION_RESPONSE_BYTES: usize = 2 * 1024 * 1024;
+const MAX_PROVIDER_ERROR_BYTES: usize = 8 * 1024;
+
+async fn bounded_response(mut response: reqwest::Response, limit: usize) -> Result<Vec<u8>> {
+    anyhow::ensure!(
+        response
+            .content_length()
+            .is_none_or(|bytes| bytes <= limit as u64),
+        "provider response exceeded its byte limit"
+    );
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await? {
+        anyhow::ensure!(
+            chunk.len() <= limit.saturating_sub(bytes.len()),
+            "provider response exceeded its byte limit"
+        );
+        bytes.extend_from_slice(&chunk);
+    }
+    Ok(bytes)
+}
+
+async fn bounded_completion<T: DeserializeOwned>(response: reqwest::Response) -> Result<T> {
+    let bytes = bounded_response(response, MAX_COMPLETION_RESPONSE_BYTES).await?;
+    serde_json::from_slice(&bytes).context("invalid provider completion envelope")
+}
+
+async fn bounded_provider_error(response: reqwest::Response) -> String {
+    bounded_response(response, MAX_PROVIDER_ERROR_BYTES)
+        .await
+        .ok()
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .unwrap_or_default()
+}
 
 impl LlmMessage {
     /// Bytes of opaque native history included in a matching direct request.
@@ -289,11 +322,13 @@ impl LlmClient {
         let resp = request.send().await.context("Kong LLM request failed")?;
         if !resp.status().is_success() {
             let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
+            let body = bounded_provider_error(resp).await;
             anyhow::bail!("Kong LLM error {status}: {body}");
         }
 
-        let body: OpenAiChatResponse = resp.json().await.context("parse Kong LLM response")?;
+        let body: OpenAiChatResponse = bounded_completion(resp)
+            .await
+            .context("parse Kong LLM response")?;
         Ok(self.from_openai_response(body, &req.provider, &req.model))
     }
 
@@ -404,8 +439,7 @@ impl LlmClient {
             resp.status(),
             resp.headers().get(reqwest::header::RETRY_AFTER),
         )?;
-        let body = resp
-            .json()
+        let body = bounded_completion(resp)
             .await
             .map_err(|_| anyhow::anyhow!("invalid Mistral response envelope"))?;
         decode_mistral_response(body, &req.model)
@@ -438,11 +472,13 @@ impl LlmClient {
 
         if !resp.status().is_success() {
             let status = resp.status();
-            let text = resp.text().await.unwrap_or_default();
+            let text = bounded_provider_error(resp).await;
             anyhow::bail!("Ollama error {status}: {text}");
         }
 
-        let parsed: OllamaChatResponse = resp.json().await.context("parse Ollama response")?;
+        let parsed: OllamaChatResponse = bounded_completion(resp)
+            .await
+            .context("parse Ollama response")?;
         Ok(Self::from_ollama_response(parsed, req, model))
     }
 
@@ -557,11 +593,13 @@ impl LlmClient {
 
         if !resp.status().is_success() {
             let status = resp.status();
-            let text = resp.text().await.unwrap_or_default();
+            let text = bounded_provider_error(resp).await;
             anyhow::bail!("Gemini error {status}: {text}");
         }
 
-        let parsed: GeminiGenerateResponse = resp.json().await.context("parse Gemini response")?;
+        let parsed: GeminiGenerateResponse = bounded_completion(resp)
+            .await
+            .context("parse Gemini response")?;
         Ok(Self::from_gemini_response(parsed, model))
     }
 

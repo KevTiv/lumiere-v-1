@@ -56,6 +56,7 @@ import {
   type PageWidgetPlacement,
   type PageWidgetWidth,
 } from "../lib/page-composition"
+import type { ModuleDataState } from "../lib/module-data-state"
 import { PageCompositionGallery } from "./page-composition-gallery"
 import {
   PageCompositionSortableWidget,
@@ -66,6 +67,7 @@ export interface PageCompositionProps {
   value: PageCompositionValue
   defaultValue: readonly PageWidgetPlacement[]
   catalog: readonly PageWidgetCatalogItem[]
+  savedCatalogState?: ModuleDataState
   revision?: string | null
   onSave: (
     value: PageCompositionValue,
@@ -78,6 +80,9 @@ export interface PageCompositionProps {
   ) => void | Promise<PageWidgetCatalogItem | null | void>
   onDraftChange?: (value: PageCompositionValue) => void
   request?: PageCompositionRequest | null
+  focusSavedWidgetId?: string
+  focusSavedPlacementId?: string
+  onAssistantWidgetPlaced?: (requestId: string, placement: PageWidgetPlacement) => void
   onRequestHandled?: (requestId: string) => void
   canEdit?: boolean
   isLoading?: boolean
@@ -95,12 +100,16 @@ export function PageComposition({
   value,
   defaultValue,
   catalog,
+  savedCatalogState,
   revision = null,
   onSave,
   onCreateWidget,
   onConfigureWidget,
   onDraftChange,
   request,
+  focusSavedWidgetId,
+  focusSavedPlacementId,
+  onAssistantWidgetPlaced,
   onRequestHandled,
   canEdit = true,
   isLoading = false,
@@ -129,6 +138,7 @@ export function PageComposition({
   const [gallery, setGallery] = useState<{
     prompt?: string
     afterId?: string
+    assistantRequestId?: string
   } | null>(null)
   const [operation, setOperation] = useState<
     "save" | "create" | "configure" | null
@@ -303,7 +313,7 @@ export function PageComposition({
           }),
         )
       } else {
-        setGallery({ prompt: request.prompt })
+        setGallery({ prompt: request.prompt, assistantRequestId: request.id })
       }
     }
     onRequestHandled?.(request.id)
@@ -385,6 +395,7 @@ export function PageComposition({
     if (!onCreateWidget || controlsDisabled || pending.current || atCapacity)
       return
     const afterId = gallery?.afterId
+    const assistantRequestId = gallery?.assistantRequestId
     setGallery(null)
     pending.current = true
     setOperation("create")
@@ -398,13 +409,11 @@ export function PageComposition({
           return
         }
         remember(item)
+        const placement = createPageWidgetPlacement(item, assistantRequestId ? `assistant-${assistantRequestId}` : undefined)
+        if (assistantRequestId && item.source === "saved") onAssistantWidgetPlaced?.(assistantRequestId, placement)
         dispatch({
           type: "change",
-          value: insertPageWidget(
-            widgets,
-            createPageWidgetPlacement(item),
-            afterId,
-          ),
+          value: insertPageWidget(widgets, placement, afterId),
         })
         setAnnouncement(
           t("pageComposition.added", {
@@ -538,12 +547,38 @@ export function PageComposition({
         {editLabel}
       </Button>
     ) : null
+  const focusPlacement = focusSavedWidgetId
+    ? widgets.find(widget => widget.source === "saved" && widget.widgetId === focusSavedWidgetId
+      && (!focusSavedPlacementId || widget.id === focusSavedPlacementId))
+    : undefined
+  const focusWidgetItem = focusPlacement ? itemsByKey.get(pageWidgetKey(focusPlacement)) : undefined
+  const lastFocusedWidget = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (!focusSavedWidgetId) {
+      lastFocusedWidget.current = undefined
+      return
+    }
+    if (editing || isLoading || !focusPlacement || !focusWidgetItem?.widget
+      || focusWidgetItem.unavailableReason || lastFocusedWidget.current === focusPlacement.id) return
+    const target = Array.from(rootRef.current?.querySelectorAll<HTMLElement>("[data-saved-widget-id]") ?? [])
+      .find(element => element.dataset.placementId === focusPlacement.id)
+    if (!target) return
+    for (let ancestor = target.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      if (ancestor instanceof HTMLDetailsElement) ancestor.open = true
+    }
+    target.focus({ preventScroll: true })
+    target.scrollIntoView({ block: "nearest" })
+    lastFocusedWidget.current = focusPlacement.id
+  }, [editing, focusPlacement, focusSavedWidgetId, focusWidgetItem, isLoading])
+  const focusedWidgetUnavailable = focusSavedWidgetId && !editing && !isLoading
+    && (!focusPlacement || !focusWidgetItem?.widget || !!focusWidgetItem.unavailableReason)
   const headerAction =
     actionTarget && launcher ? createPortal(launcher, actionTarget) : null
   if (
     insights &&
     !editing &&
     widgets.length === 0 &&
+    !focusSavedWidgetId &&
     actionTarget !== undefined
   ) {
     return (
@@ -574,6 +609,9 @@ export function PageComposition({
       }
     >
       {headerAction}
+      {focusedWidgetUnavailable && <p role="status" className="text-sm text-muted-foreground">
+        {t("pageComposition.unavailable.description")}
+      </p>}
       {insights ? (
         <h2 className="text-lg font-semibold">
           {t("pageComposition.insights", { defaultValue: "Page insights" })}
@@ -800,6 +838,8 @@ export function PageComposition({
                   pageWidgetWidthClasses[placement.width],
                 )}
                 data-placement-id={placement.id}
+                data-saved-widget-id={placement.source === "saved" ? placement.widgetId : undefined}
+                tabIndex={focusPlacement?.id === placement.id ? -1 : undefined}
               >
                 <PageCompositionWidgetBody
                   item={itemsByKey.get(pageWidgetKey(placement))}
@@ -834,6 +874,7 @@ export function PageComposition({
       {gallery ? (
         <PageCompositionGallery
           catalog={items}
+          savedCatalogState={savedCatalogState}
           placements={widgets}
           prompt={gallery.prompt}
           disabled={controlsDisabled || atCapacity}

@@ -125,6 +125,53 @@ test("the admitted SSE answer, sources and run identity require a terminal done 
   for (const crlf of [false, true]) assert.deepEqual(await readAssistantStream(sse(complete, crlf), metadata), { answer: "Admitted answer", sources: ["source"], run_id: 7 })
 })
 
+test("admitted answer text reaches chat before the stream completes", async () => {
+  const encoder = new TextEncoder()
+  const { readable, writable } = new TransformStream<Uint8Array>()
+  const writer = writable.getWriter()
+  const { promise: firstDelta, resolve: deliverDelta } = Promise.withResolvers<string>()
+  const deltas: string[] = []
+  let completed = false
+  const result = readAssistantStream(
+    new Response(readable, { headers: { "content-type": "text/event-stream" } }),
+    metadata,
+    (delta) => {
+      deltas.push(delta)
+      deliverDelta(delta)
+    },
+  ).then((reply) => {
+    completed = true
+    return reply
+  })
+
+  await writer.write(encoder.encode("event: delta\ndata: Admitted \n\n"))
+  assert.equal(await firstDelta, "Admitted ")
+  assert.equal(completed, false)
+  await writer.write(encoder.encode(complete.replace("Admitted answer", "answer")))
+  await writer.close()
+
+  assert.deepEqual(await result, { answer: "Admitted answer", sources: ["source"], run_id: 7 })
+  assert.deepEqual(deltas, ["Admitted ", "answer"])
+})
+
+test("visible provisional text does not verify an interrupted stream", async () => {
+  const deltas: string[] = []
+  const incomplete = complete.replace(/event: done[\s\S]*/, "")
+  await assert.rejects(
+    readAssistantStream(sse(incomplete), metadata, (delta) => deltas.push(delta)),
+    /ended before completion/,
+  )
+  assert.deepEqual(deltas, ["Admitted answer"])
+})
+
+test("multiple deltas in one network chunk reach chat as one update", async () => {
+  const deltas: string[] = []
+  const text = "event: delta\ndata: Admitted \n\n" + complete.replace("Admitted answer", "answer")
+  const result = await readAssistantStream(sse(text), metadata, (delta) => deltas.push(delta))
+  assert.deepEqual(deltas, ["Admitted answer"])
+  assert.equal(result.answer, "Admitted answer")
+})
+
 test("truncated, failed and malformed streams never become completed answers", async () => {
   for (const text of [complete.replace(/event: done[\s\S]*/, ""), 'event: done\ndata: {}\n\n', complete.replace('event: done', 'event: error'), complete.replace('{"sources":["source"],"run_id":7}', 'not json')]) {
     await assert.rejects(readAssistantStream(sse(text), metadata))
@@ -137,6 +184,29 @@ test("chunk boundaries, multiline data and UTF-8 are reconstructed before comple
   const body = new ReadableStream<Uint8Array>({ start(controller) { for (const byte of bytes) controller.enqueue(new Uint8Array([byte])); controller.close() } })
   const result = await readAssistantStream(new Response(body, { headers: { "content-type": "text/event-stream" } }), metadata)
   assert.equal(result.answer, "Approved: café\nline two")
+})
+
+test("an oversized unframed stream event cancels the reader before another chunk is pulled", async () => {
+  let pulls = 0
+  let cancelled = false
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulls++
+      controller.enqueue(new Uint8Array(600_000).fill(65))
+    },
+    cancel() { cancelled = true },
+  }, { highWaterMark: 0 })
+  await assert.rejects(
+    readAssistantStream(new Response(body, { headers: { "content-type": "text/event-stream" } }), metadata),
+    /event exceeds its size limit/,
+  )
+  assert.equal(pulls, 2)
+  assert.equal(cancelled, true)
+})
+
+test("bounded stream events cannot accumulate an oversized assistant answer", async () => {
+  const delta = "event: delta\ndata: " + "a".repeat(100_000) + "\n\n"
+  await assert.rejects(readAssistantStream(sse(delta.repeat(3) + complete), metadata), /answer exceeds its size limit/)
 })
 
 test("malformed JSON and SSE source envelopes retain independently prepared drafts", async () => {

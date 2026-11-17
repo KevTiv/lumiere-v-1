@@ -51,6 +51,7 @@ for (const width of [320, 390, 768, 1440]) {
           page.getByLabel("Analysis period", { exact: true }),
           "30d",
         )
+        await expect(page).toHaveURL((url) => url.searchParams.get("period") === "30d")
         await expect(page.getByTestId("module-insights-period-callback")).toContainText("2026-09-18T00:00:00.000Z")
         await expect(page.getByTestId("module-insights-period-callback")).toContainText("2026-10-18T00:00:00.000Z")
         await expect(page.getByTestId(`${module}-insights-periodValue`)).toContainText("Previous period")
@@ -105,7 +106,9 @@ for (const width of [320, 390, 768, 1440]) {
         const tokenColor = await page.evaluate(() => { const probe = document.createElement("span"); probe.style.color = "hsl(var(--chart-1))"; document.body.append(probe); const color = getComputedStyle(probe).color; probe.remove(); return color })
         expect(stroke).toBe(tokenColor)
         expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1)
+        await expect(page).toHaveURL((url) => url.searchParams.get("period") === "30d")
         await page.getByRole("button", { name: "Switch synthetic company", exact: true }).click()
+        await expect(page).toHaveURL((url) => url.searchParams.get("period") === "30d")
         if (module !== "reports") {
           await expect(page.getByLabel("Analysis currency", { exact: true })).toContainText("USD")
           await expect(page.getByLabel("Analysis period", { exact: true })).toContainText("30")
@@ -127,6 +130,36 @@ for (const width of [320, 390, 768, 1440]) {
   }
 }
 
+
+test("period is committed before a company-keyed remount in the same event", async ({ page }) => {
+  await page.goto("/module-insights?retained=1#overview")
+  await expect(page.getByTestId("module-insights-disclosure")).toHaveAttribute("data-hydrated", "true")
+  await expect(page.getByTestId("period-at-company-remount")).toHaveText("all")
+  await page.getByRole("button", { name: "Select period and immediately switch company", exact: true }).click()
+  await expect(page.getByTestId("period-at-company-remount")).toHaveText("180d")
+  await expect(page).toHaveURL(url => url.searchParams.get("period") === "180d" && url.searchParams.get("retained") === "1" && url.hash === "#overview")
+  await expect(page.getByLabel("Analysis period", { exact: true })).toContainText("180")
+})
+
+test("shared history period survives reload and follows browser back navigation", async ({ page }) => {
+  await page.goto("/module-insights?retained=1#overview")
+  await expect(page.getByTestId("module-insights-disclosure")).toHaveAttribute("data-hydrated", "true")
+  await chooseSelectOptionByTriggerValue(page, page.getByLabel("Analysis period", { exact: true }), "30d")
+  await expect(page).toHaveURL((url) => url.searchParams.get("period") === "30d" && url.searchParams.get("retained") === "1" && url.hash === "#overview")
+  await page.reload()
+  await expect(page.getByLabel("Analysis period", { exact: true })).toContainText("30")
+  await page.getByRole("button", { name: "Switch synthetic company", exact: true }).click()
+  await expect(page.getByLabel("Analysis period", { exact: true })).toContainText("30")
+  await page.evaluate(() => {
+    const url = new URL(window.location.href)
+    url.searchParams.set("period", "all")
+    window.history.pushState(null, "", url)
+  })
+  await expect(page.getByLabel("Analysis period", { exact: true })).toContainText("All history")
+  await page.goBack()
+  await expect(page).toHaveURL((url) => url.searchParams.get("period") === "30d")
+  await expect(page.getByLabel("Analysis period", { exact: true })).toContainText("30")
+})
 
 test("empty CRM sources keep the dashboard available and recover when data returns", async ({ page }) => {
   const runtimeErrors: string[] = []

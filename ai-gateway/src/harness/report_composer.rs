@@ -33,6 +33,7 @@ use crate::orchestrator::{
 
 pub const REPORT_COMPOSER_SKILL_KEY: &str = "report_composer";
 pub const REPORT_COMPOSER_SKILL_VERSION: u32 = 1;
+pub const REPORT_COMPOSER_RELEASE_VERSION: &str = "1.0.3";
 pub const REPORT_COMPOSER_RESOURCE: &str = "reports.daily_business_summary.v1";
 pub const REPORT_COMPOSER_OUTPUT_TYPE: &str = "reports.daily_business_summary.summary.v1";
 pub const NAMED_READ_TOOL: &str = "named_resource_read";
@@ -64,6 +65,12 @@ pub struct ReportComposerOutput {
     pub report_key: String,
     pub title: String,
     pub items: Vec<ReportSummaryItem>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProtectedReportRows {
+    items: Vec<ReportSummaryItem>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -150,9 +157,15 @@ fn validate_input(value: &Value) -> Result<(), String> {
 }
 
 fn validate_output(value: &Value) -> Result<(), String> {
-    let output: ReportComposerOutput = serde_json::from_value(value.clone())
-        .map_err(|error| format!("invalid report-composer output: {error}"))?;
-    if output.items.is_empty() {
+    // Certification also validates the full fixture envelope. Live policy
+    // deliberately retains only the protected row array.
+    let items = if value.get("reportKey").is_some() || value.get("title").is_some() {
+        ReportComposerOutput::deserialize(value).map(|output| output.items)
+    } else {
+        ProtectedReportRows::deserialize(value).map(|output| output.items)
+    }
+    .map_err(|error| format!("invalid report-composer output: {error}"))?;
+    if items.is_empty() {
         return Err("report-composer output must contain at least one summary item".to_string());
     }
     Ok(())
@@ -191,34 +204,13 @@ pub async fn compose_report(
         format!("composed {} summary items", output.items.len()),
     );
 
-    let request = PolicyControlledRequest {
-        execution: PolicyExecutionRequest {
-            skill: SkillVersionRef::new(REPORT_COMPOSER_SKILL_KEY, REPORT_COMPOSER_SKILL_VERSION),
-            organization_id,
-            company_id: input.company_id,
-            correlation_id: correlation_id.clone(),
-            metadata: ExecutionMetadata {
-                actor_id: Some(identity_hex.to_string()),
-                causation_id: Some(correlation_id),
-                ..Default::default()
-            },
-            input: serde_json::to_value(&input).unwrap_or_default(),
-            plan: ExecutionPlan {
-                named_resources: vec![REPORT_COMPOSER_RESOURCE.to_string()],
-                tool_calls: vec![PlannedToolCall {
-                    tool_name: NAMED_READ_TOOL.to_string(),
-                    capability: Capability::NamedRead,
-                    named_resource: Some(REPORT_COMPOSER_RESOURCE.to_string()),
-                }],
-                steps: 1,
-                expected_rows: output.items.len() as u32,
-                output_type: REPORT_COMPOSER_OUTPUT_TYPE.to_string(),
-            },
-        },
-        candidate_output: serde_json::to_value(&output).unwrap_or_default(),
-    };
-
-    let decision = policy.execute_controlled(request);
+    let decision = policy.execute_controlled(policy_request(
+        organization_id,
+        identity_hex,
+        correlation_id,
+        &input,
+        &output,
+    ));
     audit.record(
         "policy",
         format!(
@@ -228,7 +220,7 @@ pub async fn compose_report(
         ),
     );
 
-    if decision.decision.outcome == DecisionOutcome::Deny {
+    if decision.decision.outcome != DecisionOutcome::Allow {
         audit.record("completed", "report composer denied by policy");
         return Ok(ReportComposerResult {
             decision,
@@ -242,13 +234,19 @@ pub async fn compose_report(
         });
     }
 
-    let (candidate_summary, claim_texts) = build_summary(&output);
+    let protected = decision
+        .output
+        .as_ref()
+        .ok_or_else(|| "allowed report composition has no protected output".to_string())?;
+    let ProtectedReportRows { items } = ProtectedReportRows::deserialize(protected)
+        .map_err(|error| format!("invalid protected report-composer output: {error}"))?;
+    let (candidate_summary, claim_texts) = build_summary(&input.report_key, &items);
     let mut evidence = TextEvidence::default();
     let report_ref = EvidenceRef {
         kind: "named_resource".to_string(),
         id: REPORT_COMPOSER_RESOURCE.to_string(),
     };
-    for item in &output.items {
+    for item in &items {
         // Named-resource rows are server-produced evidence. Add the exact
         // displayed decimal value rather than only minor units so figure
         // grounding matches the prose representation.
@@ -299,8 +297,7 @@ pub async fn compose_report(
         );
         String::new()
     });
-    let citations = output
-        .items
+    let citations = items
         .iter()
         .map(|item| ReportCitation {
             source: REPORT_COMPOSER_RESOURCE.to_string(),
@@ -326,6 +323,41 @@ fn withheld_verification(reason: &str) -> TextAnswerVerification {
         methods: vec!["deterministic"],
         limitations: Vec::new(),
         reason: Some(reason.to_string()),
+    }
+}
+
+fn policy_request(
+    organization_id: u64,
+    identity_hex: &str,
+    correlation_id: String,
+    input: &ReportComposerInput,
+    output: &ReportComposerOutput,
+) -> PolicyControlledRequest {
+    PolicyControlledRequest {
+        execution: PolicyExecutionRequest {
+            skill: SkillVersionRef::new(REPORT_COMPOSER_SKILL_KEY, REPORT_COMPOSER_SKILL_VERSION),
+            organization_id,
+            company_id: input.company_id,
+            correlation_id: correlation_id.clone(),
+            metadata: ExecutionMetadata {
+                actor_id: Some(identity_hex.to_string()),
+                causation_id: Some(correlation_id),
+                ..Default::default()
+            },
+            input: serde_json::to_value(input).unwrap_or_default(),
+            plan: ExecutionPlan {
+                named_resources: vec![REPORT_COMPOSER_RESOURCE.to_string()],
+                tool_calls: vec![PlannedToolCall {
+                    tool_name: NAMED_READ_TOOL.to_string(),
+                    capability: Capability::NamedRead,
+                    named_resource: Some(REPORT_COMPOSER_RESOURCE.to_string()),
+                }],
+                steps: 1,
+                expected_rows: output.items.len() as u32,
+                output_type: REPORT_COMPOSER_OUTPUT_TYPE.to_string(),
+            },
+        },
+        candidate_output: serde_json::to_value(output).unwrap_or_default(),
     }
 }
 
@@ -483,12 +515,65 @@ fn push_total(
     Ok(())
 }
 
-fn build_summary(output: &ReportComposerOutput) -> (String, Vec<String>) {
+fn build_summary(report_key: &str, items: &[ReportSummaryItem]) -> (String, Vec<String>) {
     let mut parts = Vec::new();
-    parts.push(format!("Daily business summary for {}.", output.report_key));
-    for item in &output.items {
+    parts.push(format!("Daily business summary for {report_key}."));
+    for item in items {
         let value = item.value_minor_units as f64 / 10f64.powi(item.scale as i32);
         parts.push(format!("{}: {:.2}", item.label, value));
     }
     (parts.join(" "), parts)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::harness::manifest::OrgPrivacyPolicy;
+    use serde_json::json;
+
+    #[test]
+    fn report_composer_policy_allows_the_protected_row_projection() {
+        let input = ReportComposerInput {
+            report_key: PREVIEWABLE_REPORT_KEY.to_string(),
+            company_id: 7,
+            date: "2026-11-13".to_string(),
+            timezone: "UTC".to_string(),
+        };
+        let output = ReportComposerOutput {
+            report_key: input.report_key.clone(),
+            title: "Daily Business Summary".to_string(),
+            items: vec![ReportSummaryItem {
+                company_id: input.company_id,
+                label: "private report label".to_string(),
+                value_minor_units: 1000,
+                currency_id: 1,
+                scale: 2,
+            }],
+        };
+        let request = policy_request(1, "fixture", "correlation".to_string(), &input, &output);
+        let policy = PolicyEngine::default().with_org_privacy(OrgPrivacyPolicy {
+            masked_fields: vec!["label".to_string()],
+            ..Default::default()
+        });
+        let result = policy.execute_controlled(request);
+        assert_eq!(result.decision.outcome, DecisionOutcome::Allow);
+        let protected = result.output.expect("protected report rows");
+        assert_eq!(
+            protected,
+            json!({
+                "items": [{
+                    "companyId": 7,
+                    "label": "[MASKED]…abel",
+                    "valueMinorUnits": 1000,
+                    "currencyId": 1,
+                    "scale": 2
+                }]
+            })
+        );
+        let protected = ProtectedReportRows::deserialize(&protected).unwrap();
+        let (summary, _) = build_summary(&input.report_key, &protected.items);
+        assert!(summary.contains("[MASKED]…abel"));
+        assert!(!summary.contains("private report label"));
+        assert_eq!(result.privacy.unwrap().rows_processed, 1);
+    }
 }

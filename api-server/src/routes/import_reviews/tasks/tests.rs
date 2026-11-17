@@ -10,6 +10,7 @@ fn submission() -> Submission {
             file_name: "products.csv".into(),
             content_base64: STANDARD.encode(b"name,sale_price,cost_price\nEggs,600,400\n"),
         }],
+        initial_mode: None,
         preparation: None,
     }
 }
@@ -20,6 +21,12 @@ fn exact_bytes_company_filename_and_conversation_bind_submission_identity() -> R
     let (sources, initial) = decode_submission(&body)?;
     ensure!(sources[0].bytes == b"name,sale_price,cost_price\nEggs,600,400\n");
     ensure!(decode_submission(&body)?.1 == initial);
+    body.initial_mode = Some(ProcessingMode::InspectOnly);
+    let inspection = decode_submission(&body)?.1;
+    ensure!(inspection != initial);
+    body.initial_mode = Some(ProcessingMode::PrepareImport);
+    ensure!(decode_submission(&body)?.1 != inspection);
+    body.initial_mode = None;
     body.company_id = 9002;
     ensure!(decode_submission(&body)?.1 != initial);
     body.company_id = 9001;
@@ -261,6 +268,11 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
                 "../../../cold_tier/import_workflow_expand.sql"
             ))
             .await?;
+        client
+            .batch_execute(include_str!(
+                "../../../cold_tier/import_task_inspection_expand.sql"
+            ))
+            .await?;
     }
     let scoped = StorageScope {
         organization: 8001,
@@ -292,7 +304,8 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
             scoped,
             &body.request_id,
             &prepared(&sources[0])?,
-            ProcessingMode::PrepareImport
+            ProcessingMode::PrepareImport,
+            1,
         )
         .await,
         Err(ApiError::Conflict(_))
@@ -426,7 +439,8 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
             scoped,
             &body.request_id,
             &prepared(&sources[0])?,
-            ProcessingMode::InspectOnly
+            ProcessingMode::InspectOnly,
+            3,
         )
         .await,
         Err(ApiError::Conflict(_))
@@ -441,14 +455,16 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
             scoped,
             &body.request_id,
             &output,
-            ProcessingMode::PrepareImport
+            ProcessingMode::PrepareImport,
+            3,
         ),
         finish(
             pool,
             scoped,
             &body.request_id,
             &output,
-            ProcessingMode::PrepareImport
+            ProcessingMode::PrepareImport,
+            3,
         )
     );
     a?;
@@ -509,8 +525,37 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
     drop(client);
     let mut inspection_body = submission();
     inspection_body.request_id = "e".repeat(32);
-    accept(pool, scoped, &inspection_body, &sources, &hash).await?;
+    inspection_body.initial_mode = Some(ProcessingMode::InspectOnly);
+    let (inspection_sources, inspection_hash) = decode_submission(&inspection_body)?;
+    let (a, b) = tokio::join!(
+        accept(
+            pool,
+            scoped,
+            &inspection_body,
+            &inspection_sources,
+            &inspection_hash
+        ),
+        accept(
+            pool,
+            scoped,
+            &inspection_body,
+            &inspection_sources,
+            &inspection_hash
+        ),
+    );
+    a?;
+    b?;
     let repeated = read_task(pool, scoped, &inspection_body.request_id).await?;
+    ensure!(
+        repeated["status"] == "saved" && repeated["reviews"].as_array().is_some_and(Vec::is_empty)
+    );
+    ensure!(
+        repeated["decision"]["revision"] == 2
+            && repeated["decisionReceipt"]["optionId"] == "inspect_only"
+    );
+    ensure!(repeated["decisionHistory"]
+        .as_array()
+        .is_some_and(|history| history.len() == 1));
     ensure!(repeated["files"][0]["previousMatch"]["kind"] == "identical");
     ensure!(repeated["files"][0]["previousMatch"]["requestId"] == body.request_id);
 
@@ -540,14 +585,11 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
         save_decision(pool, scoped, &inspection_body.request_id, &custom).await,
         Err(ApiError::Conflict(_))
     ));
-    let inspection_decision = decision('f', 1, "inspect_only", None);
-    save_decision(
-        pool,
-        scoped,
-        &inspection_body.request_id,
-        &inspection_decision,
-    )
-    .await?;
+    let promote = decision('f', 2, "prepare_import", None);
+    ensure!(matches!(
+        save_decision(pool, scoped, &inspection_body.request_id, &promote).await,
+        Err(ApiError::Conflict(_))
+    ));
     let mut inspection = prepared(&sources[0])?;
     inspection.datasets[0].target_entity = "source_observation".into();
     validate_preparation(&inspection, &sources, ProcessingMode::InspectOnly)?;
@@ -557,6 +599,7 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
         &inspection_body.request_id,
         &inspection,
         ProcessingMode::InspectOnly,
+        2,
     )
     .await?;
     let inspected = resume_task(pool, scoped, &inspection_body.request_id)
@@ -566,6 +609,44 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
         inspected["status"] == "inspection_ready"
             && inspected["reviews"][0]["targetEntity"] == "source_observation"
     );
+    ensure!(pool.get().await?.execute(
+        "UPDATE lumiere_platform.import_task SET approved_mode='prepare_import' WHERE request_id=$1",
+        &[&inspection_body.request_id],
+    ).await.is_err());
+    let receipt = save_decision(pool, scoped, &inspection_body.request_id, &promote).await?;
+    ensure!(receipt["revision"] == 3);
+    ensure!(save_decision(pool, scoped, &inspection_body.request_id, &promote).await? == receipt);
+    let promoted = read_task(pool, scoped, &inspection_body.request_id).await?;
+    ensure!(
+        promoted["status"] == "saved" && promoted["reviews"].as_array().is_some_and(Vec::is_empty)
+    );
+    ensure!(promoted["files"][0]["sha256"] == inspected["files"][0]["sha256"]);
+    ensure!(promoted["inspection"]["coverage"] == inspected["coverage"]);
+    ensure!(promoted["inspection"]["reviews"] == inspected["reviews"]);
+    finish(
+        pool,
+        scoped,
+        &inspection_body.request_id,
+        &inspection,
+        ProcessingMode::InspectOnly,
+        2,
+    )
+    .await?;
+    finish(
+        pool,
+        scoped,
+        &inspection_body.request_id,
+        &output,
+        ProcessingMode::PrepareImport,
+        3,
+    )
+    .await?;
+    let prepared_task = read_task(pool, scoped, &inspection_body.request_id).await?;
+    ensure!(
+        prepared_task["status"] == "needs_review"
+            && prepared_task["reviews"][0]["targetEntity"] == "product"
+    );
+    ensure!(prepared_task["inspection"] == promoted["inspection"]);
     // New tasks have new review decisions even when their bytes and preparation
     // match a previous task. Exact retries of that task keep its existing rows.
     let original_batch = task["reviews"][0]["id"]
@@ -589,6 +670,7 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
         &fresh.request_id,
         &output,
         ProcessingMode::PrepareImport,
+        2,
     )
     .await?;
     let fresh_task = read_task(pool, scoped, &fresh.request_id).await?;

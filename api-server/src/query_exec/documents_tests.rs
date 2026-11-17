@@ -631,5 +631,43 @@ async fn owner_document_dispatch_keeps_empty_reads_handled_and_sql_actor_scoped(
         assert_eq!(queries.len(), 1, "{resource} must not fall through after an empty owner read");
         assert!(queries[0].ends_with(&scope), "{resource}: {}", queries[0]);
         assert!(!queries[0].starts_with("SELECT *"));
+        if resource == "documents" {
+            let (projection, _) = queries[0].split_once(" FROM ").unwrap();
+            for field in ["is_deleted", "current_version_id"] {
+                assert!(
+                    projection
+                        .trim_start_matches("SELECT ")
+                        .split(", ")
+                        .any(|column| column == field),
+                    "{field} is required by the document viewer"
+                );
+            }
+        }
     }
+}
+
+#[test]
+fn viewer_columns_respect_an_explicit_document_field_projection() {
+    let mut access = access(&["document:read"]);
+    access.field_permissions.push(FieldPermissionLike {
+        id: None,
+        organization_id: Some(7),
+        resource: "documents".into(),
+        action: "read".into(),
+        role_id: Some(3),
+        subject_role_id: None,
+        subject_user_hex: None,
+        allowed_fields: vec!["name".into(), "is_deleted".into()],
+    });
+
+    let columns =
+        document_read_columns("documents", Some(&access), DocumentReadProjection::List).unwrap();
+    assert_eq!(
+        columns
+            .iter()
+            .filter(|field| *field == "is_deleted")
+            .count(),
+        1
+    );
+    assert!(!columns.iter().any(|field| field == "current_version_id"));
 }

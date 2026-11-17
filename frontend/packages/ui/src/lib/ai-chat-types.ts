@@ -3,6 +3,7 @@
 import type { AssistantAction } from "@lumiere/query-hooks/assistant-actions"
 import type { GuideReference, OpenGuideRequest } from "./assistant-guide-types"
 import type { ChatImportTaskStatus } from "./import-task-status"
+import type { AssistantNativeFormPresentationOutcome } from "../components/assistant-native-form-provider"
 
 export type CitationKind = "live" | "passage" | "activity" | "web"
 export type CitationTrust = "authoritative" | "persisted" | "retrieved"
@@ -55,11 +56,15 @@ export interface ChatMessage {
   importTasks?: ChatImportTaskStatus[]
   /** Display names only; attachment contents are scoped to the submitted turn. */
   attachmentNames?: string[]
+  /** Saved selectors whose current status must be checked by the import workspace. */
+  importTaskIds?: string[]
   metadata?: {
     model?: string
     tokens?: number
     duration?: number
     runId?: number
+    turnId?: string
+    historyTruncated?: boolean
     companyId?: number
   }
 }
@@ -77,6 +82,9 @@ export interface ChatActionDraftPayload {
   executionRecordId?: number | string | null
   executionRecordHref?: string
   expiresAt?: string | null
+  proposedAt?: string | null
+  reviewedAt?: string | null
+  executedAt?: string | null
   sourceQuery?: string | null
   companyId?: number
   workflowInstanceId?: number | string
@@ -93,6 +101,9 @@ export interface ChatAction {
   nativeAction?: AssistantAction
   draft?: ChatActionDraftPayload
 }
+
+/** Acknowledgement of a native UI handoff. It has no authority over saved effects. */
+export type ChatNativeActionOutcome = AssistantNativeFormPresentationOutcome | "editor_opened" | "requested"
 
 export interface AtCommand {
   id: string
@@ -132,7 +143,10 @@ export interface AIChatConfig {
   onApproveActionDraft?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload | void>
   onRejectActionDraft?: (draft: ChatActionDraftPayload, reason?: string) => Promise<ChatActionDraftPayload | void>
   onUpdateActionDraft?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload | void>
-  onNativeAction?: (action: AssistantAction) => Promise<void> | void
+  onNativeAction?: (
+    action: AssistantAction,
+    messageId: string,
+  ) => ChatNativeActionOutcome | void | Promise<ChatNativeActionOutcome | void>
   onRefreshActionDraft?: (draft: ChatActionDraftPayload) => Promise<ChatActionDraftPayload>
   /** User asserts they're relying on a cited passage as evidence (AIH-13/14). */
   onCiteSource?: (args: { messageId: string; source: ChatMessageSourceRef }) => Promise<void>

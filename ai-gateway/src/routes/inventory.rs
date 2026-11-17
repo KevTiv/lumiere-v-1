@@ -13,9 +13,10 @@ use crate::{
         },
         manifest::OrgPrivacyPolicy,
         policy_engine::PolicyEngine,
-        release_registry::load_active_manifest,
+        release_registry::load_builtin_execution_manifest,
         skill_registry::SkillRegistry,
     },
+    orchestrator::skill_access::ActorSkillAccess,
     state::AppState,
 };
 
@@ -51,10 +52,20 @@ pub async fn post_scan(
         ));
     }
 
-    let identity_hex = req.identity_hex.unwrap_or_else(|| "low-stock".to_string());
-    let manifest = load_active_manifest(
+    let identity_hex = req.identity_hex.unwrap_or_default();
+    ActorSkillAccess::new(
+        &state,
+        req.org_id,
+        req.company_id,
+        &req.stdb_token,
+        &identity_hex,
+    )?
+    .require(LOW_STOCK_SKILL_KEY)
+    .await?;
+    let manifest = load_builtin_execution_manifest(
         &state.stdb,
         req.org_id,
+        req.company_id,
         LOW_STOCK_SKILL_KEY,
         LOW_STOCK_SKILL_VERSION,
     )

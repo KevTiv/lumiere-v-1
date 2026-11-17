@@ -4,6 +4,8 @@ import { useMemo } from "react"
 import { GaugeIcon, RefreshCwIcon } from "lucide-react"
 
 import { useTranslation } from "@lumiere/i18n"
+import { moduleCollection } from "@lumiere/ui/lib/module-data-state"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
 import {
   useLeadScoreFactors,
   useLeadScores,
@@ -50,8 +52,8 @@ export interface LeadScorePanelProps {
 export function LeadScorePanel({ organizationId, leadId }: LeadScorePanelProps) {
   const { t } = useTranslation()
   const organization = BigInt(organizationId)
-  const { data: scores = [], isLoading } = useLeadScores(organization)
-  const { data: factors = [] } = useLeadScoreFactors(organization)
+  const { rows: scores, state: scoreState } = moduleCollection(useLeadScores(organization))
+  const { rows: factors, state: factorState } = moduleCollection(useLeadScoreFactors(organization))
   const recompute = useRecomputeLeadScore(organization)
 
   const score = useMemo(() => {
@@ -75,7 +77,7 @@ export function LeadScorePanel({ organizationId, leadId }: LeadScorePanelProps) 
           <Button
             size="sm"
             variant="outline"
-            disabled={recompute.isPending}
+            disabled={recompute.isPending || scoreState.status !== "ready"}
             onClick={() => recompute.mutate(leadId)}
           >
             <RefreshCwIcon className="size-4" />
@@ -84,8 +86,11 @@ export function LeadScorePanel({ organizationId, leadId }: LeadScorePanelProps) 
         </CardAction>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("common.loading", "Loading…")}</p>
+        {recompute.isError ? <p role="alert" className="text-sm text-destructive">{recompute.error.message}</p> : null}
+        {scoreState.status === "loading" ? (
+          <p role="status" className="text-muted-foreground text-sm">{t("common.loading", "Loading…")}</p>
+        ) : scoreState.status !== "ready" ? (
+          <ModuleDataNotice state={scoreState} />
         ) : !score ? (
           <Empty>
             <EmptyHeader>
@@ -102,7 +107,7 @@ export function LeadScorePanel({ organizationId, leadId }: LeadScorePanelProps) 
           <>
             <div className="flex items-center gap-3">
               <span className="text-3xl font-semibold tabular-nums">
-                {String(score.totalScore ?? score.total_score ?? 0)}
+                {String(score.totalScore ?? score.total_score ?? "—")}
               </span>
               <Badge variant="secondary">
                 {String(score.formulaVersion ?? score.formula_version ?? "")}
@@ -123,7 +128,11 @@ export function LeadScorePanel({ organizationId, leadId }: LeadScorePanelProps) 
                   : null
               })()}
             </p>
-            <ul className="space-y-2">
+            {factorState.status === "loading" ? (
+              <p role="status" className="text-sm text-muted-foreground">{t("common.loading")}</p>
+            ) : factorState.status !== "ready" ? (
+              <ModuleDataNotice state={factorState} />
+            ) : <ul className="space-y-2">
               {factorRows.map((factor) => (
                 <li
                   key={String(factor.id)}
@@ -142,7 +151,7 @@ export function LeadScorePanel({ organizationId, leadId }: LeadScorePanelProps) 
                   <Badge variant="outline">+{String(factor.points ?? 0)}</Badge>
                 </li>
               ))}
-            </ul>
+            </ul>}
           </>
         )}
       </CardContent>

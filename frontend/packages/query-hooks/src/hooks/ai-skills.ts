@@ -119,7 +119,7 @@ export function legacyAiSkillRunRetirement(skillKey: string): LegacyAiSkillRunRe
     ...(replacementPath ? { replacement_path: replacementPath } : {}),
     error: replacementPath
       ? `Skill '${normalized}' no longer runs through the legacy skill hook; use ${replacementPath}.`
-      : `Skill '${normalized}' has no governed execution adapter; register and certify one before execution.`,
+      : `Skill '${normalized}' has no governed execution adapter.`,
   }
 }
 
@@ -165,7 +165,9 @@ export function useRegisteredAiSkills(organizationId: number) {
         return {
           id, skill_key: row.skillKey, name: row.name, category: row.category,
           description: row.description ?? undefined, is_system: row.isSystem,
-          source: "stdb", legacy_run_supported: false,
+          source: "stdb",
+          execution_route: legacyAiSkillRunRetirement(row.skillKey).replacement_path,
+          legacy_run_supported: false,
         }
       })
     },
@@ -238,7 +240,7 @@ export type AiSurfaceProvisioningResult = {
   company_setup?: {
     company_id: number
     status: "bindings_applied" | "profile_required" | "preserved"
-    stage: "platform_activation_required"
+    stage: "company_defaults_checked" | "platform_activation_required"
     execution_readiness: "not_verified"
     message: string
   }
@@ -280,7 +282,7 @@ export function parseAiSurfaceProvisioningResult(value: unknown): AiSurfaceProvi
     || !("company_id" in setup) || typeof setup.company_id !== "number"
     || !Number.isSafeInteger(setup.company_id) || setup.company_id <= 0
     || !("status" in setup) || (setup.status !== "bindings_applied" && setup.status !== "profile_required" && setup.status !== "preserved")
-    || !("stage" in setup) || setup.stage !== "platform_activation_required"
+    || !("stage" in setup) || (setup.stage !== "company_defaults_checked" && setup.stage !== "platform_activation_required")
     || !("execution_readiness" in setup) || setup.execution_readiness !== "not_verified"
     || !("message" in setup) || typeof setup.message !== "string") throw invalid()
   if (setup.status === "bindings_applied" && result.length !== AI_SURFACE_SKILL_KEYS.length) throw invalid()
@@ -432,50 +434,6 @@ export function useUnassignTeamMemberSkill(organizationId: number) {
       void qc.invalidateQueries({
         queryKey: aiTeamMemberSkillsQueryKey(organizationId),
       })
-    },
-  })
-}
-
-export type AiAgentRunRow = {
-  id: number
-  run_key: string
-  status: string
-  summary?: string
-  step_count?: number
-  error_message?: string
-}
-
-export function useAiAgentRuns(organizationId?: number) {
-  return useQuery({
-    queryKey: ["ai-agent-runs", organizationId],
-    enabled: organizationId != null && organizationId > 0,
-    queryFn: async () => {
-      const r = await apiFetch(`/api/query/ai-agent-runs?organizationId=${organizationId}`)
-      if (!r.ok) throw new Error(await parseAiError(r))
-      const json = (await r.json()) as { data?: AiAgentRunRow[] }
-      return json.data ?? []
-    },
-    refetchInterval: 5_000,
-  })
-}
-
-export function useCancelAiAgentRun(organizationId: number, companyId?: number) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (runId: number) => {
-      if (companyId == null || companyId <= 0) {
-        throw new Error("A valid company is required to cancel an AI agent run")
-      }
-      const { urlPath, init } = stdbBffCommandPost("cancel_ai_agent_run", {
-        companyId,
-        runId,
-        reason: "Cancelled from UI",
-      })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseAiError(r))
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["ai-agent-runs", organizationId] })
     },
   })
 }

@@ -1,338 +1,182 @@
-'use client'
+'use client';
 
-import { useMemo, useState } from 'react'
-import { useErpSession } from '@lumiere/erp-session'
-import { useOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company'
+import { useTranslation } from '@lumiere/i18n';
 import {
-  useApplyWarehouseSyncIntent,
-  useCreateWarehouseSyncIntent,
   useInventoryExceptionsExpiredLots,
   useInventoryExceptionsOpenQc,
   useInventoryExceptionsShortAtp,
-  useRefreshInventoryExceptions,
-  useResolveInventoryException,
-  useWarehouseSyncIntentsPending,
-} from '@lumiere/query-hooks/hooks/inventory'
-import { Button } from '@lumiere/ui'
+} from '@lumiere/query-hooks/hooks/inventory';
+import { Skeleton } from '@lumiere/ui/components/skeleton';
 import {
-  getOrCreateDeviceId,
-  listQueuedWarehouseOutbox,
-  markWarehouseOutboxError,
-  markWarehouseOutboxSynced,
-} from '../../../lib/warehouse-sync-outbox'
-import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@lumiere/ui/components/table';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@lumiere/ui/components/tabs';
+import {
+  canUseModuleData,
+  moduleCollection,
+} from '@lumiere/ui/lib/module-data-state';
+import { useRBAC } from '@lumiere/ui/lib/rbac-context';
+import { ModuleDataNotice } from '@lumiere/ui/pages/module-data-notice';
 
-export type InventoryOpsQueueId = 'short_atp' | 'expired_lots' | 'open_qc'
-
-const QUEUE_IDS: InventoryOpsQueueId[] = ['short_atp', 'expired_lots', 'open_qc']
-
-const QUEUE_LABELS: Record<InventoryOpsQueueId, string> = {
-  short_atp: 'Short ATP',
-  expired_lots: 'Expired lots',
-  open_qc: 'Open QC fails',
-}
-
-function rowId(row: Record<string, unknown>): string {
-  return String(row.id ?? '')
-}
-
-export interface InventoryOpsPanelProps {
-  activeQueue?: InventoryOpsQueueId
-  onQueueChange?: (queue: InventoryOpsQueueId) => void
+interface InventoryOpsPanelProps {
+  organizationId: bigint;
+  companyId: bigint | undefined;
+  productNames: ReadonlyMap<string, string>;
 }
 
 export function InventoryOpsPanel({
-  activeQueue: controlledQueue,
-  onQueueChange,
+  organizationId,
+  companyId,
+  productNames,
 }: InventoryOpsPanelProps) {
-  const { organizationId } = useErpSession()
-  const orgIdNum =
-    organizationId != null && organizationId > 0 ? organizationId : 0
-  const orgId = BigInt(orgIdNum)
-  const operatingCompanyId = useOperatingCompanyBigInt(orgIdNum) ?? 0n
-  const [localQueue, setLocalQueue] = useState<InventoryOpsQueueId>('short_atp')
-  const activeQueue = controlledQueue ?? localQueue
-  const setQueue = (q: InventoryOpsQueueId) => {
-    onQueueChange?.(q)
-    if (controlledQueue == null) setLocalQueue(q)
+  const { t } = useTranslation();
+  const { checkPermission, permissionsReady } = useRBAC();
+  const canRead =
+    permissionsReady !== false &&
+    checkPermission('stock_quant', 'read').allowed;
+  const enabled = companyId !== undefined && companyId > 0n && canRead;
+  const shortAtp = moduleCollection(
+    useInventoryExceptionsShortAtp(organizationId, undefined, enabled, companyId),
+  );
+  const expiredLots = moduleCollection(
+    useInventoryExceptionsExpiredLots(organizationId, undefined, enabled, companyId),
+  );
+  const openQc = moduleCollection(
+    useInventoryExceptionsOpenQc(organizationId, undefined, enabled, companyId),
+  );
+
+  if (companyId === undefined || permissionsReady === false) {
+    return (
+      <div aria-busy="true">
+        <Skeleton className="h-28 w-full" />
+      </div>
+    );
+  }
+  if (!canRead) return <ModuleDataNotice state={{ status: 'denied' }} />;
+
+  if (companyId === 0n) {
+    return (
+      <ModuleDataNotice
+        state={{
+          status: 'error',
+          message: t('financeReview.selectCompany', {
+            defaultValue: 'Select a company',
+          }),
+        }}
+      />
+    );
   }
 
-  const shortAtp = useInventoryExceptionsShortAtp(orgId)
-  const expiredLots = useInventoryExceptionsExpiredLots(orgId)
-  const openQc = useInventoryExceptionsOpenQc(orgId)
-  const refresh = useRefreshInventoryExceptions(orgId, operatingCompanyId)
-  const resolve = useResolveInventoryException(orgId, operatingCompanyId)
-  const pendingSync = useWarehouseSyncIntentsPending(orgId)
-  const createSync = useCreateWarehouseSyncIntent(orgId, operatingCompanyId)
-  const applySync = useApplyWarehouseSyncIntent(orgId, operatingCompanyId)
-  const [actionError, setActionError] = useState<string | null>(null)
-  const [syncBusy, setSyncBusy] = useState(false)
-  const deviceId = useMemo(() => getOrCreateDeviceId(), [])
-  const localQueued = useMemo(
-    () => listQueuedWarehouseOutbox(String(orgId), deviceId),
-    // re-read after flush via busy flag
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [orgId, deviceId, syncBusy, pendingSync.dataUpdatedAt],
-  )
-
-  const rows = useMemo(() => {
-    switch (activeQueue) {
-      case 'short_atp':
-        return shortAtp.data ?? []
-      case 'expired_lots':
-        return expiredLots.data ?? []
-      case 'open_qc':
-        return openQc.data ?? []
-    }
-  }, [activeQueue, shortAtp.data, expiredLots.data, openQc.data])
-  const pendingPager = usePagedRows(pendingSync.data ?? [])
-  const rowsPager = usePagedRows(rows)
-
-  const counts = {
-    short_atp: shortAtp.data?.length ?? 0,
-    expired_lots: expiredLots.data?.length ?? 0,
-    open_qc: openQc.data?.length ?? 0,
-  }
-
-  const flushLocalOutbox = async () => {
-    if (!operatingCompanyId) return
-    setSyncBusy(true)
-    setActionError(null)
-    try {
-      const queued = listQueuedWarehouseOutbox(String(orgId), deviceId)
-      for (const item of queued) {
-        try {
-          await createSync.mutateAsync({
-            warehouseId: BigInt(item.warehouseId),
-            opType: item.opType,
-            idempotencyKey: item.idempotencyKey,
-            deviceId: item.deviceId,
-            payload: JSON.stringify(item.payload),
-            metadata: undefined,
-          })
-          const pending = pendingSync.data ?? []
-          let intent = pending.find(
-            (r) => String(r.idempotencyKey) === item.idempotencyKey,
-          )
-          if (!intent) {
-            await pendingSync.refetch()
-            intent = (pendingSync.data ?? []).find(
-              (r) => String(r.idempotencyKey) === item.idempotencyKey,
-            )
-          }
-          // Apply all currently pending intents for this device after create.
-          const afterCreate = await pendingSync.refetch()
-          const toApply = (afterCreate.data ?? []).filter(
-            (r) =>
-              String(r.deviceId ?? '') === deviceId ||
-              String(r.idempotencyKey) === item.idempotencyKey,
-          )
-          for (const r of toApply) {
-            await applySync.mutateAsync(rowId(r))
-          }
-          markWarehouseOutboxSynced(String(orgId), deviceId, item.idempotencyKey)
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e)
-          markWarehouseOutboxError(String(orgId), deviceId, item.idempotencyKey, msg)
-          throw e
-        }
-      }
-      // Also apply any server-pending intents
-      const serverPending = await pendingSync.refetch()
-      for (const r of serverPending.data ?? []) {
-        await applySync.mutateAsync(rowId(r))
-      }
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setSyncBusy(false)
-    }
-  }
+  const queues = [
+    {
+      id: 'short_atp',
+      label: t('inventory.ops.shortAtp'),
+      ...shortAtp,
+    },
+    {
+      id: 'expired_lots',
+      label: t('inventory.ops.expiredLots'),
+      ...expiredLots,
+    },
+    {
+      id: 'open_qc',
+      label: t('inventory.ops.openQc'),
+      ...openQc,
+    },
+  ];
+  const companyKey = String(companyId);
+  const unknown = t('inventory.warehouseWorkspace.referenceUnavailable', {
+    defaultValue: 'Unavailable',
+  });
 
   return (
-    <div className="flex flex-col gap-6 p-4" data-testid="inventory-ops-panel">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-2">
-            {QUEUE_IDS.map((id) => (
-              <Button
-                key={id}
-                type="button"
-                variant={activeQueue === id ? 'default' : 'outline'}
-                size="sm"
-                data-testid={`inventory-ops-queue-${id}`}
-                onClick={() => setQueue(id)}
-              >
-                {QUEUE_LABELS[id]} ({counts[id]})
-              </Button>
-            ))}
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            disabled={!operatingCompanyId || refresh.isPending}
-            onClick={async () => {
-              try {
-                setActionError(null)
-                await refresh.mutateAsync({ upsertOnly: false, metadata: undefined })
-              } catch (e) {
-                setActionError(e instanceof Error ? e.message : String(e))
-              }
-            }}
-          >
-            {refresh.isPending ? 'Refreshing…' : 'Refresh queues'}
-          </Button>
-        </div>
-
-        {actionError ? (
-          <p className="text-sm text-destructive" role="alert">
-            {actionError}
-          </p>
-        ) : null}
-
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b bg-muted/40">
-              <tr>
-                <th className="px-3 py-2 font-medium">Summary</th>
-                <th className="px-3 py-2 font-medium">Product</th>
-                <th className="px-3 py-2 font-medium">Type</th>
-                <th className="px-3 py-2 font-medium">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td className="px-3 py-4 text-muted-foreground" colSpan={4}>
-                    No open exceptions in this queue.
-                  </td>
-                </tr>
-              ) : (
-                rowsPager.pageRows.map((row) => {
-                  const id = rowId(row)
-                  return (
-                    <tr key={id} className="border-b last:border-0">
-                      <td className="px-3 py-2">
-                        {String(row.summary ?? '—')}
-                      </td>
-                      <td className="px-3 py-2">
-                        {String(row.productId ?? '—')}
-                      </td>
-                      <td className="px-3 py-2">
-                        {String(row.exceptionType ?? '—')}
-                      </td>
-                      <td className="px-3 py-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={!operatingCompanyId || resolve.isPending}
-                          onClick={async () => {
-                            try {
-                              setActionError(null)
-                              await resolve.mutateAsync(id)
-                            } catch (e) {
-                              setActionError(
-                                e instanceof Error ? e.message : String(e),
-                              )
-                            }
-                          }}
-                        >
-                          Resolve
-                        </Button>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-          <TablePager {...rowsPager} />
-        </div>
-      </div>
-
-      <div
-        className="flex flex-col gap-3"
-        data-testid="inventory-ops-warehouse-sync"
+    <Tabs
+      defaultValue="short_atp"
+      className="min-w-0"
+      data-testid="inventory-ops-panel"
+    >
+      <TabsList
+        variant="line"
+        className="h-auto max-w-full flex-wrap justify-start"
       >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-medium">Remote warehouse sync</h3>
-            <p className="text-xs text-muted-foreground">
-              Local outbox ({localQueued.length}) · server pending (
-              {pendingSync.data?.length ?? 0}) · device {deviceId.slice(0, 8)}
-            </p>
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            disabled={!operatingCompanyId || syncBusy}
-            onClick={() => void flushLocalOutbox()}
+        {queues.map(({ id, label }) => (
+          <TabsTrigger
+            key={id}
+            value={id}
+            data-testid={`inventory-ops-queue-${id}`}
           >
-            {syncBusy ? 'Flushing…' : 'Flush outbox + apply'}
-          </Button>
-        </div>
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b bg-muted/40">
-              <tr>
-                <th className="px-3 py-2 font-medium">Key</th>
-                <th className="px-3 py-2 font-medium">Op</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(pendingSync.data ?? []).length === 0 ? (
-                <tr>
-                  <td className="px-3 py-4 text-muted-foreground" colSpan={4}>
-                    No pending server sync intents.
-                  </td>
-                </tr>
-              ) : (
-                pendingPager.pageRows.map((row) => {
-                  const id = rowId(row)
-                  return (
-                    <tr key={id} className="border-b last:border-0">
-                      <td className="px-3 py-2 font-mono text-xs">
-                        {String(row.idempotencyKey ?? '—')}
-                      </td>
-                      <td className="px-3 py-2">
-                        {String(row.opType ?? '—')}
-                      </td>
-                      <td className="px-3 py-2">
-                        {String(row.status ?? '—')}
-                      </td>
-                      <td className="px-3 py-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={!operatingCompanyId || applySync.isPending}
-                          onClick={async () => {
-                            try {
-                              setActionError(null)
-                              await applySync.mutateAsync(id)
-                            } catch (e) {
-                              setActionError(
-                                e instanceof Error ? e.message : String(e),
-                              )
-                            }
-                          }}
-                        >
-                          Apply
-                        </Button>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-          <TablePager {...pendingPager} />
-        </div>
-      </div>
-    </div>
-  )
+            {label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      {queues.map(({ id, label, state, rows }) => {
+        const companyRows = rows.filter(
+          (row) => String(row.companyId) === companyKey,
+        );
+
+        return (
+          <TabsContent
+            key={id}
+            value={id}
+            className="min-w-0 space-y-3"
+            aria-busy={state.status === 'loading'}
+          >
+            <ModuleDataNotice state={state} />
+            {state.status === 'loading' ? (
+              <Skeleton className="h-28 w-full" />
+            ) : canUseModuleData(state) ? (
+              <Table bounded viewportLabel={label}>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t('inventory.ops.summary')}</TableHead>
+                    <TableHead>
+                      {t('inventory.byRecord.product', {
+                        defaultValue: 'Product',
+                      })}
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {companyRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={2}
+                        className="py-4 text-muted-foreground"
+                      >
+                        {t('inventory.ops.empty')}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    companyRows.map((row) => (
+                      <TableRow key={String(row.id)}>
+                        <TableCell className="whitespace-normal wrap-anywhere">
+                          {row.summary || unknown}
+                        </TableCell>
+                        <TableCell className="whitespace-normal wrap-anywhere">
+                          {row.productId == null
+                            ? '—'
+                            : (productNames.get(String(row.productId)) ??
+                              unknown)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            ) : null}
+          </TabsContent>
+        );
+      })}
+    </Tabs>
+  );
 }

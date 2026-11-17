@@ -1,4 +1,58 @@
 {
+  "aiChat": {
+    "draft": {
+      "applied": "Imetekelezwa",
+      "proposedValue": "Thamani iliyopendekezwa",
+      "beforeProposal": "Kabla ya pendekezo",
+      "proposedAt": "Ilipendekezwa",
+      "reviewedAt": "Ilikaguliwa",
+      "appliedAt": "Ilitekelezwa"
+    }
+  },
+  "businessHistory": {
+    "allActivity": "Shughuli zote",
+    "openChange": "Fungua badiliko",
+    "eventUnavailable": "Badiliko hili halipatikani kwa kampuni ya sasa au ruhusa zako."
+  },
+  "moduleRecords": {
+    "shopSales": "Mauzo ya dukani",
+    "saleDate": "Tarehe ya mauzo",
+    "savedShopSale": "Mauzo ya duka yaliyohifadhiwa",
+    "shop": "Duka",
+    "emptyShopSales": "Hakuna mauzo ya dukani yaliyohifadhiwa.",
+    "sales": "Muhtasari wa mauzo kwa wateja",
+    "warehouse": "Hesabu zilizorekodiwa",
+    "period": "Kipindi cha mauzo",
+    "countDate": "Tarehe ya kuhesabu",
+    "customer": "Mteja",
+    "product": "Bidhaa",
+    "quantity": "Kiasi",
+    "unitPrice": "Bei kwa kipimo",
+    "reportedTotal": "Jumla iliyoripotiwa",
+    "paymentComment": "Dokezo la malipo",
+    "pieces": "Idadi ya vipande",
+    "kilograms": "Kilogramu",
+    "location": "Mahali",
+    "source": "Chanzo",
+    "sourceRow": "{{file}} · safu mlalo {{row}}",
+    "showAll": "Onyesha rekodi zote",
+    "loadMore": "Pakia zaidi",
+    "emptySales": "Hakuna muhtasari wa mauzo kwa wateja uliohifadhiwa.",
+    "emptyCounts": "Hakuna hesabu iliyohifadhiwa.",
+    "emptyFiltered": "Hakuna rekodi zinazolingana na tarehe au uingizaji uliochaguliwa.",
+    "otherCompany": "Chagua kampuni iliyotumika kuingiza data hii ili kuona rekodi zake.",
+    "loadError": "Imeshindwa kupakia rekodi.",
+    "recordHistory": "Tazama historia",
+    "recordHistoryLabel": "Tazama historia ya safu mlalo ya {{row}} katika {{file}}",
+    "savedSale": "Muhtasari wa mauzo ya mteja uliohifadhiwa",
+    "savedCount": "Hesabu halisi iliyohifadhiwa",
+    "recordUnavailable": "Rekodi hii iliyohifadhiwa haipatikani katika eneo lako la kazi la sasa.",
+    "sourceCustomer": "Jina la mteja kwenye chanzo",
+    "unit": "Kipimo cha chanzo",
+    "currency": "Sarafu",
+    "savedAt": "Ilihifadhiwa",
+    "sourceRevision": "Toleo la {{revision}}"
+  },
   "aiHarness": {
     "platformProfile": {
       "tab": "Wasifu wa AI",
@@ -41,6 +95,31 @@
     }
   },
   "aiSkills": {
+    "userAccess": {
+      "title": "Ufikiaji wa watumiaji",
+      "description": "Dhibiti ufikiaji wa kila mwanachama kwa ujuzi uliojengewa ndani wa shirika hili.",
+      "catalogError": "Imeshindwa kupakia ujuzi uliojengewa ndani.",
+      "loadingSkills": "Inapakia ujuzi uliojengewa ndani…",
+      "noSkills": "Hakuna ujuzi uliojengewa ndani unaopatikana.",
+      "skill": "Ujuzi uliojengewa ndani",
+      "chooseSkill": "Chagua ujuzi",
+      "searchSkills": "Tafuta ujuzi",
+      "person": "Mwanachama wa shirika",
+      "choosePerson": "Chagua mwanachama",
+      "searchPeople": "Tafuta wanachama",
+      "noPeople": "Hakuna wanachama wanaotumika wanaopatikana.",
+      "peopleDenied": "Unahitaji ufikiaji wa orodha ya wanachama wa shirika.",
+      "peopleError": "Imeshindwa kupakia orodha ya wanachama.",
+      "accessError": "Imeshindwa kuthibitisha ufikiaji wa mwanachama kwa ujuzi huu.",
+      "saving": "Inahifadhi ufikiaji…",
+      "revoked": "Ufikiaji wa mwanachama huyu umebatilishwa.",
+      "revokedLabel": "Umebatilishwa",
+      "defaultAccess": "Mwanachama huyu anatumia ufikiaji chaguomsingi wa shirika.",
+      "loadingAccess": "Inakagua ufikiaji…",
+      "restore": "Rejesha ufikiaji chaguomsingi",
+      "revoke": "Batilisha ufikiaji",
+      "saveError": "Mabadiliko hayakuweza kuthibitishwa. Kagua ufikiaji wa sasa kabla ya kujaribu tena."
+    },
     "setup": {
       "title": "Maandalizi ya vipengele vya AI",
       "action": "Sanidi vipengele vya AI",
@@ -68,6 +147,10 @@
     }
   },
   "recordChanges": {
+    "valueAbsent": "Sehemu haipo",
+    "valueRestricted": "Imezuiliwa",
+    "valueUnavailable": "Thamani haikurekodiwa",
+    "savedChange": "Badiliko limehifadhiwa",
     "fields": {
       "name": "Maelezo",
       "debit": "Debiti",
@@ -545,6 +628,7 @@
     "manufacturing": "Uzalishaji",
     "map": "Ramani",
     "fleet": "Magari",
+    "farmBatches": "Makundi ya mifugo",
     "helpdesk": "Dawati la msaada",
     "workflows": "Mtiririko wa kazi",
     "documents": "Nyaraka",
@@ -4325,6 +4409,14 @@
     }
   },
   "settings": {
+    "importReview": {
+      "grouped": {
+        "rowStatus": "Hali ya safu mlalo",
+        "fieldConfirmation": "Uthibitisho wa {{field}}",
+        "noDecisionChanges": "Hakuna thamani iliyorekodiwa au hali ya ukaguzi iliyobadilika.",
+        "proposedAfter": "Baada ya uamuzi huu"
+      }
+    },
     "page": {
       "title": "Mipangilio",
       "description": "Dhibiti akaunti yako na mipangilio ya mfumo"

@@ -1,4 +1,5 @@
 import {
+  assistantActionHref,
   assistantPageHasWidget,
   decodeAssistantAction,
   getAssistantCapability,
@@ -222,4 +223,16 @@ export function parseNativeChatActions(
   } catch {
     return []
   }
+}
+
+/** Link only a known saved widget identity. The page host checks its current layout and permission. */
+export function assistantSavedWidgetHref(action: AssistantAction, companyId: number): string | undefined {
+  if (action.kind !== "add_widget" || action.scope.companyId !== String(companyId)
+    || !action.widgetKey?.startsWith("saved:") || !parseAssistantWidgetKey(action.widgetKey)) return undefined
+  const href = assistantActionHref(action)
+  if (!href) return undefined
+  const url = new URL(href, "https://lumiere.invalid")
+  url.searchParams.set("savedWidget", action.widgetKey.slice("saved:".length))
+  url.searchParams.set("savedWidgetCompany", String(companyId))
+  return url.pathname + url.search
 }

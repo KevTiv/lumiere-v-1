@@ -105,7 +105,18 @@ pub(super) async fn load(
     task: &str,
     proposal: i64,
 ) -> Result<SavedProposal, ApiError> {
-    let row = tx.query_opt(&format!("SELECT {COLUMNS} FROM lumiere_platform.import_workflow_proposal WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND task_request_id=$4 AND id=$5 FOR UPDATE"), &[&scope.organization.to_string(), &scope.company.to_string(), &scope.actor, &task, &proposal]).await.map_err(ApiError::internal)?
+    read_proposal(tx, scope, task, proposal, true).await
+}
+
+pub(super) async fn read_proposal(
+    tx: &Transaction<'_>,
+    scope: StorageScope<'_>,
+    task: &str,
+    proposal: i64,
+    lock: bool,
+) -> Result<SavedProposal, ApiError> {
+    let lock = if lock { " FOR UPDATE" } else { "" };
+    let row = tx.query_opt(&format!("SELECT {COLUMNS} FROM lumiere_platform.import_workflow_proposal WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND task_request_id=$4 AND id=$5{lock}"), &[&scope.organization.to_string(), &scope.company.to_string(), &scope.actor, &task, &proposal]).await.map_err(ApiError::internal)?
         .ok_or_else(|| ApiError::NotFound("import proposal not found".into()))?;
     SavedProposal::from_row(&row)
 }
@@ -163,7 +174,7 @@ pub(super) async fn reviews(
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let rows = tx.query("SELECT item.id,item.batch_id,item.revision,item.state,item.source_json,item.proposed_json,item.confirmed_fields,batch.target_entity FROM lumiere_platform.import_review_item item JOIN lumiere_platform.import_review_batch batch ON batch.organization_id=item.organization_id AND batch.company_id=item.company_id AND batch.id=item.batch_id JOIN lumiere_platform.import_task_review link ON link.organization_id=batch.organization_id AND link.company_id=batch.company_id AND link.batch_id=batch.id WHERE item.organization_id=$1::text::numeric AND item.company_id=$2::text::numeric AND link.actor_identity=$3 AND link.request_id=$4 AND item.id=ANY($5::bigint[]) ORDER BY item.id FOR SHARE OF item", &[&scope.organization.to_string(), &scope.company.to_string(), &scope.actor, &task, &ids]).await.map_err(ApiError::internal)?;
+    let rows = tx.query("SELECT item.id,item.batch_id,item.revision,item.state,item.source_json,item.proposed_json,item.confirmed_fields,batch.target_entity FROM lumiere_platform.import_review_item item JOIN lumiere_platform.import_review_batch batch ON batch.organization_id=item.organization_id AND batch.company_id=item.company_id AND batch.id=item.batch_id JOIN lumiere_platform.import_task_review link ON link.organization_id=batch.organization_id AND link.company_id=batch.company_id AND link.batch_id=batch.id WHERE item.organization_id=$1::text::numeric AND item.company_id=$2::text::numeric AND link.actor_identity=$3 AND link.request_id=$4 AND NOT link.from_inspection AND item.id=ANY($5::bigint[]) ORDER BY item.id FOR SHARE OF item", &[&scope.organization.to_string(), &scope.company.to_string(), &scope.actor, &task, &ids]).await.map_err(ApiError::internal)?;
     if rows.len() != selected.len() {
         return Err(ApiError::Conflict(
             "selected source rows do not belong to this saved import task".into(),

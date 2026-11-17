@@ -100,6 +100,7 @@ def main():
                ' def do_GET(self):\n'
                '  self.send_response(200); self.end_headers(); self.wfile.write(b"ok")\n'
                ' do_POST = do_GET\n'
+               ' do_PUT = do_GET\n'
                'HTTPServer(("0.0.0.0",8080),Handler).serve_forever()')
         with tempfile.TemporaryDirectory() as directory:
             template = Path(directory, 'kong.yml')
@@ -122,7 +123,8 @@ def main():
                     for suffix in ['/', '/extra']:
                         assert request(port, path + suffix, method=method)[0] == 503, (path, suffix)
                     for unsupported in ['PUT', 'PATCH', 'DELETE']:
-                        assert request(port, path, method=unsupported)[0] == 503, (unsupported, path)
+                        if path not in fixture.get(unsupported.lower(), []):
+                            assert request(port, path, method=unsupported)[0] == 503, (unsupported, path)
                     prefixed = '/prefix' + path
                     status, headers = request(port, prefixed, method=method)
                     assert status == 200, (method, prefixed, status)

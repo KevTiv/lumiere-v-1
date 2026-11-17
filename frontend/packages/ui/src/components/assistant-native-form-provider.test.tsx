@@ -66,6 +66,23 @@ describe("assistant native form handoff lifetime", () => {
     expect(hook.result.current.outcome?.status).toBe("unavailable")
   })
 
+  it("reports only the matched form presentation to its initiating action", () => {
+    const hook = renderHook(() => useAssistantNativeFormController("actor:org:company"))
+    const onPresentationOutcome = vi.fn()
+    act(() => {
+      hook.result.current.requestForm({ ...request(), onPresentationOutcome })
+      hook.result.current.settle("wrong-request", "denied")
+    })
+    expect(onPresentationOutcome).not.toHaveBeenCalled()
+    act(() => {
+      hook.result.current.settle("request-1", "opened")
+      hook.result.current.finishActivation("request-1", { status: "saved", recordId: "9" })
+      hook.result.current.settle("request-1", "denied")
+    })
+    expect(onPresentationOutcome).toHaveBeenCalledExactlyOnceWith("opened")
+    expect(hook.result.current.outcome).toBeNull()
+  })
+
   it("cancels only the exact request and rejects unscoped handoffs", () => {
     const hook = renderHook(() =>
       useAssistantNativeFormController("actor:org:company"),

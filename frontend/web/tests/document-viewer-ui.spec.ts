@@ -158,6 +158,12 @@ const malformed = managedFile(
   "text/csv",
   'Name,Amount\n"unterminated,1200\n',
 )
+const acceptance = managedFile(
+  "12",
+  "acceptance.csv",
+  "text/csv",
+  "Name,Amount\nCassava,850\n",
+)
 const currentFiles = [
   current,
   pdf,
@@ -168,6 +174,7 @@ const currentFiles = [
   malformed,
   officeWorkbook,
   word,
+  acceptance,
 ]
 const previousFiles = [older, olderWorkbook]
 const allFiles = [...currentFiles, ...previousFiles]
@@ -221,7 +228,7 @@ function versionCount(documentId: string) {
 const documents = currentFiles.map(({ bytes: _bytes, ...source }) => ({
   ...source,
   organizationId: 7,
-  companyId: 3,
+  companyId: source.id === acceptance.id ? 4 : 3,
   name: source.fileName,
   isDeleted: false,
   currentVersionId: Number(source.id) + 10,
@@ -279,15 +286,29 @@ async function setup(page: Page) {
     workbookParseFailed: false,
     blobReads: [] as string[],
     workbookReads: [] as URL[],
+    metadataReads: [] as Array<{ resource: string; companyId: string | null }>,
   }
-  await page.route("**/api/query/documents?*", (route) =>
-    state.denied
-      ? route.fulfill({ status: 403, json: { error: "denied" } })
-      : route.fulfill({ json: { data: documents } }),
-  )
-  await page.route("**/api/query/document-versions?*", (route) =>
-    route.fulfill({ json: { data: versions } }),
-  )
+  await page.route(/\/api\/query\/(documents|document-versions)\?/, (route) => {
+    const url = new URL(route.request().url())
+    const resource = url.pathname.split("/").at(-1)!
+    const companyId = url.searchParams.get("companyId")
+    state.metadataReads.push({ resource, companyId })
+    if (state.denied && resource === "documents")
+      return route.fulfill({ status: 403, json: { error: "denied" } })
+    const matching = documents.filter(
+      (row) => companyId === null || String(row.companyId) === companyId,
+    )
+    return route.fulfill({
+      json: {
+        data:
+          resource === "documents"
+            ? matching
+            : versions.filter((version) =>
+                matching.some((row) => Number(row.id) === version.documentId),
+              ),
+      },
+    })
+  })
   await page.route("**/api/documents/spreadsheet/**", (route) => {
     const url = new URL(route.request().url())
     const { searchParams } = url
@@ -390,12 +411,63 @@ async function setup(page: Page) {
     })
   })
   await page.goto("/document-viewer", { waitUntil: "domcontentloaded" })
+  // The dev server's page bundles can take several seconds to load in CI.
   await expect(page.getByTestId("document-viewer-disclosure")).toHaveAttribute(
     "data-hydrated",
     "true",
+    { timeout: 20_000 },
   )
   return state
 }
+
+test("Documents opens and downloads a listed CSV in its owning company", async ({
+  page,
+}) => {
+  const state = await setup(page)
+  const session = page.getByTestId("document-viewer-disclosure")
+  await expect(session).toHaveAttribute("data-active-company", "3")
+  await page
+    .getByRole("region", { name: "Documents entry point" })
+    .getByRole("button", { name: "Acceptance records", exact: true })
+    .click()
+  const viewer = page.getByRole("dialog", { name: "File preview" })
+  await expect(
+    viewer.getByRole("grid").getByText("Cassava", { exact: true }),
+  ).toBeVisible()
+  const download = page.waitForEvent("download")
+  await viewer.getByRole("button", { name: "Download file" }).click()
+  expect(await downloadedBytes(await download)).toEqual(acceptance.bytes)
+  expect(state.metadataReads).toEqual(
+    expect.arrayContaining([
+      { resource: "documents", companyId: "4" },
+      { resource: "document-versions", companyId: "4" },
+    ]),
+  )
+  expect(state.metadataReads.every(({ companyId }) => companyId === "4")).toBe(
+    true,
+  )
+  await expect(session).toHaveAttribute("data-active-company", "3")
+  await viewer.getByRole("button", { name: "Close", exact: true }).click()
+
+  state.metadataReads.length = 0
+  state.blobReads.length = 0
+  await page
+    .getByRole("region", { name: "ERP attachment entry point" })
+    .getByRole("button", { name: "Acceptance records", exact: true })
+    .click()
+  await expect(
+    viewer.getByText(
+      "This file or version is unavailable in your current access scope.",
+    ),
+  ).toBeVisible()
+  expect(state.metadataReads).toEqual(
+    expect.arrayContaining([
+      { resource: "documents", companyId: "3" },
+      { resource: "document-versions", companyId: "3" },
+    ]),
+  )
+  expect(state.blobReads).toEqual([])
+})
 
 for (const width of [390, 1440]) {
   test(`file cards keep distinct original names at ${width}px`, async ({

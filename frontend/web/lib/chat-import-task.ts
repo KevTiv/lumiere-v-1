@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { CHAT_IMPORT_INITIAL_MODES, type ChatImportInitialMode } from "@lumiere/ui/lib/chat-import-files"
 import { importCoverageSchema, importPreparationIdentity, importPreparationReceiptSchema, importPreparationSchema, type ImportPreparation } from "./import-preparation"
 
 const requestId = z.string().regex(/^[0-9a-f]{32}$/)
@@ -8,6 +9,7 @@ const sourceSchema = z.object({
   size: z.number().int().positive().max(5_000_000),
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
 })
+const initialModeSchema = z.enum(CHAT_IMPORT_INITIAL_MODES)
 const decisionOption = z.enum(["prepare_import", "inspect_only", "other"])
 const decisionReceiptSchema = z.object({
   decisionId: requestId, optionId: decisionOption, otherText: z.string().nullable(),
@@ -20,7 +22,7 @@ const taskSchema = z.object({
   status: z.enum(["awaiting_decision", "saved", "needs_review", "inspection_ready", "failed"]),
   decision: z.object({
     id: z.string().min(1).max(200), revision: z.number().int().positive(), status: z.enum(["pending", "approved"]),
-    question: z.string().min(1), options: z.array(z.object({ id: z.enum(["prepare_import", "inspect_only"]), label: z.string().min(1) })).min(1).max(2),
+    question: z.string().min(1), options: z.array(z.object({ id: initialModeSchema, label: z.string().min(1) })).min(1).max(2),
     allowOther: z.literal(true), selectedOptionId: decisionOption.nullable(), otherText: z.string().nullable(), decisionId: requestId.nullable(),
   }),
   decisionReceipt: decisionReceiptSchema.nullable(),
@@ -52,7 +54,11 @@ export interface ChatImportScope {
   companyId: number
   conversationKey: string
 }
-const pointerSchema = z.object({ requestId, files: z.array(sourceSchema).min(1).max(20), preparationSha256: z.string().regex(/^[0-9a-f]{64}$/).optional() }).strict()
+const pointerSchema = z.object({
+  requestId, files: z.array(sourceSchema).min(1).max(20),
+  preparationSha256: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+  initialMode: initialModeSchema.optional(),
+}).strict()
 export type ChatImportPointer = z.infer<typeof pointerSchema>
 const decisionPointerSchema = z.object({
   taskRequestId: requestId, questionId: z.string().min(1).max(200), decisionId: requestId,
@@ -75,6 +81,29 @@ export function readChatImportPointer(storage: ReceiptStorage, scope: ChatImport
   return raw ? pointerSchema.parse(JSON.parse(raw)) : null
 }
 
+function coverageMatchesFiles(task: ChatImportTask): boolean {
+  if (!task.coverage) return true
+  const sources = new Map(task.files.map((file) => [file.fileName, file]))
+  const worksheetsByFile = new Map<string, Set<string | null>>()
+  for (const entry of task.coverage.files) {
+    const source = sources.get(entry.fileName)
+    if (!source || source.sha256 !== entry.sourceSha256 || source.size !== entry.byteCount)
+      return false
+    const seen = worksheetsByFile.get(entry.fileName) ?? new Set<string | null>()
+    if (
+      seen.has(entry.worksheet) ||
+      (seen.size > 0 && (seen.has(null) || entry.worksheet === null)) ||
+      (entry.worksheet !== null &&
+        entry.availableWorksheets !== undefined &&
+        !entry.availableWorksheets.includes(entry.worksheet))
+    )
+      return false
+    seen.add(entry.worksheet)
+    worksheetsByFile.set(entry.fileName, seen)
+  }
+  return sources.size === task.files.length && worksheetsByFile.size === sources.size
+}
+
 /** Saved tasks may be reopened outside their original conversation, in the same authorized company. */
 export function parseSavedImportTask(value: unknown, companyId: number, expectedRequest?: string): ChatImportTask {
   const task = taskSchema.parse(value)
@@ -86,7 +115,7 @@ export function parseSavedImportTask(value: unknown, companyId: number, expected
     || (task.status === "awaiting_decision") !== (task.decision.status === "pending")
     || (task.decision.status === "pending" && task.reviews.length > 0)) throw new Error("The saved file decision is inconsistent. Check the original task before continuing.")
   if (task.preparation?.files.some(rule => task.files.filter(file => file.fileName === rule.fileName && file.sha256 === rule.sourceSha256).length !== 1)
-    || (task.coverage && (task.coverage.files.length !== task.files.length || task.coverage.files.some((file, index) => file.fileName !== task.files[index]?.fileName || file.sourceSha256 !== task.files[index]?.sha256)))) {
+    || !coverageMatchesFiles(task)) {
     throw new Error("The preparation rules or coverage do not match the saved source files.")
   }
   return task
@@ -147,7 +176,10 @@ export async function verifyImportSources(task: ChatImportTask, pointer: ChatImp
   if (task.requestId !== pointer.requestId || task.files.length !== pointer.files.length
     || task.files.some((source, i) => source.fileName !== pointer.files[i].fileName
       || source.size !== pointer.files[i].size || source.sha256 !== pointer.files[i].sha256)
-    || await preparationHash(task.preparation) !== pointer.preparationSha256) {
+    || await preparationHash(task.preparation) !== pointer.preparationSha256
+    || (pointer.initialMode && !task.decisionHistory.some(
+      receipt => receipt.revision === 2 && receipt.optionId === pointer.initialMode,
+    ))) {
     throw new Error("The saved import does not match the original files. Your submission receipt is retained.")
   }
 }
@@ -163,6 +195,7 @@ export async function submitChatImportFiles(args: {
   files: File[]; scope: ChatImportScope; storage: ReceiptStorage; fetcher: ImportTaskFetch;
   isCurrent: () => boolean; createRequestId?: () => string; knownTasks?: ChatImportTask[];
   preparation?: ImportPreparation;
+  initialMode?: ChatImportInitialMode;
 }): Promise<ChatImportTask> {
   const assertCurrent = () => { if (!args.isCurrent()) throw new Error("The active company or conversation changed. Reopen the import in its original company.") }
   assertCurrent()
@@ -203,10 +236,22 @@ export async function submitChatImportFiles(args: {
     }
   }
   if (previous && (JSON.stringify(previous.files) !== JSON.stringify(fingerprints) || previous.preparationSha256 !== preparationSha256)) throw new Error("Check the previous submission before changing files or preparation rules. To retry it, select the same original files in the same order with the same rules.")
-  const pointer = pointerSchema.parse({ requestId: previous?.requestId ?? (args.createRequestId?.() ?? crypto.randomUUID().replaceAll("-", "")), files: fingerprints, ...(preparationSha256 ? { preparationSha256 } : {}) })
+  const pointer = previous ?? pointerSchema.parse({
+    requestId: args.createRequestId?.() ?? crypto.randomUUID().replaceAll("-", ""),
+    files: fingerprints,
+    preparationSha256,
+    initialMode: args.initialMode,
+  })
   args.storage.setItem(key, JSON.stringify(pointer))
   assertCurrent()
-  const body = JSON.stringify({ companyId: args.scope.companyId, requestId: pointer.requestId, conversationKey: args.scope.conversationKey, files: encoded, ...(preparation ? { preparation } : {}) })
+  const body = JSON.stringify({
+    companyId: args.scope.companyId,
+    requestId: pointer.requestId,
+    conversationKey: args.scope.conversationKey,
+    files: encoded,
+    preparation,
+    initialMode: pointer.initialMode,
+  })
   let task: ChatImportTask
   let rejected: string | null = null
   try {
@@ -330,6 +375,12 @@ async function dispatchDecision(args: {
   return task
 }
 
+export function canPrepareInspectedImport(task: ChatImportTask): boolean {
+  return task.status === "inspection_ready"
+    && task.decision.status === "approved"
+    && task.decision.selectedOptionId === "inspect_only"
+}
+
 /** Selection is local; only an explicit card submission creates this immutable approval request. */
 export async function submitChatImportDecision(args: {
   task: ChatImportTask; answer: ChatImportDecisionAnswer; scope: ChatImportScope; storage: ReceiptStorage;
@@ -337,7 +388,9 @@ export async function submitChatImportDecision(args: {
 }): Promise<ChatImportTask> {
   if (!args.isCurrent()) throw new Error("The active company or conversation changed.")
   const task = parseChatImportTask(args.task, args.scope, args.task.requestId)
-  if (task.status !== "awaiting_decision" || task.decision.status !== "pending"
+  const canAnswer = task.status === "awaiting_decision" && task.decision.status === "pending"
+  const canPromoteInspection = args.answer.optionId === "prepare_import" && canPrepareInspectedImport(task)
+  if ((!canAnswer && !canPromoteInspection)
     || args.answer.requestId !== task.decision.id || args.answer.expectedRevision !== task.decision.revision
     || (args.answer.optionId !== "other" && !task.decision.options.some(option => option.id === args.answer.optionId))) {
     throw new Error("This file question changed. Check its saved task before answering.")

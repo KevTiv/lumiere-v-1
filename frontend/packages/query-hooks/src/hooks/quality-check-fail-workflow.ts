@@ -46,7 +46,7 @@ export function useQualityCheckFailWorkflow(
           input,
           input.snapshot,
           (await qc.fetchQuery({
-            ...stockQuantsQueryOptions(organizationId),
+            ...stockQuantsQueryOptions(organizationId, companyId),
             staleTime: 0,
           })) as unknown as RowValueMap[],
         ),
@@ -68,7 +68,7 @@ export function useQualityCheckFailWorkflow(
         }
 
         const rows = (await qc.fetchQuery({
-          ...stockQuantsQueryOptions(organizationId),
+          ...stockQuantsQueryOptions(organizationId, companyId),
           staleTime: 0,
         })) as unknown as RowValueMap[]
         const snapshot = captureQualityCheckFailSnapshot(input, rows)
@@ -87,7 +87,7 @@ export function useQualityCheckFailWorkflow(
           { navigateToNext: context?.navigateToNext },
         )
       },
-    [organizationId, qc, runner, spec],
+    [companyId, organizationId, qc, runner, spec],
   )
 
   return {

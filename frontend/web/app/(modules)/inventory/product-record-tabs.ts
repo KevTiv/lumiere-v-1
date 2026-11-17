@@ -1,5 +1,10 @@
 import { field, idListOf, idOf, isRowActive, numberOf, textOf, type ReadRow } from '@/lib/row-field';
 
+export function productVariantReferences(product: ReadRow): { id: string }[] | undefined {
+  if (!Array.isArray(field(product, 'productVariantIds'))) return undefined;
+  return [...new Set(idListOf(product, 'productVariantIds'))].map((id) => ({ id }));
+}
+
 export interface VariantLineRow {
   id: string;
   attribute: string | null;

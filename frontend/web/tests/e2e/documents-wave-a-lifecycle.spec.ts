@@ -49,8 +49,8 @@ test.describe("documents wave A lifecycle", () => {
  * - `apply_document_legal_hold` (spacetimedb/src/documents/legal_hold.rs) inserts an
  *   active `DocumentLegalHold` row requiring a non-empty reason.
  * - `delete_document` refuses to soft-delete a document under an active legal hold
- *   ("Cannot delete a document under legal hold"), which this spec uses as the
- *   enforcement assertion since no dedicated `document-legal-holds` BFF query exists.
+ *   ("Cannot delete a document under legal hold"). The document details also
+ *   read the hold state and block actions while they cannot verify it.
  *
  * The UI's create form requires a real blob upload (presign + complete), so the
  * upload/attach/hold steps go through the reducer BFF directly — matching the
@@ -167,6 +167,34 @@ test.describe("DOC-009 document upload → attach → legal hold", { tag: "@p0" 
     await selectModuleTab(page, "documents", "documents")
     await page.getByTestId("module-view-table-documents").click()
     await selectEntityRowByText(page, docName)
+
+    let holdReadAvailable = false
+    await page.route((url) => url.pathname === "/api/query/document-legal-holds", async (route) => {
+      expect(new URL(route.request().url()).searchParams.get("companyId")).toBe(String(companyId))
+      if (holdReadAvailable) {
+        await route.continue()
+        return
+      }
+      await route.fulfill({ status: 503, json: { error: "Hold service unavailable" } })
+    })
+    await page.goto(`/documents/${documentId}`)
+    const holdStatus = page.getByTestId("document-legal-hold-status")
+    await expect(holdStatus.getByRole("alert")).toContainText("Legal hold status is unavailable.")
+    await page.getByRole("button", { name: "Manage", exact: true }).click()
+    await expect(page.getByTestId("document-action-legal-hold")).toHaveCount(0)
+    await expect(page.getByTestId("document-action-release-hold")).toHaveCount(0)
+    await expect(page.getByTestId("document-action-delete")).toBeDisabled()
+    await page.keyboard.press("Escape")
+
+    holdReadAvailable = true
+    await holdStatus.getByRole("button", { name: "Retry" }).click()
+    await expect(page.getByTestId("document-legal-hold-badge")).toBeVisible()
+    await expect(holdStatus).toHaveCount(0)
+    await page.getByRole("button", { name: "Manage", exact: true }).click()
+    await expect(page.getByTestId("document-action-release-hold")).toBeEnabled()
+    await expect(page.getByTestId("document-action-legal-hold")).toHaveCount(0)
+    await expect(page.getByTestId("document-action-delete")).toBeDisabled()
+    await page.keyboard.press("Escape")
 
     await expectNoAppError(page)
   })

@@ -79,11 +79,45 @@ impl ReviewState {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum HistoryView {
+    Sales,
+    Expenses,
+    Accounting,
+    Warehouse,
+    Products,
+    Crm,
+    Purchasing,
+    Fleet,
+    Reports,
+}
+
+impl HistoryView {
+    // Classify by structured source fields, independent of batch titles and catalog codes.
+    fn filter(self) -> &'static str {
+        match self {
+            Self::Sales => "(batch.target_entity = 'source_observation' AND (nullif(btrim(facts->>'sold_quantity'), '') IS NOT NULL AND nullif(btrim(facts->>'sale_amount'), '') IS NOT NULL OR (facts ?| ARRAY['product', 'product_label'] AND facts ?& ARRAY['quantity', 'unit_price', 'amount']) OR kind = 'historical_customer_sales_summary' OR (facts ?| ARRAY['customer', 'customer_label'] AND facts ?& ARRAY['quantity', 'unit_price', 'amount'])))",
+            Self::Expenses => "(kind = 'expense' AND nullif(btrim(facts->>'amount'), '') IS NOT NULL)",
+            Self::Accounting => "(batch.target_entity = 'account_move' OR kind IN ('historical_balance_snapshot', 'settlement_note') OR facts ?| ARRAY['balance_date', 'source_balance_date'] OR (kind = 'expense' AND nullif(btrim(facts->>'amount'), '') IS NOT NULL))",
+            Self::Warehouse => "(batch.target_entity = 'stock_location' OR kind IN ('stock_condition', 'historical_inventory_count', 'transfer_note') OR facts ?| ARRAY['opening_quantity', 'closing_quantity', 'count_date', 'source_count_date'])",
+            Self::Products => "(batch.target_entity = 'product' OR (batch.target_entity = 'source_observation' AND facts ?| ARRAY['product_label', 'product']))",
+            Self::Crm => "(batch.target_entity = 'contact' OR kind = 'historical_customer_sales_summary' OR (batch.target_entity = 'source_observation' AND facts ?| ARRAY['customer', 'customer_label']))",
+            Self::Purchasing => "(batch.target_entity = 'purchase_order' OR kind IN ('purchase', 'historical_purchase') OR facts ?& ARRAY['supplier', 'purchase_amount'])",
+            Self::Fleet => "(batch.target_entity = 'fleet_vehicle' OR kind IN ('vehicle', 'vehicle_service', 'fleet_service', 'mileage'))",
+            Self::Reports => "TRUE",
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct RowsQuery {
     company_id: u64,
     batch_id: Option<i64>,
+    row_id: Option<i64>,
+    view: Option<HistoryView>,
+    search: Option<String>,
     from: Option<String>,
     to_exclusive: Option<String>,
     #[serde(default)]
@@ -98,10 +132,20 @@ pub(super) struct RowsQuery {
 
 impl RowsQuery {
     fn validate(&self) -> Result<i64, ApiError> {
-        if self.company_id == 0 || self.batch_id.is_some_and(|id| id <= 0) {
+        if self.company_id == 0
+            || self.batch_id.is_some_and(|id| id <= 0)
+            || self.row_id.is_some_and(|id| id <= 0)
+        {
             return Err(ApiError::BadRequest(
-                "positive companyId and batchId are required".into(),
+                "companyId, batchId and rowId must be positive".into(),
             ));
+        }
+        if self
+            .search
+            .as_ref()
+            .is_some_and(|term| term.len() > 400 || term.contains('\0'))
+        {
+            return Err(ApiError::BadRequest("invalid source history search".into()));
         }
         let from = self
             .from
@@ -134,7 +178,7 @@ impl RowsQuery {
         fingerprint(
             &json!({"batchId":self.batch_id,"from":self.from,"toExclusive":self.to_exclusive,
             "dateMode":self.date_mode,"state":self.state,"verifiedOnly":self.verified_only,
-            "limit":self.limit.unwrap_or(50)}),
+            "limit":self.limit.unwrap_or(50),"rowId":self.row_id,"view":self.view,"search":self.search}),
         )
     }
 }
@@ -296,8 +340,9 @@ fn safe_date_sql(value: &str) -> String {
     format!("CASE WHEN {value} ~ '^[0-9]{{4}}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$' AND substring({value},1,4) <> '0000' THEN CASE WHEN substring({value},9,2)::int <= extract(day FROM (make_date(substring({value},1,4)::int,substring({value},6,2)::int,1) + interval '1 month - 1 day')) THEN make_date(substring({value},1,4)::int,substring({value},6,2)::int,substring({value},9,2)::int) END END")
 }
 
-fn date_sql(scope_filters: &str) -> String {
+fn date_sql(scope_joins: &str, scope_filters: &str) -> String {
     include_str!("history_dates.sql")
+        .replace("__SCOPE_JOINS__", scope_joins)
         .replace("__SCOPE_FILTERS__", scope_filters)
         .replace("__PARSE_FROM__", &safe_date_sql("raw_from"))
         .replace("__PARSE_TO__", &safe_date_sql("raw_to"))
@@ -305,19 +350,31 @@ fn date_sql(scope_filters: &str) -> String {
 }
 
 fn normalized_sql() -> String {
-    date_sql("")
+    date_sql("", "")
 }
 
 fn row_date_sql(query: &RowsQuery) -> String {
     // Push keyset, dataset and state restrictions into the indexed source scan.
     // The default All available page needs date metadata for at most limit+1
     // rows. Date-filtered pages must evaluate source precision before limiting.
-    let filters = "AND ($3::bigint IS NULL OR item.batch_id=$3) AND ($7::text IS NULL OR item.state=$7) AND item.id>$8 AND (NOT $10::boolean OR (item.state <> 'excluded' AND (item.state='confirmed' OR jsonb_array_length(item.confirmed_fields)>0)))";
-    if query.date_mode == DateMode::All && query.from.is_none() && query.to_exclusive.is_none() {
-        date_sql(&format!("{filters} ORDER BY item.id LIMIT $9"))
+    let mut filters = String::from("AND ($3::bigint IS NULL OR item.batch_id=$3) AND ($7::text IS NULL OR item.state=$7) AND item.id>$8 AND (NOT $10::boolean OR (item.state <> 'excluded' AND (item.state='confirmed' OR jsonb_array_length(item.confirmed_fields)>0))) AND ($11::bigint IS NULL OR item.id=$11) AND ($12::text IS NULL OR (item.state='confirmed' AND (
+        strpos(lower(item.source_json->>'label'),lower($12)) > 0
+        OR strpos(lower(item.source_json->'source'->>'file'),lower($12)) > 0
+        OR (item.source_json->'source'->>'row') = $12
+        OR EXISTS (SELECT 1 FROM jsonb_each_text(item.proposed_json) AS field(key, value)
+                   WHERE field.key IN ('product', 'product_label', 'customer', 'customer_label', 'shop', 'location', 'location_name', 'business_location', 'category', 'name')
+                     AND strpos(lower(field.value),lower($12)) > 0))))");
+    let joins = if let Some(view) = query.view {
+        filters.push_str(" AND item.state='confirmed' AND ");
+        filters.push_str(view.filter());
+        "CROSS JOIN LATERAL (SELECT item.proposed_json AS facts, item.proposed_json->>'observation_kind' AS kind) source_facts"
     } else {
-        date_sql(filters)
+        ""
+    };
+    if query.date_mode == DateMode::All && query.from.is_none() && query.to_exclusive.is_none() {
+        filters.push_str(" ORDER BY item.id LIMIT $9");
     }
+    date_sql(joins, &filters)
 }
 
 const COUNTS: &str = "count(*)::bigint AS total,
@@ -517,6 +574,8 @@ async fn rows_data(
                 &after,
                 &(limit + 1),
                 &query.verified_only,
+                &query.row_id,
+                &query.search,
             ],
         )
         .await

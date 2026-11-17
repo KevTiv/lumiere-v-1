@@ -13,6 +13,20 @@ export interface ChatImportNativeResult {
   } | null
 }
 
+export interface ChatImportPostingStatus {
+  proposalId: string
+  recordCount: number
+  draftCount: number
+  postedCount: number
+  otherCount: number
+  unavailableCount: number
+}
+
+export interface ChatImportJournalRecord {
+  id: string
+  reference: string
+}
+
 /** Deterministic saved status, separate from generated assistant prose. */
 export interface ChatImportTaskStatus {
   taskId: string
@@ -25,6 +39,7 @@ export interface ChatImportTaskStatus {
     | "needs_review"
     | "inspection_ready"
     | "failed"
+  fileNames?: string[]
   sourceRows: { total: number; ready: number; held: number; excluded: number }
   proposalCount: number
   proposals: Array<{
@@ -32,6 +47,7 @@ export interface ChatImportTaskStatus {
     status: "prepared" | "approved" | "executing" | "verified" | "blocked"
     phase: "not_started" | "headers" | "lines" | "verification" | "complete"
     expectedRecords: number
+    heldRecords?: number
     verifiedResult: {
       recordCount: number
       lineCount: number
@@ -40,6 +56,7 @@ export interface ChatImportTaskStatus {
       currencyId: string
       postedCount: 0
       verifiedAt: string
+      records?: ChatImportJournalRecord[]
     } | null
   }>
   nativeResults: ChatImportNativeResult[]

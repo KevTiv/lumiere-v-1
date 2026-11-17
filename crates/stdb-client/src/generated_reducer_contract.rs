@@ -597,6 +597,14 @@ const PARAMS_CANCEL_AI_AGENT_RUN: &[ReducerParam] = &[
     ReducerParam { name: "run_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "reason", kind: ScalarKind::OptionalString, ref_target: None },
 ];
+const PARAMS_CANCEL_AI_EMBEDDING_JOB: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "job_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "worker_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "expected_revision", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "lease_token", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "reason", kind: ScalarKind::String, ref_target: None },
+];
 const PARAMS_CANCEL_BUDGET: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "budget_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -2745,6 +2753,9 @@ const PARAMS_ENQUEUE_JOB: &[ReducerParam] = &[
 const PARAMS_ENROLL_AI_COMPANY_DEFAULTS: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+];
+const PARAMS_ENROLL_PERSISTENT_PLATFORM_OPERATOR: &[ReducerParam] = &[
+    ReducerParam { name: "apply", kind: ScalarKind::Bool, ref_target: None },
 ];
 const PARAMS_ENSURE_AI_MANAGED_ALLOWANCE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -6802,6 +6813,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "bootstrap_new_tenant", contract_operation_id: "erp.bootstrap_new_tenant", params: PARAMS_BOOTSTRAP_NEW_TENANT, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "cancel_account_move", contract_operation_id: "erp.cancel_account_move", params: PARAMS_CANCEL_ACCOUNT_MOVE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "cancel_ai_agent_run", contract_operation_id: "erp.cancel_ai_agent_run", params: PARAMS_CANCEL_AI_AGENT_RUN, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "cancel_ai_embedding_job", contract_operation_id: "erp.cancel_ai_embedding_job", params: PARAMS_CANCEL_AI_EMBEDDING_JOB, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "cancel_budget", contract_operation_id: "erp.cancel_budget", params: PARAMS_CANCEL_BUDGET, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "cancel_consolidation", contract_operation_id: "erp.cancel_consolidation", params: PARAMS_CANCEL_CONSOLIDATION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "cancel_contract", contract_operation_id: "erp.cancel_contract", params: PARAMS_CANCEL_CONTRACT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -7262,6 +7274,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "enqueue_ai_run_follow_up", contract_operation_id: "erp.enqueue_ai_run_follow_up", params: PARAMS_ENQUEUE_AI_RUN_FOLLOW_UP, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "enqueue_job", contract_operation_id: "erp.enqueue_job", params: PARAMS_ENQUEUE_JOB, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "enroll_ai_company_defaults", contract_operation_id: "erp.enroll_ai_company_defaults", params: PARAMS_ENROLL_AI_COMPANY_DEFAULTS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "enroll_persistent_platform_operator", contract_operation_id: "erp.enroll_persistent_platform_operator", params: PARAMS_ENROLL_PERSISTENT_PLATFORM_OPERATOR, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: Some("identity, organization, company and approval reference derive from deployment policy; no caller-supplied enrollment target") },
     ReducerContract { name: "ensure_ai_managed_allowance", contract_operation_id: "erp.ensure_ai_managed_allowance", params: PARAMS_ENSURE_AI_MANAGED_ALLOWANCE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "ensure_dev_admin", contract_operation_id: "erp.ensure_dev_admin", params: PARAMS_ENSURE_DEV_ADMIN, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "error_intercompany_transaction", contract_operation_id: "erp.error_intercompany_transaction", params: PARAMS_ERROR_INTERCOMPANY_TRANSACTION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -8003,7 +8016,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "update_account_tax_group", contract_operation_id: "erp.update_account_tax_group", params: PARAMS_UPDATE_ACCOUNT_TAX_GROUP, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "update_ai_action_draft_params", contract_operation_id: "erp.update_ai_action_draft_params", params: PARAMS_UPDATE_AI_ACTION_DRAFT_PARAMS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "update_ai_agent", contract_operation_id: "erp.update_ai_agent", params: PARAMS_UPDATE_AI_AGENT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
-    ReducerContract { name: "update_ai_chat_session_title", contract_operation_id: "erp.update_ai_chat_session_title", params: PARAMS_UPDATE_AI_CHAT_SESSION_TITLE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_ai_chat_session_title", contract_operation_id: "erp.update_ai_chat_session_title", params: PARAMS_UPDATE_AI_CHAT_SESSION_TITLE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "update_ai_reducer_allowlist", contract_operation_id: "erp.update_ai_reducer_allowlist", params: PARAMS_UPDATE_AI_REDUCER_ALLOWLIST, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "update_analytic_account", contract_operation_id: "erp.update_analytic_account", params: PARAMS_UPDATE_ANALYTIC_ACCOUNT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "update_analytic_distribution_model", contract_operation_id: "erp.update_analytic_distribution_model", params: PARAMS_UPDATE_ANALYTIC_DISTRIBUTION_MODEL, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -8321,6 +8334,7 @@ pub mod reducer_names {
     pub const BOOTSTRAP_NEW_TENANT: ReducerName = ReducerName::new("bootstrap_new_tenant");
     pub const CANCEL_ACCOUNT_MOVE: ReducerName = ReducerName::new("cancel_account_move");
     pub const CANCEL_AI_AGENT_RUN: ReducerName = ReducerName::new("cancel_ai_agent_run");
+    pub const CANCEL_AI_EMBEDDING_JOB: ReducerName = ReducerName::new("cancel_ai_embedding_job");
     pub const CANCEL_BUDGET: ReducerName = ReducerName::new("cancel_budget");
     pub const CANCEL_CONSOLIDATION: ReducerName = ReducerName::new("cancel_consolidation");
     pub const CANCEL_CONTRACT: ReducerName = ReducerName::new("cancel_contract");
@@ -8781,6 +8795,7 @@ pub mod reducer_names {
     pub const ENQUEUE_AI_RUN_FOLLOW_UP: ReducerName = ReducerName::new("enqueue_ai_run_follow_up");
     pub const ENQUEUE_JOB: ReducerName = ReducerName::new("enqueue_job");
     pub const ENROLL_AI_COMPANY_DEFAULTS: ReducerName = ReducerName::new("enroll_ai_company_defaults");
+    pub const ENROLL_PERSISTENT_PLATFORM_OPERATOR: ReducerName = ReducerName::new("enroll_persistent_platform_operator");
     pub const ENSURE_AI_MANAGED_ALLOWANCE: ReducerName = ReducerName::new("ensure_ai_managed_allowance");
     pub const ENSURE_DEV_ADMIN: ReducerName = ReducerName::new("ensure_dev_admin");
     pub const ERROR_INTERCOMPANY_TRANSACTION: ReducerName = ReducerName::new("error_intercompany_transaction");
@@ -9825,6 +9840,7 @@ macro_rules! reducer_call {
     ("bootstrap_new_tenant", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::BOOTSTRAP_NEW_TENANT, $args) };
     ("cancel_account_move", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_ACCOUNT_MOVE, $args) };
     ("cancel_ai_agent_run", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_AI_AGENT_RUN, $args) };
+    ("cancel_ai_embedding_job", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_AI_EMBEDDING_JOB, $args) };
     ("cancel_budget", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_BUDGET, $args) };
     ("cancel_consolidation", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_CONSOLIDATION, $args) };
     ("cancel_contract", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CANCEL_CONTRACT, $args) };
@@ -10285,6 +10301,7 @@ macro_rules! reducer_call {
     ("enqueue_ai_run_follow_up", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ENQUEUE_AI_RUN_FOLLOW_UP, $args) };
     ("enqueue_job", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ENQUEUE_JOB, $args) };
     ("enroll_ai_company_defaults", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ENROLL_AI_COMPANY_DEFAULTS, $args) };
+    ("enroll_persistent_platform_operator", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ENROLL_PERSISTENT_PLATFORM_OPERATOR, $args) };
     ("ensure_ai_managed_allowance", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ENSURE_AI_MANAGED_ALLOWANCE, $args) };
     ("ensure_dev_admin", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ENSURE_DEV_ADMIN, $args) };
     ("error_intercompany_transaction", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ERROR_INTERCOMPANY_TRANSACTION, $args) };

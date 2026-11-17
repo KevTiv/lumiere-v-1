@@ -22,13 +22,13 @@ test("legacy hook contract names the governed BFF replacement", () => {
   assert.match(new LegacyAiSkillRunRetiredError(retirement).message, /inventory\/low-stock/)
 })
 
-test("custom skills require a certified governed adapter", () => {
+test("custom skills require a governed execution adapter", () => {
   const retirement = legacyAiSkillRunRetirement("custom_skill")
 
   assert.equal(retirement.code, "legacy_skill_run_retired")
   assert.equal(retirement.skill_key, "custom_skill")
   assert.equal(retirement.replacement_path, undefined)
-  assert.match(retirement.error, /register and certify/)
+  assert.match(retirement.error, /has no governed execution adapter/)
 })
 
 test("finance reviews name their existing governed BFF replacements", () => {
@@ -55,7 +55,7 @@ test("inherited object keys are not governed skills", () => {
     assert.equal(retirement.code, "legacy_skill_run_retired")
     assert.equal(retirement.skill_key, skill)
     assert.equal(Object.hasOwn(retirement, "replacement_path"), false)
-    assert.match(retirement.error, /register and certify/)
+    assert.match(retirement.error, /has no governed execution adapter/)
   }
 })
 

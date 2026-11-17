@@ -66,6 +66,8 @@ export function ImportDestinationSupport({
                       ? t("settings.importWorkflow.destinationDrafts", {
                           defaultValue: "Draft creation with approval",
                         })
+                      : item.readiness === "reviewed_records"
+                      ? "Backfill from source decisions"
                       : t("settings.importWorkflow.destinationNative", {
                           defaultValue: "Native preview available",
                         })}

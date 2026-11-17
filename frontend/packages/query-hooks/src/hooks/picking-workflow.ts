@@ -38,7 +38,8 @@ type PartialValidateRunInput = ValidatePickingWithQuantitiesInput & {
 }
 type PackRunInput = { pickingId: string; packageIdsBefore: string[] }
 
-const readPackages = () => fetchQueryList("/api/query/stock-packages", "Failed to read stock packages")
+const readPackages = (companyId: bigint) =>
+  fetchQueryList(`/api/query/stock-packages?companyId=${companyId}`, "Failed to read stock packages")
 
 export interface PickingWorkflowLabels {
   confirm: string
@@ -69,13 +70,13 @@ export function usePickingWorkflow(
       observe: (pickingId: string) => Promise<ObservedTransition>,
     ): TransitionSpec<string> => ({ id, command, affects: PICKING_TRANSITION_AFFECTS, observe })
     const freshPickings = async () =>
-      (await qc.fetchQuery({ ...stockPickingsQueryOptions(organizationId), staleTime: 0 })) as unknown as RowValueMap[]
+      (await qc.fetchQuery({ ...stockPickingsQueryOptions(organizationId, companyId), staleTime: 0 })) as unknown as RowValueMap[]
 
     // A backorder is a new picking, so a validation reads pickings back to link it.
     const observeValidation = async (pickingId: string) =>
       observeValidatedPicking(
         pickingId,
-        (await qc.fetchQuery({ ...stockPickingsQueryOptions(organizationId), staleTime: 0 })) as unknown as RowValueMap[],
+        await freshPickings(),
       )
 
     const partialValidate: TransitionSpec<PartialValidateRunInput> = {
@@ -91,10 +92,7 @@ export function usePickingWorkflow(
         observePartialValidatedPicking(
           pickingId,
           backorderIdsBefore,
-          (await qc.fetchQuery({
-            ...stockPickingsQueryOptions(organizationId),
-            staleTime: 0,
-          })) as unknown as RowValueMap[],
+          await freshPickings(),
         ),
     }
 
@@ -121,7 +119,7 @@ export function usePickingWorkflow(
           }),
         affects: PICKING_TRANSITION_AFFECTS,
         observe: async ({ pickingId, packageIdsBefore }) =>
-          observePackedPicking(pickingId, packageIdsBefore, await readPackages()),
+          observePackedPicking(pickingId, packageIdsBefore, await readPackages(companyId)),
       } satisfies TransitionSpec<PackRunInput>,
       cancel: transition(
         "inventory.picking.cancel",
@@ -146,7 +144,7 @@ export function usePickingWorkflow(
       pack: packPickingAction({
         label: labels.pack,
         execute: async (pickingId, context) => {
-          const packageIdsBefore = pickingPackageIds(pickingId, await readPackages())
+          const packageIdsBefore = pickingPackageIds(pickingId, await readPackages(companyId))
           return runner.run(
             `inventory.picking.pack:${pickingId}`,
             specs.pack,
@@ -160,7 +158,7 @@ export function usePickingWorkflow(
         label: labels.partialValidate,
         execute: async (input, context) => {
           const pickings = (await qc.fetchQuery({
-            ...stockPickingsQueryOptions(organizationId),
+            ...stockPickingsQueryOptions(organizationId, companyId),
             staleTime: 0,
           })) as unknown as RowValueMap[]
           const backorderIdsBefore = pickingBackorderIds(input.pickingId, pickings)
@@ -194,6 +192,7 @@ export function usePickingWorkflow(
     specs,
     qc,
     organizationId,
+    companyId,
   ])
 
   return { ...actions, isRunning: runner.isRunning, isPending: runner.isPending }

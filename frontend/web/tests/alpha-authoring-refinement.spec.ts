@@ -264,7 +264,7 @@ for (const viewport of [
         await expectInViewport(page, save)
         await expectInViewport(page, cancel)
         await expect(input).toHaveAccessibleName(/\S/)
-        expect(await modal.evaluate((element) => element.contains(document.activeElement))).toBe(true)
+        await expect.poll(() => modal.evaluate((element) => element.contains(document.activeElement))).toBe(true)
         expect(await modal.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
         expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1)
 

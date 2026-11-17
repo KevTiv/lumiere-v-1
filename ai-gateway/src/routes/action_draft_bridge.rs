@@ -13,9 +13,10 @@ use crate::{
         data_scope_resolver::ResourceRegistry,
         policy_engine::{PolicyControlledRequest, PolicyEngine},
         red_action_drafts::CREATE_SALE_ORDER_DRAFT_SKILL_KEY,
-        release_registry::load_active_manifest,
+        release_registry::load_builtin_execution_manifest,
         skill_registry::SkillRegistry,
     },
+    orchestrator::skill_access::ActorSkillAccess,
     orchestrator::skill_loader::{complete_run, create_or_recover_generation_surface_run},
     state::AppState,
 };
@@ -57,6 +58,15 @@ pub async fn post_bridge(
     let organization_id = controlled_request.execution.organization_id;
     let company_id = controlled_request.execution.company_id;
     let skill_key = controlled_request.execution.skill.skill_key.clone();
+    let identity_hex = req.identity_hex.as_deref().unwrap_or_default();
+    let skill_access = ActorSkillAccess::new(
+        &state,
+        organization_id,
+        company_id,
+        &req.stdb_token,
+        identity_hex,
+    )?;
+    skill_access.require(&skill_key).await?;
     let skill_version = controlled_request.execution.skill.version;
     let correlation_id = controlled_request.execution.correlation_id.clone();
     let run_inputs = serde_json::to_string(&serde_json::json!({
@@ -68,15 +78,19 @@ pub async fn post_bridge(
     }))
     .map_err(|error| AppError::BadRequest(format!("invalid run inputs: {error}")))?;
 
-    // Built-in Phase 1 red action-draft skills are loaded directly; org-promoted
-    // skills are resolved through the release registry.
+    // Other built-in skills also check the effective tenant and company binding.
     let registry = if skill_key == CREATE_SALE_ORDER_DRAFT_SKILL_KEY {
         SkillRegistry::built_in()
     } else {
-        let manifest =
-            load_active_manifest(&state.stdb, organization_id, &skill_key, skill_version)
-                .await
-                .map_err(AppError::Forbidden)?;
+        let manifest = load_builtin_execution_manifest(
+            &state.stdb,
+            organization_id,
+            company_id,
+            &skill_key,
+            skill_version,
+        )
+        .await
+        .map_err(AppError::Forbidden)?;
         SkillRegistry::exact(manifest)
     };
 
@@ -85,11 +99,9 @@ pub async fn post_bridge(
 
     let draft_id = if decision.decision.outcome == DecisionOutcome::DraftOnly {
         if let Some(proposal) = &decision.action_draft {
-            let identity_hex = req
-                .identity_hex
-                .as_deref()
-                .filter(|identity| !identity.trim().is_empty())
-                .ok_or_else(|| AppError::BadRequest("identity_hex is required".into()))?;
+            if skill_key != "action_draft_generation" {
+                skill_access.require("action_draft_generation").await?;
+            }
             let draft_writer = state.stdb.with_token(req.stdb_token);
             let run_writer = state.stdb.as_ref();
             let reader = state.spend_read_stdb.as_deref().ok_or_else(|| {

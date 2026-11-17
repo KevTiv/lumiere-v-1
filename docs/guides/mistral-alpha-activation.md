@@ -35,30 +35,22 @@ and no table or durable migration. Publish and pin the matching immutable
 contracts before deploying consumers; do not assume the previous `0.3.178` pin
 contains these operations.
 
-Generation source activation is a separate gate from contracts publication:
+Embedding execution also needs the exact `ai_spend_writer` service binding for
+the `embedding` queue. This does not grant generic queue or business permissions.
+Unknown paid results use the private `cancel_ai_embedding_job` operation with
+the current worker, lease token and revision. Delivery is cancelled without
+settling or releasing its financial hold. Publish the contract containing this
+operation before deploying the corresponding worker.
 
-1. Discover each exact manifest from the candidate gateway's skill-binding
-   discovery endpoint. `gateway certification-bundles` also prints the current
-   compiled hashes for chat, forms, action drafts, report analysis, low-stock
-   and report composition. Never copy a hash from a different build.
-2. Through the canonical skill-version/certification owner, register a new
-   immutable version, run its independent fixture envelope, review the
-   certificate and promote the release. Do not overwrite an old version, copy another skill's
-   certificate or turn a synthetic fixture result into live provider evidence.
-3. The new chat/form/action adapters initially use `1.0.0`. Shared source changes
-   also advance report analysis to `1.0.10`, low-stock/report composition to
-   `1.0.1`, and the five Finance reviews to `1.0.4`. Re-certify affected enabled
-   surfaces against this exact build before advertising availability.
-4. RAG certification requires an immutable ordered `accessTranscript` of exact
-   scoped grant and passage reads, including both release-time rechecks.
-   Removing a recheck, leaving unused entries, or withdrawing access must not
-   produce a passing supported answer.
-5. Runtime checks the effective tenant-local catalog first, including explicit
-   disablement, and rechecks current generation source before new runs and
-   each paid generation, RAG query embedding and review attempt. Old source
-   releases therefore fail closed during an incoherent rollout. Coordinate
-   gateway deployment and certification promotion; retain coherent rollback
-   artifacts instead of disabling these checks.
+The gateway must read back each claim and verify the persisted live lease
+before dispatching work. Reducer success alone is not lease evidence: reclaiming
+an expired final attempt can successfully dead-letter the job instead. Missing,
+expired or mismatched readback stops processing without another claim or paid
+request.
+
+Built-in skills use the execution policies shipped in the gateway. An active
+catalog entry and the company’s effective binding control availability. Verify
+the enabled surfaces with the deployed gateway and an authorized company session.
 
 ## Provider and index configuration
 
@@ -94,7 +86,7 @@ is compatible, and query callers check readiness before paying for embeddings.
 
 ## Identities, prices and company bindings
 
-Retain separate writer, spend-reader and certification identities. Register the
+Retain separate writer and spend-reader identities. Register the
 existing writer's verified identity as the exact active `ai_spend_writer`
 organization binding through the platform-owned service registration operation.
 The registering administrator must be distinct from that writer. Give the
@@ -111,9 +103,7 @@ authority and its separate permission; a caller-supplied approval label alone
 does not grant that authority. A writer rotation retains old holds for approved
 reconciliation rather than transferring dispatch ownership silently.
 
-Use existing catalog records for the following infrastructure bindings. They
-identify bounded native services and do not manufacture executable skill
-certificates:
+Use existing catalog records for the following infrastructure bindings. They identify bounded native services:
 
 | Company binding | Agent action |
 | --- | --- |
@@ -125,15 +115,12 @@ certificates:
 The agent's allowed models must include `mistral-embed`, the exact OCR model,
 and the reviewed generation/review models. Chat uses its own `rag_generation`
 company binding; forms and action drafts use `form_suggestion` and
-`action_draft_generation`. Generative bindings require their current matching
-source versions, independent certificates, capability grants and model policy.
-One skill's activation does not activate another.
+`action_draft_generation`. Generative bindings require their own capability grants and model policy.
 
 Create a private manifest for `scripts/provision-mistral-capabilities.mjs` using
 its validated fields: `version: 1`, `organizationId`, `companyId`, `agentId`,
 `intelligencePolicyRef`, `currency`, `pricesReviewedAt`, `surfaces` and `meters`.
-Each surface contains `skillKey` and `skillId`; generative surfaces also require
-their exact `sourceHash`. Each meter contains `model`, `unit` and `unitsPer1k`.
+Each surface contains `skillKey` and `skillId`. Each meter contains `model`, `unit` and `unitsPer1k`.
 Prices are integer currency microunits per 1,000 tokens or per 1,000 OCR pages.
 Obtain current prices; no price or funding amount is inferred from this runbook.
 
@@ -166,7 +153,7 @@ JavaScript flag or successful SQL read grants these permissions.
 Apply adds only missing reviewed model/action entries, verifies that unrelated
 agent fields and scope are preserved, then writes missing prices and bindings
 and reads back the unchanged allowance. A stale schema, missing writer,
-catalog, certificate or operator authority blocks activation. The tool does not
+catalog or operator authority blocks activation. The tool does not
 create those prerequisites or repair them by granting privileges.
 
 ```sh
@@ -178,10 +165,67 @@ node scripts/provision-mistral-capabilities.mjs --check /private/capabilities.js
 ```
 
 Plan is offline; check is read-only. Apply never creates an agent, budget,
-funding, certificate or organization default. Existing explicit disablement and
+funding or organization default. Existing explicit disablement and
 conflicting configuration block writes. Keep credentials in the existing server
 environment. An uncertain write stops; inspect exact state before another apply.
 Provision the current UTC monthly period without resetting previous use or holds.
+
+### Restore retrieval for an existing chat agent
+
+Use the private operator environment when the company already has an enabled
+`rag_generation` binding and its agent lacks query embedding admission. Supply
+`version: 1`, `organizationId`, `companyId`, `agentId`, `currency`,
+`pricesReviewedAt` and `unitsPer1k` in the private JSON manifest. The rate is the
+reviewed `mistral-embed` price in currency microunits per 1,000 tokens.
+
+```sh
+node scripts/provision-mistral-capabilities.mjs --check --chat-retrieval /private/chat-retrieval.json
+node scripts/provision-mistral-capabilities.mjs --apply --chat-retrieval /private/chat-retrieval.json
+node scripts/provision-mistral-capabilities.mjs --check --chat-retrieval /private/chat-retrieval.json
+```
+
+The first check reports missing entries with exit status 1. Review the result
+before applying. This mode resolves the existing company binding and its
+policy, preserves that binding, and adds only missing `embedding_query`,
+`mistral-embed` and the corresponding token meter. If a meter already exists at
+a different price, it stops for review. After readback, use a signed-in company
+session to ask about an authorized indexed source and verify the reply and
+its citation. On a retrieval failure, filter AI gateway logs for
+`Chat query embedding unavailable` and inspect the `stage` field.
+
+For an existing tenant that needs to index documents, include `indexDocuments: true`
+in the same manifest. It adds the document indexing binding and action on the
+same agent. The publisher installs the infrastructure catalog on upgrade.
+Ingest an authorized test document through the Documents ingestion route and
+verify completed indexing before sending a question. Check for dead-lettered
+jobs if the source was queued before repair.
+
+For fresh managed enrollments, pass a reviewed `embeddingUnitsPer1k` in the
+Mistral manifest for `scripts/configure-ai-platform.mjs --activate`. The platform
+approval stores the rate for the selected template. Every new enrollment copies
+that rate into its own metering snapshot
+and enables query and indexing on the managed agent. Use the private operator
+path above for existing agents. An embedding request can open an eligible
+managed sponsored period at UTC month rollover through normal spend admission.
+
+### Verify a Railway release through authenticated chat
+
+Set the GitHub Environment variable `RAILWAY_VERIFY_GROUNDED_CHAT=true` and
+`AI_CHAT_ACCEPTANCE_URL` to the application's HTTPS origin. Set the Environment
+secret `AI_CHAT_ACCEPTANCE_JSON` with `fresh` and `upgraded` fixtures in different
+dedicated test companies. Provision the fresh fixture through the version being
+accepted and retain the upgraded fixture from an earlier version. Each fixture
+supplies `companyId`, `cookie` for an
+authorized signed-in operator, an indexed `documentId` and its `sourceVersion`,
+a `question` and an `expectedAnswerText` unique to that document. Use approved
+test data and an existing funded allowance. Rotate the session cookies before
+they expire.
+
+The check runs against the public chat streaming route after edge cutover. It
+requires a completed provider response, healthy retrieval, the expected fact and
+persisted claim support from the expected document version in both companies.
+It makes one chat attempt per fixture and prints only outcome labels. The same
+check can be run from the configured environment with `node scripts/verify-grounded-chat.mjs`.
 
 ## Document and activity flows
 
@@ -230,7 +274,7 @@ request/run/reservation IDs and private receipts while proving:
    callers dispatch once. Unknown outcomes retain spend and require recovery.
 5. Embedding, OCR and chat share the same cap and prepaid balance; exhausted
    allowance blocks before provider I/O, including indexing queries and retries.
-6. Disabled providers, incompatible collections, missing pricing/certificates and
+6. Disabled providers, incompatible collections, missing pricing and
    unavailable dependencies show a limitation while ordinary ERP remains usable.
 7. Chat-to-native-form and saved-guide save/reload/retrieval preserve actor scope,
    dirty work and exact saved identities on the integrated signed-in release.

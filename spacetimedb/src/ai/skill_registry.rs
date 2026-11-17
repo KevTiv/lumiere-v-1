@@ -1,13 +1,13 @@
 //! Additive AI skill versioning, release provenance, and run policy snapshots.
 
+use lumiere_policy_core::{ai_skills::is_builtin_skill, skill_projection::SkillProjection};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::ai::knowledge_promotion::{
     require_skill_version_promotion_valid, set_promotion_certification_state,
-    CERTIFICATION_CERTIFIED, CERTIFICATION_EVIDENCE_RECORDED, CERTIFICATION_FAILED,
-    CERTIFICATION_QUEUED, CERTIFICATION_RUNNING,
+    CERTIFICATION_EVIDENCE_RECORDED, CERTIFICATION_FAILED, CERTIFICATION_RUNNING,
 };
 use crate::ai::skills::{
     ai_agent_run, ai_skill, ai_skill_config, AiAgentRun, AiSkill, AiSkillConfig,
@@ -25,13 +25,16 @@ const MAX_POLICY_ITEM_LEN: usize = 512;
 const MAX_STEPS: u32 = 32;
 const MAX_TOOL_CALLS: u32 = 64;
 const MAX_FIXTURE_JSON_LEN: usize = 64_000;
+const MAX_PROJECTION_FIXTURES: usize = 32;
+const MAX_IDEMPOTENCY_KEY_LEN: usize = 160;
+const PROJECTION_TEST_ASSERTION: &str = "projection_assertion_failed";
+const PROJECTION_TEST_INPUT: &str = "projection_input_invalid";
 const MAX_FIXTURE_NAME_LEN: usize = 120;
 const MAX_FIXTURE_KEY_LEN: usize = 160;
 const MAX_CERTIFICATION_ENVIRONMENT_JSON_LEN: usize = 256_000;
 const MAX_CERTIFICATION_DATASET_RESOURCES: usize = 128;
 const MAX_CERTIFICATION_VIRTUAL_FILES: usize = 256;
 const MAX_CERTIFICATION_VIRTUAL_PATH_LEN: usize = 512;
-const MAX_IDEMPOTENCY_KEY_LEN: usize = 160;
 const MAX_EXECUTOR_RUN_ID_LEN: usize = 240;
 const MAX_ERROR_CODE_LEN: usize = 120;
 const CERTIFICATION_CLAIM_LEASE_MICROS: i64 = 5 * 60 * 1_000_000;
@@ -564,6 +567,11 @@ pub fn create_ai_skill_version(
     )?;
 
     let manifest = validate_manifest(&params.manifest_json, &skill.skill_key)?;
+    let manifest_value: Value = serde_json::from_str(&params.manifest_json)
+        .map_err(|error| format!("invalid manifest_json: {error}"))?;
+    if SkillProjection::from_manifest(&manifest_value)?.is_some() {
+        require_tenant_projection_skill(&skill, organization_id)?;
+    }
     let version_key = format!(
         "{}:{}:{}",
         organization_id, params.skill_id, manifest.version
@@ -651,8 +659,7 @@ pub fn promote_ai_skill_version(
 
     require_release_approval(ctx, &version, reason.as_deref())?;
     require_skill_version_promotion_valid(ctx, version.id)?;
-    ensure_fixtures_passed_for_version(ctx, organization_id, version.skill_id, version.id)?;
-    set_promotion_certification_state(ctx, version.id, CERTIFICATION_CERTIFIED);
+    require_tenant_draft_tests(ctx, &skill, &version)?;
     transition_release(ctx, organization_id, &version, "promote", None, reason)?;
     Ok(())
 }
@@ -674,6 +681,37 @@ pub fn create_ai_skill_fixture(
     )?;
     validate_fixture_json("input_json", &params.input_json)?;
     validate_fixture_json("expected_output_json", &params.expected_output_json)?;
+    if let Some(version_id) = projection_fixture_version(params.metadata.as_deref()) {
+        require_tenant_projection_skill(&skill, organization_id)?;
+        let version = load_org_version(ctx, organization_id, version_id)?;
+        let manifest = serde_json::from_str(&version.manifest_json)
+            .map_err(|error| format!("invalid stored skill manifest: {error}"))?;
+        if version.skill_id != skill.id || SkillProjection::from_manifest(&manifest)?.is_none() {
+            return Err("test examples must belong to a supported version of this skill".into());
+        }
+        if ctx
+            .db
+            .ai_skill_release()
+            .ai_skill_release_registry_by_version()
+            .filter(&version.id)
+            .next()
+            .is_some()
+        {
+            return Err("create a new draft to change the examples for a published version".into());
+        }
+        if ctx
+            .db
+            .ai_skill_fixture()
+            .ai_skill_fixture_registry_by_skill()
+            .filter(&skill.id)
+            .filter(|fixture| is_example_for_version(fixture, &version))
+            .take(MAX_PROJECTION_FIXTURES)
+            .count()
+            >= MAX_PROJECTION_FIXTURES
+        {
+            return Err("tenant skill version has reached its example limit".into());
+        }
+    }
 
     let fixture_key = format!(
         "{}:{}:{}",
@@ -920,18 +958,24 @@ pub fn request_ai_skill_certification(
     params: RequestAiSkillCertificationParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_skill", "write")?;
-    let superuser_bypass =
-        require_workflow_company_access(ctx, organization_id, params.company_id, ctx.sender())?;
     validate_canonical_text(
         "idempotency_key",
         &params.idempotency_key,
         MAX_IDEMPOTENCY_KEY_LEN,
     )?;
-
     let version = load_org_version(ctx, organization_id, params.skill_version_id)?;
+    let skill = load_available_skill(ctx, organization_id, version.skill_id)?;
+    require_tenant_projection_skill(&skill, organization_id)?;
+    let superuser_bypass =
+        require_workflow_company_access(ctx, organization_id, params.company_id, ctx.sender())?;
+    require_skill_version_promotion_valid(ctx, version.id)?;
+    let manifest = serde_json::from_str(&version.manifest_json)
+        .map_err(|error| format!("invalid stored skill manifest: {error}"))?;
+    let projection = SkillProjection::from_manifest(&manifest)?
+        .ok_or("this draft has no supported test executor")?;
     let fixture = load_org_fixture(ctx, organization_id, params.fixture_id)?;
-    if fixture.skill_id != version.skill_id {
-        return Err("fixture does not belong to the version skill".to_string());
+    if !is_example_for_version(&fixture, &version) {
+        return Err("test example does not belong to this exact skill version".into());
     }
 
     let request_key = format!(
@@ -947,16 +991,23 @@ pub fn request_ai_skill_certification(
         .find(&request_key)
     {
         if existing.company_id == params.company_id
+            && existing.skill_id == skill.id
             && existing.skill_version_id == version.id
             && existing.fixture_id == fixture.id
+            && is_tenant_projection_test(&existing)
         {
             return Ok(());
         }
-        return Err(
-            "idempotency key is already bound to another certification request".to_string(),
-        );
+        return Err("idempotency key is already bound to another skill test".to_string());
     }
 
+    let input: Value = serde_json::from_str(&fixture.input_json)
+        .map_err(|error| format!("invalid stored fixture input: {error}"))?;
+    let error_code = match projection.execute(&input) {
+        Ok(output) if json_values_equal(&output.to_string(), &fixture.expected_output_json) => None,
+        Ok(_) => Some(PROJECTION_TEST_ASSERTION.to_string()),
+        Err(_) => Some(PROJECTION_TEST_INPUT.to_string()),
+    };
     let row = ctx
         .db
         .ai_skill_certification_request()
@@ -965,10 +1016,14 @@ pub fn request_ai_skill_certification(
             request_key,
             organization_id,
             company_id: params.company_id,
-            skill_id: version.skill_id,
+            skill_id: skill.id,
             skill_version_id: version.id,
             fixture_id: fixture.id,
-            status: AiSkillCertificationRequestStatus::Queued,
+            status: if error_code.is_none() {
+                AiSkillCertificationRequestStatus::Completed
+            } else {
+                AiSkillCertificationRequestStatus::Errored
+            },
             requested_by: ctx.sender(),
             requested_at: ctx.timestamp,
             requester_superuser_bypass: superuser_bypass,
@@ -977,11 +1032,9 @@ pub fn request_ai_skill_certification(
             runtime_profile_id: None,
             claimed_by: None,
             claimed_at: None,
-            terminal_at: None,
-            error_code: None,
+            terminal_at: Some(ctx.timestamp),
+            error_code,
         });
-    set_promotion_certification_state(ctx, version.id, CERTIFICATION_QUEUED);
-
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -989,12 +1042,14 @@ pub fn request_ai_skill_certification(
             company_id: Some(params.company_id),
             table_name: "ai_skill_certification_request",
             record_id: row.id,
-            action: "REQUEST",
+            action: "TEST_DRAFT",
             old_values: None,
             new_values: Some(
                 serde_json::json!({
+                    "fixture_id": fixture.id,
+                    "fixture_hash": fixture_fingerprint(&fixture),
                     "skill_version_id": version.id,
-                    "fixture_id": row.fixture_id,
+                    "manifest_hash": sha256_fingerprint(version.manifest_json.as_bytes()),
                     "status": row.status.as_str(),
                     "requester_superuser_bypass": superuser_bypass,
                 })
@@ -1004,7 +1059,6 @@ pub fn request_ai_skill_certification(
             metadata: None,
         },
     );
-
     Ok(())
 }
 
@@ -1267,7 +1321,11 @@ pub fn rollback_ai_skill_release(
 
     let version = load_org_version(ctx, organization_id, target.skill_version_id)?;
     require_independent_release_actor(ctx, &version)?;
-    ensure_fixtures_passed_for_version(ctx, organization_id, skill_id, version.id)?;
+    if version.skill_id != skill_id {
+        return Err("rollback version does not match its skill".to_string());
+    }
+    require_skill_version_promotion_valid(ctx, version.id)?;
+    require_tenant_draft_tests(ctx, &skill, &version)?;
     let current = load_active_release(ctx, organization_id, skill_id)?
         .ok_or("skill has no active release to roll back")?;
     if current.released_by == ctx.sender() || target.released_by == ctx.sender() {
@@ -1626,25 +1684,6 @@ fn load_active_runtime_for_executor(
     Ok(profile)
 }
 
-fn load_active_runtime_profile(
-    ctx: &ReducerContext,
-    organization_id: u64,
-) -> Result<AiSkillCertificationRuntimeProfile, String> {
-    let mut profiles = ctx
-        .db
-        .ai_skill_certification_runtime_profile()
-        .ai_skill_certification_runtime_profile_by_org()
-        .filter(&organization_id)
-        .filter(|profile| profile.is_active);
-    let profile = profiles
-        .next()
-        .ok_or("organization has no active certification runtime profile")?;
-    if profiles.next().is_some() {
-        return Err("organization has multiple active certification runtime profiles".to_string());
-    }
-    Ok(profile)
-}
-
 fn load_claimed_certification(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -1674,8 +1713,7 @@ fn load_claimed_certification(
         .ok_or("certification runtime profile not found")?;
     // A request pins its runtime profile when claimed. Permit that exact
     // executor/profile pair to finish after profile rotation so requests are not
-    // stranded in Running. Promotion still rejects evidence from a retired
-    // profile through `ensure_fixtures_passed_for_version`.
+    // stranded in Running.
     if profile.organization_id != organization_id || profile.executor_identity != ctx.sender() {
         return Err(
             "certification runtime profile does not match the claimed executor".to_string(),
@@ -1842,85 +1880,97 @@ fn terminalize_exhausted_certification_request(
     );
 }
 
-fn ensure_fixtures_passed_for_version(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    skill_id: u64,
-    skill_version_id: u64,
-) -> Result<(), String> {
-    let active_profile = load_active_runtime_profile(ctx, organization_id)?;
-    let version = load_org_version(ctx, organization_id, skill_version_id)?;
-    if version.skill_id != skill_id {
-        return Err("skill version does not match promotion skill".to_string());
+fn require_tenant_projection_skill(skill: &AiSkill, organization_id: u64) -> Result<(), String> {
+    if organization_id == 0
+        || skill.organization_id != organization_id
+        || skill.is_system
+        || is_builtin_skill(&skill.skill_key)
+    {
+        return Err("draft testing is only available for tenant-authored skills".to_string());
     }
-    let expected_manifest_hash = sha256_fingerprint(version.manifest_json.as_bytes());
+    Ok(())
+}
+
+// Existing worker completions always have an attempt, claim, profile and environment.
+// Only the synchronous module reducer writes terminal results without any of them.
+fn is_tenant_projection_test(request: &AiSkillCertificationRequest) -> bool {
+    request.attempt_count == 0
+        && request.certification_environment_id.is_none()
+        && request.runtime_profile_id.is_none()
+        && request.claimed_by.is_none()
+        && request.claimed_at.is_none()
+        && request.terminal_at.is_some()
+        && match request.status {
+            AiSkillCertificationRequestStatus::Completed => request.error_code.is_none(),
+            AiSkillCertificationRequestStatus::Errored => matches!(
+                request.error_code.as_deref(),
+                Some(PROJECTION_TEST_ASSERTION | PROJECTION_TEST_INPUT)
+            ),
+            _ => false,
+        }
+}
+
+fn projection_fixture_version(metadata: Option<&str>) -> Option<u64> {
+    let metadata: Value = serde_json::from_str(metadata?).ok()?;
+    metadata.get("draftVersionId")?.as_u64()
+}
+
+fn is_example_for_version(fixture: &AiSkillFixture, version: &AiSkillVersion) -> bool {
+    fixture.organization_id == version.organization_id
+        && fixture.skill_id == version.skill_id
+        && projection_fixture_version(fixture.metadata.as_deref()) == Some(version.id)
+}
+
+fn require_tenant_draft_tests(
+    ctx: &ReducerContext,
+    skill: &AiSkill,
+    version: &AiSkillVersion,
+) -> Result<(), String> {
+    if require_tenant_projection_skill(skill, version.organization_id).is_err() {
+        return Ok(());
+    }
+    let manifest = serde_json::from_str(&version.manifest_json)
+        .map_err(|error| format!("invalid stored skill manifest: {error}"))?;
+    if SkillProjection::from_manifest(&manifest)?.is_none() {
+        return Ok(());
+    }
     let fixtures = ctx
         .db
         .ai_skill_fixture()
-        .ai_skill_fixture_registry_by_org()
-        .filter(&organization_id)
-        .filter(|row| row.skill_id == skill_id)
+        .ai_skill_fixture_registry_by_skill()
+        .filter(&skill.id)
+        .filter(|fixture| is_example_for_version(fixture, version))
+        .take(MAX_PROJECTION_FIXTURES + 1)
         .collect::<Vec<_>>();
-    if fixtures.is_empty() {
-        return Err("skill version requires at least one certification fixture".to_string());
+    if fixtures.is_empty() || fixtures.len() > MAX_PROJECTION_FIXTURES {
+        return Err("add between 1 and 32 examples before publishing this skill".to_string());
     }
-
+    let mut latest_by_fixture = std::collections::BTreeMap::new();
+    for request in ctx
+        .db
+        .ai_skill_certification_request()
+        .ai_skill_certification_request_by_version()
+        .filter(&version.id)
+        .filter(|request| {
+            request.organization_id == version.organization_id
+                && request.skill_id == skill.id
+                && is_tenant_projection_test(request)
+        })
+    {
+        let entry = latest_by_fixture
+            .entry(request.fixture_id)
+            .or_insert_with(|| request.clone());
+        if entry.id < request.id {
+            *entry = request;
+        }
+    }
     for fixture in fixtures {
-        let expected_fixture_hash = fixture_fingerprint(&fixture);
-        let environment = load_current_certification_environment(ctx, organization_id, fixture.id)?;
-        let expected_environment_hash = certification_environment_fingerprint(
-            organization_id,
-            skill_id,
-            fixture.id,
-            &environment.dataset_json,
-            &environment.virtual_files_json,
-        );
-        if environment.skill_id != skill_id
-            || environment.environment_fingerprint != expected_environment_hash
+        if !latest_by_fixture
+            .get(&fixture.id)
+            .is_some_and(|request| request.status == AiSkillCertificationRequestStatus::Completed)
         {
             return Err(format!(
-                "fixture '{}' has invalid certification environment provenance",
-                fixture.name
-            ));
-        }
-        let latest = ctx
-            .db
-            .ai_skill_certification_evidence()
-            .ai_skill_certification_evidence_by_version()
-            .filter(&skill_version_id)
-            .filter(|run| run.fixture_id == fixture.id)
-            .max_by_key(|run| run.id);
-        let Some(run) = latest else {
-            return Err(format!(
-                "fixture '{}' is not currently passing for this version",
-                fixture.name
-            ));
-        };
-        let request =
-            load_org_certification_request(ctx, organization_id, run.certification_request_id)?;
-        let valid = run.status == AiSkillTestRunStatus::Passed
-            && run.failure_kind.is_none()
-            && run.skill_id == skill_id
-            && run.company_id == request.company_id
-            && run.certification_environment_id == environment.id
-            && run.environment_hash == expected_environment_hash
-            && run.runtime_profile_id == active_profile.id
-            && run.runtime_hash == active_profile.runtime_hash
-            && run.source_hash == version.source_hash
-            && run.manifest_hash == expected_manifest_hash
-            && run.fixture_hash == expected_fixture_hash
-            && request.status == AiSkillCertificationRequestStatus::Completed
-            && request.skill_version_id == skill_version_id
-            && request.fixture_id == fixture.id
-            && request.certification_environment_id == Some(environment.id)
-            && request.runtime_profile_id == Some(active_profile.id)
-            && request.claimed_by == Some(run.executed_by)
-            && is_valid_sha256(&run.output_fingerprint)
-            && is_valid_sha256(&run.policy_snapshot_hash)
-            && is_valid_sha256(&run.execution_evidence_hash);
-        if !valid {
-            return Err(format!(
-                "fixture '{}' has stale or invalid certification evidence",
+                "test example '{}' must pass for this exact skill version",
                 fixture.name
             ));
         }
@@ -1943,7 +1993,7 @@ fn require_independent_release_actor(
     Ok(())
 }
 
-/// Organization administrators may explicitly approve their own certified skill.
+/// Organization administrators may explicitly approve their own skill version.
 /// Resolve authority from current tenant membership, never a client role label.
 fn require_release_approval(
     ctx: &ReducerContext,

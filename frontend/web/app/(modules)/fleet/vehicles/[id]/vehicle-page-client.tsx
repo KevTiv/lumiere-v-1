@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useErpSession } from '@lumiere/erp-session';
 import Link from 'next/link';
+import { AskAboutRecordButton } from '../../../../../components/ask-about-record-button';
 import { RecordHeaderActions } from '../../../../../components/record-header-actions';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ClipboardCheck, Wrench } from 'lucide-react';
@@ -233,6 +234,7 @@ function VehiclePageLoaded({
         }
         actions={
           <>
+            {workspace.states.vehicles.status === 'ready' ? <AskAboutRecordButton entityType="fleet_vehicle" recordId={vehicleId} label={label} activeTab={activeTab} /> : null}
             {workspace.states.vehicles.status === 'ready' ? <RecordHeaderActions key={`${company}:${vehicleId}`} model="vehicle" record={vehicle} organizationId={orgId} companyId={company} /> : null}
             {canWrite ? <Button size="sm" disabled={!workspace.serviceReady || fleetActions.isPending} data-testid="vehicle-action-service" onClick={() => setForm('service')}>
               {t('fleet.lifecycle.service.action')}

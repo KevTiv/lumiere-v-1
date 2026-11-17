@@ -83,13 +83,26 @@ test("missing or foreign session policy produces no proposals and no hidden modu
     [],
   )
   const all = serverRagUiActionOffers(authority({ isSuperuser: true }))
-  assert.equal(all.length, ALPHA_ASSISTANT_CAPABILITIES.length)
+  assert.equal(all.length, ALPHA_ASSISTANT_CAPABILITIES.filter(({ module }) => module !== "farm-batches").length)
   assert.ok(all.length <= 128)
   assert.ok(
     !all.some((offer) =>
       /manufacturing|payroll|rental|gps|execute/.test(offer.capability_key),
     ),
   )
+})
+
+test("farm offers require the company pack and independent native permissions", () => {
+  const access = authority({ rolePermissions: ["farm_batch:read", "farm_batch:create"] })
+  assert.deepEqual(serverRagUiActionOffers(access), [])
+  assert.deepEqual(serverRagUiActionOffers(access, undefined, true).map(({ capability_key }) => capability_key), [
+    "farm_batches.navigate", "farm.batch.create",
+  ])
+  access.fieldAccess.rolePermissions = ["farm_batch:read"]
+  assert.deepEqual(serverRagUiActionOffers(access, undefined, true).map(({ capability_key }) => capability_key), [
+    "farm_batches.navigate",
+  ])
+  assert.ok(serverRagUiActionOffers(authority({ isSuperuser: true }), undefined, true).length <= 126)
 })
 
 test("browser supplied offers and authority cannot change server-owned descriptors", () => {

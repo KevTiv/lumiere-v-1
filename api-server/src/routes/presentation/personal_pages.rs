@@ -1,6 +1,6 @@
 //! Authenticated personal page layouts backed by immutable native snapshots.
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use axum::{
     extract::{Path, Query, State},
@@ -11,10 +11,10 @@ use lumiere_contracts::bindings::{DashboardWidget, PresentationModule, Presentat
 use lumiere_presentation_core::{
     personal_page_decimal, personal_page_key, personal_page_widget_source_resource,
     prepare_personal_page_layout, PersonalPageLayoutResponse, PersonalPageModule,
-    SavePersonalPageLayoutRequest, StoredPersonalPageLayout, MAX_PERSONAL_PAGE_BYTES,
-    PERSONAL_PAGE_CONTRACT,
+    PersonalPageWidgetSource, SavePersonalPageLayoutRequest, StoredPersonalPageLayout,
+    MAX_PERSONAL_PAGE_BYTES, PERSONAL_PAGE_CONTRACT,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use spacetimedb_sats::serde::SerdeWrapper;
@@ -26,11 +26,13 @@ use super::{
     session,
 };
 use crate::{
+    cold_tier::pg_pool,
     commands::{authorize_reducer_company_scope, dispatch_personal_page_layout_save},
     error::ApiError,
-    session::{normalize_identity_hex_for_sql, ApiSession},
+    session::{load_field_access_context, normalize_identity_hex_for_sql, ApiSession},
     state::AppState,
     trusted_context::TrustedOperationContext,
+    web_session::OrgSession,
 };
 
 #[derive(Deserialize)]
@@ -263,6 +265,58 @@ async fn authorize_saved_widgets(
     Ok(())
 }
 
+async fn readable_receipt_widgets(
+    state: &AppState,
+    organization_id: u64,
+    company_id: u64,
+    access: &FieldAccessContext,
+    widget_ids: &HashSet<u64>,
+) -> Result<HashSet<u64>, ApiError> {
+    if widget_ids.is_empty() || !permission_allowed(access, "dashboard_widget", "read") {
+        return Ok(HashSet::new());
+    }
+    let selector = widget_ids
+        .iter()
+        .map(|id| format!("id = {id}"))
+        .collect::<Vec<_>>()
+        .join(" OR ");
+    // Exclude widget definitions and queries before the owner-token read.
+    let sql = format!(
+        "SELECT id,organization_id,company_id,model,is_active FROM dashboard_widget
+        WHERE organization_id = {organization_id} AND ({selector}) LIMIT {}",
+        widget_ids.len()
+    );
+    let rows = state
+        .stdb
+        .with_query_limits(widget_ids.len(), 128 * 1024)
+        .map_err(ApiError::internal)?
+        .query_sql(&sql)
+        .await
+        .map_err(ApiError::internal)?;
+    let mut readable = HashSet::new();
+    for row in rows {
+        let field = |camel: &str, snake: &str| row.get(camel).or_else(|| row.get(snake));
+        let number =
+            |value: &serde_json::Value| value.as_u64().or_else(|| value.as_str()?.parse().ok());
+        let Some(id) = field("id", "id").and_then(number) else {
+            continue;
+        };
+        let Some(model) = field("model", "model").and_then(serde_json::Value::as_str) else {
+            continue;
+        };
+        if field("organizationId", "organization_id").and_then(number) == Some(organization_id)
+            && field("companyId", "company_id")
+                .is_some_and(|value| value.is_null() || number(value) == Some(company_id))
+            && field("isActive", "is_active").and_then(serde_json::Value::as_bool) == Some(true)
+            && widget_ids.contains(&id)
+            && permission_allowed(access, &personal_page_widget_source_resource(model), "read")
+        {
+            readable.insert(id);
+        }
+    }
+    Ok(readable)
+}
+
 pub(super) async fn get_layout(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -367,6 +421,244 @@ pub(super) async fn save_layout(
     Ok(Json(response))
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct AssistantWidgetReceiptInput {
+    company_id: String,
+    session_key: String,
+    message_id: String,
+    request_id: String,
+    module_id: String,
+    page_id: String,
+    widget_id: String,
+    layout_revision: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct AssistantWidgetReceiptQuery {
+    company_id: String,
+    session_key: String,
+    message_ids: String,
+}
+
+#[derive(Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct AssistantWidgetReceipt {
+    session_key: String,
+    message_id: String,
+    request_id: String,
+    module_id: String,
+    page_id: String,
+    widget_id: String,
+    layout_revision: String,
+}
+
+const RECEIPT_COLUMNS: &str = "session_key,message_id::text,request_id,module_id,page_id,widget_id::text,layout_revision::text";
+
+fn receipt(row: &tokio_postgres::Row) -> AssistantWidgetReceipt {
+    AssistantWidgetReceipt {
+        session_key: row.get("session_key"),
+        message_id: row.get("message_id"),
+        request_id: row.get("request_id"),
+        module_id: row.get("module_id"),
+        page_id: row.get("page_id"),
+        widget_id: row.get("widget_id"),
+        layout_revision: row.get("layout_revision"),
+    }
+}
+
+fn validate_request_id(id: &str) -> bool {
+    id.len() == 36
+        && id.bytes().enumerate().all(|(i, b)| {
+            if matches!(i, 8 | 13 | 18 | 23) {
+                b == b'-'
+            } else {
+                b.is_ascii_digit() || (b'a'..=b'f').contains(&b)
+            }
+        })
+}
+
+fn proposed_assistant_widget(message: &serde_json::Value, module: &str, page: &str) -> bool {
+    let metadata = message["metadata"]
+        .as_str()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok());
+    message["role"] == "assistant"
+        && metadata
+            .as_ref()
+            .and_then(|value| value["nativeActions"].as_array())
+            .is_some_and(|actions| {
+                actions.iter().any(|action| {
+                    action["version"] == 1
+                        && action["kind"] == "add_widget"
+                        && action["capabilityKey"] == format!("{module}.widget.add")
+                        && action.get("widgetKey").is_none()
+                        && action["pageId"].as_str().unwrap_or("dashboard") == page
+                })
+            })
+}
+
+pub(super) async fn save_assistant_widget_receipt(
+    State(state): State<Arc<AppState>>,
+    OrgSession { session, .. }: OrgSession,
+    Json(input): Json<AssistantWidgetReceiptInput>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let (module, company, key) = path_scope(&input.module_id, &input.page_id, &input.company_id)?;
+    let widget = personal_page_decimal(&input.widget_id).map_err(ApiError::BadRequest)?;
+    let revision = personal_page_decimal(&input.layout_revision).map_err(ApiError::BadRequest)?;
+    personal_page_decimal(&input.message_id).map_err(ApiError::BadRequest)?;
+    if !validate_request_id(&input.request_id) || !stdb_client::valid_chat_key(&input.session_key) {
+        return Err(ApiError::BadRequest(
+            "Invalid Assistant widget origin".into(),
+        ));
+    }
+    let context = page_context(&state, &session, company, module).await?;
+    let history =
+        crate::routes::assistant_chat_references::scope(&state, &session, company).await?;
+    crate::routes::assistant_chat_references::owned_session(
+        &state,
+        &history,
+        company,
+        &input.session_key,
+    )
+    .await?;
+    let message = crate::routes::assistant_chat_references::owned_message(
+        &state,
+        &history,
+        company,
+        &input.session_key,
+        &input.message_id,
+    )
+    .await?;
+    if !proposed_assistant_widget(&message, &input.module_id, &input.page_id) {
+        return Err(ApiError::NotFound(
+            "Assistant widget origin is unavailable".into(),
+        ));
+    }
+    let head = read_head(&state, &context, &key)
+        .await?
+        .filter(|head| revision <= head.current_revision)
+        .ok_or_else(|| ApiError::NotFound("Saved page revision is unavailable".into()))?;
+    let saved = read_revision(
+        &state,
+        &context,
+        &head,
+        revision,
+        company,
+        module,
+        &input.page_id,
+    )
+    .await?;
+    let placement_id = format!("assistant-{}", input.request_id);
+    if !saved.layout.is_some_and(|layout| {
+        layout.widgets.iter().any(|placement| {
+            placement.id == placement_id
+                && placement.source == PersonalPageWidgetSource::Saved
+                && placement.widget_id == input.widget_id
+        })
+    }) {
+        return Err(ApiError::NotFound(
+            "Assistant widget placement is unavailable".into(),
+        ));
+    }
+    // A retry verifies the same immutable revision and the actor's current widget access.
+    authorize_saved_widgets(&state, &context, company, &[widget]).await?;
+    context.require_current_placement(&state.organization_placements)?;
+    let org = context.organization_id().to_string();
+    let actor = context.actor_identity();
+    let expected = AssistantWidgetReceipt {
+        session_key: input.session_key,
+        message_id: input.message_id,
+        request_id: input.request_id,
+        module_id: input.module_id,
+        page_id: input.page_id,
+        widget_id: input.widget_id,
+        layout_revision: input.layout_revision,
+    };
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let client = pool.get().await.map_err(ApiError::internal)?;
+    client.execute(
+        "INSERT INTO lumiere_platform.assistant_widget_receipt
+         (organization_id,company_id,actor_identity,session_key,message_id,request_id,module_id,page_id,widget_id,layout_revision)
+         VALUES ($1::text::numeric,$2::text::numeric,$3,$4,$5::text::numeric,$6,$7,$8,$9::text::numeric,$10::text::numeric)
+         ON CONFLICT DO NOTHING",
+        &[&org,&input.company_id,&actor,&expected.session_key,&expected.message_id,&expected.request_id,
+          &expected.module_id,&expected.page_id,&expected.widget_id,&expected.layout_revision],
+    ).await.map_err(ApiError::internal)?;
+    let row = client.query_one(&format!(
+        "SELECT {RECEIPT_COLUMNS} FROM lumiere_platform.assistant_widget_receipt
+         WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4"
+    ), &[&org,&input.company_id,&actor,&expected.request_id]).await.map_err(ApiError::internal)?;
+    let stored = receipt(&row);
+    if stored != expected {
+        return Err(ApiError::Conflict(
+            "Assistant widget receipt was already used".into(),
+        ));
+    }
+    Ok(Json(json!(stored)))
+}
+
+pub(super) async fn list_assistant_widget_receipts(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<AssistantWidgetReceiptQuery>,
+    OrgSession { session, .. }: OrgSession,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let company = personal_page_decimal(&query.company_id).map_err(ApiError::BadRequest)?;
+    let messages: Vec<&str> = query.message_ids.split(',').collect();
+    if !stdb_client::valid_chat_key(&query.session_key)
+        || messages.len() > 90
+        || messages.iter().any(|id| personal_page_decimal(id).is_err())
+    {
+        return Err(ApiError::BadRequest(
+            "Invalid Assistant widget receipt lookup".into(),
+        ));
+    }
+    let context =
+        crate::routes::assistant_chat_references::scope(&state, &session, company).await?;
+    crate::routes::assistant_chat_references::owned_session(
+        &state,
+        &context,
+        company,
+        &query.session_key,
+    )
+    .await?;
+    let org = context.organization_id().to_string();
+    let actor = context.actor_identity();
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let client = pool.get().await.map_err(ApiError::internal)?;
+    let rows = client.query(&format!(
+        "SELECT {RECEIPT_COLUMNS} FROM lumiere_platform.assistant_widget_receipt
+         WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3
+           AND session_key=$4 AND message_id=ANY($5::text[]::numeric[])
+         ORDER BY created_at DESC LIMIT 90"
+    ), &[&org,&query.company_id,&actor,&query.session_key,&messages]).await.map_err(ApiError::internal)?;
+    crate::routes::assistant_chat_references::recheck_scope(&state, &context, company, false)
+        .await?;
+    let current = load_field_access_context(&state.stdb, actor, context.organization_id())
+        .await
+        .map_err(ApiError::Internal)?
+        .ok_or(ApiError::Unauthorized)?;
+    let mut data = rows
+        .iter()
+        .map(receipt)
+        .filter(|row| {
+            row.module_id
+                .parse::<PersonalPageModule>()
+                .is_ok_and(|module| require_page_read(&current, module).is_ok())
+        })
+        .collect::<Vec<_>>();
+    let ids = data
+        .iter()
+        .filter_map(|row| personal_page_decimal(&row.widget_id).ok())
+        .collect();
+    let readable =
+        readable_receipt_widgets(&state, context.organization_id(), company, &current, &ids)
+            .await?;
+    data.retain(|row| personal_page_decimal(&row.widget_id).is_ok_and(|id| readable.contains(&id)));
+    context.require_current_placement(&state.organization_placements)?;
+    Ok(Json(json!({"data": data})))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -375,6 +667,45 @@ mod tests {
         http::{Request, StatusCode},
     };
     use tower::ServiceExt;
+
+    #[test]
+    fn assistant_widget_receipts_require_the_exact_unresolved_proposal() {
+        let candidate = json!({
+            "version":1,"kind":"add_widget","capabilityKey":"sales.widget.add","pageId":"dashboard"
+        });
+        let message = |role: &str, action: serde_json::Value| {
+            json!({
+                "role":role,"metadata":json!({"nativeActions":[action]}).to_string()
+            })
+        };
+        assert!(proposed_assistant_widget(
+            &message("assistant", candidate.clone()),
+            "sales",
+            "dashboard"
+        ));
+        assert!(!proposed_assistant_widget(
+            &message("user", candidate.clone()),
+            "sales",
+            "dashboard"
+        ));
+        assert!(!proposed_assistant_widget(
+            &message("assistant", candidate.clone()),
+            "warehouse",
+            "dashboard"
+        ));
+        assert!(!proposed_assistant_widget(
+            &message("assistant", candidate.clone()),
+            "sales",
+            "orders"
+        ));
+        let mut existing = candidate;
+        existing["widgetKey"] = json!("saved:42");
+        assert!(!proposed_assistant_widget(
+            &message("assistant", existing),
+            "sales",
+            "dashboard"
+        ));
+    }
 
     fn access() -> FieldAccessContext {
         FieldAccessContext {

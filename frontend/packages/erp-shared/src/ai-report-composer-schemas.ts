@@ -48,10 +48,39 @@ export interface HarnessAuditTrail {
   events: HarnessAuditEvent[]
 }
 
+interface ReportEvidenceRef {
+  kind: string
+  id: string
+}
+
+export interface ReportSummaryVerification {
+  outcome: "admitted" | "qualified" | "requires_review" | "blocked"
+  methods: string[]
+  limitations?: string[]
+  reason?: string
+}
+
+export interface ReportSummaryProvenance {
+  claims: {
+    text: string
+    supportRefs: ReportEvidenceRef[]
+    verificationMethod: string
+    verificationOutcome: string
+    limitations?: string[]
+  }[]
+  citations: ReportEvidenceRef[]
+  persisted: boolean
+  persistenceReason?: string
+  contributionId?: number
+  claimIds?: number[]
+}
+
 export interface ReportComposerResult {
   decision: PolicyResult
   summary: string
   citations: ReportCitation[]
+  summaryVerification: ReportSummaryVerification
+  summaryProvenance: ReportSummaryProvenance
   audit: HarnessAuditTrail
 }
 

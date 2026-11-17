@@ -353,6 +353,18 @@ services:
         methods: [POST]
         regex_priority: 10
         strip_path: false
+      - name: web-ai-alpha-chat-history
+        paths:
+          - '~/api/ai/chat/(?:decisions|widget-receipts)$'
+        methods: [GET, POST]
+        regex_priority: 10
+        strip_path: false
+      - name: web-ai-alpha-chat-reference-resolution
+        paths:
+          - '~/api/ai/chat/references/resolve$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
       - name: web-ai-alpha-document-evidence
         paths:
           - '~/api/ai/evidence/ingestion/documents(?:/lifecycle)?$'
@@ -369,6 +381,18 @@ services:
         paths:
           - '~/api/ai/skills/certifications$'
         methods: [POST]
+        regex_priority: 10
+        strip_path: false
+      - name: web-ai-alpha-published-skill-run
+        paths:
+          - '~/api/ai/skills/published/[1-9][0-9]*/run$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
+      - name: web-ai-alpha-skill-user-access
+        paths:
+          - '~/api/ai/skills/user-access$'
+        methods: [GET, PUT]
         regex_priority: 10
         strip_path: false
       - name: web-ai-alpha-platform-profile

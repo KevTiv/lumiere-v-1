@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useErpSession } from "@lumiere/erp-session"
+import { accountMoveBatchHref } from "@lumiere/erp-shared/record-links"
 import { useTranslation } from "@lumiere/i18n"
 import { useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting/accounts"
 import { useAccountJournals } from "@lumiere/query-hooks/hooks/accounting/journals"
@@ -34,6 +35,8 @@ import {
   type ImportProposal,
   type ImportWorkflow,
 } from "./import-workflow"
+import { ModuleBackfillAction } from "./module-backfill-action"
+import { moduleBackfillHref } from "./module-backfill-navigation"
 import { useImportProposalAttempt } from "./use-import-proposal-attempt"
 import { importTaskHref } from "./import-task-navigation"
 import { importWorkflowKey, useImportWorkflow } from "./use-import-workflow"
@@ -354,6 +357,10 @@ function ExecutionPanel({
         <>
           {!reviewId && <p>{t("settings.importWorkflow.chooseSource")}</p>}
           {review.error && <p role="alert">{review.error.message}</p>}
+          {review.data && !review.isError && (
+            <ModuleBackfillAction detail={review.data} taskId={taskId} organizationId={organizationId}
+              companyId={companyId} actor={actor} disabled={busy || preparationLocked} />
+          )}
           {nativeHandoff && (
             <div className="space-y-2">
               <p>{t("settings.importWorkflow.nativeHandoff")}</p>
@@ -370,9 +377,12 @@ function ExecutionPanel({
               )}
             </div>
           )}
-          {review.data && !expenseSource && !nativeHandoff && (
-            <p>{t("settings.importWorkflow.unsupportedSource")}</p>
-          )}
+          {review.data &&
+            !expenseSource &&
+            !nativeHandoff &&
+            !review.data.reviewOperations?.length && (
+              <p>{t("settings.importWorkflow.unsupportedSource")}</p>
+            )}
           {expenseSource && (
             <fieldset
               disabled={busy || preparationLocked}
@@ -634,6 +644,27 @@ function ExecutionPanel({
           }}
         />
       )}
+      {view === "results" && workflow.data?.backfilledRecords?.map(({ module, count }) => (
+        <p key={module}>
+          <a className="underline underline-offset-4" href={moduleBackfillHref(module, { id: taskId, companyId })}>
+            {count} {{
+              sales: "verified customer sales",
+              shop_sales: "verified shop sales",
+              warehouse: "verified inventory counts",
+            }[module]}
+          </a>
+        </p>
+      ))}
+      {view === "results" && workflow.data?.farmResults?.map(({ batchId, count }) => (
+        <p key={batchId}>
+          <a className="underline underline-offset-4" href={`/farm-batches/${batchId}?view=history`}>
+            {count} verified farm records
+          </a>
+        </p>
+      ))}
+      {view === "results" && workflow.data?.farmResultsMore ? (
+        <a className="underline underline-offset-4" href="/farm-batches">View more flocks in Farm Batches</a>
+      ) : null}
       {view === "results" && nativeResults.length > 0 && (
         <section
           className="space-y-3"
@@ -1201,7 +1232,7 @@ function ProposalDetails({
                 <li key={id}>
                   <a
                     className="underline"
-                    href={`/accounting/invoices/${id}?companyId=${companyId}`}
+                    href={accountMoveBatchHref([id], companyId)}
                   >
                     {proposal.entries[index]?.reference ??
                       t("settings.importWorkflow.record", { id })}

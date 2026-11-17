@@ -69,7 +69,8 @@ class PrivateReleaseTests(unittest.TestCase):
                         self.assertFalse(allowed(method.upper(), path + suffix))
                     self.assertFalse(allowed(method.upper(), '/prefix' + path))
                     for unsupported in ['PUT', 'PATCH', 'DELETE']:
-                        self.assertFalse(allowed(unsupported, path))
+                        if path not in fixture.get(unsupported.lower(), []):
+                            self.assertFalse(allowed(unsupported, path))
         for method, path in [
             ('GET', '/api/ai/report/compose'),
             ('GET', '/api/ai/inventory/low-stock'),
@@ -86,6 +87,8 @@ class PrivateReleaseTests(unittest.TestCase):
             ('POST', '/api/ai/skills/other/readiness'),
             ('POST', '/api/ai/skills/run'),
             ('GET', '/api/ai/skills/provision-surfaces'),
+            ('POST', '/api/ai/skills/user-access'),
+            ('GET', '/api/ai/skills/published/42/run'),
             ('POST', '/api/ai/skills/sync'),
             ('GET', '/api/ai/rag'),
             ('GET', '/api/ai/rag/stream'),
@@ -100,6 +103,7 @@ class PrivateReleaseTests(unittest.TestCase):
             self.assertFalse(allowed(method, path), (method, path))
         for identifier in ['0', '-1', '01', '1x']:
             self.assertFalse(allowed('GET', '/api/ai/skills/certifications/' + identifier))
+            self.assertFalse(allowed('POST', '/api/ai/skills/published/' + identifier + '/run'))
             self.assertFalse(allowed('GET', '/api/ai/knowledge/skill-promotions/company/' + identifier))
             self.assertFalse(allowed('POST', '/api/ai/knowledge/skill-promotions/' + identifier + '/review'))
 

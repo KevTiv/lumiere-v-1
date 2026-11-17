@@ -47,7 +47,7 @@ export function useStockQuantWorkflow(
           input,
           input.snapshot,
           (await qc.fetchQuery({
-            ...stockQuantsQueryOptions(organizationId),
+            ...stockQuantsQueryOptions(organizationId, companyId),
             staleTime: 0,
           })) as unknown as RowValueMap[],
         ),
@@ -69,7 +69,7 @@ export function useStockQuantWorkflow(
         }
 
         const rows = (await qc.fetchQuery({
-          ...stockQuantsQueryOptions(organizationId),
+          ...stockQuantsQueryOptions(organizationId, companyId),
           staleTime: 0,
         })) as unknown as RowValueMap[]
         const snapshot = captureStockQuantMoveSnapshot(input, rows)
@@ -94,7 +94,7 @@ export function useStockQuantWorkflow(
           { navigateToNext: context?.navigateToNext },
         )
       },
-    [organizationId, qc, runner, spec],
+    [companyId, organizationId, qc, runner, spec],
   )
 
   return {

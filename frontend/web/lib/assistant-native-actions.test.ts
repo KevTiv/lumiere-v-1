@@ -9,6 +9,7 @@ import {
 import type { ChatAction } from "@lumiere/ui/lib/ai-chat-types"
 import {
   assistantPresentationReply,
+  assistantSavedWidgetHref,
   modelNativeChatActions,
   nativeChatAction,
   parseAssistantUiProposals,
@@ -355,4 +356,15 @@ test("page proposals persist as scoped review cards without claiming a completed
     )?.content,
     "aiChat.native.pageReady",
   )
+})
+
+test("historical links target the exact saved widget in the original company", () => {
+  const base = {
+    version: 1, kind: "add_widget", capabilityKey: "warehouse.widget.add",
+    scope, pageId: "dashboard",
+  } as const
+  assert.equal(assistantSavedWidgetHref({ ...base, widgetKey: "saved:17" }, 12), "/warehouse?savedWidget=17&savedWidgetCompany=12")
+  assert.equal(assistantSavedWidgetHref({ ...base, widgetKey: "saved:17" }, 13), undefined)
+  assert.equal(assistantSavedWidgetHref({ ...base, widgetKey: "builtin:stock" }, 12), undefined)
+  assert.equal(assistantSavedWidgetHref(base, 12), undefined)
 })

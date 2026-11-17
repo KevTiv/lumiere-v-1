@@ -40,14 +40,14 @@ export async function POST(request: NextRequest) {
     const gw = await fetchAiGateway("/v1/skills/insights-scan", {
       method: "POST",
       body: JSON.stringify({
-        org_id: orgId,
-        company_id: companyId,
-        max_insights: body.maxInsights ?? body.max_insights ?? null,
-        abnormal_amount_threshold:
+        orgId,
+        companyId,
+        maxInsights: body.maxInsights ?? body.max_insights ?? null,
+        abnormalAmountThreshold:
           body.abnormalAmountThreshold ?? body.abnormal_amount_threshold ?? null,
-        stdb_token: session.stdbToken,
-        identity_hex: session.identityHex,
-        org_privacy_policy: resolveAiPrivacyPolicy(session.fieldAccess),
+        stdbToken: session.stdbToken,
+        identityHex: session.identityHex,
+        orgPrivacyPolicy: resolveAiPrivacyPolicy(session.fieldAccess),
       }),
     })
     const payload = gw.text

@@ -1,5 +1,6 @@
 'use client';
 
+import { AskAboutRecordButton } from '../../../../components/ask-about-record-button';
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -290,6 +291,7 @@ function SubscriptionPageLoaded({
       }
       actions={
         <>
+          <AskAboutRecordButton entityType="subscription" recordId={subscriptionId} label={label} activeTab={activeTab} />
           {subscriptionActions.dialogs}
           {subscriptionActions.hasPendingRenewal(BigInt(subscriptionId)) && <Button variant="outline" disabled={busy} data-testid="subscription-review-renewal" onClick={() => runAction('renew')}>{t('subscriptions.lifecycle.checkRenewal')}</Button>}
           <FormModal key={`${orgId}:${operatingCompanyId}:${subscriptionId}:${requestKey}`} open={requestOpen} onOpenChange={setRequestOpen} config={paymentRequestForm} draft={false}

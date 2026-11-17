@@ -3,6 +3,7 @@
 use super::company_scope::company_ids_for_organization;
 use super::row_values::sort_rows_by_id_desc;
 use crate::error::ApiError;
+use lumiere_policy_core::skill_projection::{SkillProjection, EXECUTOR};
 use serde_json::Value;
 use std::collections::HashSet;
 use stdb_auth::resolve_http_sql_columns;
@@ -18,80 +19,6 @@ fn ai_skill_permission_allowed(field_access: Option<&FieldAccessContext>, action
                     || permission == &format!("ai_skill:{action}")
             })
     })
-}
-
-fn timestamp_value(value: Option<&Value>) -> (Option<i128>, String) {
-    let Some(value) = value else {
-        return (None, String::new());
-    };
-    if let Some(micros) = value
-        .as_object()
-        .and_then(|object| object.get("__timestamp_micros_since_unix_epoch__"))
-        .and_then(Value::as_i64)
-    {
-        return (Some(micros as i128), String::new());
-    }
-    if let Some(number) = value.as_i64() {
-        return (Some(number as i128), String::new());
-    }
-    (None, value.to_string())
-}
-
-fn row_field<'a>(row: &'a Value, field: &str) -> Option<&'a Value> {
-    row.get(field).or_else(|| match field {
-        "writeDate" => row.get("write_date"),
-        "createDate" => row.get("create_date"),
-        _ => None,
-    })
-}
-
-fn sort_rows_by_timestamp(rows: &mut [Value], field: &str, descending: bool) {
-    rows.sort_by(|a, b| {
-        let (a_number, a_text) = timestamp_value(row_field(a, field));
-        let (b_number, b_text) = timestamp_value(row_field(b, field));
-        let ordering = match (a_number, b_number) {
-            (Some(a), Some(b)) => a.cmp(&b),
-            _ => a_text.cmp(&b_text),
-        };
-        let ordering = if descending {
-            ordering.reverse()
-        } else {
-            ordering
-        };
-        ordering.then_with(|| {
-            let aid = a.get("id").and_then(Value::as_u64).unwrap_or_default();
-            let bid = b.get("id").and_then(Value::as_u64).unwrap_or_default();
-            aid.cmp(&bid)
-        })
-    });
-}
-
-pub(crate) async fn read_ai_chat_sessions(
-    client: &StdbClient,
-    organization_id: u64,
-    identity_hex: &str,
-) -> Result<Vec<Value>, ApiError> {
-    let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
-    let sql = format!(
-                "SELECT id, organization_id, company_id, session_key, title, route, module, active_tab, archived, create_uid, create_date, write_uid, write_date, metadata FROM ai_chat_session WHERE organization_id = {organization_id} AND create_uid = {id}"
-            );
-    let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
-    sort_rows_by_timestamp(&mut rows, "writeDate", true);
-    Ok(rows)
-}
-
-pub(crate) async fn read_ai_chat_messages(
-    client: &StdbClient,
-    organization_id: u64,
-    identity_hex: &str,
-) -> Result<Vec<Value>, ApiError> {
-    let id = identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
-    let sql = format!(
-                "SELECT id, organization_id, company_id, session_key, role, content, sources_json, ui_context_json, model, duration_ms, status, created_by, create_date, metadata FROM ai_chat_message WHERE organization_id = {organization_id} AND created_by = {id}"
-            );
-    let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
-    sort_rows_by_timestamp(&mut rows, "createDate", false);
-    Ok(rows)
 }
 
 pub(crate) async fn read_ai_action_drafts(
@@ -111,9 +38,10 @@ pub(crate) async fn read_ai_action_drafts(
 pub(crate) async fn read_ai_agent_runs(
     client: &StdbClient,
     organization_id: u64,
+    company_id: u64,
 ) -> Result<Vec<Value>, ApiError> {
     let sql = format!(
-                "SELECT id, organization_id, company_id, skill_id, run_key, status, summary, step_count, error_message, started_at, completed_at, create_date, write_date FROM ai_agent_run WHERE organization_id = {organization_id}"
+                "SELECT id, organization_id, company_id, skill_id, run_key, status, summary, step_count, error_message, started_at, completed_at, create_date, write_date FROM ai_agent_run WHERE organization_id = {organization_id} AND company_id = {company_id}"
             );
     let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
     sort_rows_by_id_desc(&mut rows);
@@ -125,11 +53,24 @@ pub(crate) async fn read_ai_skill_versions(
     organization_id: u64,
 ) -> Result<Vec<Value>, ApiError> {
     let sql = format!(
-                "SELECT id, organization_id, skill_id, skill_key, version, manifest_schema_version, source_hash, risk, max_steps, max_tool_calls, permissions, resources, output_types, reviewed_at, review_notes, created_at, metadata FROM ai_skill_version WHERE organization_id = {organization_id}"
+                "SELECT id, organization_id, skill_id, skill_key, version, manifest_schema_version, manifest_json, source_hash, risk, max_steps, max_tool_calls, permissions, resources, output_types, reviewed_at, review_notes, created_at, metadata FROM ai_skill_version WHERE organization_id = {organization_id}"
             );
     let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
+    for row in rows.iter_mut().filter_map(Value::as_object_mut) {
+        let manifest = row
+            .remove("manifestJson")
+            .or_else(|| row.remove("manifest_json"));
+        let projection = manifest
+            .and_then(|raw| serde_json::from_str::<Value>(raw.as_str()?).ok())
+            .is_some_and(|manifest| {
+                matches!(SkillProjection::from_manifest(&manifest), Ok(Some(_)))
+            });
+        if projection {
+            row.insert("executor".into(), Value::String(EXECUTOR.into()));
+        }
+    }
     sort_rows_by_id_desc(&mut rows);
-    return Ok(rows);
+    Ok(rows)
 }
 
 pub(crate) async fn read_ai_skill_releases(

@@ -1,5 +1,6 @@
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
-import { kpiDate } from "@lumiere/ui/lib/kpi-tiles"
+import { previousHistoryPeriod, historyDateAt, type HistoryPeriod } from "@lumiere/erp-shared/history-period"
+import { accountingDate, accountingHistory, accountingTimeZone } from "./accounting-history"
 import { mergeModuleStates, type ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 import { overviewTag, type AccountantOverviewData, type OverviewCollection, type OverviewRow } from "./accountant-overview-model"
 
@@ -8,11 +9,11 @@ const unavailable: ModuleDataState = { status: "partial" }
 export type InsightDays = 30 | 90 | 180
 export interface InsightCurrency { id: string; label: string; decimals: number | null }
 export interface InsightPanel<T> { state: ModuleDataState; value: T | null }
-export interface InsightComparison { current: number; previous: number; percent: number | null }
-export interface InsightTrend { startMs: number; invoices: number; bills: number }
+export interface InsightComparison { current: number; previous: number | null; percent: number | null }
+export interface InsightTrend { startMs: number; label: string; invoices: number; bills: number }
 export interface InsightAging { bucket: "current" | "1-30" | "31-60" | "61-90" | "90+" | "undated"; invoices: number; bills: number }
 export interface InsightTurnover { dso: number | null; dpo: number | null }
-export interface InsightCashPoint { startMs: number; balance: number | null }
+export interface InsightCashPoint { startMs: number; label: string; balance: number | null }
 export interface InsightCash { position: number; asOfMs: number; accounts: number; months: InsightCashPoint[] }
 export interface InsightBudget { id: string; name: string; planned: number; actual: number; variance: number }
 
@@ -62,10 +63,16 @@ function required<T>(value: T | null | undefined): T {
   return value
 }
 
-export function buildAccountantInsights(data: AccountantOverviewData, days: InsightDays = 90, requestedCurrency?: string, now = new Date()) {
-  const endMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
-  const startMs = endMs - days * DAY
-  const previousStartMs = startMs - days * DAY
+export function buildAccountantInsights(data: AccountantOverviewData, selection: HistoryPeriod | InsightDays = "all", requestedCurrency?: string, now = new Date()) {
+  // Numeric periods remain accepted for existing model consumers.
+  const historyPeriod: HistoryPeriod = typeof selection === "number" ? `${selection}d` : selection
+  const timeZone = accountingTimeZone(data)
+  const bounds = accountingHistory(historyPeriod, now, timeZone, []).bounds
+  const { startMs, endMs } = bounds
+  const previousBounds = previousHistoryPeriod(bounds, timeZone)
+  const previousStartMs = previousBounds?.startMs ?? null
+  const days = startMs === null || endMs === null ? null :
+    (Date.parse(historyDateAt(endMs, timeZone)) - Date.parse(historyDateAt(startMs, timeZone))) / DAY
   const moves = scoped(data.moves, data)
   const companies = data.companies
   const companyRows = companies?.state.status === "ready" ? companies.rows.filter((row) => key(row.id) === key(data.companyId) && key(row.organizationId ?? row.organization_id) === key(data.organizationId)) : []
@@ -88,6 +95,11 @@ export function buildAccountantInsights(data: AccountantOverviewData, days: Insi
   const posted = moves.rows.filter((row) => overviewTag(row.state) === "posted" && ["outinvoice", "ininvoice"].includes(overviewTag(row.moveType ?? row.move_type)))
   if (posted.some((row) => !key(row.currencyId ?? row.currency_id))) documentState = unavailable
   const selected = posted.filter((row) => key(row.currencyId ?? row.currency_id) === selectedId)
+  const documentDate = (row: OverviewRow) => accountingDate(row.invoiceDate ?? row.invoice_date ?? row.date, timeZone)
+  const history = accountingHistory(historyPeriod, now, timeZone, selected.flatMap((row) => {
+    const date = documentDate(row)
+    return date === null ? [] : [date]
+  }))
   const isInvoice = (row: OverviewRow) => overviewTag(row.moveType ?? row.move_type) === "outinvoice"
   const balances = panel(documentState, () => {
     let invoices = 0n, bills = 0n
@@ -100,42 +112,38 @@ export function buildAccountantInsights(data: AccountantOverviewData, days: Insi
   })
   const period = panel(documentState, () => {
     const totals = { invoices: [0n, 0n], bills: [0n, 0n] }
-    const months: Array<{ startMs: number; invoices: bigint; bills: bigint }> = []
-    for (let month = Date.UTC(new Date(startMs).getUTCFullYear(), new Date(startMs).getUTCMonth(), 1); month < endMs;) {
-      months.push({ startMs: month, invoices: 0n, bills: 0n })
-      const date = new Date(month)
-      month = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)
-    }
+    const months = history.buckets.map((bucket) => ({ ...bucket, invoices: 0n, bills: 0n }))
     for (const row of selected) {
-      const date = required(kpiDate(row.invoiceDate ?? row.invoice_date ?? row.date)).getTime()
-      if (date < previousStartMs || date > now.getTime()) continue
+      const date = required(documentDate(row))
+      const current = history.contains(date)
+      const prior = previousBounds !== null && date >= required(previousBounds.startMs) && date < required(previousBounds.endMs) && date <= now.getTime()
+      if (!current && !prior) continue
       const value = required(minor(row.amountTotal ?? row.amount_total, required(decimals)))
       const metric = isInvoice(row) ? "invoices" : "bills"
-      totals[metric][date >= startMs ? 0 : 1]! += value
-      if (date >= startMs) {
-        const stamp = new Date(date)
-        const month = required(months.find((item) => item.startMs === Date.UTC(stamp.getUTCFullYear(), stamp.getUTCMonth(), 1)))
+      totals[metric][current ? 0 : 1]! += value
+      if (current) {
+        const month = required(months.find((item) => date >= item.startMs && date < item.endMs))
         month[metric] += value
       }
     }
     const comparison = (values: bigint[]): InsightComparison => {
-      const current = major(values[0]!, required(decimals)), previous = major(values[1]!, required(decimals))
-      return { current, previous, percent: previous === 0 ? null : (current - previous) / Math.abs(previous) * 100 }
+      const current = major(values[0]!, required(decimals)), previous = previousBounds === null ? null : major(values[1]!, required(decimals))
+      return { current, previous, percent: previous === null || previous === 0 ? null : (current - previous) / Math.abs(previous) * 100 }
     }
-    return { invoices: comparison(totals.invoices), bills: comparison(totals.bills), months: months.map((point): InsightTrend => ({ startMs: point.startMs, invoices: major(point.invoices, required(decimals)), bills: major(point.bills, required(decimals)) })) }
+    return { invoices: comparison(totals.invoices), bills: comparison(totals.bills), months: months.map((point): InsightTrend => ({ startMs: point.startMs, label: point.label, invoices: major(point.invoices, required(decimals)), bills: major(point.bills, required(decimals)) })) }
   })
   const aging = panel(documentState, () => {
     const buckets = ["current", "1-30", "31-60", "61-90", "90+", "undated"] as const
     const points = buckets.map((bucket) => ({ bucket, invoices: 0n, bills: 0n }))
-    const today = endMs - DAY
+    const today = Date.parse(historyDateAt(now.getTime(), timeZone))
     for (const row of selected) {
       const residual = required(minor(row.amountResidual ?? row.amount_residual, required(decimals)))
       if (residual < 0n) throw new Error("negative open invoice balance")
       if (residual === 0n) continue
       const raw = row.invoiceDateDue !== undefined ? row.invoiceDateDue : row.invoice_date_due
       if (raw === undefined && !Object.hasOwn(row, "invoiceDateDue") && !Object.hasOwn(row, "invoice_date_due")) throw new Error("due-date field unavailable")
-      const due = raw == null ? null : required(kpiDate(raw))
-      const daysLate = due ? Math.floor((today - Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate())) / DAY) : null
+      const due = raw == null ? null : required(accountingDate(raw, timeZone))
+      const daysLate = due === null ? null : Math.floor((today - Date.parse(historyDateAt(due, timeZone))) / DAY)
       const index = daysLate === null ? 5 : daysLate <= 0 ? 0 : daysLate <= 30 ? 1 : daysLate <= 60 ? 2 : daysLate <= 90 ? 3 : 4
       points[index]![isInvoice(row) ? "invoices" : "bills"] += residual
     }
@@ -144,15 +152,17 @@ export function buildAccountantInsights(data: AccountantOverviewData, days: Insi
   // Days sales / payables outstanding: open balance relative to what was posted in the period,
   // scaled to the period's length. No posted total in the period means no meaningful figure.
   const turnover = panel(documentState, () => {
+    // All history has no finite duration; a current balance cannot define lifetime DSO/DPO.
+    if (days === null) return { dso: null, dpo: null }
     const places = required(decimals)
     let openInvoices = 0n, openBills = 0n, postedInvoices = 0n, postedBills = 0n
     for (const row of selected) {
       const residual = required(minor(row.amountResidual ?? row.amount_residual, places))
       if (residual < 0n) throw new Error("negative open invoice balance")
-      const date = required(kpiDate(row.invoiceDate ?? row.invoice_date ?? row.date)).getTime()
+      const date = required(documentDate(row))
       const total = required(minor(row.amountTotal ?? row.amount_total, places))
-      if (isInvoice(row)) { openInvoices += residual; if (date >= startMs && date <= now.getTime()) postedInvoices += total }
-      else { openBills += residual; if (date >= startMs && date <= now.getTime()) postedBills += total }
+      if (isInvoice(row)) { openInvoices += residual; if (history.contains(date)) postedInvoices += total }
+      else { openBills += residual; if (history.contains(date)) postedBills += total }
     }
     const daysOf = (open: bigint, posted: bigint): number | null => posted <= 0n ? null : major(open, places) / major(posted, places) * days
     return { dso: daysOf(openInvoices, postedInvoices), dpo: daysOf(openBills, postedBills) }
@@ -163,7 +173,7 @@ export function buildAccountantInsights(data: AccountantOverviewData, days: Insi
   const cashState = mergeModuleStates([statements.state, currencyState])
   const cash = panel(cashState, () => {
     const places = required(decimals)
-    const byJournal = new Map<string, Array<{ at: number; id: number; closing: bigint }>>()
+    const byJournal = new Map<string, Array<{ at: number; id: bigint; closing: bigint }>>()
     for (const row of statements.rows) {
       if (overviewTag(row.state) === "cancel" || overviewTag(row.state) === "cancelled") continue
       const rowCurrency = key(row.currencyId ?? row.currency_id)
@@ -171,32 +181,29 @@ export function buildAccountantInsights(data: AccountantOverviewData, days: Insi
       if (rowCurrency !== selectedId) continue
       const journal = key(row.journalId ?? row.journal_id)
       if (!journal) throw new Error("bank statement journal unavailable")
-      const at = required(kpiDate(row.date)).getTime()
+      const at = required(accountingDate(row.date, timeZone))
       if (at > now.getTime()) continue
       const closing = required(minor(row.balanceEndReal ?? row.balance_end_real ?? row.balanceEnd ?? row.balance_end, places))
       const list = byJournal.get(journal) ?? []
-      list.push({ at, id: Number(key(row.id)), closing })
+      list.push({ at, id: BigInt(key(row.id)), closing })
       byJournal.set(journal, list)
     }
-    for (const list of byJournal.values()) list.sort((a, b) => a.at - b.at || a.id - b.id)
+    for (const list of byJournal.values()) list.sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     const latestBy = (limitMs: number): { total: bigint; accounts: number; at: number } => {
       let total = 0n, accounts = 0, at = 0
       for (const list of byJournal.values()) {
         const last = [...list].reverse().find((item) => item.at <= limitMs)
         if (!last) continue
-        total += last.closing; accounts += 1; at = Math.max(at, last.at)
+        total += last.closing; at = accounts === 0 ? last.at : Math.max(at, last.at); accounts += 1
       }
       return { total, accounts, at }
     }
     const now_ = latestBy(now.getTime())
-    const months: InsightCashPoint[] = []
-    for (let month = Date.UTC(new Date(startMs).getUTCFullYear(), new Date(startMs).getUTCMonth(), 1); month < endMs;) {
-      const date = new Date(month)
-      const next = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)
-      const point = latestBy(Math.min(next - 1, now.getTime()))
-      months.push({ startMs: month, balance: point.accounts === 0 ? null : major(point.total, places) })
-      month = next
-    }
+    const cashHistory = accountingHistory(historyPeriod, now, timeZone, [...byJournal.values()].flatMap((rows) => rows.map((row) => row.at)))
+    const months: InsightCashPoint[] = cashHistory.buckets.map((bucket) => {
+      const point = latestBy(Math.min(bucket.endMs - 1, now.getTime()))
+      return { startMs: bucket.startMs, label: bucket.label, balance: point.accounts === 0 ? null : major(point.total, places) }
+    })
     return { position: major(now_.total, places), asOfMs: now_.at, accounts: now_.accounts, months }
   })
   const budgetSource = scoped(data.budgets, data)
@@ -208,10 +215,10 @@ export function buildAccountantInsights(data: AccountantOverviewData, days: Insi
       const state = overviewTag(row.state)
       if (!["draft", "confirm", "validate", "done", "cancel"].includes(state)) throw new Error("budget state unavailable")
       if (!["confirm", "validate", "done"].includes(state)) continue
-      const from = required(kpiDate(row.dateFrom ?? row.date_from)).getTime()
-      const to = required(kpiDate(row.dateTo ?? row.date_to)).getTime()
+      const from = required(accountingDate(row.dateFrom ?? row.date_from, timeZone))
+      const to = required(accountingDate(row.dateTo ?? row.date_to, timeZone))
       if (from > to) throw new Error("invalid budget period")
-      if (from > now.getTime() || to < startMs) continue
+      if (from > now.getTime() || (endMs !== null && from >= endMs) || (startMs !== null && to < startMs)) continue
       const planned = required(minor(row.totalPlanned ?? row.total_planned, required(decimals)))
       const actual = required(minor(row.totalPractical ?? row.total_practical, required(decimals)))
       if (typeof row.name !== "string" || !row.name.trim()) throw new Error("budget name unavailable")
@@ -219,5 +226,5 @@ export function buildAccountantInsights(data: AccountantOverviewData, days: Insi
     }
     return rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
   })
-  return { currencies, currency, selectedId, companyCurrencyId, days, startMs, endMs, previousStartMs, asOfMs: now.getTime(), balances, period, aging, budgets, turnover, cash }
+  return { currencies, currency, selectedId, companyCurrencyId, days, historyPeriod, timeZone, buckets: history.buckets, startMs, endMs, previousStartMs, asOfMs: now.getTime(), balances, period, aging, budgets, turnover, cash }
 }

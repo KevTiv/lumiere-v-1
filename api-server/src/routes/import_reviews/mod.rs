@@ -1,10 +1,12 @@
 //! Durable, tenant-scoped source review and approved import workflows.
 //! Business writes use the existing validated native import owner.
 mod capabilities;
+mod farm_import;
 mod history_data;
 mod history_period;
 mod import_binding;
 mod model;
+mod module_backfill;
 mod native_requests;
 #[cfg(test)]
 mod postgres_tests;
@@ -226,8 +228,18 @@ async fn read(
     let batch=client.query_opt("SELECT id::text,title,target_entity,source_file,source_sha256 FROM lumiere_platform.import_review_batch WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND id=$3",&[&org,&company,&id]).await.map_err(ApiError::internal)?.ok_or_else(||ApiError::NotFound("source review not found".into()))?;
     let items=client.query(&format!("SELECT {ITEM_COLUMNS} FROM lumiere_platform.import_review_item WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND batch_id=$3 ORDER BY id LIMIT 1000"),&[&org,&company,&id]).await.map_err(ApiError::internal)?;
     let history=client.query(&format!("{HISTORY_SELECT} WHERE decision.organization_id=$1::text::numeric AND decision.company_id=$2::text::numeric AND item.batch_id=$3 ORDER BY decision.id DESC LIMIT 100"),&[&org,&company,&id]).await.map_err(ApiError::internal)?;
+    let target_entity: String = batch.get("target_entity");
+    let source_items = items
+        .iter()
+        .map(|row| {
+            serde_json::from_value(row.get("source_json"))
+                .map(|item| (row.get("id"), item))
+                .map_err(ApiError::internal)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let review_operations = capabilities::review_operations(&target_entity, &source_items);
     Ok(Json(
-        json!({"id":batch.get::<_,String>("id"),"title":batch.get::<_,String>("title"),"targetEntity":batch.get::<_,String>("target_entity"),"sourceFile":batch.get::<_,String>("source_file"),"sourceSha256":batch.get::<_,String>("source_sha256"),"items":items.iter().map(item_json).collect::<Vec<_>>(),"history":history.iter().map(history_json).collect::<Vec<_>>() }),
+        json!({"id":batch.get::<_,String>("id"),"title":batch.get::<_,String>("title"),"targetEntity":target_entity,"sourceFile":batch.get::<_,String>("source_file"),"sourceSha256":batch.get::<_,String>("source_sha256"),"items":items.iter().map(item_json).collect::<Vec<_>>(),"history":history.iter().map(history_json).collect::<Vec<_>>(),"reviewOperations":review_operations }),
     ))
 }
 
@@ -438,10 +450,37 @@ async fn save_bulk(
     Ok(Json(json!({"results":items})))
 }
 
-const HISTORY_SELECT: &str = "SELECT decision.item_id::text,decision.revision,decision.proposed_json,decision.confirmed_fields,decision.state,decision.reason,decision.actor_identity,decision.created_at::text,coalesce(previous.proposed_json,item.source_json->'proposed') AS previous_values,coalesce(previous.confirmed_fields,'[]'::jsonb) AS previous_confirmed_fields,coalesce(previous.state,'needs_review') AS previous_state FROM lumiere_platform.import_review_decision decision JOIN lumiere_platform.import_review_item item ON item.id=decision.item_id AND item.organization_id=decision.organization_id AND item.company_id=decision.company_id LEFT JOIN lumiere_platform.import_review_decision previous ON previous.item_id=decision.item_id AND previous.organization_id=decision.organization_id AND previous.company_id=decision.company_id AND previous.revision=decision.revision-1";
+// The initial proposal is revision 1 and precedes the first saved decision.
+const HISTORY_SELECT: &str = "SELECT decision.item_id::text, decision.revision, decision.proposed_json,
+    decision.confirmed_fields, decision.state, decision.reason, decision.actor_identity,
+    decision.created_at::text,
+    CASE WHEN previous.revision IS NULL AND decision.revision = 2
+         THEN item.source_json->'proposed' ELSE previous.proposed_json END AS previous_values,
+    CASE WHEN previous.revision IS NULL AND decision.revision = 2
+         THEN '[]'::jsonb ELSE previous.confirmed_fields END AS previous_confirmed_fields,
+    CASE WHEN previous.revision IS NULL AND decision.revision = 2
+         THEN 'needs_review' ELSE previous.state END AS previous_state
+    FROM lumiere_platform.import_review_decision decision
+    JOIN lumiere_platform.import_review_item item ON item.id = decision.item_id
+        AND item.organization_id = decision.organization_id AND item.company_id = decision.company_id
+    LEFT JOIN lumiere_platform.import_review_decision previous ON previous.item_id = decision.item_id
+        AND previous.organization_id = decision.organization_id AND previous.company_id = decision.company_id
+        AND previous.revision = decision.revision - 1";
 
 fn history_json(row: &Row) -> Value {
-    json!({"itemId":row.get::<_,String>("item_id"),"revision":row.get::<_,i32>("revision"),"values":row.get::<_,Value>("proposed_json"),"confirmedFields":row.get::<_,Value>("confirmed_fields"),"state":row.get::<_,String>("state"),"reason":row.get::<_,String>("reason"),"actor":row.get::<_,String>("actor_identity"),"createdAt":row.get::<_,String>("created_at"),"previousValues":row.get::<_,Value>("previous_values"),"previousConfirmedFields":row.get::<_,Value>("previous_confirmed_fields"),"previousState":row.get::<_,String>("previous_state")})
+    json!({
+        "itemId": row.get::<_, String>("item_id"),
+        "revision": row.get::<_, i32>("revision"),
+        "values": row.get::<_, Value>("proposed_json"),
+        "confirmedFields": row.get::<_, Value>("confirmed_fields"),
+        "state": row.get::<_, String>("state"),
+        "reason": row.get::<_, String>("reason"),
+        "actor": row.get::<_, String>("actor_identity"),
+        "createdAt": row.get::<_, String>("created_at"),
+        "previousValues": row.get::<_, Option<Value>>("previous_values"),
+        "previousConfirmedFields": row.get::<_, Option<Value>>("previous_confirmed_fields"),
+        "previousState": row.get::<_, Option<String>>("previous_state"),
+    })
 }
 
 async fn history(
@@ -480,6 +519,15 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/history/source/rows", get(history_data::rows))
         .route("/import-reviews", get(list).post(create))
         .route("/import-reviews/:id", get(read))
+        .route(
+            "/import-reviews/:id/module-backfill",
+            post(module_backfill::write),
+        )
+        .route("/module-backfill/:module", get(module_backfill::read))
+        .route(
+            "/import-reviews/:batch/farm-events",
+            post(farm_import::write),
+        )
         .route("/import-reviews/:batch/items/:item", patch(decide))
         .route("/import-reviews/:batch/decisions", post(decide_bulk))
         .route("/import-reviews/:batch/items/:item/history", get(history))

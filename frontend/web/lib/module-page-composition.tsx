@@ -18,6 +18,7 @@ import { stdbQueryKey } from "@lumiere/query-hooks/hooks/stdb";
 import { fetchQueryList } from "@lumiere/query-hooks/http";
 import {
   getAssistantCapability,
+  parseAssistantActionId,
   type AssistantPageCatalog,
 } from "@lumiere/query-hooks/assistant-actions";
 import {
@@ -32,6 +33,8 @@ import {
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "@lumiere/i18n";
 import { toast } from "sonner";
+import { moduleQueryState, type ModuleDataState } from "@lumiere/ui/lib/module-data-state";
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice";
 import { useRBAC } from "@lumiere/ui/lib/rbac-context";
 import { Button } from "@lumiere/ui/components/button";
 import {
@@ -68,6 +71,11 @@ import {
 import { useStoredDashboardDataSources } from "@/hooks/use-stored-dashboard-data-sources";
 import { assistantHistoryScope } from "./assistant-history";
 import {
+  assistantWidgetReceiptQueryKey,
+  saveAssistantWidgetReceipt,
+  type AssistantWidgetReceipt,
+} from "./assistant-widget-receipts";
+import {
   fetchModulePageLayout,
   modulePageQueryKey,
   saveModulePageLayout,
@@ -83,7 +91,11 @@ export interface AssistantPageRequest {
   kind: "edit_page" | "add_widget";
   widgetKey?: string;
   prompt?: string;
+  origin?: { sessionKey: string; messageId: string };
+  onPresentationOutcome?: (status: AssistantPagePresentationOutcome) => void;
 }
+
+type AssistantPagePresentationOutcome = "editor_opened" | "unavailable" | "scope_changed";
 
 interface RegisteredPage extends AssistantPageCatalog {
   owner: string;
@@ -97,7 +109,7 @@ interface CompositionEnvironment {
   requestPage: (
     request: AssistantPageRequest,
   ) => "pending" | "busy" | "scope_changed";
-  settle: (requestId: string) => void;
+  settle: (requestId: string, status: AssistantPagePresentationOutcome) => void;
   register: (page: RegisteredPage) => () => void;
   isCurrent: (scope: string) => boolean;
 }
@@ -136,10 +148,12 @@ export function ModulePageCompositionProvider({
       setPage((previous) => (previous?.owner === next.owner ? null : previous));
     };
   }, []);
-  const settle = useCallback((requestId: string) => {
-    if (pendingRef.current?.requestId !== requestId) return;
+  const settle = useCallback((requestId: string, status: AssistantPagePresentationOutcome) => {
+    const request = pendingRef.current;
+    if (request?.requestId !== requestId || request.scopeKey !== currentScope.current) return;
     pendingRef.current = null;
     setPending(null);
+    request.onPresentationOutcome?.(status);
   }, []);
   const requestPage = useCallback((request: AssistantPageRequest) => {
     if (
@@ -153,13 +167,19 @@ export function ModulePageCompositionProvider({
       pendingRef.current.expiresAt > Date.now()
     )
       return "busy" as const;
+    const previous = pendingRef.current;
+    previous?.onPresentationOutcome?.(previous.scopeKey === currentScope.current ? "unavailable" : "scope_changed");
     const next = { ...request, expiresAt: Date.now() + 15_000 };
     pendingRef.current = next;
     setPending(next);
     return "pending" as const;
   }, []);
   useEffect(() => {
-    if (pendingRef.current?.scopeKey !== scopeKey) pendingRef.current = null;
+    const request = pendingRef.current;
+    if (request && request.scopeKey !== scopeKey) {
+      pendingRef.current = null;
+      request.onPresentationOutcome?.("scope_changed");
+    }
     setPending((previous) =>
       previous?.scopeKey === scopeKey ? previous : null,
     );
@@ -174,8 +194,8 @@ export function ModulePageCompositionProvider({
           pending.scopeKey !== currentScope.current
         )
           return;
-        settle(pending.requestId);
-        toast.warning(t("aiChat.native.pageUnavailable"));
+        settle(pending.requestId, "unavailable");
+        if (!pending.onPresentationOutcome) toast.warning(t("aiChat.native.pageUnavailable"));
       },
       Math.max(0, pending.expiresAt - Date.now()),
     );
@@ -343,6 +363,10 @@ function ScopedModulePageHost({
     staleTime: 30_000,
     retry: false,
   });
+  const savedCatalogState: ModuleDataState = canReadWidgets
+    ? moduleQueryState(widgetsQuery)
+    : { status: "denied" };
+  const canEditSavedWidgets = canCreateWidgets && savedCatalogState.status === "ready";
   const [draft, setDraft] = useState<PageCompositionValue>(null);
   const [editor, setEditor] = useState<WidgetEditor | null>(null);
   const editorRef = useRef<WidgetEditor | null>(null);
@@ -358,8 +382,8 @@ function ScopedModulePageHost({
   );
   const savedRows = useMemo(
     () =>
-      !canReadWidgets || widgetsQuery.error ? [] : (widgetsQuery.data ?? []),
-    [canReadWidgets, widgetsQuery.data, widgetsQuery.error],
+      savedCatalogState.status === "ready" ? (widgetsQuery.data ?? []) : [],
+    [savedCatalogState.status, widgetsQuery.data],
   );
   const savedById = useMemo(
     () => new Map(savedRows.map((row) => [String(row.id), row])),
@@ -396,6 +420,12 @@ function ScopedModulePageHost({
     },
   );
   const searchParams = useSearchParams();
+  const tab = searchParams?.get("tab") ?? "dashboard";
+  const savedWidgetFocus = searchParams?.get("savedWidgetCompany") === scope.companyId && pageId === tab
+    ? parseAssistantActionId(searchParams.get("savedWidget")) : undefined;
+  const savedPlacement = searchParams?.get("savedWidgetPlacement");
+  const savedPlacementFocus = savedPlacement && /^assistant-[a-f0-9-]{36}$/.test(savedPlacement)
+    ? savedPlacement : undefined;
   const rawPeriod = searchParams?.get("period");
   const periodTimeZone = searchParams?.get("periodTimeZone") ?? "UTC";
   const bounds = useMemo(() => {
@@ -536,7 +566,7 @@ function ScopedModulePageHost({
   }, [canCreateWidgets]);
   const openEditor = (initialDraft?: QueryBuilderDraft) =>
     new Promise<PageWidgetCatalogItem | null>((resolve) => {
-      if (!canCreateWidgets || !isCurrent(scopeKey) || editorRef.current) {
+      if (!canEditSavedWidgets || !isCurrent(scopeKey) || editorRef.current) {
         resolve(null);
         return;
       }
@@ -576,6 +606,30 @@ function ScopedModulePageHost({
     editorRef.current = null;
     setEditor(null);
   };
+  const pendingWidgetOrigins = useRef(new Map<string, NonNullable<AssistantPageRequest["origin"]>>());
+  const widgetOrigins = useRef(new Map<string, Omit<AssistantWidgetReceipt, "moduleId" | "pageId" | "layoutRevision">>());
+  const markAssistantWidget = (requestId: string, placement: PageWidgetPlacement) => {
+    const origin = pendingWidgetOrigins.current.get(requestId);
+    if (!origin || !isCurrent(scopeKey)) return;
+    pendingWidgetOrigins.current.delete(requestId);
+    if (widgetOrigins.current.size >= 64) widgetOrigins.current.clear();
+    widgetOrigins.current.set(placement.id, { ...origin, requestId, widgetId: placement.widgetId });
+  };
+  const recordWidgetReceipt = async (receipt: AssistantWidgetReceipt): Promise<void> => {
+    if (!isCurrent(scopeKey)) return;
+    try {
+      await saveAssistantWidgetReceipt(scope.companyId, receipt);
+      if (isCurrent(scopeKey)) {
+        await queryClient.invalidateQueries({
+          queryKey: assistantWidgetReceiptQueryKey(scopeKey, receipt.sessionKey),
+        });
+      }
+    } catch {
+      if (isCurrent(scopeKey)) toast.warning(t("aiChat.history.widgetReceiptFailed", {
+        defaultValue: "The widget was saved. Its conversation link needs another attempt.",
+      }), { action: { label: t("common.retry"), onClick: () => void recordWidgetReceipt(receipt) } });
+    }
+  };
   const onSave = async (
     placements: PageCompositionValue,
     expectedRevision: string | null,
@@ -606,6 +660,15 @@ function ScopedModulePageHost({
       if (!isCurrent(scopeKey)) return;
       queryClient.setQueryData(queryKey, next);
       await queryClient.invalidateQueries({ queryKey, refetchType: "none" });
+      const origins = widgetOrigins.current;
+      widgetOrigins.current = new Map();
+      if (next.revision && next.layout) {
+        for (const placement of next.layout.widgets) {
+          const origin = origins.get(placement.id);
+          if (!origin || placement.source !== "saved" || placement.widgetId !== origin.widgetId) continue;
+          void recordWidgetReceipt({ ...origin, moduleId: scope.moduleId, pageId, layoutRevision: next.revision });
+        }
+      }
     } catch (error) {
       if (error instanceof ModulePageLayoutError && error.status === 409) {
         void layout.refetch();
@@ -632,6 +695,13 @@ function ScopedModulePageHost({
           prompt: pending.prompt,
         }
       : null;
+  const handleAssistantRequest = (requestId: string) => {
+    if (pending?.requestId === requestId && pending.origin) {
+      if (pendingWidgetOrigins.current.size >= 64) pendingWidgetOrigins.current.clear();
+      pendingWidgetOrigins.current.set(requestId, pending.origin);
+    }
+    settle(requestId, "editor_opened");
+  };
   if (!permitted) return <>{children}</>;
   const insights = placement === "insights";
   return (
@@ -661,18 +731,25 @@ function ScopedModulePageHost({
             </Button>
           </div>
         )}
+        {!layout.error && displayedSavedIds.length > 0 && savedCatalogState.status === "error" && (
+          <ModuleDataNotice state={savedCatalogState} />
+        )}
         <PageComposition
           value={layout.error ? null : (layout.data?.layout?.widgets ?? null)}
           defaultValue={defaultValue}
           catalog={catalog}
+          savedCatalogState={savedCatalogState}
           revision={layout.data?.revision ?? null}
           canEdit={permitted && !layout.error && layout.isSuccess}
           isLoading={isLoading || layout.isPending}
           onSave={onSave}
           onDraftChange={setDraft}
-          onCreateWidget={canCreateWidgets ? () => openEditor() : undefined}
+          focusSavedWidgetId={savedWidgetFocus}
+          focusSavedPlacementId={savedPlacementFocus}
+          onAssistantWidgetPlaced={markAssistantWidget}
+          onCreateWidget={canEditSavedWidgets ? () => openEditor() : undefined}
           onConfigureWidget={
-            canCreateWidgets
+            canEditSavedWidgets
               ? (placement: PageWidgetPlacement) => {
                   const row = savedById.get(placement.widgetId);
                   const initial = row ? queryBuilderDraftFromWidget(row) : null;
@@ -681,7 +758,7 @@ function ScopedModulePageHost({
               : undefined
           }
           request={request}
-          onRequestHandled={settle}
+          onRequestHandled={handleAssistantRequest}
           actionTarget={actionTarget}
           insights={insights}
           scopeNote={
@@ -725,6 +802,7 @@ function ScopedModulePageHost({
                   dashboards={[]}
                   initialDraft={editor.initialDraft}
                   pageTitle={title}
+                  historyBounds={bounds}
                   status={editorStatus}
                   onStatusChange={setEditorStatus}
                   onCreated={onCreated}

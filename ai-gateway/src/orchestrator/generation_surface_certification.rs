@@ -50,7 +50,7 @@ pub(crate) const KEYS: [&str; 3] = [
     "form_suggestion",
     "action_draft_generation",
 ];
-pub(crate) const VERSION: &str = "1.0.0";
+pub(crate) const VERSION: &str = "1.0.3";
 
 // Release helpers below the route modules and the local crates that implement
 // scoped reads/authentication. Explicit at compile time; never filesystem discovery.
@@ -72,6 +72,14 @@ const RELEASE_HELPERS: &[(&str, &[u8])] = &[
     (
         "rag_attachments.rs",
         include_bytes!("../routes/rag_attachments.rs"),
+    ),
+    (
+        "rag_conversation.rs",
+        include_bytes!("../routes/rag_conversation.rs"),
+    ),
+    (
+        "rag_history_references.rs",
+        include_bytes!("../routes/rag_history_references.rs"),
     ),
     (
         "rag_spreadsheet.rs",
@@ -958,6 +966,8 @@ mod tests {
         for required in [
             "rag_context.rs",
             "rag_attachments.rs",
+            "rag_conversation.rs",
+            "rag_history_references.rs",
             "rag_spreadsheet.rs",
             "rag_import_tasks.rs",
             "evidence.rs",

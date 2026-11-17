@@ -3,6 +3,54 @@ import { writeFile } from "node:fs/promises";
 
 const expect = baseExpect.configure({ timeout: 15_000 });
 
+test("Warehouse switches stock and its related sources together", async ({ page }) => {
+  // The dev server prewarms /product-fleet, so the first visit here compiles Inventory.
+  test.setTimeout(120_000);
+  const scopedResources = ["stock-quants", "stock-pickings", "stock-moves", "warehouses", "stock-locations", "stock-production-lots", "replenishment-rules"];
+  const paths = new Map<string, Set<string>>();
+  await page.route("**/api/query/**", async (route) => {
+    const url = new URL(route.request().url());
+    const resource = url.pathname.split("/").at(-1)!;
+    const company = url.searchParams.get("companyId") ?? "unscoped";
+    if (scopedResources.includes(resource)) {
+      if (!paths.has(company)) paths.set(company, new Set());
+      paths.get(company)!.add(resource);
+    }
+    const companyId = company === "22" ? "22" : "11";
+    const locationId = companyId === "22" ? "219" : "119";
+    const fixtures = {
+      companies: [{ id: "11", organizationId: "7" }, { id: "22", organizationId: "7" }],
+      products: [{ id: "41", name: "Coffee beans", defaultCode: "COF-001", uomId: "13" }],
+      uoms: [{ id: "13", name: "Unit" }],
+      "stock-quants": [{
+        id: `${companyId}1`, organizationId: "7", companyId, productId: "41",
+        locationId, quantity: companyId === "22" ? 45 : 15, availableQuantity: companyId === "22" ? 45 : 15,
+      }],
+      "stock-locations": [{
+        id: locationId, organizationId: "7", companyId, active: true, usage: "internal",
+        name: companyId === "22" ? "Musanze Bin" : "Kigali Bin",
+      }],
+      warehouses: [{
+        id: `${companyId}2`, organizationId: "7", companyId, active: true, lotStockId: locationId,
+        inTypeId: 1, outTypeId: 2, intTypeId: 3, packTypeId: 4, pickTypeId: 5,
+      }],
+    };
+    const data = fixtures[resource as keyof typeof fixtures] ?? [];
+    await route.fulfill({ json: { data } });
+  });
+
+  await page.goto("/warehouse-company-scope");
+  const warehouse = page.getByTestId("module-view-warehouse");
+  await expect(warehouse.getByRole("cell", { name: "Kigali Bin", exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Switch company" }).click();
+  await expect(warehouse.getByRole("cell", { name: "Musanze Bin", exact: true }).first()).toBeVisible();
+  await expect(warehouse.getByRole("cell", { name: "Kigali Bin", exact: true })).toHaveCount(0);
+  await expect.poll(() => ["11", "22"].map((companyId) =>
+    scopedResources.every((resource) => paths.get(companyId)?.has(resource)),
+  )).toEqual([true, true]);
+  expect(paths.has("unscoped")).toBe(false);
+});
+
 test("canvas controls fit their container and retain stock state", { tag: "@aside-fit" }, async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 850 });
   await page.goto("/canvas-controls");
@@ -147,6 +195,102 @@ test("dense tables keep aligned headings, full amounts, and keyboard disclosure"
 });
 
 for (const width of [390, 1440]) {
+  test(`Inventory stock and transfer workspaces share the responsive table layout at ${width}px`, async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize({ width, height: 900 });
+    await openWorkspace(page, "inventory");
+
+    const workspace = page.getByTestId("module-view-inventory");
+    const overview = workspace.getByTestId(
+      "module-workspace-inventory-overview",
+    );
+    const stock = workspace.getByTestId("module-workspace-inventory-stock");
+    const movements = workspace.getByTestId(
+      "module-workspace-inventory-movements",
+    );
+    await expect(overview).toHaveAttribute("aria-current", "page");
+    await expect(
+      workspace.getByTestId("module-panel-inventory-dashboard"),
+    ).toBeVisible();
+    await stock.press("Enter");
+    await expect(page).toHaveURL((url) => url.searchParams.get("tab") === "stock");
+    await expect(stock).toHaveAttribute("aria-current", "page");
+    const stockPanel = workspace.getByTestId("module-panel-inventory-stock");
+    const stockTable = stockPanel.getByRole("table");
+    await expect(stockTable).toContainText("Arabica coffee beans");
+    for (const heading of ["On Hand", "Reserved", "Available", "Counted"]) {
+      await expect(
+        stockTable.getByRole("columnheader", { name: heading, exact: true }),
+      ).toBeVisible();
+    }
+    const stockLayout = await stockPanel.evaluate((panel) => {
+      const nav = panel
+        .closest('[data-testid="module-view-inventory"]')!
+        .querySelector('[data-ui="workspace-nav"]')!;
+      const toolbar = panel.querySelector('[data-testid="entity-table-toolbar"]')!;
+      const viewport = panel.querySelector('[data-slot="table-container"]')!;
+      return {
+        navBottom: nav.getBoundingClientRect().bottom,
+        toolbarTop: toolbar.getBoundingClientRect().top,
+        panelWidth: panel.getBoundingClientRect().width,
+        viewportWidth: viewport.getBoundingClientRect().width,
+        tableOverflow: viewport.scrollWidth - viewport.clientWidth,
+        documentOverflow: document.documentElement.scrollWidth - innerWidth,
+      };
+    });
+    expect(stockLayout.toolbarTop).toBeGreaterThanOrEqual(stockLayout.navBottom);
+    expect(
+      Math.abs(stockLayout.panelWidth - stockLayout.viewportWidth),
+    ).toBeLessThanOrEqual(2);
+    expect(stockLayout.documentOverflow).toBeLessThanOrEqual(1);
+    if (width === 390) expect(stockLayout.tableOverflow).toBeGreaterThan(0);
+
+    await chooseFacet(page, "Location", "Musanze / Stock");
+    await expect(stockTable.getByRole("row")).toHaveCount(2);
+    await expect(stockTable).toContainText("Reusable delivery crate");
+    await movements.press("Enter");
+    await expect(page).toHaveURL((url) => url.searchParams.get("tab") === "transfers");
+    await expect(movements).toHaveAttribute("aria-current", "page");
+    const transfers = workspace.getByTestId("module-panel-inventory-transfers");
+    await expect(
+      transfers.getByRole("columnheader", { name: "Task", exact: true }),
+    ).toBeVisible();
+    await expect(transfers).toContainText("IN-00052");
+    await page.goBack();
+    await expect(page).toHaveURL((url) => url.searchParams.get("tab") === "stock");
+    await expect(stockPanel).toBeVisible();
+
+    await openWorkspace(
+      page,
+      "inventory",
+      "&tab=stock&filter=warehouseLocationId:22",
+    );
+    const location = stockPanel
+      .getByTestId("entity-table-toolbar")
+      .getByRole("button", { name: "Location", exact: true });
+    await expect(location).toContainText("Musanze / Stock");
+    await expect(stockTable.getByRole("row")).toHaveCount(2);
+    await location.click();
+    await page.getByRole("button", { name: "Clear filter", exact: true }).click();
+    await page.keyboard.press("Escape");
+    await expect(stockTable.getByRole("row")).toHaveCount(4);
+    await expect(page).toHaveURL((url) => !url.searchParams.has("filter"));
+
+    await openWorkspace(page, "inventory", "&tab=transfers&filter=id:52");
+    await expect(movements).toHaveAttribute("aria-current", "page");
+    const focusedTransfer = transfers.getByTestId("entity-row-52");
+    await expect(focusedTransfer).toContainText("IN-00052");
+    await expect(transfers.getByTestId("entity-active-filter-id")).toContainText(
+      "id: 52",
+    );
+    await expect(transfers.locator('[data-testid^="entity-row-"]')).toHaveCount(1);
+    await page.reload();
+    await expect(focusedTransfer).toBeVisible();
+    await expect(transfers.locator('[data-testid^="entity-row-"]')).toHaveCount(1);
+  });
+
   test(`product catalog filters and scope at ${width}px`, async ({ page }) => {
     test.setTimeout(60_000);
     await page.setViewportSize({ width, height: 900 });

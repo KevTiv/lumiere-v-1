@@ -1,8 +1,8 @@
 //! Scoped inventory query handlers.
 
 use super::company_scope::company_ids_for_organization;
-use super::company_scope::default_company_id;
-use super::row_values::row_company_matches;
+use super::company_scope::resolve_inventory_company_id;
+use super::row_values::{row_company_matches, row_u64};
 use crate::error::ApiError;
 use serde_json::Value;
 use std::collections::HashSet;
@@ -21,6 +21,35 @@ pub(super) fn filter_inventory_company_rows(
     // company members within the organization.
     let allow_shared = matches!(resource, "product-categories");
     rows.retain(|row| row_company_matches(row, company_id, allow_shared));
+}
+
+pub(super) async fn filter_warehouse_zone_company_rows(
+    client: &StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    rows: &mut Vec<Value>,
+) -> Result<(), ApiError> {
+    let warehouses = client
+        .query_sql(&format!(
+            "SELECT id FROM warehouse WHERE organization_id = {organization_id} AND company_id = {company_id}"
+        ))
+        .await
+        .map_err(ApiError::internal)?;
+    let warehouse_ids = warehouses
+        .iter()
+        .filter_map(|warehouse| row_u64(warehouse, "id", "id").ok().flatten())
+        .collect();
+    retain_warehouse_zone_rows(rows, &warehouse_ids);
+    Ok(())
+}
+
+pub(super) fn retain_warehouse_zone_rows(rows: &mut Vec<Value>, warehouse_ids: &HashSet<u64>) {
+    rows.retain(|row| {
+        row_u64(row, "warehouseId", "warehouse_id")
+            .ok()
+            .flatten()
+            .is_some_and(|warehouse| warehouse_ids.contains(&warehouse))
+    });
 }
 
 pub(super) async fn read_pos_configs(
@@ -125,11 +154,13 @@ pub(super) async fn read_delivery_carriers(
     client: &StdbClient,
     resource: &str,
     organization_id: u64,
+    identity_hex: &str,
+    requested_company_id: Option<u64>,
     fa: Option<&FieldAccessContext>,
 ) -> Result<Vec<Value>, ApiError> {
-    let Some(cid) = default_company_id(client, organization_id).await? else {
-        return Ok(vec![]);
-    };
+    let cid =
+        resolve_inventory_company_id(client, organization_id, identity_hex, requested_company_id)
+            .await?;
     let reg = registry_get(resource)
         .ok_or_else(|| ApiError::NotFound(format!("unknown resource: {resource}")))?;
     let sql = select_company_scoped_sql(resource, &reg.table, cid, fa, "", "")
@@ -162,5 +193,29 @@ pub(super) fn sort_inventory_rows(resource: &str, rows: &mut [Value]) {
             });
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn warehouse_zones_follow_their_warehouse_company() {
+        let mut rows = vec![
+            json!({"id": 1, "warehouse_id": 6}),
+            json!({"id": 2, "warehouseId": "7"}),
+            json!({"id": 3, "warehouse_id": 8}),
+            json!({"id": 4, "warehouse_id": null}),
+        ];
+        retain_warehouse_zone_rows(&mut rows, &HashSet::from([6, 7]));
+        assert_eq!(
+            rows,
+            vec![
+                json!({"id": 1, "warehouse_id": 6}),
+                json!({"id": 2, "warehouseId": "7"}),
+            ]
+        );
     }
 }

@@ -192,10 +192,10 @@ impl LumiereStdbExt for StdbClient {
             json!([
                 organization_id,
                 {
-                    "companyId": null,
+                    "company_id": {"none": []},
                     "name": EMBEDDING_WORKER_NAME,
                     "queues": [EMBEDDING_QUEUE],
-                    "metadata": "{\"service\":\"ai-gateway\"}",
+                    "metadata": {"some": "{\"service\":\"ai-gateway\"}"},
                 }
             ]),
         ))
@@ -224,20 +224,42 @@ impl LumiereStdbExt for StdbClient {
                 organization_id,
                 job_id,
                 {
-                    "expectedRevision": expected_revision,
-                    "workerId": worker_id,
-                    "leaseToken": lease_token,
-                    "leaseExpiresAtMicros": lease_expires_at_micros,
+                    "expected_revision": expected_revision,
+                    "worker_id": worker_id,
+                    "lease_token": lease_token,
+                    "lease_expires_at_micros": lease_expires_at_micros,
                 }
             ]),
         ))
         .await
         .map_err(|error| anyhow::anyhow!("{error}"))?;
-        Ok(QueueLease {
+        // Reducer success can also mean an exhausted expired claim was
+        // dead-lettered. Only persisted, current lease evidence permits work.
+        let rows = self
+            .query_sql(&format!(
+                "SELECT id, organization_id, queue_name, status, revision, lease_worker_id, \
+                 lease_token, lease_expires_at FROM queue_job \
+                 WHERE organization_id = {organization_id} AND id = {job_id} LIMIT 2"
+            ))
+            .await?;
+        anyhow::ensure!(
+            rows.len() == 1,
+            "embedding claim readback is missing or ambiguous"
+        );
+        let lease = QueueLease {
             worker_id,
             token: lease_token.to_string(),
             claimed_revision,
-        })
+        };
+        require_persisted_embedding_lease(
+            &rows[0],
+            organization_id,
+            job_id,
+            &lease,
+            lease_expires_at_micros,
+            chrono::Utc::now().timestamp_micros(),
+        )?;
+        Ok(lease)
     }
 
     async fn complete_queue_job(
@@ -294,6 +316,35 @@ impl LumiereStdbExt for StdbClient {
     }
 }
 
+fn require_persisted_embedding_lease(
+    row: &Value,
+    organization_id: u64,
+    job_id: u64,
+    lease: &QueueLease,
+    requested_expiry_micros: u64,
+    now_micros: i64,
+) -> anyhow::Result<()> {
+    let expiry = row
+        .get("leaseExpiresAt")
+        .or_else(|| row.get("lease_expires_at"))
+        .and_then(|value| value.get("microsSinceUnixEpoch"))
+        .and_then(Value::as_i64);
+    anyhow::ensure!(
+        u64_field(row, "id", "id") == Some(job_id)
+            && u64_field(row, "organizationId", "organization_id") == Some(organization_id)
+            && string_field(row, "queueName", "queue_name").as_deref() == Some(EMBEDDING_QUEUE)
+            && string_field(row, "status", "status").as_deref() == Some("Leased")
+            && u64_field(row, "revision", "revision") == Some(lease.claimed_revision)
+            && u64_field(row, "leaseWorkerId", "lease_worker_id") == Some(lease.worker_id)
+            && string_field(row, "leaseToken", "lease_token").as_deref() == Some(&lease.token)
+            && expiry.is_some_and(|expiry| {
+                expiry > now_micros && u64::try_from(expiry).ok() == Some(requested_expiry_micros)
+            }),
+        "embedding claim did not persist the requested active lease"
+    );
+    Ok(())
+}
+
 fn active_embedding_worker_id(rows: Vec<Value>) -> Option<u64> {
     rows.into_iter().find_map(|row| {
         let is_active = row
@@ -337,19 +388,27 @@ fn completion_params(
     let (outcome, error_summary, response_fingerprint, jitter) = match completion {
         QueueCompletion::Succeeded {
             response_fingerprint,
-        } => ("Succeeded", None, Some(response_fingerprint), 0),
-        QueueCompletion::Failed { error_summary } => {
-            ("Failed", Some(error_summary), None, retry_jitter_micros)
-        }
+        } => (
+            json!({"succeeded": []}),
+            json!({"none": []}),
+            json!({"some": response_fingerprint}),
+            0,
+        ),
+        QueueCompletion::Failed { error_summary } => (
+            json!({"failed": []}),
+            json!({"some": error_summary}),
+            json!({"none": []}),
+            retry_jitter_micros,
+        ),
     };
     json!({
-        "expectedRevision": lease.claimed_revision,
-        "workerId": lease.worker_id,
-        "leaseToken": lease.token,
+        "expected_revision": lease.claimed_revision,
+        "worker_id": lease.worker_id,
+        "lease_token": lease.token,
         "outcome": outcome,
-        "errorSummary": error_summary,
-        "responseFingerprint": response_fingerprint,
-        "retryJitterMicros": jitter,
+        "error_summary": error_summary,
+        "response_fingerprint": response_fingerprint,
+        "retry_jitter_micros": jitter,
     })
 }
 
@@ -399,17 +458,28 @@ pub async fn embedding_index_state_for_job(
     }
     let rows = stdb
         .query_sql(&format!(
-            "SELECT id, organization_id, company_id, expected_fingerprint, index_generation, sync_status \
+            "SELECT id, organization_id, company_id, content_type, content_id, expected_fingerprint, index_generation, sync_status \
              FROM search_embedding WHERE organization_id = {organization_id} \
-             AND company_id = {} AND content_type = '{}' AND content_id = {} LIMIT 1",
-            payload.company_id, payload.content_type, payload.content_id
+             AND content_type = '{}' AND content_id = {} LIMIT 2",
+            payload.content_type, payload.content_id
         ))
         .await
         .map_err(|error| anyhow::anyhow!("{error}"))?;
-    let row = rows
-        .into_iter()
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("embedding index state is missing"))?;
+    // HTTP SQL cannot compare nullable company_id to a scalar. Resolve the
+    // exact content reference, then enforce its decoded company ownership.
+    anyhow::ensure!(
+        rows.len() == 1,
+        "embedding index state is missing or ambiguous"
+    );
+    let row = &rows[0];
+    anyhow::ensure!(
+        u64_field(row, "organizationId", "organization_id") == Some(organization_id)
+            && u64_field(row, "companyId", "company_id") == Some(payload.company_id)
+            && u64_field(row, "contentId", "content_id") == Some(payload.content_id)
+            && string_field(row, "contentType", "content_type").as_deref()
+                == Some(payload.content_type.as_str()),
+        "embedding index state scope or content reference mismatch"
+    );
     let fingerprint = string_field(&row, "expectedFingerprint", "expected_fingerprint")
         .ok_or_else(|| anyhow::anyhow!("embedding index fingerprint is missing"))?;
     if fingerprint != payload.expected_fingerprint {
@@ -480,6 +550,94 @@ fn validate_canonical_passage(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn nullable_company_index_read_rejects_foreign_or_ambiguous_results() {
+        use axum::{http::HeaderMap, routing::post, Json, Router};
+        let option = |inner: Value| {
+            json!({"Sum":{"variants":[
+                {"name":{"some":"some"},"algebraic_type":inner},
+                {"name":{"some":"none"},"algebraic_type":{"Product":{"elements":[]}}}
+            ]}})
+        };
+        let elements = [
+            ("id", json!({"U64":[]})),
+            ("organization_id", json!({"U64":[]})),
+            ("company_id", option(json!({"U64":[]}))),
+            ("content_type", json!({"String":[]})),
+            ("content_id", json!({"U64":[]})),
+            ("expected_fingerprint", json!({"String":[]})),
+            ("index_generation", json!({"String":[]})),
+            ("sync_status", json!({"String":[]})),
+        ]
+        .into_iter()
+        .map(|(name, kind)| json!({"name":{"some":name},"algebraic_type":kind}))
+        .collect::<Vec<_>>();
+        let valid = json!([
+            41,
+            1,
+            [0, 2],
+            "ai_evidence_passage",
+            9,
+            payload().expected_fingerprint,
+            "qdrant-v1",
+            "pending"
+        ]);
+        let mut cases = vec![
+            (vec![valid.clone()], true),
+            (vec![], false),
+            (vec![valid.clone(), valid.clone()], false),
+        ];
+        for (column, value) in [
+            (1, json!(3)),
+            (2, json!([0, 3])),
+            (2, json!([1, []])),
+            (2, json!([0, "malformed"])),
+            (3, json!("other")),
+            (4, json!(10)),
+            (5, json!("stale-fingerprint")),
+            (6, json!("old-generation")),
+            (7, json!("synced")),
+        ] {
+            let mut row = valid.clone();
+            row[column] = value;
+            cases.push((vec![row], false));
+        }
+        for (rows, expected) in cases {
+            let body = json!([{"schema":{"elements":elements},"rows":rows}]);
+            let app = Router::new().route(
+                "/v1/database/test/sql",
+                post(move |headers: HeaderMap, sql: String| {
+                    let body = body.clone();
+                    async move {
+                        assert_eq!(headers["authorization"], "Bearer embedding-actor");
+                        assert!(!sql.contains("company_id ="));
+                        assert!(sql.contains("organization_id = 1"));
+                        assert!(
+                            sql.contains("content_type = 'ai_evidence_passage' AND content_id = 9")
+                        );
+                        assert!(sql.ends_with("LIMIT 2"));
+                        Json(body)
+                    }
+                }),
+            );
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+            let client = StdbClient::new(
+                format!("http://{address}"),
+                "test".into(),
+                "embedding-actor".into(),
+            )
+            .with_http_client(reqwest::Client::builder().no_proxy().build().unwrap());
+            let result = embedding_index_state_for_job(&client, 1, &payload()).await;
+            server.abort();
+            assert_eq!(result.is_ok(), expected, "{result:?}");
+            if expected {
+                assert_eq!(result.unwrap().id, 41);
+            }
+        }
+    }
 
     fn payload() -> EmbedJobPayload {
         let fingerprint = format!("{:x}", Sha256::digest(b"canonical text"));
@@ -555,11 +713,225 @@ mod tests {
             },
             42,
         );
-        assert_eq!(params["expectedRevision"], 4);
-        assert_eq!(params["workerId"], 17);
-        assert_eq!(params["leaseToken"], "opaque-token");
-        assert_eq!(params["outcome"], "Succeeded");
-        assert_eq!(params["responseFingerprint"], "indexed:abc123");
-        assert_eq!(params["retryJitterMicros"], 0);
+        assert_eq!(params["expected_revision"], 4);
+        assert_eq!(params["worker_id"], 17);
+        assert_eq!(params["lease_token"], "opaque-token");
+        assert_eq!(params["outcome"], json!({"succeeded": []}));
+        assert_eq!(params["error_summary"], json!({"none": []}));
+        assert_eq!(
+            params["response_fingerprint"],
+            json!({"some": "indexed:abc123"})
+        );
+        assert_eq!(params["retry_jitter_micros"], 0);
+        let failure = completion_params(
+            &lease,
+            QueueCompletion::Failed {
+                error_summary: "synthetic failure",
+            },
+            42,
+        );
+        assert_eq!(failure["outcome"], json!({"failed": []}));
+        assert_eq!(
+            failure["error_summary"],
+            json!({"some": "synthetic failure"})
+        );
+        assert_eq!(failure["response_fingerprint"], json!({"none": []}));
+        assert_eq!(failure["retry_jitter_micros"], 42);
+    }
+
+    #[test]
+    fn claim_readback_requires_exact_scope_revision_and_live_lease() {
+        let lease = QueueLease {
+            worker_id: 17,
+            token: "opaque-token".into(),
+            claimed_revision: 4,
+        };
+        let row = json!({
+            "id": 9, "organizationId": 1, "queueName": "embedding",
+            "status": "Leased", "revision": 4, "leaseWorkerId": 17,
+            "leaseToken": "opaque-token", "leaseExpiresAt": {"microsSinceUnixEpoch": 200},
+        });
+        require_persisted_embedding_lease(&row, 1, 9, &lease, 200, 100).unwrap();
+        for (key, invalid) in [
+            ("id", json!(10)),
+            ("organizationId", json!(2)),
+            ("queueName", json!("other")),
+            ("status", json!("DeadLettered")),
+            ("revision", json!(5)),
+            ("leaseWorkerId", json!(18)),
+            ("leaseWorkerId", Value::Null),
+            ("leaseToken", json!("foreign-token")),
+            ("leaseToken", Value::Null),
+            ("leaseExpiresAt", json!({"microsSinceUnixEpoch": 100})),
+            ("leaseExpiresAt", json!({"microsSinceUnixEpoch": 201})),
+            ("leaseExpiresAt", Value::Null),
+        ] {
+            let mut invalid_row = row.clone();
+            invalid_row[key] = invalid;
+            assert!(
+                require_persisted_embedding_lease(&invalid_row, 1, 9, &lease, 200, 100).is_err(),
+                "accepted invalid {key}"
+            );
+        }
+        assert!(require_persisted_embedding_lease(&row, 1, 9, &lease, 200, 200).is_err());
+    }
+
+    #[tokio::test]
+    async fn reducer_success_requires_real_sats_lease_readback_without_retry() {
+        use axum::{http::StatusCode, routing::post, Json, Router};
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
+
+        let option = |kind: Value| {
+            json!({"Sum":{"variants":[
+                {"name":{"some":"some"},"algebraic_type":kind},
+                {"name":{"some":"none"},"algebraic_type":{"Product":{"elements":[]}}}
+            ]}})
+        };
+        let elements: Vec<_> = [
+            ("id", json!({"U64":[]})),
+            ("organization_id", json!({"U64":[]})),
+            ("queue_name", json!({"String":[]})),
+            (
+                "status",
+                json!({"Sum":{"variants":[
+                    {"name":{"some":"leased"},"algebraic_type":{"Product":{"elements":[]}}},
+                    {"name":{"some":"deadLettered"},"algebraic_type":{"Product":{"elements":[]}}}
+                ]}}),
+            ),
+            ("revision", json!({"U64":[]})),
+            ("lease_worker_id", option(json!({"U64":[]}))),
+            ("lease_token", option(json!({"String":[]}))),
+            (
+                "lease_expires_at",
+                option(json!({"Product":{"elements":[{
+                    "name":{"some":"__timestamp_micros_since_unix_epoch__"},
+                    "algebraic_type":{"I64":[]}
+                }]}})),
+            ),
+        ]
+        .into_iter()
+        .map(|(name, kind)| json!({"name":{"some":name},"algebraic_type":kind}))
+        .collect();
+        let expiry = chrono::Utc::now().timestamp_micros() as u64 + 300_000_000;
+        let active = json!([
+            9,
+            1,
+            "embedding",
+            [0, []],
+            4,
+            [0, 17],
+            [0, "opaque-token"],
+            [0, [expiry]]
+        ]);
+        let dead_lettered = json!([9, 1, "embedding", [1, []], 4, [1, []], [1, []], [1, []]]);
+        for (rows, read_status, succeeds) in [
+            (vec![active.clone()], StatusCode::OK, true),
+            (vec![dead_lettered], StatusCode::OK, false),
+            (vec![], StatusCode::OK, false),
+            (vec![active.clone(), active.clone()], StatusCode::OK, false),
+            (vec![active.clone()], StatusCode::SERVICE_UNAVAILABLE, false),
+        ] {
+            let calls = Arc::new(AtomicUsize::new(0));
+            let reads = Arc::new(AtomicUsize::new(0));
+            let claim_calls = calls.clone();
+            let query_reads = reads.clone();
+            let body = json!([{"schema":{"elements":elements},"rows":rows}]);
+            let app = Router::new()
+                .route(
+                    "/v1/database/test/call/claim_queue_job",
+                    post(move |Json(args): Json<Value>| {
+                        claim_calls.fetch_add(1, Ordering::SeqCst);
+                        assert_eq!(args[0], 1);
+                        assert_eq!(args[1], 9);
+                        assert_eq!(
+                            args[2],
+                            json!({
+                                "expected_revision": 3, "worker_id": 17,
+                                "lease_token": "opaque-token", "lease_expires_at_micros": expiry,
+                            })
+                        );
+                        async { StatusCode::OK }
+                    }),
+                )
+                .route(
+                    "/v1/database/test/sql",
+                    post(move |statement: String| {
+                        query_reads.fetch_add(1, Ordering::SeqCst);
+                        assert!(statement.contains("WHERE organization_id = 1 AND id = 9 LIMIT 2"));
+                        let body = body.clone();
+                        async move { (read_status, Json(body)) }
+                    }),
+                );
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+            let client = StdbClient::new(
+                format!("http://{address}"),
+                "test".into(),
+                "synthetic-local-token".into(),
+            );
+            let result = client
+                .claim_queue_job(1, 9, 3, 17, "opaque-token", expiry)
+                .await;
+            assert_eq!(result.is_ok(), succeeds, "{result:?}");
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            assert_eq!(reads.load(Ordering::SeqCst), 1);
+            server.abort();
+        }
+    }
+
+    /// Run only against the isolated fixture created by the loopback proof.
+    /// Native claim success on its exhausted job must not yield a usable lease.
+    #[tokio::test]
+    #[ignore = "requires isolated loopback native queue fixtures"]
+    async fn native_embedding_queue_transport_and_terminal_claim() {
+        let host = std::env::var("EMBEDDING_QUEUE_PROOF_HOST").unwrap();
+        let url = reqwest::Url::parse(&host).unwrap();
+        assert_eq!(url.scheme(), "http");
+        assert_eq!(url.host_str(), Some("127.0.0.1"));
+        let scope = |key| std::env::var(key).unwrap().parse::<u64>().unwrap();
+        let client = StdbClient::new(
+            host,
+            std::env::var("EMBEDDING_QUEUE_PROOF_MODULE").unwrap(),
+            std::env::var("EMBEDDING_QUEUE_PROOF_TOKEN").unwrap(),
+        );
+        let org = scope("EMBEDDING_QUEUE_PROOF_ORG");
+        let job = scope("EMBEDDING_QUEUE_PROOF_JOB");
+        let exhausted_job = scope("EMBEDDING_QUEUE_PROOF_EXHAUSTED_JOB");
+        let worker = client.ensure_embedding_worker(org).await.unwrap();
+        // Also exercise persisted registration recovery and heartbeat.
+        assert_eq!(client.ensure_embedding_worker(org).await.unwrap(), worker);
+        let expiry = chrono::Utc::now().timestamp_micros() as u64 + 300_000_000;
+        let lease = client
+            .claim_queue_job(org, job, 0, worker, "proof-lease", expiry)
+            .await
+            .unwrap();
+        client
+            .complete_queue_job(
+                org,
+                job,
+                &lease,
+                QueueCompletion::Failed {
+                    error_summary: "synthetic retry",
+                },
+                0,
+            )
+            .await
+            .unwrap();
+        assert!(client
+            .claim_queue_job(org, exhausted_job, 1, worker, "must-not-dispatch", expiry,)
+            .await
+            .is_err());
+        let rows = client
+            .query_sql(&format!(
+                "SELECT status, lease_token FROM queue_job WHERE id = {exhausted_job}"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(rows[0]["status"], "DeadLettered");
+        assert!(rows[0]["leaseToken"].is_null());
     }
 }

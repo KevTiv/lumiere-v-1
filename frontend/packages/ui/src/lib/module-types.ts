@@ -45,7 +45,7 @@ export interface EntityRecordSheetConfig {
   /** Additional tabs rendered as ReactNode slots */
   customTabs?: EntityRecordSheetTab[]
   /** Optional action buttons rendered in the header area */
-  actions?: ReactNode | ((record: EntityRow) => ReactNode)
+  actions?: ReactNode | ((record: EntityRow, close: () => void) => ReactNode)
   /** SpacetimeDB snake_case table name for the Audit tab filter */
   auditTableName?: string
   /** Adds a Discussion tab with the record's notes, followers and attachments. */

@@ -28,12 +28,12 @@ export async function POST(request: NextRequest) {
   const gateway = await fetchAiGateway("/v1/skills/distributor/delivery-run-summary", {
     method: "POST",
     body: JSON.stringify({
-      org_id: orgId,
-      company_id: companyId,
-      include_done: bodyResult.body.includeDone === true || bodyResult.body.include_done === true,
-      stdb_token: session.stdbToken,
-      identity_hex: session.identityHex,
-      org_privacy_policy: resolveAiPrivacyPolicy(session.fieldAccess),
+      orgId,
+      companyId,
+      includeDone: bodyResult.body.includeDone === true || bodyResult.body.include_done === true,
+      stdbToken: session.stdbToken,
+      identityHex: session.identityHex,
+      orgPrivacyPolicy: resolveAiPrivacyPolicy(session.fieldAccess),
     }),
   })
   const payload = gateway.text ? safeJson(gateway.text) : {}

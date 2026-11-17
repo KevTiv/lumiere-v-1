@@ -9,7 +9,7 @@ Without --apply the command validates configuration and prints a redacted plan.
 Required environment variables:
   STDB_HOST, STDB_MODULE, STDB_SERVER_TOKEN
   DOPPLER_API_TOKEN, DOPPLER_PROJECT, DOPPLER_CONFIG_MAP_JSON
-  AI_CERTIFICATION_RUNTIME_HASH, LUMIERE_IDENTITY_RUN_ID
+  LUMIERE_IDENTITY_RUN_ID
 
 Set LUMIERE_INITIALIZE_NON_ROTATING_SECRETS=1 only on the first bootstrap to
 create encryption and shared internal keys. Rotation additionally requires

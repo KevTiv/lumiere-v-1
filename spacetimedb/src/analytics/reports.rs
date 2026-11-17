@@ -9,8 +9,9 @@ use crate::core::business_changes::{capture_business_audit, merge_business_audit
 /// | **ScheduledReport** | Automated periodic report delivery configuration |
 /// | **AnalyticsMetric** | KPI / trend metric with cached computed values |
 use crate::core::business_changes::{native_row_snapshot, write_private_business_audit};
-use chrono::{Datelike, Days, LocalResult, NaiveDate, NaiveTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
+use lumiere_report_schedule::ReportSchedule;
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::messaging::{mail_message, MailMessage};
@@ -460,66 +461,38 @@ fn validate_owner_recipients(
     Ok(())
 }
 
+fn report_schedule(
+    timezone: &str,
+    frequency: &str,
+    hour: u8,
+    minute: u8,
+) -> Result<ReportSchedule, String> {
+    let timezone = timezone
+        .parse::<Tz>()
+        .map_err(|_| "timezone must be a valid IANA identifier".to_string())?;
+    ReportSchedule::new(frequency, hour, minute, timezone).map_err(str::to_owned)
+}
+
+fn schedule_time(timestamp: Timestamp) -> Result<DateTime<Utc>, String> {
+    DateTime::from_timestamp_micros(timestamp.to_micros_since_unix_epoch())
+        .ok_or_else(|| "scheduled report timestamp is invalid".to_string())
+}
+
 fn next_run_after(
     schedule: &ScheduledReport,
     timezone: &str,
     now: Timestamp,
 ) -> Result<Timestamp, String> {
-    let timezone = timezone
-        .parse::<Tz>()
-        .map_err(|_| "timezone must be a valid IANA identifier".to_string())?;
-    let mut local_date = chrono::DateTime::<Utc>::from_timestamp_micros(
-        schedule.next_run.to_micros_since_unix_epoch(),
-    )
-    .ok_or("scheduled report next_run is invalid")?
-    .with_timezone(&timezone)
-    .date_naive();
-    let now_micros = now.to_micros_since_unix_epoch();
-    loop {
-        local_date = advance_schedule_date(local_date, &schedule.frequency)?;
-        let local_time = NaiveTime::from_hms_opt(schedule.hour as u32, schedule.minute as u32, 0)
-            .ok_or("scheduled report time is invalid")?;
-        let local = local_date.and_time(local_time);
-        let candidate = match timezone.from_local_datetime(&local) {
-            LocalResult::Single(value) | LocalResult::Ambiguous(value, _) => value,
-            // A skipped wall time (normally spring-forward) runs at the first
-            // valid instant after the gap instead of silently dropping a run.
-            LocalResult::None => timezone
-                .from_local_datetime(&(local + chrono::Duration::hours(1)))
-                .earliest()
-                .ok_or("scheduled report time is invalid due to DST")?,
-        };
-        let candidate_micros = candidate.with_timezone(&Utc).timestamp_micros();
-        if candidate_micros > now_micros {
-            return Ok(Timestamp::from_micros_since_unix_epoch(candidate_micros));
-        }
-    }
-}
-
-fn advance_schedule_date(date: NaiveDate, frequency: &str) -> Result<NaiveDate, String> {
-    if frequency.eq_ignore_ascii_case("daily") {
-        return date
-            .checked_add_days(Days::new(1))
-            .ok_or("scheduled report date is out of range".to_string());
-    }
-    if frequency.eq_ignore_ascii_case("weekly") {
-        return date
-            .checked_add_days(Days::new(7))
-            .ok_or("scheduled report date is out of range".to_string());
-    }
-    let (year, month) = if date.month() == 12 {
-        (date.year() + 1, 1)
-    } else {
-        (date.year(), date.month() + 1)
-    };
-    let last_day = match month {
-        2 if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) => 29,
-        2 => 28,
-        4 | 6 | 9 | 11 => 30,
-        _ => 31,
-    };
-    NaiveDate::from_ymd_opt(year, month, date.day().min(last_day))
-        .ok_or("scheduled report date is out of range".to_string())
+    let cadence = report_schedule(
+        timezone,
+        &schedule.frequency,
+        schedule.hour,
+        schedule.minute,
+    )?;
+    let next = cadence.next_run(schedule_time(schedule.next_run)?, schedule_time(now)?)?;
+    Ok(Timestamp::from_micros_since_unix_epoch(
+        next.timestamp_micros(),
+    ))
 }
 
 fn enqueue_owner_report_run(
@@ -998,6 +971,18 @@ pub fn create_scheduled_report(
 
     validate_schedule_configuration(ctx, organization_id, company_id, &params)?;
 
+    let next_run = if params.owner_report_key.is_some() {
+        let schedule = report_schedule(
+            params.timezone.as_deref().unwrap_or("UTC"),
+            &params.frequency,
+            params.hour,
+            params.minute,
+        )?;
+        let next = schedule.first_run(schedule_time(ctx.timestamp)?)?;
+        Timestamp::from_micros_since_unix_epoch(next.timestamp_micros())
+    } else {
+        params.next_run
+    };
     let report = ctx.db.scheduled_report().insert(ScheduledReport {
         id: 0,
         organization_id,
@@ -1020,7 +1005,7 @@ pub fn create_scheduled_report(
         attachment_format: params.attachment_format,
         // System-managed: starts with no prior run
         last_run: None,
-        next_run: params.next_run,
+        next_run,
         is_active: params.is_active,
         // System-managed: starts at 0, incremented by record_report_run
         run_count: 0,
@@ -1621,15 +1606,6 @@ pub fn update_metric_values(
 #[cfg(test)]
 mod scheduled_owner_report_tests {
     use super::*;
-
-    #[test]
-    fn monthly_cadence_clamps_month_end() {
-        let january_31 = NaiveDate::from_ymd_opt(2026, 1, 31).expect("valid date");
-        assert_eq!(
-            advance_schedule_date(january_31, "monthly").expect("advance date"),
-            NaiveDate::from_ymd_opt(2026, 2, 28).expect("valid date"),
-        );
-    }
 
     #[test]
     fn cadence_rejects_unsupported_values() {

@@ -90,6 +90,8 @@ struct Rules {
     date_order: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     sections: Option<Vec<Section>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    worksheet_names: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -115,6 +117,8 @@ struct Section {
     identity_namespace: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     identity_fields: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    worksheet_name: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -272,31 +276,60 @@ fn recipe_document(
             && options.grouping_separator.is_none()
             && options.date_order.is_none()
             && options.sections.as_ref().is_none_or(Vec::is_empty)
+            && options.worksheet_names.is_none()
         {
             return Err(ApiError::BadRequest(
                 "choose locale or section rules before saving this source recipe".into(),
             ));
         }
-        let receipt = coverage_files
+        let receipts = coverage_files
             .iter()
-            .find(|entry| {
+            .filter(|entry| {
                 entry["fileName"] == name
                     && entry["sourceSha256"] == sha256
                     && entry["status"] == "prepared"
             })
-            .ok_or_else(|| {
-                ApiError::Conflict("this source does not have an accepted coverage receipt".into())
-            })?;
-        let layout = receipt["layoutSha256"]
+            .collect::<Vec<_>>();
+        let first = receipts.first().ok_or_else(|| {
+            ApiError::Conflict("this source does not have an accepted coverage receipt".into())
+        })?;
+        let layout_field = if let Some(worksheets) = &options.worksheet_names {
+            let selected = worksheets
+                .iter()
+                .map(String::as_str)
+                .collect::<BTreeSet<_>>();
+            let covered = receipts
+                .iter()
+                .filter_map(|receipt| receipt["worksheet"].as_str())
+                .collect::<BTreeSet<_>>();
+            if selected.is_empty()
+                || selected.len() != worksheets.len()
+                || covered != selected
+                || receipts.len() != worksheets.len()
+                || receipts
+                    .iter()
+                    .any(|receipt| receipt["workbookLayoutSha256"] != first["workbookLayoutSha256"])
+            {
+                return Err(ApiError::Conflict(
+                    "prepare every selected worksheet before saving this recipe".into(),
+                ));
+            }
+            "workbookLayoutSha256"
+        } else {
+            "layoutSha256"
+        };
+        let layout = first[layout_field]
             .as_str()
             .filter(|value| model::sha256(value))
             .ok_or_else(|| {
                 ApiError::Conflict("prepare this source again to record its reusable layout".into())
             })?;
-        if !receipt["sections"].as_array().is_some_and(|sections| {
-            sections
-                .iter()
-                .any(|section| section["headerSha256"].as_str().is_some_and(model::sha256))
+        if receipts.iter().any(|receipt| {
+            !receipt["sections"].as_array().is_some_and(|sections| {
+                sections
+                    .iter()
+                    .any(|section| section["headerSha256"].as_str().is_some_and(model::sha256))
+            })
         }) {
             return Err(ApiError::BadRequest(
                 "choose explicit section headers before reusing an unstructured source".into(),

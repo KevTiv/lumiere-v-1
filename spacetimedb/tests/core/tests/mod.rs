@@ -26,7 +26,8 @@ pub fn run_all_core_tests(ctx: &ReducerContext) -> Result<(), String> {
 pub fn run_queue_foundation_tests(ctx: &ReducerContext) -> Result<(), String> {
     queue_tests::test_queue_system(ctx)?;
     queue_tests::test_queue_job_edge_cases(ctx)?;
-    queue_tests::test_worker_edge_cases(ctx)
+    queue_tests::test_worker_edge_cases(ctx)?;
+    queue_tests::test_embedding_service_authority(ctx)
 }
 
 #[spacetimedb::reducer]
@@ -50,6 +51,8 @@ pub fn run_core_sod_test(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|error| format!("canonical_duty_policy: {error}"))?;
     access_lifecycle_test::test_effective_access_and_atomic_updates(ctx)
         .map_err(|e| format!("atomic_member_access: {e}"))?;
+    access_lifecycle_test::test_builtin_skill_access_denial(ctx)
+        .map_err(|e| format!("builtin_skill_access: {e}"))?;
     access_lifecycle_test::test_invitation_acceptance_retries_do_not_regrant(ctx)
         .map_err(|e| format!("atomic_invitation: {e}"))?;
     sod_test::test_sod_blocks_conflicting_roles(ctx).map_err(|e| format!("sod_validate: {e}"))?;
@@ -72,6 +75,8 @@ pub fn run_core_sod_test(ctx: &ReducerContext) -> Result<(), String> {
 
 #[spacetimedb::reducer]
 pub fn run_core_permissions_test(ctx: &ReducerContext) -> Result<(), String> {
+    permissions_tests::test_persistent_operator_enrollment(ctx)
+        .map_err(|e| format!("persistent_operator_enrollment: {e}"))?;
     permissions_tests::test_expired_operator_cannot_register_certification_runtime(ctx)
         .map_err(|e| format!("expired_operator_registration: {e}"))?;
     permissions_tests::test_setup_membership_carries_lease_without_granting_privilege(ctx)

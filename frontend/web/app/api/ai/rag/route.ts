@@ -4,18 +4,17 @@
 import { type NextRequest } from 'next/server'
 
 import {
-  parseJsonBody,
   proxyAiGateway,
   requireAiRouteContext,
 } from '../_lib/route-helpers'
-import { prepareRagPayload } from '../_lib/rag-request'
+import { parseRagRequest, prepareRagPayload } from '../_lib/rag-request'
 
 export async function POST(request: NextRequest) {
   const contextResult = await requireAiRouteContext(request)
   if (!contextResult.ok) return contextResult.response
   const { session, orgId } = contextResult.context
 
-  const bodyResult = await parseJsonBody(request)
+  const bodyResult = await parseRagRequest(request)
   if (!bodyResult.ok) return bodyResult.response
 
   const ragResult = await prepareRagPayload({
@@ -25,5 +24,5 @@ export async function POST(request: NextRequest) {
   })
   if (!ragResult.ok) return ragResult.response
 
-  return proxyAiGateway('/v1/rag', ragResult.payload as unknown as Record<string, unknown>)
+  return proxyAiGateway('/v1/rag', ragResult.payload as unknown as Record<string, unknown>, undefined, request.signal)
 }

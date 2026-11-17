@@ -1,12 +1,21 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { approvalInboxHref, approvalInboxTarget, approvalTaskMatchesTarget, approvalSubjectKind } from "./approval-inbox-view"
+import { approvalInboxHref, approvalInboxTarget, approvalRequestTarget, approvalTaskMatchesTarget, approvalSubjectKind } from "./approval-inbox-view"
 
 test("approval inbox target accepts only an exact model and positive record id", () => {
   assert.deepEqual(approvalInboxTarget("purchase_order", "42"), { model: "purchase_order", resId: 42 })
   for (const input of [[null, "42"], ["purchase_order", null], ["purchase_order", "0"], ["purchase_order", "4x"]] as const) {
     assert.equal(approvalInboxTarget(input[0], input[1]), null)
   }
+})
+
+test("an exact approval request link stays scoped to the active company", () => {
+  assert.equal(approvalRequestTarget("9007199254740993", "7", 7), "9007199254740993")
+  assert.equal(approvalRequestTarget("42", null, 7), "42")
+  assert.equal(approvalRequestTarget("42", "7", 8), null)
+  assert.equal(approvalRequestTarget("42", "7", null), null)
+  assert.equal(approvalRequestTarget("18446744073709551616", "7", 7), null)
+  assert.equal(approvalRequestTarget("4e2", "7", 7), null)
 })
 
 test("approval subject labels use supported business kinds and do not invent unknown source titles", () => {

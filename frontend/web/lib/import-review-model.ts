@@ -5,6 +5,7 @@ export type ReviewField = {
   label: string
   kind: "text" | "decimal" | "date" | "choice"
   sourceValue: string | null
+  sourceColumn?: number
   required: boolean
   options?: string[]
   export?: boolean
@@ -21,6 +22,7 @@ export type ReviewSource = {
     file: string
     row: number
     sha256: string
+    sheet?: string
     rowBasis?: "source_line" | "import_row"
   }
   issue: string
@@ -61,13 +63,25 @@ export type ReviewHistory = {
   revision: number
   values: Record<string, string | null>
   confirmedFields?: string[]
-  state: string
+  state: ReviewRow["state"]
   reason: string
   actor: string
   createdAt: string
-  previousValues?: Record<string, string | null>
-  previousConfirmedFields?: string[]
-  previousState?: ReviewRow["state"]
+  previousValues?: Record<string, string | null> | null
+  previousConfirmedFields?: string[] | null
+  previousState?: ReviewRow["state"] | null
+}
+export type ReviewedRecordOperation = {
+  key: string
+  version: number
+  label: string
+  destination: string
+  reviewedRecord: {
+    dispatch: string
+    inputs: Array<"customer">
+    previewFields: Array<{ key: string; label: string }>
+  }
+  itemIds: string[]
 }
 export type ReviewDetail = {
   id: string
@@ -76,6 +90,7 @@ export type ReviewDetail = {
   sourceFile: string
   items: ReviewRow[]
   history: ReviewHistory[]
+  reviewOperations?: ReviewedRecordOperation[]
 }
 export type ReviewedImportSource = {
   targetEntity: string

@@ -216,10 +216,11 @@ pub async fn update_user_email(
     Ok(true)
 }
 
-/// Resolve active status without granting an expired operator lease authority.
+/// Resolve interactive profile status. Permanent non-human operators use native
+/// authority only; their projected PG flags must never authorize a browser session.
 pub fn profile_is_active(row: &tokio_postgres::Row) -> bool {
     row.get::<_, bool>("is_active")
-        && stdb_auth::platform_bootstrap_lease_active(
+        && stdb_auth::profile_metadata_allows_interactive_session(
             row.get::<_, Option<String>>("bootstrap_metadata")
                 .as_deref(),
             chrono::Utc::now().timestamp_micros(),

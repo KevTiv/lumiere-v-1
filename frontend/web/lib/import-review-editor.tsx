@@ -284,6 +284,11 @@ export function ImportReviewEditor({
               </TableCell>
               <TableCell className="max-w-48 whitespace-normal break-words">
                 {field.sourceValue ?? t("settings.importReview.unknown")}
+                {field.sourceColumn != null ? (
+                  <span className="block text-xs text-muted-foreground">
+                    {t("settings.importReview.sourceColumn", { defaultValue: "Source column {{column}}", column: field.sourceColumn })}
+                  </span>
+                ) : null}
               </TableCell>
               <TableCell className="min-w-48">
                 <ReviewValueInput
@@ -424,6 +429,7 @@ export function ImportReviewEditor({
       </div>
       <p className="mt-3 break-all text-xs text-muted-foreground">
         {item.source.source.file} ·{" "}
+        {item.source.source.sheet ? <>{item.source.source.sheet} ·{" "}</> : null}
         {t(
           item.source.source.rowBasis === "import_row"
             ? "settings.importReview.importRow"

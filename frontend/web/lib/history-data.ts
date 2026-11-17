@@ -76,8 +76,22 @@ export interface HistoryRows extends HistoryPage {
   data: HistoryRow[]
 }
 
+export type SourceHistoryView =
+  | "sales"
+  | "expenses"
+  | "accounting"
+  | "warehouse"
+  | "products"
+  | "crm"
+  | "purchasing"
+  | "fleet"
+  | "reports"
+
 export interface HistoryFilters {
   batchId: string | null
+  rowId?: string | null
+  view?: SourceHistoryView
+  search?: string
   period: HistoryPeriod
   timeZone: string
   dateMode: HistoryDateMode
@@ -254,6 +268,9 @@ export function historyRowsUrl(companyId: number, filters: HistoryFilters, curso
   params.set("limit", "50")
   params.set("dateMode", filters.dateMode)
   if (filters.batchId !== null) params.set("batchId", id(filters.batchId))
+  if (filters.rowId != null) params.set("rowId", id(filters.rowId))
+  if (filters.view !== undefined) params.set("view", filters.view)
+  if (filters.search) params.set("search", filters.search)
   if (filters.state !== "all") params.set("state", filters.state)
   if (filters.verifiedOnly) params.set("verifiedOnly", "true")
   if (filters.dateMode !== "undated" && filters.dateMode !== "invalid") {

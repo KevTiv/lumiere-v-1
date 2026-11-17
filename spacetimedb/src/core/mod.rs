@@ -32,6 +32,7 @@ pub mod operational_messaging;
 pub mod organization;
 pub mod permissions;
 pub mod persistence;
+pub(crate) mod platform_operator;
 pub mod privacy;
 pub mod queue;
 pub mod reconstruction;

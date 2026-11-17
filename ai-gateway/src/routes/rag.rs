@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::convert::Infallible;
 use std::time::Instant;
+use tokio::sync::Semaphore;
 
 use crate::{
     ai_agent::{
@@ -22,9 +23,13 @@ use crate::{
         format_live_context_block, resolve_snapshot_candidates, ActorCredentials, LiveSnapshot,
         SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
+    orchestrator::skill_access::ActorSkillAccess,
     orchestrator::{
         intelligence::EvidenceRef,
-        intelligence_router::{gate_rag_answer_with_review, run_catalogued_generation_surface},
+        intelligence_router::{
+            gate_rag_answer_with_review, generation_prompt_budget_bytes,
+            run_catalogued_generation_surface,
+        },
         model_configuration::StdbModelConfigurationStore,
         output_gate::record_run_answer_provenance,
         skill_loader::{complete_run, create_generation_surface_run, GovernedRunRef},
@@ -52,6 +57,10 @@ mod attachments;
 #[path = "rag_context.rs"]
 mod context;
 use attachments::ChatAttachment;
+#[path = "rag_conversation.rs"]
+mod conversation;
+#[path = "rag_history_references.rs"]
+mod history_references;
 #[path = "rag_spreadsheet.rs"]
 mod spreadsheet;
 use spreadsheet::{AuthorizedSelection, SpreadsheetAccess, SpreadsheetSelection};
@@ -63,7 +72,11 @@ use super::rag_ui_actions::{
     UiActionProposal,
 };
 pub use context::RagSource;
-use context::{build_user_prompt, format_retrieved_context, passage_to_ranked, RankedSource};
+use context::{build_user_prompt_value, format_retrieved_context, passage_to_ranked, RankedSource};
+use history_references::{
+    resolve_history_references, validate_history_references, HistoryReference,
+    ResolvedHistoryReference,
+};
 use import_tasks::{
     AuthorizedImportTask, ImportTaskAccess, ImportTaskReference, LiveImportTaskAccess,
 };
@@ -71,6 +84,10 @@ use import_tasks::{
 const RAG_MAX_CONTEXT_CHUNKS: u64 = RAG_MAX_EVIDENCE_ROWS;
 const RAG_ORG_ACTIVITY_TOP_K: usize = 8;
 const RAG_MAX_INCLUDE_TYPES: usize = 8;
+const MAX_QUERY_BYTES: usize = 8 * 1024;
+const MAX_GENERATION_PROMPT_BYTES: usize = 48 * 1024;
+const PROMPT_ENVELOPE_BYTES: usize = 1024;
+static RAG_SLOTS: Semaphore = Semaphore::const_new(12);
 
 #[derive(Clone, Deserialize, Default)]
 pub struct UiContext {
@@ -115,6 +132,9 @@ pub struct RagRequest {
     /// User-supplied text for this turn only; never ERP record authority.
     #[serde(default)]
     attachments: Vec<ChatAttachment>,
+    pub chat_session_key: Option<String>,
+    #[serde(default)]
+    pub history_refs: Vec<HistoryReference>,
     spreadsheet_selection: Option<SpreadsheetSelection>,
     /// BFF-owned native presentation catalog, never caller-provided authority.
     #[serde(default)]
@@ -130,6 +150,7 @@ pub struct RagResponse {
     pub answer: String,
     pub sources: Vec<RagSource>,
     pub retrieval_degraded: bool,
+    pub earlier_context_unavailable: bool,
     /// Related saved documents, never implicitly promoted to evidence for the
     /// generated answer. A draft remains visibly a draft.
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -180,6 +201,7 @@ fn no_relevant_information_response(
         answer: answer.to_string(),
         sources: Vec::new(),
         retrieval_degraded,
+        earlier_context_unavailable: false,
         related_guides,
         import_task_statuses: Vec::new(),
         guide_retrieval_degraded,
@@ -259,6 +281,7 @@ struct RoutedRagAdmission<'a> {
     transport: &'a dyn crate::providers::llm::LlmCompletion,
     /// Reads the durable evidence tables to find an exact human review.
     reader: &'a stdb_client::StdbClient,
+    skill_access: &'a ActorSkillAccess<'a>,
 }
 
 #[async_trait]
@@ -283,6 +306,7 @@ impl RagAnswerAdmission for RoutedRagAdmission<'_> {
             evidence,
             passages,
             Some(&reviewed_claims),
+            self.skill_access,
         )
         .await
     }
@@ -321,6 +345,7 @@ pub(crate) struct ReleaseInputs<'a> {
     import_access: Option<&'a dyn ImportTaskAccess>,
     spreadsheet: Option<&'a AuthorizedSelection>,
     attachments: &'a [ChatAttachment],
+    history_references: &'a [ResolvedHistoryReference],
 }
 
 impl<'a> ReleaseInputs<'a> {
@@ -342,6 +367,7 @@ impl<'a> ReleaseInputs<'a> {
             import_access: None,
             spreadsheet: None,
             attachments: &[],
+            history_references: &[],
         }
     }
 }
@@ -405,6 +431,10 @@ pub(crate) async fn release_rag_answer(
     }
     for file in inputs.attachments {
         file.add_to_evidence(&mut text_evidence);
+    }
+    for reference in inputs.history_references {
+        text_evidence.add_ref("assistant_history", reference.support_id());
+        text_evidence.add_json(&reference.context);
     }
     let mut gated = admission
         .admit(candidate, &text_evidence, &passages)
@@ -506,6 +536,7 @@ fn answer_chunks(answer: &str) -> Vec<String> {
         .collect()
 }
 
+#[cfg(test)]
 fn has_grounded_context(ranked: &[RankedSource], snapshots: &[LiveSnapshot]) -> bool {
     !ranked.is_empty() || !snapshots.is_empty()
 }
@@ -634,16 +665,24 @@ pub async fn post_rag(
     Json(req): Json<RagRequest>,
 ) -> AppResult<Json<RagResponse>> {
     let started = Instant::now();
+    let _permit = RAG_SLOTS.try_acquire().map_err(|_| {
+        AppError::RateLimitExceeded("Assistant capacity is busy. Try again.".into())
+    })?;
 
     if req.query.trim().is_empty() {
         return Err(AppError::BadRequest("query must not be empty".into()));
     }
     attachments::validate(&req.attachments)
         .map_err(|error| AppError::BadRequest(error.to_string()))?;
+    if req.query.len() > MAX_QUERY_BYTES {
+        return Err(AppError::ChatInputTooLarge);
+    }
     if req.spreadsheet_selection.is_some()
         && (!req.guide_refs.is_empty()
             || !req.attachments.is_empty()
             || !req.import_task_refs.is_empty()
+            || !req.history_refs.is_empty()
+            || req.chat_session_key.is_some()
             || !req.ui_action_offers.is_empty()
             || req.ui_context.is_some()
             || !matches!(
@@ -657,6 +696,8 @@ pub async fn post_rag(
         ));
     }
     validate_guide_refs(&req.guide_refs)
+        .map_err(|error| AppError::BadRequest(error.to_string()))?;
+    validate_history_references(&req.history_refs)
         .map_err(|error| AppError::BadRequest(error.to_string()))?;
     import_tasks::validate_references(&req.import_task_refs, req.company_id)
         .map_err(|error| AppError::BadRequest(error.to_string()))?;
@@ -676,6 +717,59 @@ pub async fn post_rag(
         return Err(AppError::Forbidden(
             "company does not belong to organization".into(),
         ));
+    }
+
+    let skill_access = ActorSkillAccess::new(
+        &state,
+        org_id,
+        req.company_id,
+        &actor.stdb_token,
+        &actor.identity_hex,
+    )?;
+    skill_access.require("rag_generation").await?;
+
+    let conversation = conversation::retrieve(
+        &state,
+        &actor,
+        org_id,
+        req.company_id,
+        req.chat_session_key.as_deref(),
+    )
+    .await?;
+    let mut earlier_context_unavailable = conversation.earlier_context_unavailable;
+    let used_conversation = conversation.prompt.is_some();
+    let mut reference_selectors = req.history_refs.clone();
+    let mut history_references =
+        resolve_history_references(&state, &actor, org_id, req.company_id, &reference_selectors)
+            .await
+            .map_err(|_| {
+                AppError::BadRequest(
+                    "A selected chat reference is unavailable. Remove or replace it and try again."
+                        .into(),
+                )
+            })?;
+    for reference in conversation.references {
+        if reference_selectors.len() == 4 {
+            break;
+        }
+        if reference_selectors.contains(&reference) {
+            continue;
+        }
+        match resolve_history_references(
+            &state,
+            &actor,
+            org_id,
+            req.company_id,
+            std::slice::from_ref(&reference),
+        )
+        .await
+        {
+            Ok(resolved) => {
+                reference_selectors.push(reference);
+                history_references.extend(resolved);
+            }
+            Err(_) => earlier_context_unavailable = true,
+        }
     }
 
     let ui_block = req
@@ -764,30 +858,37 @@ pub async fn post_rag(
         None
     } else {
         Some(
-            async {
-                state.vector_store.check_ready().await?;
-                super::context::admitted_query_vector(
-                    &state,
-                    &actor,
-                    org_id,
-                    req.company_id,
-                    &req.query,
-                    "rag",
-                    Some(&agent),
-                    Some("rag_generation"),
-                )
-                .await
-            }
+            super::context::admitted_query_vector(
+                &state,
+                &actor,
+                org_id,
+                req.company_id,
+                &req.query,
+                "rag",
+                Some(&agent),
+                Some("rag_generation"),
+            )
             .await,
         )
     };
     if let Some(Err(error)) = &query_vector {
-        if error.is::<crate::error::GenerationSourceUnavailable>() {
-            // Revoked source is an activation failure, not optional retrieval.
-            return Err(AppError::GenerationSourceUnavailable(
-                crate::error::GenerationSourceUnavailable,
-            ));
+        if let Some(access_error) =
+            error.downcast_ref::<crate::orchestrator::skill_access::SkillAccessError>()
+        {
+            return Err((*access_error).into());
         }
+        if error.is::<crate::error::SkillUnavailable>() {
+            // Stop the chat turn when the skill has been disabled.
+            return Err(AppError::SkillUnavailable(crate::error::SkillUnavailable));
+        }
+        tracing::warn!(
+            org_id,
+            company_id = req.company_id,
+            stage = error
+                .downcast_ref::<super::context::QueryEmbeddingStage>()
+                .map_or("unknown", |stage| stage.0),
+            "Chat query embedding unavailable"
+        );
     }
     let mut retrieval_degraded = false;
     let company_result = match &query_vector {
@@ -946,7 +1047,7 @@ pub async fn post_rag(
     } else {
         include_types.clone()
     };
-    let authorized = if has_passage_candidates {
+    let mut authorized = if has_passage_candidates {
         match authorize_and_resolve(
             &evidence_access,
             scope,
@@ -974,17 +1075,13 @@ pub async fn post_rag(
     } else {
         AuthorizedEvidence::none()
     };
-    let ranked: Vec<RankedSource> = authorized
-        .passages
-        .iter()
-        .cloned()
-        .map(passage_to_ranked)
-        .collect();
-
-    if !has_grounded_context(&ranked, &live_snapshots)
+    if authorized.passages.is_empty()
+        && live_snapshots.is_empty()
         && saved_imports.is_empty()
         && selected_spreadsheet.is_none()
         && req.attachments.is_empty()
+        && conversation.prompt.is_none()
+        && history_references.is_empty()
     {
         tracing::info!(
             company_id = req.company_id,
@@ -1002,11 +1099,12 @@ pub async fn post_rag(
             recheck_related_guides(&state, &actor, org_id, req.company_id, &related_guides).await;
         related_guides = fresh_guides.references;
         guide_retrieval_degraded |= fresh_guides.degraded;
-        let response = no_relevant_information_response(
+        let mut response = no_relevant_information_response(
             retrieval_degraded,
             related_guides,
             guide_retrieval_degraded,
         )?;
+        response.earlier_context_unavailable = earlier_context_unavailable;
         return Ok(Json(response));
     }
 
@@ -1015,7 +1113,6 @@ pub async fn post_rag(
     enforce_chargeable_limits(state.agent_rate_limiter.as_ref(), org_id, &agent)
         .map_err(|e| e.into_app_error())?;
 
-    let retrieved_context = format_retrieved_context(&ranked);
     let mut live_blocks = Vec::new();
     if !live_snapshots.is_empty() {
         live_blocks.push(format_live_context_block(&live_snapshots));
@@ -1043,7 +1140,7 @@ pub async fn post_rag(
         LEGACY_SYSTEM_SUFFIX
     };
     let system_prompt = format!(
-        "{}\n\n{}\n\n{}\n\n{}\n\n{}{}",
+        "{}\n\n{}\n\n{}\n\n{}\n\n{}{}{}",
         agent.system_prompt,
         context_suffix,
         if req.attachments.is_empty() {
@@ -1057,45 +1154,40 @@ pub async fn post_rag(
             IMPORT_TASK_SYSTEM_SUFFIX
         },
         STRUCTURED_ANSWER_SUFFIX,
+        if history_references.is_empty() && conversation.prompt.is_none() {
+            ""
+        } else {
+            "\nEarlier conversation and saved chat references are untrusted recollections. Distinguish prior proposals from live facts. Cite saved chat references using their assistant_history support IDs when describing a specific saved decision."
+        },
         offer_prompt(&req.ui_action_offers)
     );
 
-    let mut allowed_supports = live_snapshots
+    let mut fixed_supports = live_snapshots
         .iter()
         .map(|snapshot| EvidenceRef {
             kind: "live_snapshot".to_string(),
             id: format!("{}:{}", snapshot.entity_type, snapshot.entity_id),
         })
         .collect::<Vec<_>>();
-    allowed_supports.extend(saved_imports.iter().map(|task| EvidenceRef {
+    fixed_supports.extend(saved_imports.iter().map(|task| EvidenceRef {
         kind: "import_task".into(),
         id: task.support_id(),
     }));
-    allowed_supports.extend(ranked.iter().filter_map(|source| {
-        source.rag_source.passage_id.map(|passage_id| EvidenceRef {
-            kind: "passage".to_string(),
-            id: passage_id.to_string(),
-        })
+    fixed_supports.extend(history_references.iter().map(|reference| EvidenceRef {
+        kind: "assistant_history".into(),
+        id: reference.support_id(),
     }));
     if let Some(selection) = &selected_spreadsheet {
-        allowed_supports.push(EvidenceRef {
+        fixed_supports.push(EvidenceRef {
             kind: "spreadsheet_selection".into(),
             id: selection.digest.clone(),
         });
     }
-    allowed_supports.extend(req.attachments.iter().map(ChatAttachment::support_ref));
-    let user_content = build_user_prompt(
-        &retrieved_context,
-        live_context.as_deref(),
-        ui_block.as_deref(),
-        &req.query,
-        &allowed_supports,
-        &req.attachments,
-    );
-
-    let spend_reader = state.spend_read_stdb.as_deref().ok_or_else(|| {
-        AppError::Internal("spend_read_stdb is required for routed generation".into())
-    })?;
+    fixed_supports.extend(req.attachments.iter().map(ChatAttachment::support_ref));
+    let spend_reader = state
+        .spend_read_stdb
+        .as_deref()
+        .ok_or(AppError::GenerationAdmissionUnavailable)?;
     let run_inputs = json!({
         "surface": "rag_generation",
         "query": req.query.clone(),
@@ -1119,6 +1211,99 @@ pub async fn post_rag(
     let model_store = StdbModelConfigurationStore {
         reader: state.stdb.as_ref(),
     };
+    let prepared_prompt = async {
+        let budget = generation_prompt_budget_bytes(
+            &model_store,
+            org_id,
+            &agent,
+            run.intelligence_policy_ref.as_deref(),
+        )
+        .await
+        .map_err(AppError::from_generation)?
+        .min(MAX_GENERATION_PROMPT_BYTES);
+        let references = json!(history_references
+            .iter()
+            .map(|reference| &reference.context)
+            .collect::<Vec<_>>());
+        let mut conversation_prompt = conversation.prompt;
+        let mut ranked = authorized
+            .passages
+            .iter()
+            .cloned()
+            .map(passage_to_ranked)
+            .collect::<Vec<_>>();
+        loop {
+            let mut supports = fixed_supports.clone();
+            supports.extend(ranked.iter().filter_map(|source| {
+                source.rag_source.passage_id.map(|id| EvidenceRef {
+                    kind: "passage".into(),
+                    id: id.to_string(),
+                })
+            }));
+            let mut payload = build_user_prompt_value(
+                &format_retrieved_context(&ranked),
+                live_context.as_deref(),
+                ui_block.as_deref(),
+                &req.query,
+                &supports,
+                &req.attachments,
+            );
+            if let Some(history) = &conversation_prompt {
+                payload["untrusted_context"]["earlier_conversation"] = history.clone();
+            }
+            if !history_references.is_empty() {
+                payload["untrusted_context"]["saved_chat_references"] = references.clone();
+            }
+            let prompt = payload.to_string();
+            // The provider adapter includes the objective in the system and
+            // user message. Reserve framing and keep this payload out of state.
+            let used_bytes = prompt
+                .len()
+                .saturating_mul(2)
+                .saturating_add(system_prompt.len())
+                .saturating_add(PROMPT_ENVELOPE_BYTES);
+            if used_bytes <= budget {
+                tracing::debug!(
+                    prompt_bytes = used_bytes,
+                    prompt_budget_bytes = budget,
+                    earlier_context_unavailable,
+                    "Assistant prompt fits routed model budget"
+                );
+                return Ok((prompt, ranked));
+            }
+            if ranked.pop().is_some() {
+                continue;
+            }
+            if conversation::trim(&mut conversation_prompt) {
+                earlier_context_unavailable = true;
+                continue;
+            }
+            return Err(AppError::ChatInputTooLarge);
+        }
+    }
+    .await;
+    let (user_prompt, ranked) = match prepared_prompt {
+        Ok(prepared) => prepared,
+        Err(error) => {
+            let _ = complete_run(
+                state.stdb.as_ref(),
+                org_id,
+                req.company_id,
+                run.run_id,
+                "failed",
+                None,
+                None,
+                None,
+                0,
+                0,
+                Some(error.to_string()),
+            )
+            .await;
+            return Err(error);
+        }
+    };
+    authorized.truncated |= authorized.passages.len() != ranked.len();
+    authorized.passages.truncate(ranked.len());
     let ledger = StdbSpendLedger {
         writer: state.stdb.as_ref(),
         reader: spend_reader,
@@ -1134,15 +1319,11 @@ pub async fn post_rag(
         &agent,
         state.providers.llm.as_ref(),
         "rag_generation",
-        user_content,
-        json!({
-            "retrieved_context": retrieved_context,
-            "live_context": live_context,
-            "ui_context": ui_block,
-            "user_attachments": req.attachments,
-        }),
+        user_prompt,
+        json!({"surface":"rag_generation"}),
         Some(system_prompt),
         Some(agent.max_tokens),
+        &skill_access,
     )
     .await;
     let program = match program {
@@ -1181,6 +1362,7 @@ pub async fn post_rag(
         agent: &agent,
         transport: state.providers.llm.as_ref(),
         reader: spend_reader,
+        skill_access: &skill_access,
     };
     let provenance_sink = StdbRagProvenance {
         writer: state.stdb.as_ref(),
@@ -1199,6 +1381,7 @@ pub async fn post_rag(
             import_access: Some(&import_access),
             spreadsheet: selected_spreadsheet.as_ref(),
             attachments: &req.attachments,
+            history_references: &history_references,
         },
         &answer_candidate,
         &review_admission,
@@ -1254,6 +1437,42 @@ pub async fn post_rag(
             );
         }
     }
+    if !history_references.is_empty()
+        && !resolve_history_references(&state, &actor, org_id, req.company_id, &reference_selectors)
+            .await
+            .is_ok_and(|fresh| fresh == history_references)
+    {
+        release.withhold(
+            "saved conversation evidence changed or its current access could not be checked",
+        );
+    }
+    if let Some(key) = req
+        .chat_session_key
+        .as_deref()
+        .filter(|_| used_conversation)
+    {
+        if !conversation::recheck_scope(&state, &actor, req.company_id, key).await {
+            release.withhold("the earlier conversation is no longer available");
+        }
+    }
+
+    if let Err(error) = skill_access.require("rag_generation").await {
+        let _ = complete_run(
+            state.stdb.as_ref(),
+            org_id,
+            req.company_id,
+            run.run_id,
+            "failed",
+            None,
+            None,
+            None,
+            program.trace.len() as u32,
+            total_tokens,
+            Some(error.to_string()),
+        )
+        .await;
+        return Err(error.into());
+    }
 
     // The durable run completes only after admission and provenance
     // persistence have succeeded and the release recheck has passed.
@@ -1302,6 +1521,11 @@ pub async fn post_rag(
         sources.extend(ranked.into_iter().map(|s| s.rag_source));
         sources.extend(saved_imports.iter().map(AuthorizedImportTask::source));
         sources.extend(selected_spreadsheet.iter().map(AuthorizedSelection::source));
+        sources.extend(
+            history_references
+                .iter()
+                .map(ResolvedHistoryReference::source),
+        );
     }
 
     tracing::info!(
@@ -1321,6 +1545,7 @@ pub async fn post_rag(
         answer,
         sources,
         retrieval_degraded,
+        earlier_context_unavailable,
         related_guides,
         import_task_statuses,
         guide_retrieval_degraded,
@@ -1371,6 +1596,7 @@ fn rag_stream_metadata(response: &RagResponse) -> Value {
         "provider": response.provider,
         "model": response.model,
         "retrieval_degraded": response.retrieval_degraded,
+        "earlier_context_unavailable": response.earlier_context_unavailable,
         "related_guides": response.related_guides,
         "import_task_statuses": response.import_task_statuses,
         "guide_retrieval_degraded": response.guide_retrieval_degraded,
@@ -1771,6 +1997,7 @@ mod tests {
             import_access: None,
             spreadsheet: None,
             attachments: &files,
+            history_references: &[],
         };
         let released = release_rag_answer(
             &inputs,
@@ -1853,6 +2080,7 @@ mod tests {
                 import_access: None,
                 spreadsheet: None,
                 attachments: &[],
+                history_references: &[],
             },
             candidate,
             &TestAdmission { checker },
@@ -1878,6 +2106,7 @@ mod tests {
             answer: release.answer.clone(),
             sources,
             retrieval_degraded: false,
+            earlier_context_unavailable: false,
             related_guides: Vec::new(),
             import_task_statuses: Vec::new(),
             guide_retrieval_degraded: false,
@@ -2339,6 +2568,7 @@ mod tests {
                     import_access: Some(&authority),
                     spreadsheet: None,
                     attachments: &[],
+                    history_references: &[],
                 },
                 &passage_candidate(BODY),
                 &TestAdmission {
@@ -2374,6 +2604,7 @@ mod tests {
                 import_access: None,
                 spreadsheet: None,
                 attachments: &[],
+                history_references: &[],
             },
             &cited(
                 "Four rows are confirmed.",

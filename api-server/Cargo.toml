@@ -48,9 +48,11 @@ path = "src/bin/reconstruct-organization.rs"
 
 [dependencies]
 lumiere-auth-context.workspace = true
+lumiere-policy-core.workspace = true
 lumiere-finance-review-core.workspace = true
 lumiere-file-inspection.workspace = true
 lumiere-presentation-core.workspace = true
+lumiere-report-schedule = { path = "../crates/report-schedule" }
 lumiere-contracts = { workspace = true, features = ["bindings"] }
 anyhow.workspace = true
 ammonia = "4.2.3"

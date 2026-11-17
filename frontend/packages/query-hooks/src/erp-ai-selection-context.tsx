@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -23,38 +24,43 @@ export type ErpAiSelectionReporter = {
   clearSelection: () => void
 }
 
-const SelectionStateContext = createContext<ErpAiSelectionState>({
-  activeTab: null,
-  selection: null,
-})
+const emptySelection: ErpAiSelectionState = { activeTab: null, selection: null }
+const SelectionStateContext = createContext(emptySelection)
 
 const SelectionReporterContext = createContext<ErpAiSelectionReporter | null>(null)
 
-export function ErpAiSelectionStateProvider({ children }: { children: ReactNode }) {
-  const [activeTab, setActiveTabState] = useState<string | null>(null)
-  const [selection, setSelectionState] = useState<AiEntitySelection | null>(null)
+export function ErpAiSelectionStateProvider({
+  children,
+  scopeKey = null,
+}: {
+  children: ReactNode
+  scopeKey?: string | null
+}) {
+  const [tracked, setTracked] = useState<{ scopeKey: string | null; state: ErpAiSelectionState }>()
+  const state = tracked?.scopeKey === scopeKey ? tracked.state : emptySelection
 
-  const setActiveTab = useCallback((nextActiveTab: string | null) => {
-    setActiveTabState((prev) => {
-      if (prev !== nextActiveTab) {
-        setSelectionState(null)
-      }
-      return nextActiveTab
+  useEffect(() => {
+    setTracked(current => current?.scopeKey === scopeKey ? current : undefined)
+  }, [scopeKey])
+
+  const update = useCallback((transform: (state: ErpAiSelectionState) => ErpAiSelectionState) => {
+    setTracked(current => {
+      const previous = current?.scopeKey === scopeKey ? current.state : emptySelection
+      const next = transform(previous)
+      return current?.scopeKey === scopeKey && previous === next ? current : { scopeKey, state: next }
     })
-  }, [])
+  }, [scopeKey])
 
-  const setSelection = useCallback((nextSelection: AiEntitySelection | null) => {
-    setSelectionState(nextSelection)
-    if (nextSelection?.activeTab) {
-      setActiveTabState(nextSelection.activeTab)
-    }
-  }, [])
+  const setActiveTab = useCallback((activeTab: string | null) => {
+    update(previous => previous.activeTab === activeTab ? previous : { activeTab, selection: null })
+  }, [update])
 
-  const clearSelection = useCallback(() => {
-    setSelectionState(null)
-  }, [])
+  const setSelection = useCallback((selection: AiEntitySelection | null) => {
+    update(previous => ({ activeTab: selection?.activeTab ?? previous.activeTab, selection }))
+  }, [update])
 
-  const state = useMemo(() => ({ activeTab, selection }), [activeTab, selection])
+  const clearSelection = useCallback(() => setSelection(null), [setSelection])
+
   const reporter = useMemo(
     () => ({ setActiveTab, setSelection, clearSelection }),
     [clearSelection, setActiveTab, setSelection],

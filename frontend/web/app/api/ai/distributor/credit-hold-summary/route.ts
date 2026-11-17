@@ -35,12 +35,12 @@ export async function POST(request: NextRequest) {
   const gateway = await fetchAiGateway("/v1/skills/distributor/credit-hold-summary", {
     method: "POST",
     body: JSON.stringify({
-      org_id: orgId,
-      company_id: companyId,
-      minimum_outstanding: minimumOutstanding,
-      stdb_token: session.stdbToken,
-      identity_hex: session.identityHex,
-      org_privacy_policy: resolveAiPrivacyPolicy(session.fieldAccess),
+      orgId,
+      companyId,
+      minimumOutstanding,
+      stdbToken: session.stdbToken,
+      identityHex: session.identityHex,
+      orgPrivacyPolicy: resolveAiPrivacyPolicy(session.fieldAccess),
     }),
   })
   const payload = gateway.text ? safeJson(gateway.text) : {}

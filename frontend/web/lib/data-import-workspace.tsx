@@ -31,6 +31,7 @@ import {
 } from "./import-task-navigation"
 import type { SavedImportScope } from "./use-saved-import-task"
 import type { ChatImportTask } from "./chat-import-task"
+import type { ImportPreparationSection } from "./import-preparation"
 
 export type DataImportWorkspaceProps = {
   organizationId: number
@@ -41,6 +42,7 @@ export type DataImportWorkspaceProps = {
   syncUrl?: boolean
   sourceHistory?: ReactNode
   urlSearch?: string
+  preparationTarget?: ImportPreparationSection["targetEntity"]
   onTaskFocus?: (task: ChatImportTask) => void
 }
 
@@ -92,6 +94,7 @@ function ScopedWorkspace({
   syncUrl = true,
   sourceHistory,
   urlSearch,
+  preparationTarget,
   onTaskFocus,
 }: DataImportWorkspaceProps & { identity: string; companyId: number }) {
   const { t } = useTranslation()
@@ -163,6 +166,7 @@ function ScopedWorkspace({
         <SavedImportWorkspace
           key={location.taskId}
           scope={scope}
+          preparationTarget={preparationTarget}
           taskId={location.taskId}
           view={location.view}
           initialReviewId={location.reviewId}
@@ -246,10 +250,9 @@ function ScopedWorkspace({
         />
       ) : null}
       {history}
-      <LegacyWorkspace
-        organizationId={organizationId}
-        initialReviewId={initialReviewId}
-      />
+      {preparationTarget ? null : (
+        <LegacyWorkspace organizationId={organizationId} initialReviewId={initialReviewId} />
+      )}
     </div>
   )
 }

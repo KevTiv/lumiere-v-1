@@ -1,5 +1,6 @@
 'use client';
 
+import { AskAboutRecordButton } from '../../../../../components/ask-about-record-button';
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -329,8 +330,12 @@ function PurchaseOrderPageLoaded({
 
   const receipts = purchaseHandoffSectionData(pickingsQuery, (rows) => purchaseDiscrepancyReceipts(order, scope, rows));
   const bills = purchaseHandoffSectionData(movesQuery, (rows) => purchaseDiscrepancyBills(order, scope, rows));
-  const receiptCount = receipts.result?.links.length ?? 0;
-  const billCount = bills.result?.links.length ?? 0;
+  const relatedCount = ({ state, result }: ReturnType<typeof purchaseHandoffSectionData>) => {
+    if (result?.status === 'ready') return result.links.length;
+    if (state.status === 'loading') return t('common.loading');
+    if (state.status === 'denied') return t('purchasing.order.relatedAccessRestricted', { defaultValue: 'Access restricted' });
+    return t('purchasing.order.relatedUnavailable', { defaultValue: 'Unavailable' });
+  };
 
   const detail = purchaseOrderDetailConfig(t);
   const detailConfig = {
@@ -517,14 +522,14 @@ function PurchaseOrderPageLoaded({
               {
                 id: 'lines',
                 label: t('purchasing.orderLines.title'),
-                count: lines.length,
+                count: linesState.status === 'ready' && linesQuery.data ? lines.length : relatedCount({ state: linesState }),
                 icon: <ListOrdered className="h-4 w-4" />,
                 onClick: () => setActiveTab('lines'),
               },
               {
                 id: 'receipts',
                 label: t('purchasing.order.receipts', { defaultValue: 'Receipts' }),
-                count: receiptCount,
+                count: relatedCount(receipts),
                 icon: <PackageCheck className="h-4 w-4" />,
                 onClick: () => setActiveTab('handoffs'),
                 hideWhenZero: true,
@@ -532,7 +537,7 @@ function PurchaseOrderPageLoaded({
               {
                 id: 'bills',
                 label: t('purchasing.order.bills', { defaultValue: 'Vendor bills' }),
-                count: billCount,
+                count: relatedCount(bills),
                 icon: <FileText className="h-4 w-4" />,
                 onClick: () => setActiveTab('handoffs'),
                 hideWhenZero: true,
@@ -542,6 +547,7 @@ function PurchaseOrderPageLoaded({
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <AskAboutRecordButton entityType="purchase_order" recordId={orderId} label={label} activeTab={activeTab} />
             <RecordWorkflowActions
               actions={headerActions}
               record={record}

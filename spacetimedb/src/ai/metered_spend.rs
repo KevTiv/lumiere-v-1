@@ -19,6 +19,28 @@ use crate::core::users::find_user_profile_for_identity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 const MAX_USAGE: u32 = 10_000_000;
+pub(super) const EMBEDDING_MODEL: &str = "mistral-embed";
+
+pub(super) fn latest_metered_price(
+    ctx: &ReducerContext,
+    org: u64,
+    agent: u64,
+    model: &str,
+    unit: &str,
+    currency: &str,
+) -> Option<AiMeteredPrice> {
+    ctx.db
+        .ai_metered_price()
+        .ai_metered_price_by_org()
+        .filter(&org)
+        .filter(|price| {
+            price.agent_id == agent
+                && price.model == model
+                && price.unit == unit
+                && price.currency == currency
+        })
+        .max_by_key(|price| price.version)
+}
 
 fn require_metered_writer(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     let service = "ai_spend_writer".to_string();
@@ -140,7 +162,7 @@ fn validate_meter(model: &str, unit: &str) -> Result<(), String> {
     {
         return Err("an exact model and supported usage meter are required".into());
     }
-    if (unit == "tokens" && model != "mistral-embed")
+    if (unit == "tokens" && model != EMBEDDING_MODEL)
         || (unit == "pages" && !model.starts_with("mistral-ocr-"))
     {
         return Err("model does not support the requested usage meter".into());
@@ -164,7 +186,6 @@ pub fn configure_ai_metered_price(
 ) -> Result<(), String> {
     // Tenant Owner wildcards are not platform authority to change provider prices.
     require_platform_superuser(ctx)?;
-    check_permission(ctx, organization_id, "ai_spend", "configure_meter")?;
     validate_meter(&params.model, &params.unit)?;
     if params.currency.len() != 3
         || !params.currency.bytes().all(|b| b.is_ascii_uppercase())
@@ -173,31 +194,39 @@ pub fn configure_ai_metered_price(
     {
         return Err("invalid metered currency or price".into());
     }
-    let agent = ctx
-        .db
-        .ai_agent()
-        .id()
-        .find(&agent_id)
-        .ok_or("agent not found")?;
-    if agent.organization_id != organization_id
-        || !agent.is_active
-        || !spend::provider_eq(&agent.provider, "mistral")
-        || !spend::model_allowed(&agent.allowed_models, &params.model)
-    {
-        return Err("metered model is not allowed for this agent".into());
+    if organization_id == 0 {
+        // Global prices are platform approvals keyed by template ID. Tenant
+        // reservations can only use a snapshot in their own organization.
+        super::platform_defaults::require_template_embedding_scope(
+            ctx,
+            agent_id,
+            &params.model,
+            &params.currency,
+        )?;
+    } else {
+        check_permission(ctx, organization_id, "ai_spend", "configure_meter")?;
+        let agent = ctx
+            .db
+            .ai_agent()
+            .id()
+            .find(&agent_id)
+            .ok_or("agent not found")?;
+        if agent.organization_id != organization_id
+            || !agent.is_active
+            || !spend::provider_eq(&agent.provider, "mistral")
+            || !spend::model_allowed(&agent.allowed_models, &params.model)
+        {
+            return Err("metered model is not allowed for this agent".into());
+        }
     }
-    let latest = ctx
-        .db
-        .ai_metered_price()
-        .ai_metered_price_by_org()
-        .filter(&organization_id)
-        .filter(|p| {
-            p.agent_id == agent_id
-                && p.model == params.model
-                && p.unit == params.unit
-                && p.currency == params.currency
-        })
-        .max_by_key(|p| p.version);
+    let latest = latest_metered_price(
+        ctx,
+        organization_id,
+        agent_id,
+        &params.model,
+        &params.unit,
+        &params.currency,
+    );
     if latest
         .as_ref()
         .is_some_and(|p| p.units_per_1k == params.units_per_1k)
@@ -314,40 +343,22 @@ pub fn reserve_ai_metered_spend(
     }
     super::owner_configuration::require_single_pool(ctx, organization_id, params.agent_id)?;
     let period = spend::current_period(ctx.timestamp)?;
-    let budgets: Vec<_> = ctx
-        .db
-        .ai_spend_budget()
-        .ai_spend_budget_by_agent_period()
-        .filter((&params.agent_id, &period))
-        .filter(|p| p.organization_id == organization_id)
-        .collect();
-    if budgets.len() != 1 {
-        return Err("one existing current-period budget is required".into());
-    }
-    let currency = &budgets[0].currency;
-    let prices: Vec<_> = ctx
-        .db
-        .ai_metered_price()
-        .ai_metered_price_by_org()
-        .filter(&organization_id)
-        .filter(|p| {
-            p.agent_id == params.agent_id
-                && p.model == params.model
-                && p.unit == params.unit
-                && &p.currency == currency
-        })
-        .collect();
-    let price = prices
-        .into_iter()
-        .max_by_key(|p| p.version)
-        .ok_or("metered price is not configured")?;
     let budget = super::owner_configuration::budget_for_reservation(
         ctx,
         organization_id,
         params.agent_id,
         &period,
-        &price.currency,
+        None,
     )?;
+    let price = latest_metered_price(
+        ctx,
+        organization_id,
+        params.agent_id,
+        &params.model,
+        &params.unit,
+        &budget.currency,
+    )
+    .ok_or("metered price is not configured")?;
     let reserved = metered_cost(price.units_per_1k, params.allowance)?;
     let outstanding = spend::reserve_units(
         budget.limit_units,

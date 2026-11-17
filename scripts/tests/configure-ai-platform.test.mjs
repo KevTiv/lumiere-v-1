@@ -6,21 +6,27 @@ const profile = model => ({ provider: 'mistral', model, maxTokens: 1000, context
   timeoutMs: 30000, maxConcurrency: 1, inputUnitsPer1k: 10, outputUnitsPer1k: 20 })
 const manifest = () => ({ templateKey: 'alpha', templateVersion: 1, generation: profile('fixture-generation'),
   review: profile('fixture-review'), skillIds: [1, 2, 3], currency: 'USD', monthlyLimitUnits: 1_000_000,
-  rateLimitPerMinute: 10, maxEnrolledOrganizations: 5 })
+  rateLimitPerMinute: 10, maxEnrolledOrganizations: 5, embeddingUnitsPer1k: 123 })
 function fixture() {
   let registered = false
   let active = null
+  let price
   const calls = []
   const client = {
     async call(name, args) {
       calls.push({ name, args })
       if (name === 'register_ai_platform_template') registered = true
+      else if (name === 'configure_ai_metered_price') {
+        assert.deepEqual(args, [0, 7, { model: 'mistral-embed', unit: 'tokens', currency: 'USD', units_per_1_k: 123 }])
+        price = { units_per_1_k: args[2].units_per_1_k, version: 1 }
+      }
       else if (name === 'set_ai_platform_default') active = args[0]
       else throw new Error('unexpected mutation')
     },
     async sql(statement) {
       if (statement.includes('FROM ai_platform_template')) return registered ? [{ id: 7, ...templateParams(manifest()) }] : []
       if (statement.includes('FROM ai_platform_default')) return [{ template_id: active }]
+      if (statement.includes('FROM ai_metered_price')) return price ? [price] : []
       throw new Error('unexpected query')
     },
   }
@@ -38,11 +44,21 @@ test('register does not activate; activate verifies and is repeatable', async ()
   assert.deepEqual(await configurePlatform(manifest(), client), { registered: false, active: false, billableCalls: 0 })
   assert.deepEqual(calls, [])
   assert.equal((await configurePlatform(manifest(), client, '--register')).active, false)
-  assert.deepEqual(calls.map(call => call.name), ['register_ai_platform_template'])
+  assert.deepEqual(calls.map(call => call.name), ['register_ai_platform_template', 'configure_ai_metered_price'])
   assert.equal((await configurePlatform(manifest(), client, '--activate')).active, true)
   assert.equal((await configurePlatform(manifest(), client, '--activate')).active, true)
   assert.deepEqual(calls.at(-1), { name: 'set_ai_platform_default', args: [{ some: 7 }] })
   assert.equal(calls.filter(call => call.name === 'register_ai_platform_template').length, 1)
+  assert.equal(calls.filter(call => call.name === 'configure_ai_metered_price').length, 1)
+})
+
+test('Mistral activation needs a reviewed rate and never overwrites one', async () => {
+  const { client, calls } = fixture()
+  await assert.rejects(configurePlatform({ ...manifest(), embeddingUnitsPer1k: undefined }, client, '--activate'), /reviewed embeddingUnitsPer1k/)
+  assert.deepEqual(calls, [])
+  await configurePlatform(manifest(), client, '--register')
+  await assert.rejects(configurePlatform({ ...manifest(), embeddingUnitsPer1k: 456 }, client, '--activate'), /review an existing/)
+  assert.equal(calls.length, 2)
 })
 test('unknown registration outcome prevents activation and is never retried', async () => {
   const { client, calls } = fixture()
@@ -105,6 +121,7 @@ test('check verifies nested SQL tuple profile and SATS option encodings', async 
     async sql(statement) {
       if (statement.includes('FROM ai_platform_template')) return [{ id: 7, ...expected,
         generation_profile: wireProfile(expected.generation_profile), review_profile: wireProfile(expected.review_profile) }]
+      if (statement.includes('FROM ai_metered_price')) return [{ units_per_1_k: 123, version: 1 }]
       return [{ template_id: [0, 7] }]
     },
   }

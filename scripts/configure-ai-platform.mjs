@@ -8,7 +8,7 @@ const integer = (value, max = 0xffffffff) => Number.isSafeInteger(value) && valu
 const label = value => typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,95}$/.test(value)
 const option = value => value == null ? { none: [] } : { some: value }
 const fields = ['templateKey', 'templateVersion', 'generation', 'review', 'skillIds', 'currency',
-  'monthlyLimitUnits', 'rateLimitPerMinute', 'maxEnrolledOrganizations']
+  'monthlyLimitUnits', 'rateLimitPerMinute', 'maxEnrolledOrganizations', 'embeddingUnitsPer1k']
 const profileFields = ['provider', 'model', 'maxTokens', 'contextWindow', 'timeoutMs', 'maxConcurrency',
   'inputUnitsPer1k', 'outputUnitsPer1k']
 
@@ -54,6 +54,10 @@ export function templateParams(config) {
   const review_profile = profile('review')
   ensure(generation_profile.provider === review_profile.provider, 'generation and review must use the same provider')
   ensure(generation_profile.model !== review_profile.model, 'review requires a distinct model')
+  if (config.embeddingUnitsPer1k !== undefined) {
+    ensure(generation_profile.provider === 'mistral' && integer(config.embeddingUnitsPer1k, 1_000_000_000_000),
+      'a reviewed embedding rate requires Mistral and positive microunits per 1,000 tokens')
+  }
   return { template_key: config.templateKey, template_version: config.templateVersion,
     generation_profile, review_profile, skill_ids: config.skillIds, currency: config.currency,
     monthly_limit_units: config.monthlyLimitUnits, rate_limit_per_minute: config.rateLimitPerMinute,
@@ -129,6 +133,8 @@ function verifyTemplate(row, params) {
 export async function configurePlatform(config, client, mode = '--check') {
   const params = templateParams(config)
   ensure(['--check', '--register', '--activate'].includes(mode), 'invalid platform setup mode')
+  ensure(mode === '--register' || params.generation_profile.provider !== 'mistral' || config.embeddingUnitsPer1k !== undefined,
+    'Mistral readiness requires a reviewed embeddingUnitsPer1k')
   const statement = `SELECT * FROM ai_platform_template WHERE template_key = '${params.template_key}' AND template_version = ${params.template_version}`
   let rows = await client.sql(statement)
   ensure(rows.length <= 1, 'platform template is ambiguous')
@@ -141,6 +147,19 @@ export async function configurePlatform(config, client, mode = '--check') {
   verifyTemplate(rows[0], params)
   const templateId = Number(rows[0].id)
   ensure(integer(templateId, Number.MAX_SAFE_INTEGER), 'invalid platform template ID')
+  if (config.embeddingUnitsPer1k !== undefined) {
+    const meter = { model: 'mistral-embed', unit: 'tokens', currency: params.currency, units_per_1_k: config.embeddingUnitsPer1k }
+    const sql = `SELECT units_per_1_k, version FROM ai_metered_price WHERE organization_id = 0 AND agent_id = ${templateId} AND model = 'mistral-embed' AND unit = 'tokens' AND currency = '${params.currency}'`
+    const latest = async () => (await client.sql(sql)).sort((a, b) => Number(b.version) - Number(a.version))[0]
+    let price = await latest()
+    if (!price && mode !== '--check') {
+      await client.call('configure_ai_metered_price', [0, templateId, meter])
+      price = await latest()
+      ensure(price, 'platform embedding price registration is unconfirmed')
+    }
+    if (!price) return { templateId, registered: true, active: false, billableCalls: 0, missing: ['embedding_price'] }
+    ensure(Number(price.units_per_1_k) === meter.units_per_1_k, 'review an existing template embedding price before changing it')
+  }
   if (mode === '--activate') await client.call('set_ai_platform_default', [option(templateId)])
   const defaults = await client.sql('SELECT template_id FROM ai_platform_default WHERE id = 1')
   ensure(defaults.length <= 1, 'platform default is ambiguous')
@@ -159,7 +178,7 @@ async function main() {
   ensure(raw?.trim(), 'missing AI_PLATFORM_TEMPLATE_JSON')
   let config
   try { config = JSON.parse(raw) } catch { throw new Error('platform template contains invalid JSON') }
-  const result = mode === '--plan' ? { params: templateParams(config), billableCalls: 0 }
+  const result = mode === '--plan' ? { params: templateParams(config), embeddingUnitsPer1k: config.embeddingUnitsPer1k, billableCalls: 0 }
     : await configurePlatform(config, platformClient(process.env), mode)
   console.log(JSON.stringify(result, null, 2))
   if (mode === '--check' && !result.active) process.exitCode = 1

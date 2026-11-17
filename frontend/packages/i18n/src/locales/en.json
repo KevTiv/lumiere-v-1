@@ -1,4 +1,43 @@
 {
+  "moduleRecords": {
+    "shopSales": "Shop sales",
+    "saleDate": "Sale date",
+    "savedShopSale": "Saved shop sale",
+    "shop": "Shop",
+    "emptyShopSales": "No shop sales have been saved.",
+    "sales": "Customer sales summaries",
+    "warehouse": "Recorded counts",
+    "period": "Sales period",
+    "countDate": "Count date",
+    "customer": "Customer",
+    "product": "Product",
+    "quantity": "Quantity",
+    "unitPrice": "Unit price",
+    "reportedTotal": "Reported total",
+    "paymentComment": "Payment note",
+    "pieces": "Pieces",
+    "kilograms": "Kilograms",
+    "location": "Location",
+    "source": "Source",
+    "sourceRow": "{{file}} · row {{row}}",
+    "showAll": "Show all records",
+    "loadMore": "Load more",
+    "emptySales": "No customer sales summaries have been saved.",
+    "emptyCounts": "No counts have been saved.",
+    "emptyFiltered": "No records match the selected dates or import.",
+    "otherCompany": "Switch to the company used for this import to see its records.",
+    "loadError": "Could not load records.",
+    "recordHistory": "View history",
+    "recordHistoryLabel": "View history for {{file}} row {{row}}",
+    "savedSale": "Saved customer sales summary",
+    "savedCount": "Saved physical count",
+    "recordUnavailable": "This saved record is unavailable in your current workspace.",
+    "sourceCustomer": "Source customer name",
+    "unit": "Source unit",
+    "currency": "Currency",
+    "savedAt": "Saved at",
+    "sourceRevision": "Revision {{revision}}"
+  },
   "activation": {
     "tasks": {
       "contact": "Add a contact",
@@ -52,6 +91,10 @@
     }
   },
   "recordChanges": {
+    "valueAbsent": "Field absent",
+    "valueRestricted": "Restricted",
+    "valueUnavailable": "Value not recorded",
+    "savedChange": "Saved change",
     "title": "Changes",
     "permission": "Business change history",
     "loading": "Loading changes…",
@@ -682,6 +725,7 @@
     "manufacturing": "Manufacturing",
     "map": "Map",
     "fleet": "Fleet",
+    "farmBatches": "Farm Batches",
     "helpdesk": "Helpdesk",
     "workflows": "Workflows",
     "documents": "Documents",
@@ -1236,6 +1280,13 @@
       "dpoHint": "Open bill balances relative to bills posted in the last {{count}} days.",
       "daysValue": "{{count}} days",
       "noPostings": "Nothing posted in this period to compare against.",
+      "allDuration": "All history has no finite duration for DSO/DPO.",
+      "allNoPrior": "No prior period for all history",
+      "timezoneFallback": "UTC fallback: organization timezone unavailable or invalid",
+      "organizationTimezone": "Organization timezone",
+      "historyDatesHint": "Future postings excluded; undated or unavailable posting dates cannot be included in historical totals.",
+      "historyTrendHint": "Posted invoice and bill totals in adaptive reporting-calendar buckets. Every dated historical posting in the selected period is retained.",
+      "historyBankHint": "Latest closing balance per bank journal at each adaptive reporting-calendar bucket end; future statements excluded.",
       "previous": "Previous period",
       "vsPrevious": "vs previous period",
       "noBaseline": "No previous-period baseline",
@@ -1310,15 +1361,15 @@
       "currency": "Currency",
       "currencyUnspecified": "Currency unspecified",
       "activityTitle": "Document activity",
-      "activityHint": "Posted invoices and vendor bills over the past six months",
+      "activityHint": "Posted invoices and vendor bills in the selected analysis period",
       "activityPosted": "Posted documents",
       "activityInvoices": "Customer invoices",
       "activityBills": "Vendor bills",
       "activityEmpty": "No posted documents in this period",
-      "activityAccessible": "Monthly posted document counts. Expand monthly counts below for exact values.",
-      "activityPeriodHint": "Calendar months in UTC; the current month includes documents dated through today.",
-      "activityTable": "View monthly counts",
-      "activityMonth": "Month",
+      "activityAccessible": "Posted document counts by period. Expand period counts below for exact values.",
+      "activityPeriodHint": "Adaptive reporting-calendar buckets in the selected analysis period; future postings excluded. Current queues and open balances are unaffected.",
+      "activityTable": "View period counts",
+      "activityMonth": "Period",
       "description": "Keep balances in view and the next task within reach.",
       "newJournalEntry": "Journal entry",
       "newBill": "New bill",
@@ -1591,6 +1642,8 @@
       "partnerId": "Partner #{{id}}",
       "statusUnavailable": "Status unavailable",
       "entriesInView": "Entries in this view",
+      "importedSelection": "Journal entries from the saved import",
+      "clearImportedSelection": "Show all journal entries",
       "cancelEntryAction": "Cancel entry",
       "cancelEntryConfirm": "Cancel this journal entry?"
     },
@@ -4049,6 +4102,12 @@
       "opportunityFunnel": "Opportunity Funnel",
       "weightedPipeline": "Weighted pipeline",
       "forecastSnapshot": "Last forecast",
+      "forecastCaptured": "Captured",
+      "forecastEmpty": "No forecast snapshots for this company.",
+      "forecastPeriod": "Snapshot period",
+      "forecastSaved": "Forecast snapshot saved",
+      "forecastSaving": "Saving forecast snapshot…",
+      "forecastStoredWeight": "Weighted pipeline (currency unspecified)",
       "pipelineHealthAttribution": "Pipeline & attribution"
     },
     "leads": {
@@ -4937,12 +4996,44 @@
     },
     "segments": {
       "rulesTitle": "Dynamic segment rules",
-      "rulesDescription": "Bounded AST (country / flags). Evaluate to refresh membership.",
+      "rulesDescription": "Contacts must match every rule. Evaluate to refresh membership.",
       "select": "Dynamic segment",
       "selectPlaceholder": "Choose segment",
       "noRules": "No rules yet.",
-      "applySample": "Apply AU customer rules",
-      "evaluate": "Evaluate"
+      "evaluate": "Evaluate",
+      "addRule": "Add rule",
+      "evaluated": "Membership refreshed.",
+      "existingMembers": "Current membership: {{count}}",
+      "removeAllImpact": "This removes every rule. Current membership stays in place, and evaluation requires at least one rule.",
+      "removeRule": "Remove rule",
+      "replacementImpact": "These rules replace the current rules. Existing membership changes when you evaluate the new rules.",
+      "replacementTitle": "Rules after saving",
+      "resetRules": "Reload saved rules",
+      "reviewRules": "Review changes",
+      "ruleField": "Rule field {{number}}",
+      "ruleOperator": "Rule operator {{number}}",
+      "rulesCannotEdit": "These saved rules include settings that this editor cannot preserve.",
+      "rulesChanged": "The saved rules changed while you were editing.",
+      "rulesRefreshConflict": "Saved rules could not be verified. Reload the saved rules before replacing them.",
+      "rulesSaved": "Rules saved. Evaluate to update membership.",
+      "ruleValue": "Rule value {{number}}",
+      "saveRules": "Save replacement rules",
+      "fields": {
+        "CountryCode": "Country code",
+        "City": "City",
+        "Industry": "Industry",
+        "IsCustomer": "Customer",
+        "IsProspect": "Prospect",
+        "IsVendor": "Vendor",
+        "TagId": "Contact tag"
+      },
+      "operators": {
+        "Eq": "Equals",
+        "Neq": "Does not equal",
+        "Contains": "Contains",
+        "IsTrue": "Yes",
+        "IsFalse": "No"
+      }
     },
     "inlineEdit": {
       "emailInvalid": "Enter a valid email address",
@@ -5241,7 +5332,12 @@
       "openPositions": "Open Positions",
       "pendingLeaveRequests": "Pending Leave Requests",
       "runningContracts": "Running Contracts",
-      "headcountTrend": "Headcount Trend",
+      "headcountTrend": "Reconstructed Headcount",
+      "headcount": "Headcount",
+      "requestedLeaveDays": "Requested Leave Days in Selected Period",
+      "unspecifiedLeaveType": "Unspecified leave type",
+      "historyBasisTitle": "Historical chart basis",
+      "historyBasis": "Headcount is reconstructed from known hire and termination dates at each bucket end, not a complete historical staffing snapshot. Employees without hire dates and inactive employees without termination dates are excluded. Leave usage counts full requested days by request start date in the selected period, not prorated overlap. Dates use UTC. Current headcount and work queues remain current.",
       "payslipsToExport": "Payslips to export"
     },
     "employees": {
@@ -5945,6 +6041,13 @@
     }
   },
   "inventory": {
+    "ops": {
+      "shortAtp": "Stock shortages",
+      "expiredLots": "Expired lots",
+      "openQc": "Open quality failures",
+      "summary": "Summary",
+      "empty": "No open exceptions in this queue."
+    },
     "warehouseSetup": {
       "title": "Warehouse setup",
       "company-required": "Select an operating company before setting up a warehouse.",
@@ -6005,7 +6108,12 @@
       "pendingTransfers": "Pending Transfers",
       "stockTurnover": "Top Products by Stock Movement",
       "skuFallback": "SKU-{{id}}",
-      "productFallback": "Product {{id}}"
+      "productFallback": "Product {{id}}",
+      "belowMinimum": "Below minimum",
+      "categoryUnavailable": "Category unavailable",
+      "incompleteLowStock": "Low Stock Items · incomplete data",
+      "rulesWithoutStock": "{{count}} reorder positions have no stock record. Open Replenishment to review those rules.",
+      "zeroAvailable": "Zero available"
     },
     "tabs": {
       "productCategories": "Categories",
@@ -6142,7 +6250,8 @@
       "backToTransfers": "Back to transfers",
       "discussion": "Discussion",
       "notFound": "Transfer not found",
-      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "notFoundHint": "It may have been removed or belong to another company.",
+      "selectCompany": "Select an operating company to open this transfer.",
       "purchaseOrder": "Purchase order",
       "saleOrder": "Sales order",
       "backorders": "Backorders",
@@ -7351,7 +7460,12 @@
         "empty": "No attributes or variants configured for this product.",
         "title": "Variants",
         "valueCount": "Count",
-        "values": "Values"
+        "values": "Values",
+        "attributes": "Variant attributes",
+        "noAttributes": "No variant attributes configured.",
+        "noSaved": "No saved variants for this product.",
+        "reference": "Variant reference",
+        "unavailable": "Saved variants are unavailable."
       },
       "vendors": {
         "currency": "Currency",
@@ -7390,6 +7504,16 @@
       "description": "Packed shipments awaiting confirmation or dispatch",
       "emptyMessage": "No packages found.",
       "title": "Packages"
+    },
+    "currencyEmpty": "No active currencies are available.",
+    "currencyLoading": "Loading currencies…",
+    "stockReadIncomplete": "Stock data incomplete",
+    "warehouse3d": {
+      "invalidMove": "Choose a different active internal location and enter a quantity within available stock.",
+      "loading": "Loading warehouse data…",
+      "noWarehouses": "No active warehouses in this company.",
+      "noZones": "No 3D zones are set up for this warehouse.",
+      "selectWarehouse": "Select a warehouse"
     }
   },
   "purchasing": {
@@ -8253,6 +8377,8 @@
       "attachments": "Attachments",
       "backToOrders": "Back to purchase orders",
       "bills": "Vendor bills",
+      "relatedAccessRestricted": "Access restricted",
+      "relatedUnavailable": "Unavailable",
       "createBill": "Create bill",
       "discussion": "Discussion",
       "handoffs": "Receipts & vendor bills",
@@ -10337,6 +10463,7 @@
       "confirm": "Confirm event",
       "noAttendees": "No attendees",
       "editRecurrence": "Edit recurrence",
+      "invalidRecurrence": "Enter a valid daily, weekly, monthly or yearly recurrence rule.",
       "rrule": "Recurrence rule",
       "rruleType": "Recurrence type",
       "duplicate": "Duplicate",
@@ -10387,6 +10514,7 @@
       "agendaRange": "{{start}} to {{end}}",
       "eventDetails": "Event details",
       "browserTimezone": "Times shown in {{timezone}} (this browser)",
+      "recurrenceUnavailable": "Some recurring dates could not be displayed. Open the original event to check its recurrence.",
       "timezoneSource": {
         "account": "Times shown in {{timezone}} (account setting)",
         "browser": "Times shown in {{timezone}} (browser fallback)",
@@ -10935,7 +11063,10 @@
       "manage": "Manage",
       "deleteAction": "Move to recycle bin",
       "versionChanges": "Changes",
-      "standalone": "Standalone file"
+      "standalone": "Standalone file",
+      "holdStatusChanged": "Legal hold status changed or is unavailable. Check the current status and try again.",
+      "holdUnavailable": "Legal hold status is unavailable.",
+      "loadingHold": "Checking legal hold status…"
     },
     "knowledgeActions": {
       "categoryInvalid": "Enter a name, a colour from 0 to 11 and a whole-number sequence.",
@@ -12366,7 +12497,9 @@
       "planSetup": "A plan needs a product, a price list and an active invoice journal. Complete the missing setup in the catalog and accounting, then refresh. Your entries are retained.",
       "inheritedCustomer": "Inherited from the selected sales order",
       "statusUnavailable": "Status unavailable",
-      "contractMrrHistory": "Estimated MRR and churn · last 12 months ({{currency}})",
+      "contractMrrHistory": "Estimated contract MRR and churn ({{currency}})",
+      "historyBasisTitle": "Contract history estimate",
+      "historyBasis": "History applies current contract MRR to recorded start and close dates; it is not a historical billing or MRR ledger. Contracts with unknown start dates or closed contracts with unknown close dates are excluded. The selected range uses UTC dates and ends no later than now. Plan mix always shows current contract MRR, regardless of the selected range.",
       "contractMrrByPlan": "Current contract MRR by plan ({{currency}})"
     },
     "lifecycle": {
@@ -13771,6 +13904,10 @@
       "noSkills": "No skills selected.",
       "noModule": "No active module",
       "contextSelect": "Assistant context",
+      "clearSelection": "Remove selected record from chat",
+      "clearFiles": "Remove files from this message",
+      "focusedFiles": "{{count}} files in this message",
+      "askAboutRecord": "Ask Lumière",
       "openFull": "Open full workspace",
       "dockBesideErp": "Dock beside ERP"
     },
@@ -13815,6 +13952,8 @@
       "attachFiles": "Attach CSV or XLSX files",
       "uncertain": "An upload has no confirmed result yet. Check again, or select the same original files in the same order to retry its saved request.",
       "check": "Check saved imports",
+      "checkingOutcome": "Checking saved import…",
+      "receiptUnavailable": "Saved import is unavailable.",
       "ready": "Import prepared for review",
       "preparationFailed": "Files saved · preparation needs attention",
       "saved": "Files saved · preparation can be resumed",
@@ -13933,7 +14072,9 @@
       "chooseOutcome": "Choose a verdict",
       "reviewNote": "Review note",
       "saveReview": "Save review",
-      "navigation": "Guide navigation"
+      "navigation": "Guide navigation",
+      "historyLoading": "Loading revision history…",
+      "historyUnavailable": "Revision history is unavailable."
     },
     "title": "AI Assistant",
     "subtitle": "Type @ for commands",
@@ -13965,6 +14106,17 @@
     },
     "commands": "Commands",
     "thinking": "Thinking...",
+    "progress": {
+      "sending": "Sending message…",
+      "answering": "Writing reply…",
+      "preparingDraft": "Preparing a draft for review…",
+      "savingReply": "Saving reply to history…",
+      "stop": "Stop reply",
+      "stopping": "Stopping reply…",
+      "stopped": "Reply stopped.",
+      "partial": "Reply stopped. Partial reply only.",
+      "jumpToLatest": "Jump to latest"
+    },
     "sources": "Sources",
     "sourceLive": "Live",
     "sourceMemory": "Memory",
@@ -13981,6 +14133,70 @@
       "send": "send"
     },
     "requestFailed": "The assistant request failed. Review the error and your message before sending again.",
+    "history": {
+      "allModules": "All modules",
+      "archive": "Archive",
+      "archived": "Archived",
+      "attachedReferences": "Attached chat references",
+      "back": "Back to chat",
+      "confirmDecision": "Confirm and save",
+      "confirmedBy": "Confirmed by {{actor}}",
+      "copyLink": "Copy link",
+      "decisionDescription": "Record what you confirmed in this conversation.",
+      "decisionNote": "Confirmed decision",
+      "decisionReceipt": "You confirmed revision {{revision}} · {{date}}",
+      "decisionSaveFailed": "The decision could not be saved. Your note is retained.",
+      "derivedReplyUnavailable": "This reply links to the original conversation. Its source data must be retrieved again for a new answer.",
+      "earlierUnavailable": "Earlier context is temporarily unavailable.",
+      "empty": "No matching conversations.",
+      "inputTooLarge": "Shorten your message before sending. You can attach a file separately.",
+      "latestMessages": "Back to latest messages",
+      "linkCopied": "Conversation link copied.",
+      "linkFailed": "The conversation link could not be copied.",
+      "loadFailed": "Conversation history could not be loaded.",
+      "loadMore": "Load more conversations",
+      "loading": "Loading conversations…",
+      "loadingThread": "Loading conversation…",
+      "messageTruncated": "Part of this saved message exceeds the history display limit.",
+      "module": "Module",
+      "newChat": "New chat",
+      "newerDecision": "A newer revision exists. You are viewing the selected revision.",
+      "olderMessages": "Load older messages",
+      "openCurrentView": "Open current view",
+      "openCurrentWidget": "Open current view for {{widget}}",
+      "openMessage": "Open original message",
+      "openWorkflowSource": "Open workflow source",
+      "recent": "Recent",
+      "referenceApproval": "Saved approval receipt",
+      "referenceDecision": "Saved chat decision",
+      "referenceImportDecision": "Saved import decision",
+      "referenceImportMapping": "Confirmed import mapping",
+      "referenceLimit": "Remove a reference before adding another. Each chat can attach up to four.",
+      "referenceMessage": "Earlier chat message",
+      "referenceUnavailable": "Source unavailable",
+      "removeReference": "Remove {{reference}}",
+      "removeReferenceShort": "Remove",
+      "rename": "Rename",
+      "restore": "Restore",
+      "restoreToContinue": "Restore this conversation to continue.",
+      "reviseDecision": "Revise decision",
+      "revision": "Revision {{revision}}",
+      "saveDecision": "Save decision",
+      "savedChart": "Saved chart",
+      "search": "Search conversations",
+      "sourceDescription": "Original saved conversation source",
+      "status": "Conversation status",
+      "threadTitle": "Conversation title",
+      "threadUnavailable": "This conversation could not be opened.",
+      "title": "History",
+      "untitled": "Untitled conversation",
+      "updateFailed": "The conversation could not be updated.",
+      "useInDraft": "Add reference",
+      "useInNewChat": "Use in new chat",
+      "viewSource": "View source",
+      "waitForReply": "Wait for an Assistant response to finish before sending another message.",
+      "widgetReceiptFailed": "The widget was saved. Its conversation link needs another attempt."
+    },
     "historySaveFailed": "Conversation history may not be available after leaving this page. Your answer is still here. Copy anything you need to keep. This warning does not describe whether a business action completed.",
     "turn": {
       "loadingCompany": "Loading companies. Select a company before asking the assistant.",
@@ -14005,7 +14221,17 @@
       "explain": "Explain this error"
     },
     "native": {
+      "approvals": "Approvals",
       "opening": "Opening…",
+      "openCancelled": "Opening cancelled",
+      "formOpenedStatus": "Form opened",
+      "editorOpenedStatus": "Page editor opened",
+      "viewHint": "View this area in the ERP.",
+      "recordHint": "View the current record in the ERP.",
+      "formHint": "Open the form to review and save the draft in the ERP.",
+      "workflowHint": "Review this change on the record before submitting it.",
+      "editorHint": "Preview changes in the page editor before saving.",
+      "widgetHint": "Preview the widget in the page editor before saving the layout.",
       "reviewHint": "Review inputs and use the existing ERP controls to save or approve changes.",
       "openFailed": "This action could not be opened. Check the current company, access and required setup.",
       "formReady": "Open the native form to review your request. Nothing has been saved.",
@@ -14124,17 +14350,41 @@
       }
     },
     "draft": {
+      "applied": "Applied",
+      "proposedValue": "Proposed value",
+      "beforeProposal": "Before proposal",
+      "proposedAt": "Proposed",
+      "reviewedAt": "Reviewed",
+      "appliedAt": "Applied",
+      "title": "ERP action draft",
+      "intent": {
+        "createTask": "Create task",
+        "createSalesOrder": "Create sales order",
+        "createPurchaseOrder": "Create purchase order",
+        "reversePayment": "Reverse payment"
+      },
+      "checking": "Checking saved draft…",
+      "checkOutcome": "Check outcome",
+      "proposedChanges": "Proposed changes",
+      "noParameters": "No parameters to preview.",
+      "reviewed": "I reviewed the proposed changes.",
       "outcomeUnconfirmed": "Outcome unconfirmed",
       "checkRequired": "Saved status needs checking",
       "submitting": "Submitting decision…",
       "saving": "Saving parameters…",
       "awaitingReview": "Awaiting review",
+      "approve": "Approve draft",
+      "reject": "Reject",
+      "createdRecord": "Created record #{{id}}",
+      "savedReversal": "Saved payment reversal #{{id}}",
+      "openCreated": "Open created record",
       "approved": "Approved",
       "rejected": "Rejected",
       "failed": "Failed",
       "expired": "Expired",
       "parameters": "Draft parameters"
-    }
+    },
+    "skillSetupUnavailable": "Ask your Lumière administrator to check AI setup for this company."
   },
   "aiHarness": {
     "platformProfile": {
@@ -14343,9 +14593,12 @@
       "errorDescription": "Could not compose the report. Please try again.",
       "decisionTitle": "Policy decision",
       "summaryTitle": "Summary",
+      "summaryWithheld": "The summary is withheld pending verification. You can review the source figures below.",
       "citationsTitle": "Citations",
       "rowsProcessed": "{{count}} rows",
-      "browserTimezone": "Uses this browser’s timezone. Financial reports may use a different reporting timezone."
+      "browserTimezone": "Uses this browser’s timezone. Financial reports may use a different reporting timezone.",
+      "catalogEmpty": "No reports are available for composition.",
+      "catalogUnavailable": "The report catalog could not be loaded."
     },
     "redAction": {
       "title": "Red Action Drafts",
@@ -14918,9 +15171,23 @@
       "discussion": "Discussion",
       "notFound": "Vehicle not found",
       "notFoundHint": "It may have been deleted, or belong to another company."
+    },
+    "position": {
+      "lastKnown": "Last known position · {{timestamp}}",
+      "recent": "Recent position · {{timestamp}}",
+      "timestampUnavailable": "Position timestamp unavailable"
     }
   },
   "tasks": {
+    "link": {
+      "title": "Linked task",
+      "review": "Review task changes",
+      "assign": "Assign people",
+      "assignees": "Assignees",
+      "loading": "Loading task…",
+      "error": "The task could not be loaded.",
+      "unavailable": "This task is unavailable in the current company."
+    },
     "page": {
       "title": "Tasks",
       "description": "Cross-project task board backed by live project tasks"
@@ -16098,7 +16365,8 @@
       "errorsLoading": "Loading import row errors…",
       "unknownStatus": "Status unavailable",
       "backToResults": "Back to ERP results",
-      "backToImports": "Back to Data import"
+      "backToImports": "Back to Data import",
+      "loadMoreErrors": "Load more row errors"
     },
     "importReview": {
       "sourceMeaning": "Interpret source notes",
@@ -16174,6 +16442,7 @@
       "checkResult": "Check import result",
       "retrySame": "Retry same submission",
       "importRow": "Import row {{row}}",
+      "sourceColumn": "Source column {{column}}",
       "sourceLine": "Source row {{row}}",
       "search": "Find an item or source file",
       "category": "Product category",
@@ -16183,6 +16452,10 @@
       "referenceHint": "Choose from this organization. Enter quantities and prices for the chosen unit.",
       "importSetup": "Advanced import settings",
       "grouped": {
+        "rowStatus": "Row status",
+        "fieldConfirmation": "{{field}} confirmation",
+        "noDecisionChanges": "No captured values or review statuses changed.",
+        "proposedAfter": "After this decision",
         "unavailableValue": "{{value}} (unavailable)",
         "editor": "Review {{name}}",
         "independentFields": "Confirm each value you know. Unknown weight, original unit and cost can remain unresolved. Choosing a unit never changes quantities or prices.",
@@ -16409,6 +16682,17 @@
       "cardInspection": "Inspection ready",
       "cardFailed": "Preparation needs attention",
       "cardTitle": "Saved import status",
+      "openSourceReview": "Review source rows",
+      "cardPostedTitle": "{{count}} journal entries posted",
+      "cardDraftTitle": "{{count}} journal drafts saved",
+      "cardDraftTotals": "{{currency}} {{amount}} · {{lines}} balanced lines",
+      "cardNeedsOutcome": "Needs attention",
+      "cardExecutionStarted": "Execution started",
+      "cardPartiallySaved": "Partially saved",
+      "cardOpenEntries": "View journal entries",
+      "cardCurrentPosting": "Current state · {{postedCount}} posted · {{draftCount}} draft · {{otherCount}} other · {{unavailableCount}} unavailable",
+      "cardRecordLinks": "Journal entry references",
+      "cardCheck": "Check outcome",
       "cardSourceCounts": "{{ready}} confirmed source rows · {{held}} need a decision · {{excluded}} excluded",
       "cardBoundary": "Source confirmation does not create ERP records. The receipts below describe verified ERP drafts.",
       "cardVerified": "{{records}} verified draft journal entries · {{lines}} lines",
@@ -16442,6 +16726,8 @@
       "cardAccountingTitle": "Accounting drafts",
       "cardNoAccountingProposal": "No saved Accounting draft proposal yet.",
       "cardNativeTitle": "Native import job receipts",
+      "cardNativePending": "Awaiting job receipt",
+      "cardNativeResultTitle": "{{entity}} import · {{state}}",
       "cardNativeBoundary": "These counts come from native import jobs. They do not verify the current product, contact or location records.",
       "cardNativeJob": "Job #{{job}} · {{state}}",
       "cardNativeCounts": "Job reports {{imported}} of {{total}} rows imported · {{errors}} row errors",
@@ -16491,7 +16777,7 @@
       "checkRules": "Check the source rules before preparing.",
       "chooseRecipe": "Choose a saved recipe.",
       "comma": "Comma",
-      "completeCoverage": "Every source record is accounted for as review data, a header or a blank record.",
+      "completeCoverage": "Every selected source record is accounted for as review data, a header or a blank record.",
       "conflictingVersion": "Conflicting source versions",
       "contacts": "Contact records",
       "coverageCounts": "{{review}} review records · {{headers}} headers · {{blank}} blank records",
@@ -16602,6 +16888,7 @@
       "next": "Next",
       "none": "None",
       "observations": "Historical source observations",
+      "farmEvents": "Farm batch events",
       "originalRows": "Original rows",
       "otherRecords": "Plus {{count}} other source records in this group.",
       "overlappingPeriod": "Overlapping reporting periods",
@@ -16640,7 +16927,10 @@
       "transform": "Text adjustment",
       "transformField": "Text field",
       "trim": "Remove surrounding spaces",
-      "uppercase": "Use uppercase letters"
+      "uppercase": "Use uppercase letters",
+      "worksheet": "Worksheet",
+      "worksheetHint": "Choose the sheets to include. Each sheet keeps its original rows and can have its own mapping.",
+      "worksheets": "Worksheets to prepare"
     },
     "selectSection": "Settings section"
   },
@@ -17336,6 +17626,8 @@
       "updateDefinition": "Update pivot",
       "deleteDefinition": "Delete pivot",
       "exportXlsx": "Export XLSX",
+      "exportFailed": "Could not export the pivot table. Try again.",
+      "noSourceReports": "Generate a financial report to preview a pivot.",
       "empty": "Select a generated report to preview the pivot.",
       "searchPlaceholder": "Search pivot rows…"
     },
@@ -18220,6 +18512,31 @@
     "resetDescription": "Return this cancelled document to draft for editing? Only documents that have never been posted can be reset."
   },
   "aiSkills": {
+    "userAccess": {
+      "title": "User access",
+      "description": "Manage individual access to built-in skills across this organization.",
+      "catalogError": "Built-in skills could not be loaded.",
+      "loadingSkills": "Loading built-in skills…",
+      "noSkills": "No built-in skills are available.",
+      "skill": "Built-in skill",
+      "chooseSkill": "Choose a skill",
+      "searchSkills": "Search skills",
+      "person": "Organization member",
+      "choosePerson": "Choose a member",
+      "searchPeople": "Search members",
+      "noPeople": "No active members are available.",
+      "peopleDenied": "Organization directory access is required.",
+      "peopleError": "The member directory could not be loaded.",
+      "accessError": "The member’s skill access could not be verified.",
+      "saving": "Saving access…",
+      "revoked": "Access revoked for this member.",
+      "revokedLabel": "Revoked",
+      "defaultAccess": "This member inherits the organization’s default access.",
+      "loadingAccess": "Checking access…",
+      "restore": "Restore default access",
+      "revoke": "Revoke access",
+      "saveError": "The change could not be confirmed. Check the current access before trying again."
+    },
     "actions": {
       "assignSkill": "Assign skill",
       "cancel": "Cancel",
@@ -18233,7 +18550,7 @@
       "update": "Update"
     },
     "agentRuns": {
-      "description": "Live skill orchestration runs for this organization.",
+      "description": "Live skill orchestration runs for the selected company.",
       "empty": "No runs yet.",
       "stepCount": " ({{count}} steps)",
       "stepCount_one": " ({{count}} step)",
@@ -18248,12 +18565,16 @@
         "pending": "Pending",
         "running": "Running"
       },
-      "title": "Agent runs"
+      "title": "Agent runs",
+      "chooseCompany": "Select a company to view its agent runs.",
+      "unavailable": "Agent runs could not be loaded for this company."
     },
     "assignments": {
       "description": "Link AI personas to skills they may run by default.",
       "empty": "No skill assignments yet.",
-      "title": "Team member skill assignments"
+      "title": "Team member skill assignments",
+      "inputsUnavailable": "The skill or team-member list is unavailable.",
+      "unavailable": "Skill assignments are unavailable."
     },
     "confirm": {
       "removeAssignment": "Remove this skill assignment?"
@@ -18329,77 +18650,71 @@
       }
     },
     "registry": {
+      "draftTest": {
+        "title": "Test draft",
+        "examples": "Test examples",
+        "exampleHelp": "Use sample data. Every saved example must pass before this skill version can be published.",
+        "name": "Example name",
+        "input": "Sample input JSON",
+        "expected": "Expected output JSON",
+        "saveExample": "Save example",
+        "loadError": "Could not load test examples or results.",
+        "companyRequired": "Select a company to run draft tests.",
+        "results": "Draft test results",
+        "pass": "Passed",
+        "badInput": "Input could not be evaluated",
+        "mismatch": "Output differed from expected",
+        "pending": "Awaiting test",
+        "runAll": "Run all examples",
+        "runPublished": "Run published skill",
+        "runInput": "Input JSON",
+        "run": "Run skill",
+        "starter": "Use JSON projection template",
+        "required": "Every saved example must pass before activation. Close this dialog to run the draft tests."
+      },
       "validation": {
-        "title": "Validate a new skill version",
-        "description": "Attach this skill to the running harness. Skill versions can change independently; fixture certification checks the current adapter before activation.",
-        "version": "Skill version",
-        "note": "Validation note",
-        "prepare": "Prepare validation",
-        "attached": "Attached to current harness",
-        "runtime": "Certification runtime",
-        "create": "Create version for validation",
         "advanced": "Advanced manifest",
         "reviewActivate": "Review and activate",
-        "approvalPolicy": "Owners and organization administrators can approve their own certified skills. Other authors and reviewers need an independent approver. The decision and validation note are recorded.",
-        "confirm": "I reviewed the skill and its passing fixture evidence and approve activation for this organization.",
-        "activate": "Activate certified skill"
+        "approvalNote": "Approval note",
+        "releaseApprovalPolicy": "Owners and organization administrators can approve their own skill versions. Other authors and reviewers need an independent approver.",
+        "confirmRelease": "I reviewed this skill version and approve its activation for this organization.",
+        "activateVersion": "Activate skill version"
       },
       "actions": {
         "accept": "Accept",
-        "createFixture": "Create fixture",
         "createReviewedVersion": "Create reviewed version",
         "promote": "Promote",
         "proposeForReview": "Propose for review",
         "proposing": "Proposing…",
         "reject": "Reject",
         "retry": "Retry",
-        "retryCertification": "Retry certification",
-        "rollBackToThis": "Roll back to this",
-        "runCertification": "Run certification"
+        "rollBackToThis": "Roll back to this"
       },
       "activeRelease": "Active release #{{releaseNumber}} · version id {{versionId}}",
-      "certification": {
-        "blockedFixtureRequired": " · certification blocked: fixture required",
-        "evidenceSummary": "evidence #{{evidenceId}} · {{status}} · {{hash}}",
-        "noExecutionHash": "no execution hash",
-        "passed": "Passed",
-        "passedSuffix": " · certification passed",
-        "pendingSuffix": " · certification pending",
-        "queued": "Queued",
-        "requestSummary": "v{{version}} · request #{{requestId}} · {{status}} · {{readinessCode}}",
-        "running": "Running"
-      },
-      "description": "Review immutable skill versions, run server-owned fixture certification, and manage release history.",
+      "description": "Review and publish tenant skill versions.",
       "empty": {
-        "noFixtures": "No fixtures yet.",
         "noPromotions": "No persisted knowledge promotions.",
         "noReleases": "No releases recorded.",
-        "noSkillsForCertification": "No persisted skills are available for certification.",
-        "noTerminalEvidence": "No terminal evidence has been persisted.",
-        "noVersions": "No versions for this skill yet."
+        "noVersions": "No versions for this skill yet.",
+        "noSkillVersionsAvailable": "No tenant-created skills available."
       },
       "errors": {
         "invalidKnowledgeVersion": "Enter a positive approved knowledge version id and select a skill",
-        "loadCertification": "Failed to load persisted certification state",
-        "loadPromotions": "Failed to load knowledge promotions."
+        "loadPromotions": "Failed to load knowledge promotions.",
+        "loadVersions": "Could not load skill versions."
       },
       "fields": {
         "approvedKnowledgeVersionId": "Approved knowledge version id",
         "skill": "Skill"
       },
       "knowledge": {
-        "description": "Independent acceptance creates an unreleased skill version. The server binds the reviewed knowledge lineage; certification and release remain gated above.",
+        "description": "Independent acceptance creates an unpublished version linked to the reviewed knowledge.",
         "promotionSummary": "Knowledge version {{versionId}} → {{skillName}}",
-        "statusSummary": "{{status}} · certification {{certification}}",
-        "title": "Knowledge promotion"
-      },
-      "messages": {
-        "selectCompanyForCertification": "Select an operating company before requesting certification."
+        "title": "Knowledge promotion",
+        "reviewStatus": "{{status}}"
       },
       "noActiveRelease": "No active release",
       "placeholders": {
-        "fixtureKey": "fixture key",
-        "name": "name",
         "reviewNote": "Independent review note"
       },
       "release": {
@@ -18407,18 +18722,15 @@
         "version": "version {{versionId}}"
       },
       "sections": {
-        "addFixture": "Add fixture",
         "createVersion": "Create version",
-        "fixturesAndRuns": "Fixtures & test runs",
         "releaseHistory": "Release history",
         "versions": "Versions"
       },
       "states": {
-        "loadingCertification": "Loading persisted certification state…",
-        "loadingPromotions": "Loading persisted promotions…"
+        "loadingPromotions": "Loading persisted promotions…",
+        "loadingVersions": "Loading skill versions…"
       },
       "status": {
-        "certified": "Certified",
         "accepted": "Accepted",
         "completed": "Completed",
         "draft": "Draft",
@@ -18431,7 +18743,9 @@
         "rejected": "Rejected",
         "running": "Running",
         "rolledBack": "Rolled back",
-        "unknown": "unknown"
+        "unknown": "unknown",
+        "reviewed": "Reviewed",
+        "superseded": "Superseded"
       },
       "title": "Skill registry"
     },
@@ -18622,7 +18936,8 @@
         "furniture": "Furniture",
         "packaging": "Packaging",
         "rawMaterials": "Raw Materials",
-        "tools": "Tools"
+        "tools": "Tools",
+        "unavailable": "Category unavailable"
       },
       "details": {
         "actions": "Actions",
@@ -18634,7 +18949,9 @@
         "quantity": "Quantity",
         "removeConfirmation": "Remove \"{{name}}\" from inventory?",
         "saveQuantity": "Save quantity",
-        "stockRange": "Min: {{min}} / Max: {{max}}"
+        "stockRange": "Min: {{min}} / Max: {{max}}",
+        "receivedOn": "Received on",
+        "reorderMinimum": "Reorder minimum: {{min}}"
       },
       "emptySlot": {
         "addItemHint": "Click to add item",
@@ -19018,6 +19335,7 @@
       "workflowRevision": "Workflow revision",
       "sourceRevision": "Reviewed source revision",
       "clearRecordFilter": "Show all requests",
+      "linkedRequest": "Linked approval request",
       "actingAsSelf": "Acting as yourself",
       "comment": "Evidence comment",
       "rejectReason": "Reason for rejection",
@@ -19025,6 +19343,7 @@
     },
     "empty": {
       "noTasks": "No requests are waiting for approval in this company. New requests appear here when a business action needs review.",
+      "linkedRequest": "This approval request is unavailable in the current company.",
       "target": "No open approval task matches this record.",
       "invalidTarget": "This request link does not identify a valid record. Show all requests to browse the company inbox."
     },
@@ -19090,6 +19409,7 @@
   "purchasing.dashboard.orderValue": "Order value",
   "purchasing.dashboard.vendorUnavailable": "Vendor unavailable",
   "availableHistory": {
+    "showDataset": "Show all rows in this dataset",
     "verifiedOnly": "Only rows with confirmed facts",
     "verifiedHint": "Includes partially reviewed rows with confirmed fields. Unconfirmed interpretations remain hidden; original text, dates and row labels remain source context. These observations do not change posted documents or current balances.",
     "confirmedValue": "Value confirmed",
@@ -19161,6 +19481,9 @@
     }
   },
   "businessHistory": {
+    "allActivity": "All activity",
+    "openChange": "Open change",
+    "eventUnavailable": "This change is unavailable for the current company or your access.",
     "title": "History & sources",
     "changes": "Changes",
     "activity": "Activity",

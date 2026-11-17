@@ -16,8 +16,12 @@ export interface AssistantNativeFormRequest {
   scopeKey: string
   moduleId: string
   tabId: string
+  /** Exact existing record when the native form is scoped to one record. */
+  targetRecordId?: string
   /** User-authored input for the existing advisory form assistant. */
   prompt?: string
+  /** Report whether the destination opened the form, independently of any later save. */
+  onPresentationOutcome?: (status: AssistantNativeFormPresentationOutcome) => void
   /** Return to the initiating checklist after the native form closes. */
   onActivationReturn?: (result: NativeFormActivationResult) => void
 }
@@ -27,6 +31,10 @@ export type AssistantNativeFormStatus =
   | "denied"
   | "unavailable"
   | "busy"
+export type AssistantNativeFormPresentationOutcome =
+  | AssistantNativeFormStatus
+  | "cancelled"
+  | "scope_changed"
 export interface AssistantNativeFormOutcome {
   requestId: string
   scopeKey: string
@@ -55,6 +63,7 @@ export function useAssistantNativeFormController(scopeKey: string | null) {
     const request = pendingRef.current
     if (request && request.scopeKey !== scopeKey) {
       pendingRef.current = null
+      request.onPresentationOutcome?.("scope_changed")
       request.onActivationReturn?.({ status: "scope_changed" })
     }
     const activation = activationRef.current
@@ -109,20 +118,23 @@ export function useAssistantNativeFormController(scopeKey: string | null) {
         return
       pendingRef.current = null
       setPending(null)
+      request.onPresentationOutcome?.(status)
       if (request.onActivationReturn) {
         if (status === "opened") activationRef.current = request
         else request.onActivationReturn({ status })
         return
       }
-      setOutcome({ requestId, scopeKey: request.scopeKey, status })
+      if (!request.onPresentationOutcome) setOutcome({ requestId, scopeKey: request.scopeKey, status })
     },
     [],
   )
 
   const cancel = useCallback((requestId: string) => {
-    if (pendingRef.current?.requestId !== requestId) return
+    const request = pendingRef.current
+    if (request?.requestId !== requestId) return
     pendingRef.current = null
     setPending(null)
+    request.onPresentationOutcome?.("cancelled")
   }, [])
 
   const finishActivation = useCallback((requestId: string, result: NativeFormActivationResult) => {

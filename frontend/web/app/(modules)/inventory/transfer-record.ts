@@ -1,5 +1,5 @@
 import type { WorkspaceProfile } from '@lumiere/ui/lib/workspace-profile';
-import { moduleTabHref } from '@lumiere/erp-shared/record-links';
+import { moduleTabHref, stockTransferRecordPageHref } from '@lumiere/erp-shared/record-links';
 
 /** Resolve return links from the active profile, including direct record opens and reloads. */
 export function transferWorkspaceNavigation(profile: WorkspaceProfile) {
@@ -13,7 +13,7 @@ export function transferWorkspaceNavigation(profile: WorkspaceProfile) {
 
 /** Where a stock transfer's page lives. */
 export function transferRecordHref(transfer: Record<string, unknown>): string | undefined {
-  return transfer.id == null ? undefined : `/inventory/transfers/${String(transfer.id)}`;
+  return transfer.id == null ? undefined : stockTransferRecordPageHref(String(transfer.id));
 }
 
 /**

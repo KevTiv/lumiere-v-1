@@ -487,7 +487,8 @@ export function EntityTable({
   const showSelectColumn = selectionActions.length > 0 || config.selectable === true
   const selectColumnCount = showSelectColumn ? 1 : 0
   const rowActionColumnCount = rowActions.length > 0 ? 1 : 0
-  const fixedTracks = columns.some((column) => column.layout) && (isLoading || pageRows.length > 0)
+  const hasColumnLayouts = columns.some((column) => column.layout)
+  const fixedTracks = hasColumnLayouts && (isLoading || pageRows.length > 0)
   const bounded = pageRows.length >= BOUNDED_ROW_COUNT
   const viewportRef = useRef<HTMLDivElement>(null)
   const [viewportRem, setViewportRem] = useState<number>()
@@ -940,7 +941,7 @@ export function EntityTable({
             pagination={false}
             bounded={bounded}
             viewportRef={viewportRef}
-            viewportLabel={bounded || fixedTracks ? t("common.entityView.records", { defaultValue: "Records" }) : undefined}
+            viewportLabel={bounded || hasColumnLayouts ? t("common.entityView.records", { defaultValue: "Records" }) : undefined}
             className={fixedTracks ? "table-fixed" : undefined}
             style={fixedTracks ? { width: `${tableWidth}rem` } : undefined}
           >
@@ -965,40 +966,49 @@ export function EntityTable({
                     />
                   </TableHead>
                 )}
-                {columns.map((col) => (
-                  <TableHead
-                    key={col.key}
-                    aria-sort={col.sortable
-                      ? sortedBy?.id === col.key
-                        ? sortedBy.desc ? "descending" : "ascending"
-                        : "none"
-                      : undefined}
-                    className={cn(
-                      !fixedTracks && col.width,
-                      (fixedTracks || col.layout) && "whitespace-normal [overflow-wrap:anywhere]",
-                      col.align === "right" && "text-right",
-                      col.align === "center" && "text-center",
-                      col.sortable && "select-none",
-                    )}
-                  >
-                    {col.sortable ? (
-                      <button
-                        type="button"
-                        className={cn(
-                          "inline-flex max-w-full items-center font-medium [&>svg]:shrink-0",
-                          col.align === "right" && "ml-auto",
-                          col.align === "center" && "mx-auto",
-                        )}
-                        onClick={() => handleSort(col.key, col.sortable)}
-                      >
-                        <span className="min-w-0">{col.label}</span>
-                        {getSortIcon(col.key, col.sortable)}
-                      </button>
-                    ) : (
-                      col.label
-                    )}
-                  </TableHead>
-                ))}
+                {columns.map((col) => {
+                  const label = fixedTracks ? (
+                    <span className="block min-w-0 truncate" title={col.label}>
+                      {col.label}
+                    </span>
+                  ) : (
+                    col.label
+                  )
+
+                  return (
+                    <TableHead
+                      key={col.key}
+                      aria-sort={col.sortable
+                        ? sortedBy?.id === col.key
+                          ? sortedBy.desc ? "descending" : "ascending"
+                          : "none"
+                        : undefined}
+                      className={cn(
+                        !fixedTracks && col.width,
+                        col.align === "right" && "text-right",
+                        col.align === "center" && "text-center",
+                        col.sortable && "select-none",
+                      )}
+                    >
+                      {col.sortable ? (
+                        <button
+                          type="button"
+                          className={cn(
+                            "inline-flex max-w-full items-center font-medium [&>svg]:shrink-0",
+                            col.align === "right" && "ml-auto",
+                            col.align === "center" && "mx-auto",
+                          )}
+                          onClick={() => handleSort(col.key, col.sortable)}
+                        >
+                          {label}
+                          {getSortIcon(col.key, col.sortable)}
+                        </button>
+                      ) : (
+                        label
+                      )}
+                    </TableHead>
+                  )
+                })}
                 {rowActionColumnCount > 0 && (
                   <TableHead className="w-10">
                     <span className="sr-only">Row actions</span>

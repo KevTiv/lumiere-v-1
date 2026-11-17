@@ -527,6 +527,9 @@ dependencies = [
 [[package]]
 name = "lumiere-policy-core"
 version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
 
 [[package]]
 name = "lumiere-presentation-core"
@@ -538,16 +541,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumiere-report-schedule"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+]
+
+[[package]]
 name = "lumiere_v1"
 version = "0.1.0"
 dependencies = [
- "lumiere-file-inspection",
  "chrono",
  "chrono-tz",
  "hex",
  "log",
+ "lumiere-file-inspection",
  "lumiere-policy-core",
  "lumiere-presentation-core",
+ "lumiere-report-schedule",
  "phonenumber",
  "serde",
  "serde_json",

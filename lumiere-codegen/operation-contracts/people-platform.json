@@ -641,6 +641,16 @@
       },
       "evidence": "spacetimedb/src/ai/skills.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
     },
+    "cancel_ai_embedding_job": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/queue.rs: active organization-bound AI writer, embedding-only worker, exact revision and active lease proof; delivery cancellation preserves financial holds"
+    },
     "cancel_contract": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -5602,8 +5612,8 @@
       "evidence": "spacetimedb/src/ai/agents.rs: body writes or refreshes deterministic state and safely repeats the same input"
     },
     "update_ai_chat_session_title": {
-      "semantic_kind": "internal",
-      "client_facing": false,
+      "semantic_kind": "command",
+      "client_facing": true,
       "idempotency": "idempotent",
       "codec": {
         "id": "spacetimedb-sats-json",
@@ -6260,6 +6270,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/platform_defaults.rs: immutable template and enrollment uniqueness guards preserve settings and funding on retry"
+    },
+    "enroll_persistent_platform_operator": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/platform_operator.rs: deployment-compiled caller/scope policy, exact existing bootstrap binding, atomic audited enrollment and no regrant after revocation"
     }
   }
 }

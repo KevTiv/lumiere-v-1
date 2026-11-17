@@ -1,4 +1,53 @@
 {
+  "aiChat": {
+    "draft": {
+      "applied": "Byashyizwe mu bikorwa",
+      "proposedValue": "Agaciro kasabwe",
+      "beforeProposal": "Mbere y’icyifuzo",
+      "proposedAt": "Byasabwe",
+      "reviewedAt": "Byasuzumwe",
+      "appliedAt": "Byashyizwe mu bikorwa"
+    }
+  },
+  "moduleRecords": {
+    "shopSales": "Ibyagurishijwe mu maduka",
+    "saleDate": "Itariki y’igurisha",
+    "savedShopSale": "Igurisha ryo mu iduka ryabitswe",
+    "shop": "Iduka",
+    "emptyShopSales": "Nta byagurishijwe mu maduka byabitswe.",
+    "sales": "Incamake y’ibyagurishijwe ku bakiriya",
+    "warehouse": "Ibarura ryanditswe",
+    "period": "Igihe cy’igurisha",
+    "countDate": "Itariki y’ibarura",
+    "customer": "Umukiriya",
+    "product": "Igicuruzwa",
+    "quantity": "Ingano",
+    "unitPrice": "Igiciro kuri kimwe",
+    "reportedTotal": "Igiteranyo cyatangajwe",
+    "paymentComment": "Icyitonderwa ku bwishyu",
+    "pieces": "Umubare w’ibintu",
+    "kilograms": "Ibiro",
+    "location": "Ahantu",
+    "source": "Inkomoko",
+    "sourceRow": "{{file}} · umurongo {{row}}",
+    "showAll": "Erekana inyandiko zose",
+    "loadMore": "Erekana izindi",
+    "emptySales": "Nta ncamake y’ibyagurishijwe ku bakiriya yabitswe.",
+    "emptyCounts": "Nta barura ryabitswe.",
+    "emptyFiltered": "Nta nyandiko zihuye n’amatariki cyangwa ibyinjijwe byatoranyijwe.",
+    "otherCompany": "Hitamo sosiyete yakoreshejwe muri iri yinjiza kugira ngo urebe inyandiko zayo.",
+    "loadError": "Ntibishobotse kwerekana inyandiko.",
+    "recordHistory": "Reba amateka",
+    "recordHistoryLabel": "Reba amateka y’umurongo {{row}} wo muri {{file}}",
+    "savedSale": "Incamake y’ibyagurishijwe ku mukiriya yabitswe",
+    "savedCount": "Ibarura ryakozwe ryabitswe",
+    "recordUnavailable": "Iyi nyandiko yabitswe ntiboneka mu mwanya w’akazi urimo.",
+    "sourceCustomer": "Izina ry’umukiriya riri mu nkomoko",
+    "unit": "Igipimo kiri mu nkomoko",
+    "currency": "Ifaranga",
+    "savedAt": "Yabitswe ku wa",
+    "sourceRevision": "Ivugurura {{revision}}"
+  },
   "aiHarness": {
     "platformProfile": {
       "tab": "Igenamiterere rya AI",
@@ -41,6 +90,31 @@
     }
   },
   "aiSkills": {
+    "userAccess": {
+      "title": "Uburenganzira bw’abakoresha",
+      "description": "Genzura uburenganzira bwa buri munyamuryango bwo gukoresha ubushobozi bwubatswe muri uyu muryango.",
+      "catalogError": "Ubushobozi bwubatswe ntibwashoboye kuboneka.",
+      "loadingSkills": "Turimo gushaka ubushobozi bwubatswe…",
+      "noSkills": "Nta bushobozi bwubatswe buboneka.",
+      "skill": "Ubushobozi bwubatswe",
+      "chooseSkill": "Hitamo ubushobozi",
+      "searchSkills": "Shakisha ubushobozi",
+      "person": "Umunyamuryango",
+      "choosePerson": "Hitamo umunyamuryango",
+      "searchPeople": "Shakisha abanyamuryango",
+      "noPeople": "Nta munyamuryango ukora uboneka.",
+      "peopleDenied": "Ukeneye uburenganzira bwo kureba urutonde rw’abanyamuryango.",
+      "peopleError": "Urutonde rw’abanyamuryango ntirwashoboye kuboneka.",
+      "accessError": "Ntitwashoboye kugenzura uburenganzira bw’uyu munyamuryango.",
+      "saving": "Turimo kubika uburenganzira…",
+      "revoked": "Uburenganzira bw’uyu munyamuryango bwakuweho.",
+      "revokedLabel": "Byakuweho",
+      "defaultAccess": "Uyu munyamuryango afite uburenganzira busanzwe bw’umuryango.",
+      "loadingAccess": "Turimo kugenzura uburenganzira…",
+      "restore": "Subizaho uburenganzira busanzwe",
+      "revoke": "Kuraho uburenganzira",
+      "saveError": "Ntitwashoboye kwemeza impinduka. Banza urebe uburenganzira buriho mbere yo kongera kugerageza."
+    },
     "setup": {
       "title": "Gutegura ibikorwa bya AI",
       "action": "Tegura ibikorwa bya AI",
@@ -68,6 +142,10 @@
     }
   },
   "recordChanges": {
+    "valueAbsent": "Umwanya udahari",
+    "valueRestricted": "Uburenganzira bugarukira",
+    "valueUnavailable": "Agaciro ntikanditswe",
+    "savedChange": "Impinduka yabitswe",
     "fields": {
       "name": "Ibisobanuro",
       "debit": "Debi",
@@ -545,6 +623,7 @@
     "manufacturing": "Inganda",
     "map": "Ikarita",
     "fleet": "Ibinyabiziga",
+    "farmBatches": "Amatsinda y’amatungo",
     "helpdesk": "Ubufasha",
     "workflows": "Imigendekere y’akazi",
     "documents": "Inyandiko",
@@ -4325,6 +4404,14 @@
     }
   },
   "settings": {
+    "importReview": {
+      "grouped": {
+        "rowStatus": "Imiterere y’umurongo",
+        "fieldConfirmation": "Kwemeza {{field}}",
+        "noDecisionChanges": "Nta gaciro kanditswe cyangwa imiterere y’isuzuma byahindutse.",
+        "proposedAfter": "Nyuma y’iki cyemezo"
+      }
+    },
     "page": {
       "title": "Igenamiterere",
       "description": "Gena konti yawe n’imikorere ya sisitemu"
@@ -4342,6 +4429,11 @@
       "status": "Uko bihagaze",
       "importedRows": "Byinjijwe",
       "errorRows": "Amakosa"
+    },
+    "importPreparation": {
+      "worksheet": "Urupapuro",
+      "worksheetHint": "Hitamo impapuro ushaka gushyiramo. Buri rupapuro rugumana imirongo yarwo y’umwimerere kandi rushobora kugira uburyo bwarwo bwo guhuza inkingi.",
+      "worksheets": "Impapuro zo gutegura"
     },
     "backToSettings": "Subira ku igenamiterere",
     "adminAccess": "Uburenganzira bw’umuyobozi",
@@ -5091,6 +5183,9 @@
     }
   },
   "businessHistory": {
+    "allActivity": "Ibikorwa byose",
+    "openChange": "Fungura impinduka",
+    "eventUnavailable": "Iyi mpinduka ntiboneka mu kigo kiri gukoreshwa cyangwa ku burenganzira bwawe.",
     "title": "Amateka n’inkomoko",
     "changes": "Impinduka",
     "activity": "Ibikorwa",

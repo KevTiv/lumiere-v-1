@@ -28,6 +28,7 @@ use super::{
     model_configuration::{
         IntelligenceRole, IntelligenceRoute, IntelligenceRouteResolver, ModelProfile,
     },
+    skill_access::{ActorSkillAccess, SkillAccessError},
     spend_admission::{
         spend_binding_for_profile, SpendAdmittedLlm, SpendLedger, UnresolvedProviderAttempt,
     },
@@ -227,6 +228,27 @@ pub(crate) async fn generate_routed_for_run(
 /// Execute one catalogued generation surface through the normal routed
 /// generation provider and common GovernedProgramExecutor.
 #[allow(clippy::too_many_arguments)]
+pub(crate) async fn generation_prompt_budget_bytes(
+    store: &super::model_configuration::StdbModelConfigurationStore<'_>,
+    organization_id: u64,
+    agent: &ResolvedAgentConfig,
+    policy_ref: Option<&str>,
+) -> Result<usize> {
+    let resolver = IntelligenceRouteResolver::new(store, organization_id, agent, policy_ref)?;
+    let route = resolver.resolve(IntelligenceRole::Generation, None).await?;
+    std::iter::once(route.primary)
+        .chain(route.fallbacks)
+        .map(|profile| {
+            profile
+                .context_window
+                .saturating_sub(agent.max_tokens.min(profile.max_tokens))
+                .saturating_sub(64) as usize
+                * 3
+        })
+        .min()
+        .context("generation route has no context budget")
+}
+
 pub(crate) async fn run_catalogued_generation_surface(
     store: &super::model_configuration::StdbModelConfigurationStore<'_>,
     ledger: &dyn SpendLedger,
@@ -242,6 +264,7 @@ pub(crate) async fn run_catalogued_generation_surface(
     bounded_state: serde_json::Value,
     generation_instructions: Option<String>,
     generation_max_tokens: Option<u32>,
+    skill_access: &ActorSkillAccess<'_>,
 ) -> Result<GovernedProgramOutcome> {
     let catalog = governed_program_for_skill(skill_key).with_context(|| {
         format!("skill '{skill_key}' is not registered in governed program catalog")
@@ -269,7 +292,8 @@ pub(crate) async fn run_catalogued_generation_surface(
         company_id,
         run.run_id,
     )
-    .with_source_gate(reader, skill_key);
+    .with_skill_gate(reader, skill_key)
+    .with_actor_skill_access(skill_access, skill_key);
     let checkpoint_store = StdbProgramCheckpointStore { writer, reader };
     let recorder = StdbIntelligenceEventRecorder { writer, reader };
     let context = GovernedProgramContext {
@@ -311,6 +335,7 @@ pub(crate) async fn gate_rag_answer_with_review(
     evidence: &TextEvidence,
     passages: &[SourcePassage],
     reviewed_claims: Option<&dyn super::reviewed_claims::ReviewedClaimResolver>,
+    skill_access: &ActorSkillAccess<'_>,
 ) -> Result<GatedTextAnswer> {
     let resolver = IntelligenceRouteResolver::new(
         store,
@@ -330,7 +355,8 @@ pub(crate) async fn gate_rag_answer_with_review(
         IntelligenceRole::Review,
         &NoopShadowDecisionRecorder,
     )?
-    .with_source_gate(store.reader, "rag_generation");
+    .with_skill_gate(store.reader, "rag_generation")
+    .with_actor_skill_access(skill_access, "rag_generation");
     let checker = DecisionClaimCoverageChecker {
         reviewer: &reviewer,
     };
@@ -375,7 +401,8 @@ pub(super) struct RoutedDecisionProvider<'a> {
     role: IntelligenceRole,
     shadow_recorder: &'a dyn ShadowDecisionRecorder,
     next_scope: AtomicU32,
-    source_gate: Option<(&'a stdb_client::StdbClient, &'a str)>,
+    actor_skill_access: Option<(&'a ActorSkillAccess<'a>, &'a str)>,
+    skill_gate: Option<(&'a stdb_client::StdbClient, &'a str)>,
 }
 
 impl<'a> RoutedDecisionProvider<'a> {
@@ -404,18 +431,25 @@ impl<'a> RoutedDecisionProvider<'a> {
             role,
             shadow_recorder,
             next_scope: AtomicU32::new(1),
-            source_gate: None,
+            actor_skill_access: None,
+            skill_gate: None,
         })
     }
 
-    fn with_source_gate(mut self, stdb: &'a stdb_client::StdbClient, key: &'a str) -> Self {
-        self.source_gate = Some((stdb, key));
+    fn with_skill_gate(mut self, stdb: &'a stdb_client::StdbClient, key: &'a str) -> Self {
+        self.skill_gate = Some((stdb, key));
         self
     }
 
-    async fn require_source(&self) -> Result<()> {
-        if let Some((stdb, key)) = self.source_gate {
-            super::skill_loader::require_generation_source(stdb, self.organization_id, key).await?;
+    async fn require_skill_enabled(&self) -> Result<()> {
+        if let Some((stdb, key)) = self.skill_gate {
+            super::skill_loader::require_enabled_skill(
+                stdb,
+                self.organization_id,
+                self.company_id,
+                key,
+            )
+            .await?;
         }
         Ok(())
     }
@@ -486,7 +520,10 @@ impl<'a> RoutedDecisionProvider<'a> {
         request: DecisionRequest,
         call_scope: u32,
     ) -> Result<DecisionResponse> {
-        self.require_source().await?;
+        self.require_skill_enabled().await?;
+        if let Some((access, skill_key)) = self.actor_skill_access {
+            access.require(skill_key).await?;
+        }
         let binding = spend_binding_for_profile(
             self.agent,
             profile,
@@ -501,12 +538,21 @@ impl<'a> RoutedDecisionProvider<'a> {
             .decide(request)
             .await
     }
+
+    pub(super) fn with_actor_skill_access(
+        mut self,
+        access: &'a ActorSkillAccess<'a>,
+        skill_key: &'a str,
+    ) -> Self {
+        self.actor_skill_access = Some((access, skill_key));
+        self
+    }
 }
 
 #[async_trait::async_trait]
 impl DecisionProvider for RoutedDecisionProvider<'_> {
     async fn decide(&self, request: DecisionRequest) -> Result<DecisionResponse> {
-        self.require_source().await?;
+        self.require_skill_enabled().await?;
         let route = self
             .router
             .route(self.role, Some(&request.decision_type.name))
@@ -526,7 +572,10 @@ impl DecisionProvider for RoutedDecisionProvider<'_> {
                         return Ok(response);
                     }
                     Err(error) if error.is::<UnresolvedProviderAttempt>() => return Err(error),
-                    Err(error) if error.is::<crate::error::GenerationSourceUnavailable>() => {
+                    Err(error)
+                        if error.is::<crate::error::SkillUnavailable>()
+                            || error.is::<SkillAccessError>() =>
+                    {
                         return Err(error)
                     }
                     Err(error) => {
@@ -552,6 +601,7 @@ pub(super) struct RoutedReasoningProvider<'a> {
     company_id: u64,
     run_id: u64,
     next_scope: AtomicU32,
+    actor_skill_access: Option<(&'a ActorSkillAccess<'a>, &'a str)>,
 }
 
 impl<'a> RoutedReasoningProvider<'a> {
@@ -573,7 +623,17 @@ impl<'a> RoutedReasoningProvider<'a> {
             company_id,
             run_id,
             next_scope: AtomicU32::new(1),
+            actor_skill_access: None,
         }
+    }
+
+    pub(super) fn with_actor_skill_access(
+        mut self,
+        access: &'a ActorSkillAccess<'a>,
+        skill_key: &'a str,
+    ) -> Self {
+        self.actor_skill_access = Some((access, skill_key));
+        self
     }
 }
 
@@ -587,6 +647,9 @@ impl ReasoningProvider for RoutedReasoningProvider<'_> {
         let mut failures = Vec::new();
         for profile in profiles {
             for attempt_no in 0..=profile.max_retries.min(MAX_SAFE_RETRIES) {
+                if let Some((access, skill_key)) = self.actor_skill_access {
+                    access.require(skill_key).await?;
+                }
                 let binding = spend_binding_for_profile(
                     self.agent,
                     &profile,
@@ -631,7 +694,8 @@ pub(super) struct RoutedGenerationProvider<'a> {
     company_id: u64,
     run_id: u64,
     next_scope: AtomicU32,
-    source_gate: Option<(&'a stdb_client::StdbClient, &'a str)>,
+    actor_skill_access: Option<(&'a ActorSkillAccess<'a>, &'a str)>,
+    skill_gate: Option<(&'a stdb_client::StdbClient, &'a str)>,
 }
 
 impl<'a> RoutedGenerationProvider<'a> {
@@ -653,12 +717,22 @@ impl<'a> RoutedGenerationProvider<'a> {
             company_id,
             run_id,
             next_scope: AtomicU32::new(1),
-            source_gate: None,
+            actor_skill_access: None,
+            skill_gate: None,
         }
     }
 
-    fn with_source_gate(mut self, stdb: &'a stdb_client::StdbClient, key: &'a str) -> Self {
-        self.source_gate = Some((stdb, key));
+    fn with_skill_gate(mut self, stdb: &'a stdb_client::StdbClient, key: &'a str) -> Self {
+        self.skill_gate = Some((stdb, key));
+        self
+    }
+
+    pub(super) fn with_actor_skill_access(
+        mut self,
+        access: &'a ActorSkillAccess<'a>,
+        skill_key: &'a str,
+    ) -> Self {
+        self.actor_skill_access = Some((access, skill_key));
         self
     }
 }
@@ -667,9 +741,15 @@ impl<'a> RoutedGenerationProvider<'a> {
 impl GenerationProvider for RoutedGenerationProvider<'_> {
     async fn generate(&self, request: GenerationRequest) -> Result<GenerationResponse> {
         // The executor may recover a completed checkpoint without invoking this
-        // provider. Only new paid generation needs the current source release.
-        if let Some((stdb, key)) = self.source_gate {
-            super::skill_loader::require_generation_source(stdb, self.organization_id, key).await?;
+        // provider. Only new paid generation needs a live enablement check.
+        if let Some((stdb, key)) = self.skill_gate {
+            super::skill_loader::require_enabled_skill(
+                stdb,
+                self.organization_id,
+                self.company_id,
+                key,
+            )
+            .await?;
         }
         let route = self
             .router
@@ -681,9 +761,17 @@ impl GenerationProvider for RoutedGenerationProvider<'_> {
         let mut failures = Vec::new();
         for profile in profiles {
             for attempt_no in 0..=profile.max_retries.min(MAX_SAFE_RETRIES) {
-                if let Some((stdb, key)) = self.source_gate {
-                    super::skill_loader::require_generation_source(stdb, self.organization_id, key)
-                        .await?;
+                if let Some((stdb, key)) = self.skill_gate {
+                    super::skill_loader::require_enabled_skill(
+                        stdb,
+                        self.organization_id,
+                        self.company_id,
+                        key,
+                    )
+                    .await?;
+                }
+                if let Some((access, skill_key)) = self.actor_skill_access {
+                    access.require(skill_key).await?;
                 }
                 let binding = spend_binding_for_profile(
                     self.agent,
@@ -798,8 +886,8 @@ mod tests {
     struct Broken;
 
     #[tokio::test]
-    async fn source_revocation_or_change_blocks_provider_before_routing_or_spend() {
-        use super::super::skill_loader::tests::{generation_source_rows, sats_rows};
+    async fn disabled_skill_blocks_provider_before_routing_or_spend() {
+        use super::super::skill_loader::tests::{sats_rows, skill_availability_rows};
         use axum::{extract::State, routing::post, Json, Router};
         use std::sync::{Arc, Mutex};
 
@@ -810,7 +898,7 @@ mod tests {
                 &self,
                 _: crate::providers::llm::LlmRequest,
             ) -> Result<crate::providers::llm::LlmResponse> {
-                panic!("revoked source must not dispatch");
+                panic!("disabled skill must not dispatch");
             }
         }
         async fn sql(
@@ -820,8 +908,8 @@ mod tests {
             let case = *case.lock().unwrap();
             // Any model configuration, spend query or write is unexpected.
             Json(sats_rows(
-                generation_source_rows(&statement, "rag_generation", case)
-                    .expect("only release SQL before dispatch"),
+                skill_availability_rows(&statement, "rag_generation", case)
+                    .expect("only catalog and binding SQL before dispatch"),
             ))
         }
         let case = Arc::new(Mutex::new("active"));
@@ -835,7 +923,7 @@ mod tests {
             .route("/v1/database/fixture/sql", post(sql))
             .with_state(case.clone());
         let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        super::super::skill_loader::require_generation_source(&stdb, 1, "rag_generation")
+        super::super::skill_loader::require_enabled_skill(&stdb, 1, 3, "rag_generation")
             .await
             .unwrap();
         let agent = ResolvedAgentConfig {
@@ -866,7 +954,7 @@ mod tests {
         };
         let provider =
             RoutedGenerationProvider::new(&router, &NeverPaid, &ledger, &agent, 1, 3, 99)
-                .with_source_gate(&stdb, "rag_generation");
+                .with_skill_gate(&stdb, "rag_generation");
         let reviewer = RoutedDecisionProvider::new(
             &router,
             &NeverPaid,
@@ -879,8 +967,8 @@ mod tests {
             &NoopShadowDecisionRecorder,
         )
         .unwrap()
-        .with_source_gate(&stdb, "rag_generation");
-        for changed in ["missing", "stale"] {
+        .with_skill_gate(&stdb, "rag_generation");
+        for changed in ["missing", "disabled"] {
             *case.lock().unwrap() = changed;
             let error = provider
                 .generate(GenerationRequest {
@@ -893,17 +981,17 @@ mod tests {
                 })
                 .await
                 .unwrap_err();
-            assert!(error.is::<crate::error::GenerationSourceUnavailable>());
+            assert!(error.is::<crate::error::SkillUnavailable>());
             // Both initial routing and an already-routed retry/fallback must
-            // re-read source authority, not reuse the earlier active result.
+            // re-read skill availability, even after earlier admission.
             let error = reviewer.decide(request()).await.unwrap_err();
-            assert!(error.is::<crate::error::GenerationSourceUnavailable>());
+            assert!(error.is::<crate::error::SkillUnavailable>());
             for key in ["primary", "retry", "fallback"] {
                 let error = reviewer
                     .attempt(&limit_profile(key), request(), 4001)
                     .await
                     .unwrap_err();
-                assert!(error.is::<crate::error::GenerationSourceUnavailable>());
+                assert!(error.is::<crate::error::SkillUnavailable>());
             }
         }
         server.abort();

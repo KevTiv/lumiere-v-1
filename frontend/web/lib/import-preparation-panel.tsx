@@ -49,6 +49,7 @@ import {
 } from "./import-preparation-editor"
 
 interface Props {
+  defaultDestination?: ImportPreparationSection["targetEntity"]
   task: ChatImportTask
   organizationId: number
   companyId: number
@@ -68,6 +69,7 @@ export function ImportPreparationPanel(props: Props) {
 
 function PreparationEditor({
   task,
+  defaultDestination = "source_observation",
   organizationId,
   companyId,
   onPrepared,
@@ -94,7 +96,12 @@ function PreparationEditor({
     queryFn: () => listImportRecipes(apiFetch, scope),
     enabled: !!actor,
   })
-  const [selectedFile, setSelectedFile] = useState(task.files[0]!.fileName)
+  const [selectedFile, setSelectedFile] = useState(
+    () =>
+      task.coverage?.files.find(
+        (file) => file.status === "held" && file.availableWorksheets?.length,
+      )?.fileName ?? task.files[0]!.fileName,
+  )
   const [rules, setRules] = useState<Record<string, ImportPreparationRules>>(
     () => savedPreparationRules(task),
   )
@@ -192,9 +199,18 @@ function PreparationEditor({
     !alreadySaved &&
     /^[a-z][a-z0-9_-]{0,99}$/.test(recipeKey) &&
     recipeName.trim().length > 0
-  const currentCoverage = task.coverage?.files.find(
-    (file) => file.fileName === selectedFile,
+  const currentCoverage =
+    task.coverage?.files.filter((file) => file.fileName === selectedFile) ?? []
+  const availableWorksheets =
+    currentCoverage.find((file) => file.availableWorksheets)
+      ?.availableWorksheets ?? []
+  const selectedWorksheets = options.worksheetNames ?? []
+  const needsWorksheetSelection =
+    availableWorksheets.length > 0 && selectedWorksheets.length === 0
+  const pendingWorkbook = task.coverage?.files.some(
+    (file) => file.status === "held" && file.availableWorksheets?.length,
   )
+  const sourceIsWorkbook = selectedFile.toLowerCase().endsWith(".xlsx")
 
   return (
     <section
@@ -220,7 +236,7 @@ function PreparationEditor({
               : "settings.importPreparation.partialCoverage",
             {
               defaultValue: task.coverage.complete
-                ? "Every source record is accounted for as review data, a header or a blank record."
+                ? "Every selected source record is accounted for as review data, a header or a blank record."
                 : "Some source files are held. Review their errors before treating the import as complete.",
             },
           )}
@@ -231,8 +247,9 @@ function PreparationEditor({
           {task.coverage.files
             .filter((file) => file.error)
             .map((file) => (
-              <li key={file.fileName}>
-                {file.fileName}: {file.error}
+              <li key={JSON.stringify([file.fileName, file.worksheet])}>
+                {[file.fileName, file.worksheet].filter(Boolean).join(" · ")} —{" "}
+                {file.error}
               </li>
             ))}
         </ul>
@@ -247,7 +264,7 @@ function PreparationEditor({
           {notice}
         </p>
       )}
-      <details>
+      <details open={pendingWorkbook || undefined}>
         <summary className="cursor-pointer font-medium">
           {t("settings.importPreparation.editRules", {
             defaultValue: "Review language and layout rules",
@@ -265,9 +282,55 @@ function PreparationEditor({
               label: file.fileName,
             }))}
           />
-          {currentCoverage && (
-            <SourceCoverage key={selectedFile} coverage={currentCoverage} />
+          {availableWorksheets.length > 0 && (
+            <fieldset className="space-y-2">
+              <legend className="font-medium">
+                {t("settings.importPreparation.worksheets", {
+                  defaultValue: "Worksheets to prepare",
+                })}
+              </legend>
+              <p className="text-sm text-muted-foreground">
+                {t("settings.importPreparation.worksheetHint", {
+                  defaultValue:
+                    "Choose the sheets to include. Each sheet keeps its original rows and can have its own mapping.",
+                })}
+              </p>
+              {availableWorksheets.map((worksheet) => (
+                <IdentityChoice
+                  key={worksheet}
+                  label={worksheet}
+                  checked={selectedWorksheets.includes(worksheet)}
+                  disabled={operation.isPending}
+                  onChange={(checked) => {
+                    const worksheets = availableWorksheets.filter((name) =>
+                      name === worksheet
+                        ? checked
+                        : selectedWorksheets.includes(name),
+                    )
+                    const sections = options.sections?.map((section) => ({
+                      ...section,
+                      worksheetName:
+                        section.worksheetName ??
+                        selectedWorksheets[0] ??
+                        worksheets[0],
+                    }))
+                    change({
+                      worksheetNames:
+                        worksheets.length > 0 ? worksheets : undefined,
+                      sections,
+                      delimiter: undefined,
+                    })
+                  }}
+                />
+              ))}
+            </fieldset>
           )}
+          {currentCoverage.map((coverage) => (
+            <SourceCoverage
+              key={JSON.stringify([selectedFile, coverage.worksheet])}
+              coverage={coverage}
+            />
+          ))}
           {options.expectedLayoutSha256 && (
             <div className="space-y-2 text-sm">
               <p>
@@ -288,52 +351,54 @@ function PreparationEditor({
             </div>
           )}
           <div className="grid gap-3 md:grid-cols-2">
-            <Choice
-              label={t("settings.importPreparation.delimiter", {
-                defaultValue: "Column separator",
-              })}
-              value={options.delimiter ?? "detect"}
-              onChange={(value) =>
-                change({
-                  delimiter:
-                    value === "detect"
-                      ? undefined
-                      : (value as ImportPreparationRules["delimiter"]),
-                })
-              }
-              options={[
-                {
-                  value: "detect",
-                  label: t("settings.importPreparation.detect", {
-                    defaultValue: "Use strict detection",
-                  }),
-                },
-                {
-                  value: ",",
-                  label: t("settings.importPreparation.comma", {
-                    defaultValue: "Comma",
-                  }),
-                },
-                {
-                  value: ";",
-                  label: t("settings.importPreparation.semicolon", {
-                    defaultValue: "Semicolon",
-                  }),
-                },
-                {
-                  value: "\t",
-                  label: t("settings.importPreparation.tab", {
-                    defaultValue: "Tab",
-                  }),
-                },
-                {
-                  value: "|",
-                  label: t("settings.importPreparation.pipe", {
-                    defaultValue: "Vertical bar",
-                  }),
-                },
-              ]}
-            />
+            {!sourceIsWorkbook && (
+              <Choice
+                label={t("settings.importPreparation.delimiter", {
+                  defaultValue: "Column separator",
+                })}
+                value={options.delimiter ?? "detect"}
+                onChange={(value) =>
+                  change({
+                    delimiter:
+                      value === "detect"
+                        ? undefined
+                        : (value as ImportPreparationRules["delimiter"]),
+                  })
+                }
+                options={[
+                  {
+                    value: "detect",
+                    label: t("settings.importPreparation.detect", {
+                      defaultValue: "Use strict detection",
+                    }),
+                  },
+                  {
+                    value: ",",
+                    label: t("settings.importPreparation.comma", {
+                      defaultValue: "Comma",
+                    }),
+                  },
+                  {
+                    value: ";",
+                    label: t("settings.importPreparation.semicolon", {
+                      defaultValue: "Semicolon",
+                    }),
+                  },
+                  {
+                    value: "\t",
+                    label: t("settings.importPreparation.tab", {
+                      defaultValue: "Tab",
+                    }),
+                  },
+                  {
+                    value: "|",
+                    label: t("settings.importPreparation.pipe", {
+                      defaultValue: "Vertical bar",
+                    }),
+                  },
+                ]}
+              />
+            )}
             <Choice
               label={t("settings.importPreparation.decimal", {
                 defaultValue: "Decimal separator",
@@ -422,6 +487,7 @@ function PreparationEditor({
             <SectionEditor
               key={`${selectedFile}:${index}`}
               section={section}
+              worksheetNames={selectedWorksheets}
               onChange={(next) =>
                 change({
                   sections: options.sections!.map((current, position) =>
@@ -441,17 +507,23 @@ function PreparationEditor({
           <Button
             size="sm"
             variant="outline"
-            disabled={(options.sections?.length ?? 0) >= 50}
+            disabled={
+              (options.sections?.length ?? 0) >= 50 || needsWorksheetSelection
+            }
             onClick={() =>
               change({
                 sections: [
                   ...(options.sections ?? []),
                   {
                     key: nextPreparationSectionKey(options.sections ?? []),
+                    worksheetName: selectedWorksheets[0],
                     headerRecord: 1,
                     firstRecord: 2,
-                    lastRecord: Math.max(2, currentCoverage?.recordCount ?? 2),
-                    targetEntity: "source_observation",
+                    lastRecord: Math.max(
+                      2,
+                      currentCoverage[0]?.recordCount ?? 2,
+                    ),
+                    targetEntity: defaultDestination,
                     expectedHeaders: [""],
                   },
                 ],
@@ -469,7 +541,11 @@ function PreparationEditor({
           )}
           <div>
             <Button
-              disabled={!parsed.success || operation.isPending}
+              disabled={
+                !parsed.success ||
+                operation.isPending ||
+                needsWorksheetSelection
+              }
               onClick={() => operation.mutate("prepare")}
             >
               {t("settings.importPreparation.prepare", {
@@ -588,10 +664,12 @@ function PreparationEditor({
 
 function SectionEditor({
   section,
+  worksheetNames,
   onChange,
   onRemove,
 }: {
   section: ImportPreparationSection
+  worksheetNames: string[]
   onChange: (next: ImportPreparationSection) => void
   onRemove: () => void
 }) {
@@ -606,6 +684,19 @@ function SectionEditor({
   return (
     <div className="space-y-3 rounded border p-3">
       <div className="grid gap-3 md:grid-cols-2">
+        {worksheetNames.length > 0 && (
+          <Choice
+            label={t("settings.importPreparation.worksheet", {
+              defaultValue: "Worksheet",
+            })}
+            value={section.worksheetName ?? worksheetNames[0]!}
+            options={worksheetNames.map((name) => ({
+              value: name,
+              label: name,
+            }))}
+            onChange={(worksheetName) => change({ worksheetName })}
+          />
+        )}
         <TextField
           label={t("settings.importPreparation.sectionName", {
             defaultValue: "Section name",
@@ -638,6 +729,12 @@ function SectionEditor({
             )
           }}
           options={[
+            {
+              value: "farm_event",
+              label: t("settings.importPreparation.farmEvents", {
+                defaultValue: "Farm batch events",
+              }),
+            },
             {
               value: "source_observation",
               label: t("settings.importPreparation.observations", {
@@ -1237,7 +1334,7 @@ function ReconciliationCoverage({
                 .slice(0, 10)
                 .map(
                   (source) =>
-                    `${source.fileName}: ${source.rowStart === source.rowEnd ? source.rowStart : `${source.rowStart}–${source.rowEnd}`}`,
+                    `${[source.fileName, source.worksheet].filter(Boolean).join(" · ")}: ${source.rowStart === source.rowEnd ? source.rowStart : `${source.rowStart}–${source.rowEnd}`}`,
                 )
                 .join(" · ")}
             </p>

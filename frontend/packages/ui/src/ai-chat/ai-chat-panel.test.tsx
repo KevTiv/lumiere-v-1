@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react"
 import { chooseSelectValue } from "../components/select-test-utils"
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -23,6 +24,8 @@ vi.mock("./ai-action-draft-card", () => ({
 
 import { AIChatPanel } from "./ai-chat-panel"
 
+type StreamHandler = NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>
+
 afterEach(cleanup)
 
 describe("AI chat workspace", () => {
@@ -43,7 +46,7 @@ describe("AI chat workspace", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "aiChat.attachments.remove" })[2]!)
     fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "Summarize these files" } })
     fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
-    await waitFor(() => expect(onSendMessage).toHaveBeenCalledExactlyOnceWith("Summarize these files", files))
+    await waitFor(() => expect(onSendMessage).toHaveBeenCalledExactlyOnceWith("Summarize these files", expect.any(String), files))
     await screen.findByText("According to counts.txt, there are 42 eggs.")
     expect(screen.queryByRole("button", { name: "aiChat.attachments.remove" })).toBeNull()
     expect(screen.getByTestId("erp-ai-chat-message-user").textContent).toContain("counts.txt")
@@ -62,6 +65,20 @@ describe("AI chat workspace", () => {
     await waitFor(() => expect(onStreamMessage).toHaveBeenCalledExactlyOnceWith("Summarize", expect.any(Object), files))
     await screen.findByText("File summarized.")
     expect(onSendMessage).not.toHaveBeenCalled()
+  })
+
+  it("keeps text attachments staged when a history-backed streaming turn is stopped", async () => {
+    const files = [new File(["notes"], "notes.txt")]
+    const onStreamMessage = vi.fn(async () => ({ content: "", stopped: true }))
+    render(<AIChatPanel open onClose={vi.fn()} conversationKey="thread" enableChatAttachments onStreamMessage={onStreamMessage} />)
+    fireEvent.click(screen.getByRole("button", { name: /^aiChat\.workspace\.files/ }))
+    fireEvent.change(screen.getByTestId("erp-ai-chat-context-file-input"), { target: { files } })
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "Summarize" } })
+    fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
+    await screen.findByText("aiChat.progress.stopped")
+    expect(onStreamMessage).toHaveBeenCalledExactlyOnceWith("Summarize", expect.objectContaining({ turnId: expect.any(String) }), files)
+    expect((screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value).toBe("Summarize")
+    expect(screen.getByRole("button", { name: "aiChat.attachments.remove" })).toBeTruthy()
   })
 
   it("keeps attachments and the question on read, transport or reported answer failure", async () => {
@@ -121,6 +138,17 @@ describe("AI chat workspace", () => {
     expect(screen.getByTestId("erp-ai-chat-message-user").textContent).toContain("saved.txt")
     fireEvent.click(screen.getByRole("button", { name: /^aiChat\.workspace\.files/ }))
     expect(screen.queryByRole("button", { name: "aiChat.attachments.remove" })).toBeNull()
+  })
+
+  it("uses an administrator recovery message until the skills route is available", () => {
+    const messages = [{ id: "setup", role: "assistant", content: "AI setup is incomplete.", timestamp: new Date(), recoveryPath: "/ai-skills" }] satisfies NonNullable<ComponentProps<typeof AIChatPanel>["initialMessages"]>
+    const props = { open: true, onClose: vi.fn(), initialMessages: messages }
+    const { rerender } = render(<AIChatPanel {...props} />)
+    expect(screen.getByText("aiChat.skillSetupUnavailable")).toBeTruthy()
+    expect(screen.queryByRole("link", { name: "aiSkills.title" })).toBeNull()
+    rerender(<AIChatPanel {...props} canOpenSkillSetup />)
+    expect(screen.getByRole("link", { name: "aiSkills.title" }).getAttribute("href")).toBe("/ai-skills")
+    expect(screen.queryByText("aiChat.skillSetupUnavailable")).toBeNull()
   })
 
   it("keeps the shell composer mounted when a dock becomes a modal", async () => {
@@ -278,6 +306,19 @@ describe("AI chat workspace", () => {
     expect(within(popover).getByText("Quotation SO-023")).toBeTruthy()
     fireEvent.keyDown(popover, { key: "Escape" })
     expect(input.value).toBe("Keep my question")
+  })
+
+  it("carries the explicit import mode without sending or replacing the instruction", async () => {
+    const onImportFiles = vi.fn(async () => {})
+    const onSendMessage = vi.fn()
+    const file = new File(["name\nEggs"], "products.csv", { type: "text/csv" })
+    render(<AIChatPanel open onClose={vi.fn()} config={{ enableFileUpload: true }} onImportFiles={onImportFiles} onSendMessage={onSendMessage} />)
+    const input = screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: "Please prepare an import from these files" } })
+    fireEvent.drop(screen.getByTestId("erp-ai-chat-panel"), { dataTransfer: { types: ["Files"], files: [file] } })
+    await waitFor(() => expect(onImportFiles).toHaveBeenCalledExactlyOnceWith([file], "prepare_import"))
+    expect(input.value).toBe("Please prepare an import from these files")
+    expect(onSendMessage).not.toHaveBeenCalled()
   })
 
   it("accepts multiple files from the picker and clears it for future selection", async () => {
@@ -479,6 +520,106 @@ describe("AI chat workspace", () => {
     await act(async () => { fail(new Error("Network unavailable")) })
     expect((screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value).toBe("New unsent draft")
     expect(onStreamMessage).toHaveBeenCalledOnce()
+  })
+
+  it("shows provisional text before completion, then renders the final Markdown and actions", async () => {
+    let callbacks!: Parameters<StreamHandler>[1]
+    let finish!: (reply: Awaited<ReturnType<StreamHandler>>) => void
+    const stream: StreamHandler = (_text, handlers) => {
+      callbacks = handlers
+      return new Promise(resolve => { finish = resolve })
+    }
+    render(<AIChatPanel open onClose={vi.fn()} onStreamMessage={stream} turnProgress="answering" />)
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "Show the entries" } })
+    fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
+    await act(async () => {
+      callbacks.onDelta("## Current entries")
+      callbacks.onSources([{ kind: "live", trust: "authoritative", label: "Journal entry #25" }])
+    })
+    expect(await screen.findByText("## Current entries")).toBeTruthy()
+    expect(screen.queryByText("Journal entry #25")).toBeNull()
+    expect(screen.queryByText("Use in form")).toBeNull()
+    expect(screen.getByRole("status").textContent).toBe("aiChat.progress.answering")
+    await act(async () => finish({ content: "## Current entries\n\n- **Verified**" }))
+    expect(screen.getByRole("heading", { name: "Current entries" })).toBeTruthy()
+    expect(screen.getByText("Verified").closest("li")).toBeTruthy()
+    expect(screen.getByText("Use in form")).toBeTruthy()
+    expect(screen.getByText("Journal entry #25")).toBeTruthy()
+  })
+
+  it("shows a stopped partial reply without actions and preserves its unsent text", async () => {
+    let callbacks!: Parameters<StreamHandler>[1]
+    let finish!: (reply: Awaited<ReturnType<StreamHandler>>) => void
+    const stream: StreamHandler = (_text, handlers) => {
+      callbacks = handlers
+      return new Promise(resolve => { finish = resolve })
+    }
+    const stop = vi.fn(() => finish({ content: "", stopped: true }))
+    render(<AIChatPanel open onClose={vi.fn()} onStreamMessage={stream} onStopReply={stop} />)
+    const input = screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: "Check the entries" } })
+    fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
+    await act(async () => callbacks.onDelta("Partial"))
+    fireEvent.click(screen.getByRole("button", { name: "aiChat.progress.stop" }))
+    expect(await screen.findByText("aiChat.progress.partial")).toBeTruthy()
+    expect(screen.getByText("Partial")).toBeTruthy()
+    expect(screen.queryByText("Use in form")).toBeNull()
+    expect(input.value).toBe("Check the entries")
+    expect(document.activeElement).toBe(input)
+    expect(stop).toHaveBeenCalledOnce()
+  })
+
+  it("reopens an in-flight turn after switching threads and reconciles its persisted answer once", () => {
+    const onClose = vi.fn()
+    const timestamp = new Date()
+    const turnProjection = {
+      id: "turn-one",
+      userText: "Review these journal entries",
+      content: "## Retrieved entries",
+      timestamp,
+      settled: false as const,
+    }
+    const { rerender } = render(<AIChatPanel open onClose={onClose} conversationKey="accounting" turnProjection={turnProjection} sendPending />)
+    expect(screen.getByText("Review these journal entries")).toBeTruthy()
+    expect(screen.getByText("## Retrieved entries")).toBeTruthy()
+    expect(screen.queryByText("Use in form")).toBeNull()
+
+    rerender(<AIChatPanel open onClose={onClose} conversationKey="warehouse" />)
+    expect(screen.queryByText("Review these journal entries")).toBeNull()
+    expect(screen.queryByText("## Retrieved entries")).toBeNull()
+    rerender(<AIChatPanel open onClose={onClose} conversationKey="accounting" turnProjection={turnProjection} sendPending />)
+    expect(screen.getByText("## Retrieved entries")).toBeTruthy()
+
+    const reply = { content: "## Verified entries" }
+    rerender(<AIChatPanel open onClose={onClose} conversationKey="accounting" turnProjection={{ ...turnProjection, settled: true, reply }}
+      initialMessages={[
+        { id: "saved-prompt", role: "user", content: turnProjection.userText, timestamp, metadata: { turnId: turnProjection.id } },
+        { id: "saved-reply", role: "assistant", content: reply.content, timestamp, metadata: { turnId: turnProjection.id } },
+      ]} />)
+    expect(screen.getAllByText("Review these journal entries")).toHaveLength(1)
+    expect(screen.getAllByRole("heading", { name: "Verified entries" })).toHaveLength(1)
+    expect(screen.queryByText("## Retrieved entries")).toBeNull()
+  })
+
+  it("shows and clears record and attachment scope without resetting the draft", () => {
+    const clearSelection = vi.fn()
+    const clearFiles = vi.fn()
+    render(<AIChatPanel open onClose={vi.fn()} onClearSelection={clearSelection} importCompanyLabel="Mugisha Farm"
+      importFocusedFileNames={["journal.csv"]} onClearImportFocus={clearFiles}
+      context={{ activeView: "Accounting", activeTab: "journal-entries", selectedData: { selectionSummary: "Journal entry #25" } }} />)
+    const input = screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement
+    fireEvent.change(input, { target: { value: "Keep my draft" } })
+    const scope = within(screen.getByTestId("assistant-composer-scope"))
+    expect(scope.getByText("Mugisha Farm")).toBeTruthy()
+    expect(scope.getByText("Accounting · journal entries")).toBeTruthy()
+    expect(scope.getByText("Journal entry #25")).toBeTruthy()
+    expect(scope.getByText("journal.csv")).toBeTruthy()
+    fireEvent.click(scope.getByRole("button", { name: "aiChat.workspace.clearSelection" }))
+    fireEvent.click(scope.getByRole("button", { name: "aiChat.workspace.clearFiles" }))
+    expect(clearSelection).toHaveBeenCalledOnce()
+    expect(clearFiles).toHaveBeenCalledOnce()
+    expect(input.value).toBe("Keep my draft")
+    expect(document.activeElement).toBe(input)
   })
   it("opens full-screen with a context selector and uses the existing message transport", async () => {
     const onStreamMessage = vi.fn(async (_text: string, handlers: { onDelta: (text: string) => void }) => {

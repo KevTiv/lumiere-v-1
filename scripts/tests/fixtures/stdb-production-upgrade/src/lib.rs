@@ -262,8 +262,132 @@ pub struct SearchEmbedding {
     pub metadata: Option<String>,
 }
 
+#[spacetimedb::table(
+    accessor = user_profile,
+    index(accessor = user_profile_by_organization, btree(columns = [organization_id])),
+    index(accessor = user_profile_by_identity, btree(columns = [identity])),
+    index(
+        accessor = user_profile_by_identity_organization,
+        btree(columns = [identity, organization_id])
+    ),
+    index(
+        accessor = user_profile_by_organization_platform_user,
+        btree(columns = [organization_id, platform_user_id])
+    )
+)]
+pub struct UserProfile {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub identity: Identity,
+    pub platform_user_id: String,
+    pub organization_id: u64,
+    pub email: String,
+    pub email_verified: bool,
+    pub name: String,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub phone: Option<String>,
+    pub mobile: Option<String>,
+    pub timezone: String,
+    pub language: String,
+    pub signature: Option<String>,
+    pub notification_preferences: Option<String>, // JSON
+    pub ui_preferences: Option<String>,           // JSON
+    pub is_active: bool,
+    pub is_superuser: bool,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub last_login: Option<Timestamp>,
+    pub metadata: Option<String>,
+}
+
+#[spacetimedb::table(
+    accessor = user_organization,
+    public,
+    index(accessor = user_org_by_user, btree(columns = [user_identity])),
+    index(accessor = user_org_by_org,  btree(columns = [organization_id]))
+)]
+#[derive(Clone)]
+pub struct UserOrganization {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub user_identity: Identity,
+    pub organization_id: u64,
+    pub company_id: Option<u64>,
+    pub role_id: u64,
+    pub department_id: Option<u64>,
+    pub job_title: Option<String>,
+    pub employee_id: Option<String>,
+    pub date_joined: Timestamp,
+    pub is_active: bool,
+    pub is_default: bool,
+    pub metadata: Option<String>,
+}
+
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = ai_skill,
+    public,
+    index(accessor = ai_skill_by_org, btree(columns = [organization_id])),
+    index(accessor = ai_skill_by_org_key, btree(columns = [organization_id, skill_key]))
+)]
+pub struct AiSkill {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub skill_key: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub category: String,
+    pub prompt_template: String,
+    pub required_tools: Vec<String>,
+    pub optional_tools: Vec<String>,
+    pub default_max_steps: u32,
+    pub default_max_tool_calls: u32,
+    pub output_schema: Option<String>,
+    pub config_schema: Option<String>,
+    pub dataset_specs: Option<String>,
+    pub allowed_action_drafts: Vec<String>,
+    pub is_active: bool,
+    pub is_system: bool,
+    pub create_date: Timestamp,
+    pub write_date: Timestamp,
+    pub metadata: Option<String>,
+}
+
+#[derive(Clone)]
+#[spacetimedb::table(
+    accessor = ai_skill_config,
+    public,
+    index(accessor = ai_skill_config_by_org, btree(columns = [organization_id])),
+    index(
+        accessor = ai_skill_config_by_company_skill,
+        btree(columns = [company_id, skill_id])
+    )
+)]
+pub struct AiSkillConfig {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    pub company_id: Option<u64>,
+    pub skill_id: u64,
+    pub is_enabled: bool,
+    pub config_json: String,
+    pub custom_instructions: Option<String>,
+    pub tool_overrides: Vec<String>,
+    pub create_date: Timestamp,
+    pub write_date: Timestamp,
+    pub metadata: Option<String>,
+}
+
 #[spacetimedb::reducer(init)]
 pub fn init(ctx: &ReducerContext) {
+    seed_existing_ai_catalog(ctx);
     ctx.db.account_payment().insert(AccountPayment {
         id: 42,
         organization_id: 42,
@@ -415,5 +539,82 @@ pub fn init(ctx: &ReducerContext) {
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
         metadata: Some("legacy-metadata".to_string()),
+    });
+}
+
+fn seed_existing_ai_catalog(ctx: &ReducerContext) {
+    ctx.db.user_profile().insert(UserProfile {
+        id: 42,
+        identity: ctx.sender(),
+        platform_user_id: "upgrade-fixture-owner".into(),
+        organization_id: 42,
+        email: "publisher@example.test".into(),
+        email_verified: true,
+        name: "Fixture publisher".into(),
+        first_name: None,
+        last_name: None,
+        avatar_url: None,
+        phone: None,
+        mobile: None,
+        timezone: "UTC".into(),
+        language: "en".into(),
+        signature: None,
+        notification_preferences: None,
+        ui_preferences: None,
+        is_active: true,
+        is_superuser: true,
+        created_at: ctx.timestamp,
+        updated_at: ctx.timestamp,
+        last_login: None,
+        metadata: None,
+    });
+    ctx.db.user_organization().insert(UserOrganization {
+        id: 42,
+        user_identity: ctx.sender(),
+        organization_id: 42,
+        company_id: Some(42),
+        role_id: 42,
+        department_id: None,
+        job_title: None,
+        employee_id: None,
+        date_joined: ctx.timestamp,
+        is_active: true,
+        is_default: true,
+        metadata: None,
+    });
+    ctx.db.ai_skill().insert(AiSkill {
+        id: 42,
+        organization_id: 0,
+        skill_key: "report_composer".into(),
+        name: "Existing Report Composer".into(),
+        description: None,
+        category: "reports".into(),
+        prompt_template: "Existing prompt".into(),
+        required_tools: vec![],
+        optional_tools: vec![],
+        default_max_steps: 1,
+        default_max_tool_calls: 1,
+        output_schema: None,
+        config_schema: None,
+        dataset_specs: None,
+        allowed_action_drafts: vec![],
+        is_active: true,
+        is_system: true,
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
+        metadata: None,
+    });
+    ctx.db.ai_skill_config().insert(AiSkillConfig {
+        id: 42,
+        organization_id: 42,
+        company_id: Some(42),
+        skill_id: 42,
+        is_enabled: false,
+        config_json: "{}".into(),
+        custom_instructions: None,
+        tool_overrides: vec![],
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
+        metadata: None,
     });
 }

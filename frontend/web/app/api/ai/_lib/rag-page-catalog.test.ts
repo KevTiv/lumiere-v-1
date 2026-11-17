@@ -12,6 +12,7 @@ import * as assistantActions from "@lumiere/query-hooks/assistant-actions"
 import type { ApiSession } from "@/lib/api-session"
 import * as agentSelection from "../rag/agent-selection"
 import * as guideReferences from "./guide-references"
+import * as historyReferences from "./history-references"
 import * as importTaskReferences from "./import-task-references"
 import { positiveInteger } from "./positive-integer"
 import * as uiActions from "./rag-ui-actions"
@@ -30,6 +31,7 @@ function loadModule<T>(file: string, dependencies: Record<string, unknown>): T {
   runInNewContext(compiled, {
     module,
     exports: module.exports,
+    TextEncoder,
     require: (name: string) => {
       assert.ok(name in dependencies, `Unexpected dependency ${name}`)
       return dependencies[name]
@@ -174,6 +176,29 @@ test("untrusted, malformed or unauthorized page scope cannot cause widget discov
   assert.deepEqual(requests, [])
 })
 
+test("all privileged Alpha action offers satisfy the Gateway identifier and count limits", () => {
+  const offers = uiActions.serverRagUiActionOffers(
+    {
+      ...session,
+      fieldAccess: { ...session.fieldAccess!, isSuperuser: true },
+    },
+    { moduleId: "overview", pageId: "dashboard", widgets: [] },
+  )
+  const keys = offers.map((offer) => offer.capability_key)
+  const identifier = /^[a-z][a-z0-9_.]{0,159}$/
+
+  assert.ok(offers.length <= 128)
+  assert.equal(new Set(keys).size, keys.length)
+  for (const offer of offers) {
+    assert.match(offer.capability_key, identifier)
+    if (offer.entity_type) assert.match(offer.entity_type, identifier)
+  }
+  assert.ok(keys.includes("accounting.overdue_invoices.navigate"))
+  assert.ok(keys.includes("accounting.draft_bills.navigate"))
+  assert.ok(keys.includes("warehouse.low_stock.navigate"))
+  assert.ok(keys.includes("overview.widget.add"))
+})
+
 test("empty, denied and unavailable saved-widget reads preserve bare edit and add actions", async () => {
   const reads: Array<() => Promise<QueryResourceState<unknown>>> = [
     async () => ({ status: "empty", rows: [] }),
@@ -237,6 +262,7 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
     rows: [baseRow],
   }))
   const scopeChecks: number[] = []
+  const farmPackChecks: number[] = []
   const request = loadModule<typeof import("./rag-request")>(
     "./rag-request.ts",
     {
@@ -244,6 +270,13 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
       zod: { z },
       "@lumiere/erp-shared/ai-ui-context": uiContext,
       "@lumiere/erp-shared/ai-chat-attachments": chatAttachments,
+      "@/lib/server-farm-operations": {
+        serverFarmOperationsEnabled: async (actualSession: ApiSession, company: number) => {
+          assert.equal(actualSession, session)
+          farmPackChecks.push(company)
+          return false
+        },
+      },
       "./route-helpers": {
         positiveInteger,
         boundedInteger: () => 20,
@@ -259,6 +292,7 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
         },
       },
       "./guide-references": guideReferences,
+      "./history-references": historyReferences,
       "./import-task-references": importTaskReferences,
       "./rag-ui-actions": uiActions,
       "./rag-page-catalog": api,
@@ -292,7 +326,18 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
       },
     ],
   }
-  const result = await request.prepareRagPayload({ body, session, orgId: 7 })
+  const historyReference = {
+    kind: "decision",
+    sessionKey: "previous-thread",
+    messageId: "9007199254740993",
+    decisionId: "a".repeat(32),
+    revision: 2,
+  }
+  const result = await request.prepareRagPayload({
+    body: { ...body, chat_session_key: "active-thread", history_refs: [historyReference] },
+    session,
+    orgId: 7,
+  })
   assert.equal(result.ok, true)
   if (!result.ok) throw new Error("Expected a prepared RAG request")
   assert.equal(result.payload.org_id, 7)
@@ -304,6 +349,8 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
     if (invalid.ok) throw new Error("Expected attachment validation failure")
     assert.equal(invalid.response.status, 400)
   }
+  assert.equal(result.payload.chat_session_key, "active-thread")
+  assert.deepEqual(plain(result.payload.history_refs), [historyReference])
   assert.deepEqual(plain(result.payload.import_task_refs), [
     { taskId: "b".repeat(32), companyId: "12" },
   ])
@@ -340,7 +387,18 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
   if (rejected.ok) throw new Error("Expected company authorization to fail")
   assert.equal(rejected.response.status, 403)
   assert.deepEqual(scopeChecks, [12, 13])
+  assert.deepEqual(farmPackChecks, [12])
   assert.equal(requests.length, 1)
+
+  const oversized = await request.prepareRagPayload({
+    body: { ...body, query: "é".repeat(4097) },
+    session,
+    orgId: 7,
+  })
+  assert.ok(!oversized.ok)
+  assert.equal(oversized.response.status, 413)
+  assert.equal((await oversized.response.json()).code, "ai_chat_input_too_large")
+  assert.deepEqual(scopeChecks, [12, 13])
 
   const spreadsheetSelection = {
     documentId: "9007199254740993",

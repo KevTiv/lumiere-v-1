@@ -14,9 +14,10 @@ use crate::{
         },
         manifest::OrgPrivacyPolicy,
         policy_engine::PolicyEngine,
-        release_registry::load_active_manifest,
+        release_registry::load_builtin_execution_manifest,
         skill_registry::SkillRegistry,
     },
+    orchestrator::skill_access::ActorSkillAccess,
     state::AppState,
 };
 
@@ -56,9 +57,20 @@ pub async fn post_credit_hold_summary(
             "minimum_outstanding must be a finite non-negative number".into(),
         ));
     }
-    let manifest = load_active_manifest(
+    let identity_hex = req.identity_hex.unwrap_or_default();
+    ActorSkillAccess::new(
+        &state,
+        req.org_id,
+        req.company_id,
+        &req.stdb_token,
+        &identity_hex,
+    )?
+    .require(CREDIT_HOLD_SKILL_KEY)
+    .await?;
+    let manifest = load_builtin_execution_manifest(
         &state.stdb,
         req.org_id,
+        req.company_id,
         CREDIT_HOLD_SKILL_KEY,
         DISTRIBUTOR_CONTROL_SKILL_VERSION,
     )
@@ -70,8 +82,7 @@ pub async fn post_credit_hold_summary(
     let result = summarize_credit_exposure(
         &stdb,
         req.org_id,
-        &req.identity_hex
-            .unwrap_or_else(|| "credit-hold-summary".to_string()),
+        &identity_hex,
         CreditHoldInput {
             minimum_outstanding,
         },
@@ -88,9 +99,20 @@ pub async fn post_delivery_run_summary(
     Json(req): Json<GatewayDeliveryRunSummaryRequest>,
 ) -> AppResult<Json<DeliveryRunSummaryResult>> {
     validate_context(req.org_id, req.company_id, &req.stdb_token)?;
-    let manifest = load_active_manifest(
+    let identity_hex = req.identity_hex.unwrap_or_default();
+    ActorSkillAccess::new(
+        &state,
+        req.org_id,
+        req.company_id,
+        &req.stdb_token,
+        &identity_hex,
+    )?
+    .require(DELIVERY_RUN_SKILL_KEY)
+    .await?;
+    let manifest = load_builtin_execution_manifest(
         &state.stdb,
         req.org_id,
+        req.company_id,
         DELIVERY_RUN_SKILL_KEY,
         DISTRIBUTOR_CONTROL_SKILL_VERSION,
     )
@@ -102,8 +124,7 @@ pub async fn post_delivery_run_summary(
     let result = summarize_delivery_run(
         &stdb,
         req.org_id,
-        &req.identity_hex
-            .unwrap_or_else(|| "delivery-run-summary".to_string()),
+        &identity_hex,
         DeliveryRunInput {
             include_done: req.include_done,
         },

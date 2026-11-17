@@ -1,4 +1,5 @@
 import type { HumanTaskRow } from "@lumiere/query-hooks/hooks/approvals"
+import { parseAssistantActionId } from "@lumiere/query-hooks/assistant-actions"
 
 function positiveId(value: string | null): number | null {
   if (value == null || !/^\d+$/.test(value)) return null
@@ -7,6 +8,16 @@ function positiveId(value: string | null): number | null {
 }
 
 export type ApprovalInboxTarget = { model: string; resId: number }
+
+/** Assistant links capture the company. Existing native links may omit it. */
+export function approvalRequestTarget(
+  taskId: string | null,
+  companyId: string | null,
+  activeCompanyId: number | null,
+): string | null {
+  if (activeCompanyId == null || (companyId !== null && companyId !== String(activeCompanyId))) return null
+  return parseAssistantActionId(taskId) ?? null
+}
 
 export function approvalInboxHref(model: string, resId: string): string {
   return `/approvals?${new URLSearchParams({ model, resId })}`

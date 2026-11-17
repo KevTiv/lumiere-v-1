@@ -53,7 +53,7 @@ test('rejects duplicate identities, unsafe IDs and unpinned source', () => {
     [(m) => { m.organizationId = Number.MAX_SAFE_INTEGER + 1 }, /safe integer/],
     [(m) => { m.sourceCommit = 'main' }, /exact commit/],
     [(m) => { m.deployment.projectId = '-'.repeat(36) }, /exact UUID/],
-    [(m) => { m.runtimeHash = 'sha256:placeholder' }, /exact certification/],
+    [(m) => { m.runtimeHash = 'sha256:placeholder' }, /invalid legacy runtimeHash/],
     [(m) => { m.profiles[0].model = 'mistral-large-latest' }, /exact model/],
   ]
   for (const [alter, expected] of cases) { const m = manifest(); alter(m); assert.throws(() => validateManifest(m), expected) }
@@ -82,6 +82,8 @@ test('rejects ambiguous model prices, fractional units and excessive rates', () 
 
 test('configuration report never exposes secrets and never claims admission', () => {
   const env = environment()
+  delete env.AI_CERTIFICATION_STDB_TOKEN
+  delete env.AI_CERTIFICATION_RUNTIME_HASH
   const result = checkEnvironment(manifest(), env)
   assert.equal(result.configuration, 'passed')
   assert.equal(result.deploymentAcceptance, false)
@@ -97,7 +99,6 @@ test('configuration rejects missing keys, reused credentials, wrong runtime and 
     [(e) => { e.AI_SPEND_READ_STDB_TOKEN = e.STDB_TOKEN }, /tokens must differ/],
     [(e) => { e.STDB_SERVER_TOKEN = e.STDB_TOKEN }, /tokens must differ/],
     [(e) => { e.KONG_LLM_URL = 'http://kong' }, /KONG_LLM_URL/],
-    [(e) => { e.AI_CERTIFICATION_RUNTIME_HASH = `sha256:${'9'.repeat(64)}` }, /digest differs/],
     [(e) => { e.STDB_HOST = 'http://user:password@spacetimedb.railway.internal' }, /credential-free/],
     [(e) => { e.STDB_HOST = 'http://external.example.test' }, /requires HTTPS/],
   ]
@@ -133,15 +134,15 @@ test('provider errors do not expose response or transport secrets', async () => 
 })
 
 test('identity check verifies server identities and a sender-scoped budget using SELECT only', async () => {
-  const m = manifest(), calls = [], ids = Object.values(m.identities)
+  const m = manifest(), calls = [], ids = [m.identities.writer, m.identities.spendReader]
   const result = await checkIdentities(m, environment(), async (url, init) => {
     calls.push({ url, init })
     assert.match(init.body, /^SELECT /)
-    return new Response(JSON.stringify(calls.length <= 3 ? [] : sqlPayload([['EUR', '10000000']])), {
-      headers: { 'spacetime-identity': ids[(calls.length - 1) % 3] },
+    return new Response(JSON.stringify(calls.length <= 2 ? [] : sqlPayload([['EUR', '10000000']])), {
+      headers: { 'spacetime-identity': ids[(calls.length - 1) % 2] },
     })
   })
-  assert.equal(calls.length, 4)
+  assert.equal(calls.length, 3)
   assert.equal(calls.some(({ url }) => url.includes('/call/')), false)
   assert.equal(result.spendReaderBudget, 'passed')
   assert.equal(result.deploymentAcceptance, false)
@@ -149,7 +150,7 @@ test('identity check verifies server identities and a sender-scoped budget using
 
 test('identity check fails closed on wrong identity or empty scoped budget', async () => {
   await assert.rejects(checkIdentities(manifest(), environment(), async () => new Response('[]', { headers: { 'spacetime-identity': 'f'.repeat(64) } })), /identity differs/)
-  const m = manifest(), ids = Object.values(m.identities)
+  const m = manifest(), ids = [m.identities.writer, m.identities.spendReader]
   let calls = 0
-  await assert.rejects(checkIdentities(m, environment(), async () => new Response('[]', { headers: { 'spacetime-identity': ids[calls++ % 3] } })), /budget is absent/)
+  await assert.rejects(checkIdentities(m, environment(), async () => new Response('[]', { headers: { 'spacetime-identity': ids[calls++ % 2] } })), /budget is absent/)
 })

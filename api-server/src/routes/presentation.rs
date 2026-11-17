@@ -48,6 +48,11 @@ pub(super) fn router() -> Router<Arc<AppState>> {
             "/presentation/pages/:module_id/:page_id",
             get(personal_pages::get_layout).put(personal_pages::save_layout),
         )
+        .route(
+            "/ai/chat/widget-receipts",
+            get(personal_pages::list_assistant_widget_receipts)
+                .post(personal_pages::save_assistant_widget_receipt),
+        )
         .layer(DefaultBodyLimit::max(96 * 1024))
 }
 

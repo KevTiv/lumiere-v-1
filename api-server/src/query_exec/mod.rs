@@ -28,9 +28,8 @@ use access_control::{
     read_roles, read_user_organization, read_user_roles, require_ui_child_read_permission,
 };
 use ai::{
-    read_ai_action_drafts, read_ai_action_drafts_inbox, read_ai_agent_runs, read_ai_chat_messages,
-    read_ai_chat_sessions, read_ai_skill_fixtures, read_ai_skill_releases, read_ai_skill_test_runs,
-    read_ai_skill_versions,
+    read_ai_action_drafts, read_ai_action_drafts_inbox, read_ai_agent_runs, read_ai_skill_fixtures,
+    read_ai_skill_releases, read_ai_skill_test_runs, read_ai_skill_versions,
 };
 pub use authoritative::execute_authorized_resource_record;
 #[cfg(test)]
@@ -237,17 +236,19 @@ async fn read_resource_query_for_company(
             return read_user_organization(client, resource, organization_id, identity_hex, fa)
                 .await;
         }
-        "ai-chat-sessions" => {
-            return read_ai_chat_sessions(client, organization_id, identity_hex).await;
-        }
-        "ai-chat-messages" => {
-            return read_ai_chat_messages(client, organization_id, identity_hex).await;
-        }
         "ai-action-drafts" => {
             return read_ai_action_drafts(client, organization_id, identity_hex).await;
         }
         "ai-agent-runs" => {
-            return read_ai_agent_runs(client, organization_id).await;
+            let company_id = resolve_membership_company_id(
+                client,
+                organization_id,
+                identity_hex,
+                requested_company_id,
+                "Cannot read another company's AI agent runs",
+            )
+            .await?;
+            return read_ai_agent_runs(client, organization_id, company_id).await;
         }
         "ai-skill-versions" => {
             return read_ai_skill_versions(client, organization_id).await;
@@ -400,7 +401,15 @@ async fn read_resource_query_for_company(
         | "delivery-price-rules"
         | "shipping-methods"
         | "pos-payment-methods" => {
-            return inventory::read_delivery_carriers(client, resource, organization_id, fa).await;
+            return inventory::read_delivery_carriers(
+                client,
+                resource,
+                organization_id,
+                identity_hex,
+                requested_company_id,
+                fa,
+            )
+            .await;
         }
         "picking-batches" => {
             return inventory::read_picking_batches(client, resource, fa, inventory_company_id)
@@ -516,7 +525,17 @@ async fn read_resource_query_for_company(
         filter_crm_company_rows(client, resource, organization_id, company_id, &mut rows).await?;
     }
     if let Some(company_id) = inventory_company_id {
-        inventory::filter_inventory_company_rows(resource, company_id, &mut rows);
+        if resource == "warehouse-3d-zones" {
+            inventory::filter_warehouse_zone_company_rows(
+                client,
+                organization_id,
+                company_id,
+                &mut rows,
+            )
+            .await?;
+        } else {
+            inventory::filter_inventory_company_rows(resource, company_id, &mut rows);
+        }
     }
     if let Some(company_id) = purchasing_company_id {
         rows.retain(|row| row_company_matches(row, company_id, false));
@@ -570,5 +589,7 @@ async fn read_resource_query_for_company(
     Ok(rows)
 }
 
+#[cfg(test)]
+mod company_configuration_tests;
 #[cfg(test)]
 mod tests;

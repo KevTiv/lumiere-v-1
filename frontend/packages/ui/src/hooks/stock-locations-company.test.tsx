@@ -17,9 +17,14 @@ it("reads the selected company without reusing another company's server seed", a
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client }, children)
   const seed = [{ id: 1n, name: "Primary company location", companyId: 41n }]
-  state.rows.mockResolvedValueOnce(seed)
+  const primary = [{ id: 3n, name: "Refreshed primary company location", companyId: 41n }]
+  const queryPrefix = ["stock-locations", "7"] as const
+  const primaryKey = [...queryPrefix, "company", "41"] as const
+  const selectedKey = [...queryPrefix, "company", "42"] as const
+  state.rows.mockResolvedValueOnce(primary)
   const hook = renderHook(() => useStockLocations(7n, seed as Parameters<typeof useStockLocations>[1]), { wrapper })
-  await waitFor(() => expect(hook.result.current.data).toEqual(seed))
+  expect(hook.result.current.data).toBeUndefined()
+  await waitFor(() => expect(hook.result.current.data).toEqual(primary))
   expect(state.rows).toHaveBeenLastCalledWith("/api/query/stock-locations?companyId=41", expect.any(String))
   let finish: (rows: typeof seed) => void = () => {}
   state.rows.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
@@ -30,11 +35,11 @@ it("reads the selected company without reusing another company's server seed", a
   const selected = [{ id: 2n, name: "Selected company location", companyId: 42n }]
   await act(async () => finish(selected))
   await waitFor(() => expect(hook.result.current.data).toEqual(selected))
-  expect(client.getQueryData(["stock-locations", "7", "company", 41])).toEqual(seed)
-  expect(client.getQueryData(["stock-locations", "7", "company", 42])).toEqual(selected)
-  await act(async () => { await client.invalidateQueries({ queryKey: ["stock-locations", "7"], refetchType: "none" }) })
-  expect(client.getQueryState(["stock-locations", "7", "company", 41])?.isInvalidated).toBe(true)
-  expect(client.getQueryState(["stock-locations", "7", "company", 42])?.isInvalidated).toBe(true)
+  expect(client.getQueryData(primaryKey)).toEqual(primary)
+  expect(client.getQueryData(selectedKey)).toEqual(selected)
+  await client.invalidateQueries({ queryKey: queryPrefix, refetchType: "none" })
+  expect(client.getQueryState(primaryKey)?.isInvalidated).toBe(true)
+  expect(client.getQueryState(selectedKey)?.isInvalidated).toBe(true)
   client.clear()
 })
 

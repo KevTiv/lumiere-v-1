@@ -1,12 +1,13 @@
 /**
  * Shared RAG-request preparation for the non-streaming and streaming RAG routes.
  */
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
 import { sanitizeRagUiContext } from "@lumiere/erp-shared/ai-ui-context"
 import { parseChatAttachments, type AiChatAttachment } from "@lumiere/erp-shared/ai-chat-attachments"
 import type { ApiSession } from "@/lib/api-session"
+import { serverFarmOperationsEnabled } from "@/lib/server-farm-operations"
 
 import type { JsonObject } from "./route-helpers"
 import {
@@ -27,12 +28,50 @@ import {
   type RagUiActionOffer,
 } from "./rag-ui-actions"
 import { serverRagPageCatalog } from "./rag-page-catalog"
+import { parseHistoryReferences, type AssistantHistoryReference } from "./history-references"
 import {
   parseRagAgentSelection,
   type RagAgentSelection,
 } from "../rag/agent-selection"
 
 export const MAX_INCLUDE_TYPES = 8
+const MAX_RAG_REQUEST_BYTES = 32 * 1024
+const MAX_RAG_QUERY_BYTES = 8 * 1024
+const chatSessionKey = z.string().regex(/^[A-Za-z0-9_-]{1,150}$/).optional()
+
+export async function parseRagRequest(request: NextRequest): Promise<
+  | { ok: true; body: JsonObject }
+  | { ok: false; response: NextResponse }
+> {
+  const reader = request.body?.getReader()
+  if (!reader) {
+    return { ok: false, response: NextResponse.json({ error: "JSON object body required" }, { status: 400 }) }
+  }
+  const decoder = new TextDecoder("utf-8", { fatal: true })
+  let bytes = 0
+  let json = ""
+  try {
+    while (true) {
+      const chunk = await reader.read()
+      if (chunk.done) break
+      bytes += chunk.value.byteLength
+      if (bytes > MAX_RAG_REQUEST_BYTES) {
+        void reader.cancel().catch(() => undefined)
+        return { ok: false, response: NextResponse.json({ code: "ai_chat_input_too_large", error: "Shorten the question or remove some attachments and try again." }, { status: 413 }) }
+      }
+      json += decoder.decode(chunk.value, { stream: true })
+    }
+    const body: unknown = JSON.parse(json + decoder.decode())
+    if (body && typeof body === "object" && !Array.isArray(body)) {
+      return { ok: true, body: body as JsonObject }
+    }
+  } catch {
+    // Keep transport and decoder errors outside the public error body.
+  } finally {
+    reader.releaseLock()
+  }
+  return { ok: false, response: NextResponse.json({ error: "Invalid JSON object body" }, { status: 400 }) }
+}
 
 /**
  * Sanitize the `include_types` array: normalize to lowercase snake_case,
@@ -100,6 +139,8 @@ export interface RagPayload extends RagAgentSelection {
   guide_refs?: RagGuideReference[]
   import_task_refs?: RagImportTaskReference[]
   attachments?: AiChatAttachment[]
+  chat_session_key?: string
+  history_refs?: AssistantHistoryReference[]
   spreadsheet_selection?: z.infer<typeof spreadsheetSelection>
   ui_action_offers: RagUiActionOffer[]
 }
@@ -132,11 +173,16 @@ export async function prepareRagPayload(params: {
       ),
     }
   }
+  if (new TextEncoder().encode(query).byteLength > MAX_RAG_QUERY_BYTES) {
+    return { ok: false, response: NextResponse.json({ code: "ai_chat_input_too_large", error: "Shorten the question and try again." }, { status: 413 }) }
+  }
 
   const companyId = positiveInteger(body.companyId ?? body.company_id)
   let guideRefs: RagGuideReference[] | undefined
   let importTaskRefs: RagImportTaskReference[] | undefined
   let attachments: AiChatAttachment[]
+  let historyRefs: AssistantHistoryReference[] | undefined
+  let sessionKey: string | undefined
   let agentSelection: RagAgentSelection
   try {
     attachments = parseChatAttachments(body.attachments)
@@ -146,6 +192,8 @@ export async function prepareRagPayload(params: {
       companyId,
     )
     agentSelection = parseRagAgentSelection(body)
+    historyRefs = parseHistoryReferences(body.history_refs)
+    sessionKey = chatSessionKey.parse(body.chat_session_key)
   } catch (error) {
     return {
       ok: false,
@@ -166,7 +214,7 @@ export async function prepareRagPayload(params: {
     const selection = spreadsheetSelection.safeParse(body.spreadsheet_selection)
     if (
       attachments.length > 0 ||
-      !selection.success ||
+      !selection.success || sessionKey !== undefined || historyRefs !== undefined ||
       ![
         "Explain the selected spreadsheet cells.",
         "Check the selected spreadsheet cells for issues.",
@@ -199,12 +247,10 @@ export async function prepareRagPayload(params: {
   const limit = boundedInteger(body.limit, 20, 1, 40)
   const include_types = sanitizeIncludeTypes(body.include_types)
   const ui_context = sanitizeRagUiContext(body.ui_context)
-  const page = await serverRagPageCatalog({
-    session,
-    orgId,
-    companyId,
-    uiContext: ui_context,
-  })
+  const [page, farmOperationsEnabled] = await Promise.all([
+    serverRagPageCatalog({ session, orgId, companyId, uiContext: ui_context }),
+    serverFarmOperationsEnabled(session, companyId),
+  ])
 
   const payload: RagPayload = {
     ...agentSelection,
@@ -214,13 +260,15 @@ export async function prepareRagPayload(params: {
     limit,
     stdb_token: session.stdbToken,
     identity_hex: session.identityHex,
-    ui_action_offers: serverRagUiActionOffers(session, page),
+    ui_action_offers: serverRagUiActionOffers(session, page, farmOperationsEnabled),
   }
   if (include_types?.length) payload.include_types = include_types
   if (ui_context) payload.ui_context = ui_context
   if (guideRefs) payload.guide_refs = guideRefs
   if (importTaskRefs) payload.import_task_refs = importTaskRefs
   if (attachments.length) payload.attachments = attachments
+  if (sessionKey) payload.chat_session_key = sessionKey
+  if (historyRefs) payload.history_refs = historyRefs
 
   return { ok: true, payload }
 }

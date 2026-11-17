@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises"
 import { expect, test, type Page } from "@playwright/test"
 import type { ImportProposal } from "../lib/import-workflow"
 
@@ -308,7 +309,10 @@ test("source confirmation, approval and verified native completion remain distin
   await page.getByText("Open created journal entries", { exact: true }).click()
   await expect(
     page.getByRole("link", { name: "SOURCE-electricity", exact: true }),
-  ).toHaveAttribute("href", "/accounting/invoices/90?companyId=9001")
+  ).toHaveAttribute(
+    "href",
+    "/accounting?tab=journal-entries&importEntryCompany=9001&importEntryIds=90",
+  )
   await page.reload()
   await expect(page.getByText("Verified in ERP", { exact: true })).toBeVisible()
   expect(actions).toEqual(["prepare", "approve", "execute"])
@@ -335,4 +339,61 @@ test("a lost execution reply recovers the saved verified result without a second
   await page.reload()
   await expect(page.getByText("Verified in ERP", { exact: true })).toBeVisible()
   expect(actions).toEqual(["prepare", "approve", "execute"])
+})
+
+test("opens an older import by exact company and job and continues its row diagnostics", async ({ page }) => {
+  const jobId = "9007199254740993"
+  let errorsAvailable = false
+  const jobReads: (string | null)[] = []
+  const cursors: (string | null)[] = []
+
+  await page.route("**/api/query/import-jobs**", async (route) => {
+    const params = new URL(route.request().url()).searchParams
+    jobReads.push(params.get("jobId"))
+    const data = params.get("companyId") === "9001" && params.get("jobId") === jobId
+      ? [{ id: jobId, fileName: "older-import.csv", status: "partial", totalRows: 8, importedRows: 6, errorRows: 2 }]
+      : []
+    await route.fulfill({ json: { data } })
+  })
+  await page.route("**/api/query/import-job-errors**", async (route) => {
+    const params = new URL(route.request().url()).searchParams
+    expect(params.get("companyId")).toBe("9001")
+    expect(params.get("jobId")).toBe(jobId)
+    const cursor = params.get("cursor")
+    cursors.push(cursor)
+    if (!errorsAvailable) {
+      await route.fulfill({ status: 503, json: { error: "Unavailable" } })
+      return
+    }
+    await route.fulfill({ json: cursor === null
+      ? { data: [{ id: "710", jobId, rowNumber: 8, errorMessage: "Unknown unit" }], nextCursor: "710" }
+      : { data: [{ id: "709", jobId, rowNumber: 7, errorMessage: "Invalid count" }], nextCursor: null } })
+  })
+
+  await page.goto("/import-job-readback")
+  await expect(page.getByRole("button", { name: "Show original filename: older-import.csv" })).toBeVisible()
+  const retry = page.getByRole("button", { name: /retry/i })
+  const downloadErrors = page.getByRole("button", { name: "Download error report (CSV)", exact: true })
+  await expect(retry).toBeVisible()
+  await expect(downloadErrors).toHaveCount(0)
+  errorsAvailable = true
+  await retry.click()
+
+  await expect(page.getByText("Row 8: Unknown unit")).toBeVisible()
+  await expect(downloadErrors).toHaveCount(0)
+  await page.getByRole("button", { name: "Load more row errors" }).click()
+  await expect(page.getByText("Row 7: Invalid count")).toBeVisible()
+  await expect(downloadErrors).toBeVisible()
+  const downloadEvent = page.waitForEvent("download")
+  await downloadErrors.click()
+  const download = await downloadEvent
+  expect(download.suggestedFilename()).toBe("older-import-errors.csv")
+  const csv = await readFile(await download.path(), "utf8")
+  expect(csv.split("\n")).toEqual([
+    "row_number,field_name,raw_value,error_message",
+    '"8","","","Unknown unit"',
+    '"7","","","Invalid count"',
+  ])
+  expect(jobReads).toEqual([jobId])
+  expect(cursors).toEqual([null, null, "710"])
 })

@@ -137,7 +137,7 @@ export function useCountryPackCatalog(enabled = true) {
     queryKey: ["country-pack-catalog"],
     queryFn: async () => {
       const response = await apiFetch("/api/country-packs/catalog")
-      if (!response.ok) throw new Error(await parseCallError(response))
+      if (!response.ok) throw Object.assign(new Error(await parseCallError(response)), { status: response.status })
       const body = (await response.json()) as { data?: CountryPackDefinitionWireRow[] }
       return (body.data ?? []).map(countryPackDefinitionFromWire)
     },
@@ -151,7 +151,7 @@ export function useCompanyCountryPacks(companyId: bigint, enabled = true) {
     queryKey: ["company-country-packs", String(companyId)],
     queryFn: async () => {
       const response = await apiFetch(`/api/country-packs/${companyId}`)
-      if (!response.ok) throw new Error(await parseCallError(response))
+      if (!response.ok) throw Object.assign(new Error(await parseCallError(response)), { status: response.status })
       const body = (await response.json()) as { data?: CompanyCountryPackWireRow[] }
       return (body.data ?? []).map(companyCountryPackFromWire)
     },
@@ -268,7 +268,7 @@ export function useSetCompanyCountryPack() {
 export function useSetCompanyVerticalPack() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { companyId: bigint; organizationId: number; packKey: "distributor_wholesaler"; enabled: boolean; configuration?: string }) => {
+    mutationFn: async (args: { companyId: bigint; organizationId: number; packKey: "distributor_wholesaler" | "farm_operations"; enabled: boolean; configuration?: string }) => {
       const { urlPath, init } = stdbBffCommandPost("set_company_vertical_pack", { companyId: args.companyId, params: stdbParamsToJson({ packKey: args.packKey, enabled: args.enabled, configuration: encodeOptionalString(args.configuration) }, "SetCompanyVerticalPackParams") })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await parseCallError(response))

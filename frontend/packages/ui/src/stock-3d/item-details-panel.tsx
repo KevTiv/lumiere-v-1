@@ -21,7 +21,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { useWarehouse3DContext } from './warehouse-3d-context'
-import { CATEGORY_COLORS, type StockCategory } from './types'
+import { stockCategoryColor, isLowStockItem, type StockCategory } from './types'
 
 interface ItemDetailsPanelProps {
   className?: string
@@ -60,7 +60,7 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
 
   if (!item || !selectedItemId) return null
 
-  const isLowStock = item.minStock !== undefined && item.quantity <= item.minStock
+  const isLowStock = isLowStockItem(item)
 
   const handleSaveQuantity = () => {
     const newQuantity = parseInt(editQuantity)
@@ -96,11 +96,11 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
           <div className="flex items-center gap-3">
             <div
               className="w-12 h-12 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: CATEGORY_COLORS[item.category] + '20' }}
+              style={{ backgroundColor: stockCategoryColor(item.category) + '20' }}
             >
               <Package
                 className="h-6 w-6"
-                style={{ color: CATEGORY_COLORS[item.category] }}
+                style={{ color: stockCategoryColor(item.category) }}
               />
             </div>
             <div>
@@ -117,12 +117,12 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
                 <Badge variant="outline">{item.sku}</Badge>
                 <Badge
                   style={{
-                    backgroundColor: CATEGORY_COLORS[item.category] + '20',
-                    color: CATEGORY_COLORS[item.category],
-                    borderColor: CATEGORY_COLORS[item.category],
+                    backgroundColor: stockCategoryColor(item.category) + '20',
+                    color: stockCategoryColor(item.category),
+                    borderColor: stockCategoryColor(item.category),
                   }}
                 >
-                  {categoryLabels[item.category]}
+                  {(Object.hasOwn(categoryLabels, item.category) ? categoryLabels[item.category] : item.category) || t('ui.stock3d.categories.unavailable', { defaultValue: 'Category unavailable' })}
                 </Badge>
               </div>
             </div>
@@ -184,10 +184,9 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
             )}
             {item.minStock !== undefined && (
               <p className="text-xs text-muted-foreground">
-                {t('ui.stock3d.details.stockRange', {
-                  min: item.minStock,
-                  max: item.maxStock,
-                })}
+                {item.maxStock == null
+                  ? t('ui.stock3d.details.reorderMinimum', { defaultValue: 'Reorder minimum: {{min}}', min: item.minStock })
+                  : t('ui.stock3d.details.stockRange', { min: item.minStock, max: item.maxStock })}
               </p>
             )}
           </div>
@@ -212,35 +211,27 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
 
           {/* Last Updated */}
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">{t('ui.stock3d.details.lastUpdated')}</Label>
+            <Label className="text-xs text-muted-foreground">{t('ui.stock3d.details.receivedOn', { defaultValue: 'Received on' })}</Label>
             <div className="flex items-center gap-1.5">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <p className="text-sm font-medium text-foreground">
-                {new Intl.DateTimeFormat(i18n.resolvedLanguage ?? i18n.language, {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                }).format(item.lastUpdated)}
+                {item.lastUpdated ? new Intl.DateTimeFormat(i18n.resolvedLanguage ?? i18n.language, {
+                  dateStyle: 'medium', timeStyle: 'short',
+                }).format(item.lastUpdated) : '—'}
               </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {new Intl.DateTimeFormat(i18n.resolvedLanguage ?? i18n.language, {
-                hour: 'numeric',
-                minute: '2-digit',
-              }).format(item.lastUpdated)}
-            </p>
           </div>
 
           {/* Actions */}
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">{t('ui.stock3d.details.actions')}</Label>
             <div className="flex items-center gap-2">
-              {onMoveItem && (
+              {onMoveItem && (item.availableQuantity ?? item.quantity) > 0 && (
                 <Button
                   size="sm"
                   variant="outline"
                   className="h-8 gap-1.5"
-                  onClick={() => onMoveItem(item.id, '')}
+                  onClick={() => onMoveItem(item.id)}
                 >
                   <ArrowRightLeft className="h-3.5 w-3.5" />
                   {t('ui.stock3d.details.move')}

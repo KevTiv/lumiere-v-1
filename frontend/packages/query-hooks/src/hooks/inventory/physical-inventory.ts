@@ -13,6 +13,8 @@ import {
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
 import {
+  inventoryInitialData,
+  inventoryListQueryOptions,
   companyScopeParams,
   mergeReducerParams,
   CREATE_PRODUCT_DEFAULTS,
@@ -116,17 +118,12 @@ export function useInventoryAdjustments(
   organizationId: bigint,
   initialData?: InventoryAdjustment[],
   enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<InventoryAdjustment[]>({
     enabled,
-    queryKey: ['inventory-adjustments', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList(
-        '/api/query/inventory-adjustments',
-        'Failed to fetch inventory adjustments',
-      ),
-    staleTime: 30_000,
-    initialData: coalesceQueryInitialData(initialData),
+    ...inventoryListQueryOptions('inventory-adjustments', organizationId, 'Failed to fetch inventory adjustments', companyId),
+    initialData: inventoryInitialData(initialData, companyId),
   });
 }
 
@@ -135,17 +132,12 @@ export function useStockCycleCounts(
   organizationId: bigint,
   initialData?: StockCycleCount[],
   enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<StockCycleCount[]>({
     enabled,
-    queryKey: ['stock-cycle-counts', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList(
-        '/api/query/stock-cycle-counts',
-        'Failed to fetch cycle counts',
-      ),
-    staleTime: 30_000,
-    initialData: coalesceQueryInitialData(initialData),
+    ...inventoryListQueryOptions('stock-cycle-counts', organizationId, 'Failed to fetch cycle counts', companyId),
+    initialData: inventoryInitialData(initialData, companyId),
   });
 }
 
@@ -153,17 +145,12 @@ export function useStockInventories(
   organizationId: bigint,
   initialData?: StockInventory[],
   enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<StockInventory[]>({
     enabled,
-    queryKey: ['stock-inventories', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList(
-        '/api/query/stock-inventories',
-        'Failed to fetch stock inventories',
-      ),
-    staleTime: 30_000,
-    initialData: coalesceQueryInitialData(initialData),
+    ...inventoryListQueryOptions('stock-inventories', organizationId, 'Failed to fetch stock inventories', companyId),
+    initialData: inventoryInitialData(initialData, companyId),
   });
 }
 
@@ -508,17 +495,12 @@ export function useInventoryExceptionsShortAtp(
   organizationId: bigint,
   initialData?: InventoryException[],
   enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<InventoryException[]>({
     enabled,
-    queryKey: ['inventory-exceptions-short-atp', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList(
-        '/api/query/inventory-exceptions-short-atp',
-        'Failed to fetch short ATP exceptions',
-      ),
-    staleTime: 30_000,
-    initialData: coalesceQueryInitialData(initialData),
+    ...inventoryListQueryOptions('inventory-exceptions-short-atp', organizationId, 'Failed to fetch short ATP exceptions', companyId),
+    initialData: inventoryInitialData(initialData, companyId),
   });
 }
 
@@ -527,20 +509,12 @@ export function useInventoryExceptionsExpiredLots(
   organizationId: bigint,
   initialData?: InventoryException[],
   enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<InventoryException[]>({
     enabled,
-    queryKey: [
-      'inventory-exceptions-expired-lots',
-      rqBigIntKey(organizationId),
-    ],
-    queryFn: () =>
-      fetchQueryList(
-        '/api/query/inventory-exceptions-expired-lots',
-        'Failed to fetch expired lot exceptions',
-      ),
-    staleTime: 30_000,
-    initialData: coalesceQueryInitialData(initialData),
+    ...inventoryListQueryOptions('inventory-exceptions-expired-lots', organizationId, 'Failed to fetch expired lot exceptions', companyId),
+    initialData: inventoryInitialData(initialData, companyId),
   });
 }
 
@@ -549,17 +523,12 @@ export function useInventoryExceptionsOpenQc(
   organizationId: bigint,
   initialData?: InventoryException[],
   enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<InventoryException[]>({
     enabled,
-    queryKey: ['inventory-exceptions-open-qc', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList(
-        '/api/query/inventory-exceptions-open-qc',
-        'Failed to fetch open QC exceptions',
-      ),
-    staleTime: 30_000,
-    initialData: coalesceQueryInitialData(initialData),
+    ...inventoryListQueryOptions('inventory-exceptions-open-qc', organizationId, 'Failed to fetch open QC exceptions', companyId),
+    initialData: inventoryInitialData(initialData, companyId),
   });
 }
 
@@ -609,17 +578,12 @@ export function useInventoryValuations(
   organizationId: bigint,
   initialData?: InventoryValuation[],
   enabled = true,
+  companyId?: bigint,
 ) {
   return useQuery<InventoryValuation[]>({
     enabled,
-    queryKey: ['inventory-valuations', rqBigIntKey(organizationId)],
-    queryFn: () =>
-      fetchQueryList(
-        '/api/query/inventory-valuations',
-        'Failed to fetch inventory valuations',
-      ),
-    staleTime: 30_000,
-    initialData: coalesceQueryInitialData(initialData),
+    ...inventoryListQueryOptions('inventory-valuations', organizationId, 'Failed to fetch inventory valuations', companyId),
+    initialData: inventoryInitialData(initialData, companyId),
   });
 }
 

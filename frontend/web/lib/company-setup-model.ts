@@ -306,7 +306,7 @@ export function companySetupLinks(companyId: string | null) {
       title: "Units and products",
       detail:
         "Review units per product. Choosing a unit here does not convert quantities or prices.",
-      href: `/inventory?tab=products${scope}`,
+      href: `/products?tab=products${scope}`,
     },
     {
       title: "Import source files",

@@ -131,6 +131,7 @@ async function mockReview(
     loseBulkReply?: boolean
     targetEntity?: string
     incompleteBulkReceipt?: boolean
+    reviewOperations?: ReviewDetail["reviewOperations"]
   } = {},
 ) {
   const items = new Map(initial.map((item) => [item.id, item]))
@@ -149,6 +150,7 @@ async function mockReview(
     sourceFile: "farm-review.json",
     items: [...items.values()],
     history: history.slice().reverse().slice(0, 100),
+    reviewOperations: options.reviewOperations,
   })
   const apply = (decision: ReviewDecision) => {
     const before = items.get(decision.itemId)!
@@ -345,6 +347,75 @@ function editor(page: Page) {
     exact: true,
   })
 }
+
+test("the review renders and dispatches server-registered operations", async ({
+  page,
+}) => {
+  const selected = source("11")
+  const unregistered = source("12")
+  const excluded: ReviewRow = { ...source("13"), state: "excluded" }
+  await mockReview(page, [selected, unregistered, excluded], {
+    targetEntity: "source_observation",
+    reviewOperations: [
+      {
+        key: "fleet_odometer",
+        version: 1,
+        label: "Odometer readings",
+        destination: "/fleet?tab=odometer",
+        reviewedRecord: {
+          dispatch: "fleet_odometer",
+          inputs: [],
+          previewFields: [{ key: "mileage", label: "Mileage" }],
+        },
+        itemIds: [selected.id, excluded.id],
+      },
+    ],
+  })
+  const requests: unknown[] = []
+  const digest = "c".repeat(64)
+  await page.route("**/api/import-reviews/1/module-backfill", (route) => {
+    const request = route.request().postDataJSON()
+    requests.push(request)
+    const result = request.preview
+      ? {
+          itemId: selected.id,
+          status: "ready",
+          digest,
+          periodStart: "2024-06-03",
+          periodEnd: "2024-06-03",
+          facts: { mileage: "1258.00" },
+        }
+      : { itemId: selected.id, status: "saved", recordId: "55" }
+    return route.fulfill({ json: { results: [result] } })
+  })
+  await page.goto("/import-review")
+  await expect(
+    page.getByRole("link", { name: "Open odometer readings" }),
+  ).toHaveAttribute("href", "/fleet?tab=odometer")
+  await expect(
+    page.getByRole("button", { name: "Match customers" }),
+  ).toHaveCount(0)
+  await page.getByRole("button", { name: "Preview odometer readings" }).click()
+  await expect(page.getByText("Mileage 1258.00", { exact: false })).toBeVisible()
+  await page.getByRole("button", { name: /Save and verify 1 record/ }).click()
+  await expect(
+    page.getByText("1 saved · 0 matched existing records", { exact: false }),
+  ).toBeVisible()
+  expect(requests).toEqual([
+    {
+      companyId: 9001,
+      module: "fleet_odometer",
+      preview: true,
+      rows: [{ itemId: "11", revision: 1 }],
+    },
+    {
+      companyId: 9001,
+      module: "fleet_odometer",
+      preview: false,
+      rows: [{ itemId: "11", revision: 1, expectedDigest: digest }],
+    },
+  ])
+})
 
 test("review progress distinguishes confirmed source evidence from importable records", async ({
   page,

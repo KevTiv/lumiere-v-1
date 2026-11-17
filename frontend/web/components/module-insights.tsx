@@ -30,7 +30,13 @@ function SourceNotice({ state }: { state: ModuleDataState }) {
 
 /** One composition for module dashboards; figures are derived only from explicit read projections. */
 export interface InsightPeriodRange { startMs: number; endMs: number }
-interface ModuleInsightsProps { input: ModuleInsightInput; sections?: DashboardSection[]; now?: Date; onPeriodRangeChange?: (range: InsightPeriodRange) => void }
+interface ModuleInsightsProps {
+  input: ModuleInsightInput
+  sections?: DashboardSection[]
+  now?: Date
+  onPeriodRangeChange?: (range: InsightPeriodRange) => void
+  actionReadback?: ReactNode
+}
 
 export function CompanyModuleInsights(props: ModuleInsightsProps) {
   const { input } = props
@@ -40,12 +46,12 @@ export function CompanyModuleInsights(props: ModuleInsightsProps) {
   return <ModuleInsights {...props} input={{ ...input, companyCurrencyId: input.companyCurrencyId ?? companyCurrencyId }} />
 }
 
-export function ModuleInsights({ input, sections = [], now, onPeriodRangeChange }: ModuleInsightsProps) {
+export function ModuleInsights({ input, sections = [], now, onPeriodRangeChange, actionReadback }: ModuleInsightsProps) {
   // A company switch remounts controls instead of retaining an old company's currency or queue.
-  return <ScopedModuleInsights key={`${input.module}:${input.organizationId}:${input.companyId}`} input={input} sections={sections} now={now} onPeriodRangeChange={onPeriodRangeChange} />
+  return <ScopedModuleInsights key={`${input.module}:${input.organizationId}:${input.companyId}`} input={input} sections={sections} now={now} onPeriodRangeChange={onPeriodRangeChange} actionReadback={actionReadback} />
 }
 
-function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }: ModuleInsightsProps) {
+function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange, actionReadback }: ModuleInsightsProps) {
   const { t } = useTranslation()
   const [period, setPeriod, invalidPeriod] = useHistoryPeriod()
   const [currencyId, setCurrencyId] = useState<string>()
@@ -99,6 +105,7 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }
       ].map(([queue, key]) => <Link key={queue} className={linkClass} href={`/sales?tab=ops&queue=${queue}`}>{t(`sales.dashboard.queues.${key}`)}<ArrowUpRight aria-hidden="true" className="size-4" /></Link>)}</nav></details>}
       {hasCompanyForecast && <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.forecastHint")}</p>}
       {quickSections.length > 0 && <DashboardGrid sections={quickSections} />}
+      {actionReadback}
     </section>
   const recentContent = <section aria-labelledby={sectionId("recent")} className={`${workspaceStyles.surface} min-w-0 space-y-3 p-4 sm:p-5`}><h2 id={sectionId("recent")} className={workspaceStyles.sectionTitle}>{t("moduleInsights.recent")}</h2><p className="text-xs text-muted-foreground">{t("moduleInsights.recentHint")}</p>{model.recent.value ? <ul className="divide-y">{model.recent.value.length ? model.recent.value.map((record) => <li key={record.id}><Link className="flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-sm py-3 text-sm hover:text-primary focus-visible:outline-2 focus-visible:outline-ring" href={insightRecordHref(input.module, record.id)}><span className="min-w-0 break-words">{record.name}</span><span className="text-xs text-muted-foreground">{status(record.status)} · {date(record.time)}</span></Link></li>) : <li className="py-3 text-sm text-muted-foreground">{t("moduleInsights.queueEmpty")}</li>}</ul> : <SourceNotice state={model.recent.state} />}</section>
   const compositionSections: DashboardSection[] = [
@@ -148,7 +155,6 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }
         {model.previousBounds?.startMs != null && model.previousBounds.endMs != null && <> · {t("moduleInsights.comparedWith")} {date(model.previousBounds.startMs)} – {date(model.previousBounds.endMs - 1)}</>}
         {` · ${model.timeZone}`}
       </p>
-      <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.historySource", { defaultValue: "These figures use the module records available to you. Inspect imported source history to see its complete date coverage and review status." })} <Link className="underline underline-offset-2" href="/settings?section=imports#available-history">{t("moduleInsights.availableHistory", { defaultValue: "Available history" })}</Link></p>
       <p className="text-xs leading-5 text-muted-foreground">{label("basis")}</p>
     </section>
     <ModulePageComposition moduleId={input.module} pageId="dashboard" title={label("title")} sections={compositionSections}

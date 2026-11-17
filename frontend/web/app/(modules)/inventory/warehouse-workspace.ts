@@ -13,6 +13,7 @@ import type { ModuleConfig } from "@lumiere/ui/lib/module-types";
 import { entityColumnLayouts as layout } from "@lumiere/ui/lib/entity-column-layouts";
 
 import { WAREHOUSE_TAB_IDS } from '../../../lib/inventory-workspace-navigation';
+import { moduleBackfillTabs } from '../../../lib/module-backfill-navigation';
 export { WAREHOUSE_TAB_IDS } from '../../../lib/inventory-workspace-navigation';
 
 const CREATE_PERMISSIONS: Readonly<Record<string, EntitySurfacePermission>> = {
@@ -87,6 +88,8 @@ function locationLabel(location: EntityRow | undefined): string | null {
   return location ? label(getRowField(location, "completeName")) ?? label(location.name) : null;
 }
 
+export const STOCK_LOCATION_FILTER_KEY = "warehouseLocationId";
+
 /** Add display references only: never calculate stock, change units, or replace command IDs. */
 export function warehouseRows(
   rows: readonly EntityRow[],
@@ -94,6 +97,7 @@ export function warehouseRows(
   locations: readonly EntityRow[],
   units: readonly EntityRow[] = [],
 ): EntityRow[] {
+  if (rows.length === 0) return [];
   const productById = recordsById(products);
   const locationById = recordsById(locations);
   const unitById = recordsById(units);
@@ -113,7 +117,7 @@ export function warehouseRows(
       ...row,
       warehouseProductName: product ? label(product.name) : null,
       warehouseProductCode: product ? label(getRowField(product, "defaultCode")) : null,
-      warehouseLocationId: locationId,
+      [STOCK_LOCATION_FILTER_KEY]: locationId,
       warehouseLocationName: locationName(locationId),
       warehouseDestinationName: locationName(destinationId),
       warehouseUnitName: unit ? label(unit.name) : null,
@@ -171,8 +175,8 @@ const REFERENCE_COLUMNS: Readonly<Record<string, string>> = {
   locationDestId: "warehouseDestinationName",
 };
 
-/** Named stock references and location filtering retain the source table's operation owners. */
-export function warehouseTable(
+/** Shared list presentation for Inventory and Warehouse, retaining the source actions. */
+export function inventoryOperationalTable(
   config: EntityViewConfig,
   tabId: string,
   locations: readonly EntityRow[],
@@ -181,7 +185,6 @@ export function warehouseTable(
   if (config.view.mode !== "table") return config;
   const view = config.view;
   const unavailable = t("inventory.warehouseWorkspace.referenceUnavailable", { defaultValue: "Unavailable" });
-  const countStockHint = t("inventory.warehouseWorkspace.countStockHint", { defaultValue: "Use Counts to record stock corrections. Receipts, deliveries and transfers update stock through their own workflows." });
   const transferTasks = [
     { value: "receive", label: t("inventory.warehouseWorkspace.receive", { defaultValue: "Receive" }) },
     { value: "deliver", label: t("inventory.warehouseWorkspace.deliver", { defaultValue: "Deliver" }) },
@@ -244,13 +247,14 @@ export function warehouseTable(
     ];
   }
   const namedReferences = tabId === "transfers" || view.columns.some((column) => column.key in REFERENCE_COLUMNS);
-  const locationOptions = [...recordsById(locations)].flatMap(([value, location]) => {
-    const name = locationLabel(location);
-    return name ? [{ value, label: name }] : [];
-  });
+  const locationOptions = tabId === "stock"
+    ? [...recordsById(locations)].flatMap(([value, location]) => {
+        const name = locationLabel(location);
+        return name ? [{ value, label: name }] : [];
+      })
+    : [];
   return {
     ...config,
-    ...(tabId === "stock" ? { description: countStockHint } : {}),
     view: {
       ...view,
       columns,
@@ -262,10 +266,30 @@ export function warehouseTable(
         ? [...new Set([...(view.searchKeys ?? []), "warehouseProductName", "warehouseProductCode", "warehouseLocationName", "warehouseDestinationName"])]
         : view.searchKeys,
       filters: tabId === "stock"
-        ? [...(view.filters ?? []), { key: "warehouseLocationId", label: t("inventory.byRecord.location"), type: "select", faceted: true, options: locationOptions }]
+        ? [...(view.filters ?? []), { key: STOCK_LOCATION_FILTER_KEY, label: t("inventory.byRecord.location"), type: "select", faceted: true, options: locationOptions }]
         : tabId === "transfers"
           ? [...(view.filters ?? []), { key: "warehouseTransferTask", label: t("inventory.warehouseWorkspace.transferTask", { defaultValue: "Task" }), type: "select", faceted: true, options: transferTasks }]
         : view.filters,
+    },
+  };
+}
+
+/** Warehouse applies narrower operation gates to the shared table presentation. */
+export function warehouseTable(
+  config: EntityViewConfig,
+  tabId: string,
+  locations: readonly EntityRow[],
+  t: TFunction,
+): EntityViewConfig {
+  const shared = inventoryOperationalTable(config, tabId, locations, t);
+  if (shared.view.mode !== "table") return shared;
+  const view = shared.view;
+  const countStockHint = t("inventory.warehouseWorkspace.countStockHint", { defaultValue: "Use Counts to record stock corrections. Receipts, deliveries and transfers update stock through their own workflows." });
+  return {
+    ...shared,
+    ...(tabId === "stock" ? { description: countStockHint } : {}),
+    view: {
+      ...view,
       ...(tabId === "stock" && view.emptyState ? {
         emptyState: { ...view.emptyState, description: countStockHint, actionLabel: undefined, onAction: undefined },
       } : {}),
@@ -333,7 +357,7 @@ export function warehouseWorkspace(
   const groups = [
     { id: "stock", label: t("modules.tabGroups.stock"), tabIds: ["stock", "lots", "serials"] },
     { id: "movements", label: t("modules.tabGroups.movements"), tabIds: ["transfers", "stock-moves"] },
-    { id: "counts", label: t("inventory.warehouseWorkspace.counts", { defaultValue: "Counts" }), tabIds: ["adjustments", "cycle-counts", "cycle-wizard"] },
+    { id: "counts", label: t("inventory.warehouseWorkspace.counts", { defaultValue: "Counts" }), tabIds: ["adjustments", "cycle-counts", moduleBackfillTabs.warehouse, "cycle-wizard"] },
     { id: "setup", label: t("modules.tabGroups.setup"), tabIds: ["warehouses", "locations", "replenishment"] },
   ].map((group) => ({ ...group, tabIds: group.tabIds.filter((id) => tabs.some((tab) => tab.id === id)) }))
     .filter((group) => group.tabIds.length > 0);

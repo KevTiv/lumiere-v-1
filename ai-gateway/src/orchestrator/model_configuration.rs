@@ -708,7 +708,7 @@ fn row_string_list(row: &Value, key: &str) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::sync::Mutex;
 
@@ -901,6 +901,103 @@ mod tests {
             )]),
             fallbacks: HashMap::new(),
         }
+    }
+
+    pub(crate) async fn route_chat_prompt_through_provider_switch(objective: String) -> Value {
+        use crate::{
+            orchestrator::{
+                intelligence::{GenerationProvider, GenerationRequest},
+                intelligence_router::{ConfiguredIntelligenceRouter, RoutedGenerationProvider},
+                spend_admission::tests::FakeLedger,
+            },
+            providers::{llm::LlmClient, readiness_tests::test_config},
+        };
+        use axum::{extract::State, routing::post, Json, Router};
+        use serde_json::json;
+        use std::sync::Arc;
+
+        async fn complete(
+            State(requests): State<Arc<Mutex<Vec<Value>>>>,
+            Json(request): Json<Value>,
+        ) -> Json<Value> {
+            let response = json!({
+                "model": request["model"],
+                "choices": [{"message": {"content": "fixture answer"}, "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 16, "completion_tokens": 4},
+            });
+            requests.lock().unwrap().push(request);
+            Json(response)
+        }
+
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut config = test_config();
+        config.kong_llm_url = Some(format!("http://{}", listener.local_addr().unwrap()));
+        let app = Router::new()
+            .route("/v1/chat/completions", post(complete))
+            .with_state(requests.clone());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let transport = LlmClient::from_config(&config).unwrap();
+        let ledger = FakeLedger::configured();
+        let store = FakeStore::new();
+        let agent = agent();
+        let role = IntelligenceRole::Generation;
+        let routes = [
+            (1, "mistral", "fixture-mistral"),
+            (2, "gemini", "fixture-gemini"),
+        ];
+        for (version, provider, model) in routes {
+            let mut model_profile = profile("assistant-history-generation", role, model);
+            model_profile.provider = provider.into();
+            model_profile.reference.version = version;
+            let mut configured = policy();
+            configured.version = version;
+            configured
+                .defaults
+                .insert(role, model_profile.reference.clone());
+            store.insert_profile(7, model_profile);
+            store.insert_policy(7, configured);
+        }
+        let request = GenerationRequest {
+            objective,
+            context: json!({"surface": "rag_generation"}),
+            format: "grounded JSON answer".into(),
+            response_format: Default::default(),
+            instructions: None,
+            max_tokens: Some(128),
+        };
+        for (version, provider, model) in routes {
+            let policy_ref = format!("default@{version}");
+            let resolver =
+                IntelligenceRouteResolver::new_governed(&store, 7, &agent, Some(&policy_ref))
+                    .unwrap();
+            let router = ConfiguredIntelligenceRouter::new(resolver);
+            let result = RoutedGenerationProvider::new(
+                &router,
+                &transport,
+                &ledger,
+                &agent,
+                7,
+                9,
+                u64::from(version),
+            )
+            .generate(request.clone())
+            .await
+            .unwrap();
+            assert_eq!(result.provider, provider);
+            assert_eq!(result.model, model);
+        }
+        server.abort();
+
+        let requests = requests.lock().unwrap();
+        assert_eq!(requests.len(), routes.len());
+        for (request, (_, _, model)) in requests.iter().zip(routes) {
+            assert_eq!(request["model"], model);
+        }
+        assert_eq!(requests[0]["messages"], requests[1]["messages"]);
+        let user = &requests[0]["messages"][1];
+        assert_eq!(user["role"], "user");
+        serde_json::from_str(user["content"].as_str().unwrap()).unwrap()
     }
 
     #[tokio::test]

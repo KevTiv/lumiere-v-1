@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Locator, type Page } from "@playwright/test"
 import type { ChatImportTask as Task } from "../lib/chat-import-task"
 
 // Production chat/task components, synthetic HTTP only. Original private farm
@@ -9,11 +9,50 @@ type DecisionBody = {
   optionId: "prepare_import" | "inspect_only" | "other"; otherText?: string;
 }
 
-async function mockTasks(page: Page, options: { losePostReply?: boolean; loseDecisionReply?: boolean } = {}) {
+async function mockTasks(page: Page, options: {
+  losePostReply?: boolean
+  loseDecisionReply?: boolean
+  seedPendingTask?: boolean
+  waitForScan?: Promise<void>
+} = {}) {
   const tasks = new Map<string, Task>()
+  const pending = ({
+    requestId, companyId, conversationKey, files,
+  }: {
+    requestId: string; companyId: number; conversationKey: string
+    files: { fileName: string; contentBase64: string }[]
+  }): Task => ({
+    requestId,
+    companyId: String(companyId),
+    conversationKey,
+    status: "awaiting_decision",
+    decision: {
+      id: `${requestId}:purpose`, revision: 1, status: "pending",
+      question: "How would you like to use these files?", allowOther: true,
+      options: [{ id: "prepare_import", label: "Prepare an import for review" }, { id: "inspect_only", label: "Inspect files only" }],
+      selectedOptionId: null, otherText: null, decisionId: null,
+    },
+    decisionReceipt: null,
+    decisionHistory: [],
+    createdAt: "2026-11-01T10:00:00Z",
+    warnings: [],
+    error: null,
+    files: files.map((file, ordinal) => {
+      const bytes = Buffer.from(file.contentBase64, "base64")
+      return { ordinal, fileName: file.fileName, size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") }
+    }),
+    reviews: [],
+  })
+  if (options.seedPendingTask) {
+    const task = pending({
+      requestId: "a".repeat(32), companyId: 9001, conversationKey: "fixture-import-conversation",
+      files: [{ fileName: "synthetic-farm-1.csv", contentBase64: Buffer.from("name\nEggs").toString("base64") }],
+    })
+    tasks.set(task.requestId, task)
+  }
   const requests = {
     posts: 0, exactReads: 0, decisionReads: 0, preparations: 0, inspections: 0, businessWrites: 0,
-    decisionPosts: [] as DecisionBody[], hideStoredTasks: false, body: null as Record<string, unknown> | null,
+    decisionPosts: [] as DecisionBody[], hideStoredTasks: false, savedReads: 0, body: null as Record<string, unknown> | null,
   }
   await page.route("**/api/import-tasks**", async route => {
     const url = new URL(route.request().url())
@@ -50,29 +89,19 @@ async function mockTasks(page: Page, options: { losePostReply?: boolean; loseDec
       const body = route.request().postDataJSON() as {
         requestId: string; companyId: number; conversationKey: string;
         files: { fileName: string; contentBase64: string }[];
+        initialMode?: "inspect_only" | "prepare_import"
       }
       requests.body = body
-      const task: Task = {
-        requestId: body.requestId,
-        companyId: String(body.companyId),
-        conversationKey: body.conversationKey,
-        status: "awaiting_decision",
-        decision: {
-          id: `${body.requestId}:purpose`, revision: 1, status: "pending",
-          question: "How would you like to use these files?", allowOther: true,
-          options: [{ id: "prepare_import", label: "Prepare an import for review" }, { id: "inspect_only", label: "Inspect files only" }],
-          selectedOptionId: null, otherText: null, decisionId: null,
-        },
-        decisionReceipt: null,
-        decisionHistory: [],
-        createdAt: "2026-11-01T10:00:00Z",
-        warnings: [],
-        error: null,
-        files: body.files.map((file, ordinal) => {
-          const bytes = Buffer.from(file.contentBase64, "base64")
-          return { ordinal, fileName: file.fileName, size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") }
-        }),
-        reviews: [],
+      const task = pending(body)
+      if (body.initialMode) {
+        const receipt = {
+          decisionId: "d".repeat(32), optionId: body.initialMode, otherText: null,
+          revision: 2, createdAt: "2026-11-01T10:00:00Z",
+        }
+        task.status = "saved"
+        task.decision = { ...task.decision, revision: 2, status: "approved", selectedOptionId: body.initialMode, decisionId: receipt.decisionId }
+        task.decisionReceipt = receipt
+        task.decisionHistory.push(receipt)
       }
       tasks.set(task.requestId, task)
       if (options.losePostReply) return route.abort("failed")
@@ -80,6 +109,7 @@ async function mockTasks(page: Page, options: { losePostReply?: boolean; loseDec
     }
     if (route.request().method() === "GET" && path === "/api/import-tasks") {
       const conversationKey = url.searchParams.get("conversationKey")
+      if (!conversationKey) requests.savedReads += 1
       return route.fulfill({ json: { tasks: requests.hideStoredTasks ? [] : [...tasks.values()].filter(task => task.companyId === url.searchParams.get("companyId") && (!conversationKey || task.conversationKey === conversationKey)), nextCursor: null } })
     }
     const requestId = path.split("/")[3]
@@ -90,6 +120,20 @@ async function mockTasks(page: Page, options: { losePostReply?: boolean; loseDec
       return route.fulfill({ status: 500, json: { error: "Source preparation must not dispatch ERP workflow actions" } })
     }
     if (!task || requests.hideStoredTasks || task.companyId !== url.searchParams.get("companyId")) return route.fulfill({ status: 404, json: { error: "Not found" } })
+    if (path.endsWith("/resume") && route.request().method() === "POST") {
+      await options.waitForScan
+      if (task.status === "saved") {
+        const preparing = task.decision.selectedOptionId === "prepare_import"
+        if (preparing) requests.preparations += 1
+        else requests.inspections += 1
+        task.status = preparing ? "needs_review" : "inspection_ready"
+        task.reviews = [{
+          id: "71", title: preparing ? "Synthetic farm history" : "Synthetic file inspection",
+          targetEntity: "source_observation", total: 15, pending: 15, confirmed: 0, excluded: 0,
+        }]
+      }
+      return route.fulfill({ json: task })
+    }
     if (path.includes("/workflow")) {
       if (!path.endsWith("/workflow")) return route.fulfill({ status: 404, json: { error: "No saved proposal request" } })
       return route.fulfill({ json: {
@@ -103,7 +147,7 @@ async function mockTasks(page: Page, options: { losePostReply?: boolean; loseDec
       const receipt = task.decisionHistory.find(receipt => receipt.decisionId === decisionId)
       return receipt ? route.fulfill({ json: { ...task, decisionReceipt: receipt } }) : route.fulfill({ status: 404, json: { error: "Decision not accepted" } })
     }
-    return route.fulfill({ json: task })
+    return route.fulfill({ json: { ...task, organizationId: "8001" } })
   })
   await page.route("**/api/import/*", route => {
     if (route.request().method() === "POST") requests.businessWrites += 1
@@ -132,10 +176,23 @@ async function dropCsvFiles(page: Page, count = 1) {
 }
 
 async function approvePreparation(page: Page) {
-  const card = page.getByTestId("chat-decision-card")
-  await card.getByRole("radio", { name: "Prepare an import for review", exact: true }).check()
-  await card.getByRole("button", { name: "Approve preparation", exact: true }).click()
+  await page.getByRole("button", { name: "Approve preparation", exact: true }).click()
   await expect(page.getByRole("button", { name: "Review Synthetic farm history", exact: true })).toBeVisible()
+}
+
+async function expectPanelBelowImportTabs(workspace: Locator, stage: string) {
+  const tabs = workspace.getByRole("tablist", { name: "Import task stages" })
+  const panel = workspace.getByRole("tabpanel", { name: stage, exact: true })
+  await expect(panel).toBeVisible()
+  await expect.poll(async () => {
+    const [tabBounds, panelBounds] = await Promise.all([
+      tabs.boundingBox(),
+      panel.boundingBox(),
+    ])
+    return tabBounds && panelBounds
+      ? panelBounds.y - (tabBounds.y + tabBounds.height)
+      : Number.NEGATIVE_INFINITY
+  }).toBeGreaterThanOrEqual(0)
 }
 
 async function mockSourceReview(page: Page, inspection = false) {
@@ -169,23 +226,16 @@ async function mockSourceReview(page: Page, inspection = false) {
   })
 }
 
-test("dropping fifteen CSVs only saves originals and asks before any processing", async ({ page }) => {
-  const requests = await mockTasks(page)
+test("an older file task can still wait for manual preparation or inspection", async ({ page }) => {
+  const requests = await mockTasks(page, { seedPendingTask: true })
   await openChat(page)
-  await page.getByTestId("erp-ai-chat-input").fill("Keep this unsent note")
-  await dropCsvFiles(page, 15)
-  await expect(page.getByText("synthetic-farm-15.csv", { exact: true })).toBeVisible()
   const card = page.getByTestId("chat-decision-card")
   await expect(card.getByRole("heading", { name: "How would you like to use these files?", exact: true })).toBeVisible()
   await expect(card.getByRole("radio", { name: "Other", exact: true })).toBeVisible()
   await expect(card.getByRole("button", { name: "Submit answer", exact: true })).toBeDisabled()
   await card.getByRole("radio", { name: "Prepare an import for review", exact: true }).check()
   await expect(card.getByRole("button", { name: "Approve preparation", exact: true })).toBeEnabled()
-  await expect(page.getByRole("button", { name: "Review Synthetic farm history", exact: true })).toHaveCount(0)
-  await expect(page.getByTestId("erp-ai-chat-input")).toHaveValue("Keep this unsent note")
-  await expect(page.getByTestId("chat-text-requests")).toHaveText("0")
-  expect(requests.posts).toBe(1)
-  expect(requests.body?.files).toHaveLength(15)
+  expect(requests.posts).toBe(0)
   expect(requests.decisionPosts).toHaveLength(0)
   expect(requests.preparations).toBe(0)
   expect(requests.inspections).toBe(0)
@@ -193,14 +243,13 @@ test("dropping fifteen CSVs only saves originals and asks before any processing"
 })
 
 test("refresh restores the pending question without uploading or processing again", async ({ page }) => {
-  const requests = await mockTasks(page)
+  const requests = await mockTasks(page, { seedPendingTask: true })
   await openChat(page)
-  await dropCsvFiles(page)
   await expect(page.getByText("synthetic-farm-1.csv", { exact: true })).toBeVisible()
   await page.reload()
   await expect(page.getByText("synthetic-farm-1.csv", { exact: true })).toBeVisible()
   await expect(page.getByTestId("chat-decision-card").getByRole("heading", { name: "How would you like to use these files?", exact: true })).toBeVisible()
-  expect(requests.posts).toBe(1)
+  expect(requests.posts).toBe(0)
   expect(requests.decisionPosts).toHaveLength(0)
   expect(requests.preparations).toBe(0)
   expect(requests.businessWrites).toBe(0)
@@ -223,7 +272,6 @@ test("switching company hides the previous task and leaves no automatic import",
   await openChat(page)
   await dropCsvFiles(page)
   await expect(page.getByText("synthetic-farm-1.csv", { exact: true })).toBeVisible()
-  await page.getByTestId("chat-decision-card").getByRole("radio", { name: "Prepare an import for review", exact: true }).check()
   await page.getByRole("button", { name: "Change import company", exact: true }).click()
   await expect(page.getByText("synthetic-farm-1.csv", { exact: true })).toHaveCount(0)
   await expect(page.getByTestId("chat-decision-card")).toHaveCount(0)
@@ -243,9 +291,8 @@ test("unsupported files report an error before making an upload request", async 
 })
 
 test("changing actor discards the previous actor's task cards", async ({ page }) => {
-  const requests = await mockTasks(page)
+  const requests = await mockTasks(page, { seedPendingTask: true })
   await openChat(page)
-  await dropCsvFiles(page)
   await expect(page.getByText("synthetic-farm-1.csv", { exact: true })).toBeVisible()
   await page.getByTestId("chat-decision-card").getByRole("radio", { name: "Other", exact: true }).check()
   await page.getByRole("textbox", { name: "Tell us what you want to do", exact: true }).fill("Do not reuse this actor's answer")
@@ -256,7 +303,7 @@ test("changing actor discards the previous actor's task cards", async ({ page })
   await expect(page.getByText("synthetic-farm-1.csv", { exact: true })).toHaveCount(0)
   await expect(page.getByTestId("chat-decision-card")).toHaveCount(0)
   await expect(page.getByTestId("erp-ai-chat-attach")).toBeEnabled()
-  expect(requests.posts).toBe(1)
+  expect(requests.posts).toBe(0)
   expect(requests.decisionPosts).toHaveLength(0)
 })
 
@@ -269,6 +316,7 @@ test("a prepared task opens its exact source in the existing review workspace", 
   await page.getByRole("button", { name: "Review Synthetic farm history", exact: true }).click()
   const dialog = page.getByRole("dialog")
   await expect(dialog.getByRole("heading", { name: "Review source and prepare import", exact: true })).toBeVisible()
+  await expectPanelBelowImportTabs(dialog.getByTestId("saved-import-workspace"), "Decisions")
   const row = dialog.getByRole("row").filter({ has: page.getByRole("cell", { name: "Synthetic historical sausage", exact: true }) })
   await expect(row).toContainText("Historical observation: actual weight remains unknown.")
   await row.getByRole("button", { name: "Review and correct", exact: true }).click()
@@ -279,10 +327,31 @@ test("a prepared task opens its exact source in the existing review workspace", 
   expect(requests.businessWrites).toBe(0)
 })
 
-test("Other requires instructions and preserves the paused question after receipt and refresh", async ({ page }) => {
+test("saved import stages sit above their panels in the narrow Settings workspace", async ({ page }) => {
   const requests = await mockTasks(page)
+  await mockSourceReview(page)
   await openChat(page)
   await dropCsvFiles(page)
+  await approvePreparation(page)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto("/chat-import?surface=settings")
+  const savedTasks = page.getByRole("region", { name: "Saved import tasks" })
+  await savedTasks.getByRole("button", { name: "Open saved task", exact: true }).click()
+
+  const workspace = page.getByTestId("saved-import-workspace")
+  const tabs = workspace.getByRole("tablist", { name: "Import task stages" })
+  await expectPanelBelowImportTabs(workspace, "Sources")
+  for (const stage of ["Decisions", "ERP preview", "ERP results"]) {
+    await tabs.getByRole("tab", { name: stage, exact: true }).click()
+    await expectPanelBelowImportTabs(workspace, stage)
+  }
+  expect(requests.businessWrites).toBe(0)
+})
+
+test("Other requires instructions and preserves the paused question after receipt and refresh", async ({ page }) => {
+  const requests = await mockTasks(page, { seedPendingTask: true })
+  await openChat(page)
   const card = page.getByTestId("chat-decision-card")
   await card.getByRole("radio", { name: "Other", exact: true }).check()
   const answer = page.getByRole("textbox", { name: "Tell us what you want to do", exact: true })
@@ -300,7 +369,7 @@ test("Other requires instructions and preserves the paused question after receip
   await page.reload()
   await expect(page.getByText(instructions, { exact: true })).toBeVisible()
   await expect(page.getByTestId("chat-decision-card")).toBeVisible()
-  expect(requests.posts).toBe(1)
+  expect(requests.posts).toBe(0)
   expect(requests.decisionPosts).toHaveLength(1)
   expect(requests.preparations).toBe(0)
   expect(requests.businessWrites).toBe(0)
@@ -313,7 +382,7 @@ test("explicit preparation approval recovers a lost reply using one decision ide
   await approvePreparation(page)
   expect(requests.decisionPosts).toHaveLength(1)
   expect(requests.decisionPosts[0].optionId).toBe("prepare_import")
-  expect(requests.decisionPosts[0].expectedRevision).toBe(1)
+  expect(requests.decisionPosts[0].expectedRevision).toBe(2)
   expect(requests.decisionPosts[0].decisionId).toMatch(/^[0-9a-f]{32}$/)
   expect(requests.decisionReads).toBeGreaterThanOrEqual(1)
   expect(requests.preparations).toBe(1)
@@ -326,21 +395,65 @@ test("explicit preparation approval recovers a lost reply using one decision ide
   expect(requests.businessWrites).toBe(0)
 })
 
-test("inspection approval keeps even confirmed observations out of the import continuation", async ({ page }) => {
+test("automatic inspection keeps even confirmed observations out of the import continuation", async ({ page }) => {
   const requests = await mockTasks(page)
   await mockSourceReview(page, true)
   await openChat(page)
   await dropCsvFiles(page)
-  const card = page.getByTestId("chat-decision-card")
-  await card.getByRole("radio", { name: "Inspect files only", exact: true }).check()
-  expect(requests.inspections).toBe(0)
-  await card.getByRole("button", { name: "Approve inspection", exact: true }).click()
   await page.getByRole("button", { name: "View inspection Synthetic file inspection", exact: true }).click()
   const dialog = page.getByRole("dialog")
   await expect(dialog.getByRole("heading", { name: "Inspect saved source files", exact: true })).toBeVisible()
   await expect(dialog.getByRole("button", { name: /Continue import/ })).toHaveCount(0)
-  expect(requests.decisionPosts).toHaveLength(1)
+  expect(requests.decisionPosts).toHaveLength(0)
   expect(requests.inspections).toBe(1)
   expect(requests.preparations).toBe(0)
+  expect(requests.businessWrites).toBe(0)
+})
+
+
+test("plain drop saves an exact task link, inspects, and reopens in a new chat", async ({ page }) => {
+  let finishScan!: () => void
+  const waitForScan = new Promise<void>(resolve => { finishScan = resolve })
+  const requests = await mockTasks(page, { waitForScan })
+  await mockSourceReview(page, true)
+  await openChat(page)
+  await page.getByTestId("erp-ai-chat-input").fill("Keep this unsent note")
+  await dropCsvFiles(page, 15)
+  const link = page.getByRole("link", { name: "Open this task in Data import", exact: true })
+  try {
+    await expect(link).toHaveAttribute("href", /importTask=[0-9a-f]{32}&importCompany=9001&importView=sources/)
+    expect(requests.inspections).toBe(0)
+  } finally {
+    finishScan()
+  }
+  await expect(page.getByRole("button", { name: "View inspection Synthetic file inspection" })).toBeVisible()
+  await expect(page.getByTestId("erp-ai-chat-input")).toHaveValue("Keep this unsent note")
+  await expect(page.getByTestId("chat-text-requests")).toHaveText("0")
+
+  await page.goto("/chat-import?thread=another-conversation")
+  await page.getByRole("button", { name: "Continue saved import", exact: true }).click()
+  const dialog = page.getByRole("dialog")
+  await dialog.getByRole("button", { name: "Open saved task", exact: true }).click()
+  await expect(dialog.getByTestId("saved-import-workspace")).toBeVisible()
+  await expect(dialog.getByRole("tab", { name: "ERP preview" })).toBeDisabled()
+
+  expect(requests.posts).toBe(1)
+  expect(requests.savedReads).toBe(1)
+  expect(requests.inspections).toBe(1)
+  expect(requests.preparations).toBe(0)
+  expect(requests.businessWrites).toBe(0)
+})
+
+test("a direct chat instruction starts preparation, preserving the unsent text", async ({ page }) => {
+  const requests = await mockTasks(page)
+  await openChat(page)
+  await page.getByTestId("erp-ai-chat-input").fill("Please backfill these shop sales")
+  await dropCsvFiles(page)
+  await expect(page.getByRole("button", { name: "Review Synthetic farm history" })).toBeVisible()
+  await expect(page.getByTestId("erp-ai-chat-input")).toHaveValue("Please backfill these shop sales")
+  await expect(page.getByTestId("chat-text-requests")).toHaveText("0")
+  expect(requests.body?.initialMode).toBe("prepare_import")
+  expect(requests.preparations).toBe(1)
+  expect(requests.inspections).toBe(0)
   expect(requests.businessWrites).toBe(0)
 })

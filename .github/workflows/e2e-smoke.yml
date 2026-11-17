@@ -53,8 +53,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       valid: ${{ steps.scope.outputs.valid }}
-      run_e2e: ${{ steps.scope.outputs.run_e2e == 'true' || steps.guides.outputs.run_guides == 'true' }}
+      run_e2e: ${{ steps.scope.outputs.run_e2e == 'true' || steps.guides.outputs.run_guides == 'true' || steps.assistant_history.outputs.run_assistant_history == 'true' }}
       run_guides: ${{ steps.guides.outputs.run_guides }}
+      run_assistant_history: ${{ steps.assistant_history.outputs.run_assistant_history }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,6 +68,12 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: python3 scripts/guide-lifecycle-scope.py --github-output "$GITHUB_OUTPUT"
+      - id: assistant_history
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 scripts/assistant-history-scope.py --github-output "$GITHUB_OUTPUT"
       - name: Test guide lifecycle scope
         run: python3 -m unittest discover -s scripts/tests -p 'test_guide_lifecycle_scope.py'
       - name: Test change classifier
@@ -737,10 +744,99 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  assistant-history:
+    name: Assistant long-thread acceptance
+    needs: [scope, build-e2e]
+    if: needs.scope.outputs.run_assistant_history == 'true' && needs.build-e2e.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: lumiere
+          POSTGRES_USER: lumiere
+          POSTGRES_PASSWORD: lumiere
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U lumiere -d lumiere"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      qdrant:
+        image: qdrant/qdrant:v1.12.6
+        ports:
+          - 6334:6334
+    env:
+      STDB_HOST: http://127.0.0.1:3000
+      STDB_MODULE: lumiere-v1-local-e2e
+      LUMIERE_API_SERVER_URL: http://127.0.0.1:8082
+      LUMIERE_AI_GATEWAY_URL: http://127.0.0.1:8080
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3100
+      PG_HOST: 127.0.0.1
+      PG_PORT: "5432"
+      PG_DATABASE: lumiere
+      PG_USER: lumiere
+      PG_PASSWORD: lumiere
+      PG_TLS_MODE: disable
+      QDRANT_URL: http://127.0.0.1:6334
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-frontend
+      - uses: ./.github/actions/setup-spacetime-cli
+        with:
+          version: ${{ env.SPACETIME_CLI_VERSION }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/prepare-contracts
+      - name: Identify Rust dependency cache environment
+        id: rust-dependency-environment
+        run: |
+          set -euo pipefail
+          : "${ImageOS:?runner image must be identified}"
+          : "${ImageVersion:?runner image version must be identified}"
+          printf 'image=%s-%s\n' "$ImageOS" "$ImageVersion" >> "$GITHUB_OUTPUT"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace-native-dev-deps-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-dependency-environment.outputs.image }}
+          workspaces: .
+          cache-workspace-crates: false
+          cache-bin: false
+          cache-on-failure: false
+      - name: Build Gateway and verify bounded context assembly
+        run: |
+          make contracts-staging-from-pinned
+          cargo build --locked -p ai-gateway --bin gateway
+          python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --bin gateway routes::rag::conversation::tests
+      - name: Install frontend and Playwright
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --dir web exec playwright install --with-deps chromium
+      - uses: actions/download-artifact@v4
+        with:
+          name: e2e-build-${{ github.sha }}
+          path: .ci
+      - name: Verify the exact-commit E2E artifacts
+        run: scripts/e2e-ci-artifact.sh install "$GITHUB_SHA"
+      - name: Measure the authenticated long-thread lifecycle
+        run: node scripts/run-assistant-history-load.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: assistant-history-${{ github.sha }}
+          path: |
+            .tmp/assistant-history/acceptance.json
+            frontend/web/test-results/assistant-history/**/browser-heap.json
+            frontend/web/test-results/assistant-history/**/alpha-history-surfaces.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+
   gate:
     name: E2E gate
     if: always()
-    needs: [scope, plan, build-e2e, e2e-smoke, guide-lifecycle]
+    needs: [scope, plan, build-e2e, e2e-smoke, guide-lifecycle, assistant-history]
     runs-on: ubuntu-latest
     steps:
       - name: Require scope and E2E result
@@ -753,6 +849,10 @@ jobs:
             *) exit 1 ;;
           esac
           case "${{ needs.scope.outputs.run_guides }}:${{ needs.guide-lifecycle.result }}" in
+            true:success|false:skipped) ;;
+            *) exit 1 ;;
+          esac
+          case "${{ needs.scope.outputs.run_assistant_history }}:${{ needs.assistant-history.result }}" in
             true:success|false:skipped) ;;
             *) exit 1 ;;
           esac

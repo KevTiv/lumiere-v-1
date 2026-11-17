@@ -144,6 +144,42 @@ pub fn check_permission(
     resource: &str,
     action: &str,
 ) -> Result<(), String> {
+    check_permission_with_operator(
+        ctx,
+        organization_id,
+        resource,
+        action,
+        crate::core::platform_operator::is_persistent_platform_operator(ctx),
+    )
+}
+
+/// Internal policy-injection seam for persisted tests; never a reducer argument.
+pub(crate) fn check_permission_with_operator_policy(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    resource: &str,
+    action: &str,
+    policy: &lumiere_policy_core::PersistentPlatformOperatorPolicy,
+) -> Result<(), String> {
+    check_permission_with_operator(
+        ctx,
+        organization_id,
+        resource,
+        action,
+        crate::core::platform_operator::is_persistent_operator_with_policy(ctx, policy),
+    )
+}
+
+fn check_permission_with_operator(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    resource: &str,
+    action: &str,
+    is_operator: bool,
+) -> Result<(), String> {
+    if is_operator {
+        return check_global_operator_target(ctx, organization_id, action);
+    }
     let user = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
         .ok_or("User not found")?;
 
@@ -175,6 +211,28 @@ pub fn check_permission(
             Err(format!("Permission denied: {} on {}", action, resource))
         }
     }
+}
+
+/// Global authority does not bypass target validity or reconstruction fences.
+pub(crate) fn check_global_operator_target(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    action: &str,
+) -> Result<(), String> {
+    use crate::core::organization::organization;
+    let target = ctx
+        .db
+        .organization()
+        .id()
+        .find(organization_id)
+        .ok_or("Organization not found")?;
+    if !target.is_active || target.organization_id != target.id {
+        return Err("Organization is inactive or invalid".into());
+    }
+    if action != "read" {
+        crate::core::reconstruction::require_writes_unfenced(ctx, organization_id)?;
+    }
+    Ok(())
 }
 
 /// Params for `write_audit_log_v2`. All fields are named — no positional `None` ambiguity.

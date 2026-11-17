@@ -13,13 +13,13 @@ test("legacy BFF retirement returns a governed replacement without proxying", ()
   })
 })
 
-test("legacy BFF retirement blocks uncertified custom skills", () => {
+test("legacy BFF retirement blocks custom skills without a governed adapter", () => {
   const result = legacyRunRetirement("custom_skill")
 
   assert.equal(result.code, "legacy_skill_run_retired")
   assert.equal(result.skillKey, "custom_skill")
   assert.equal("replacementPath" in result, false)
-  assert.match(result.error, /register and certify/)
+  assert.match(result.error, /has no governed execution adapter/)
 })
 
 test("legacy BFF retirement names the existing finance review routes", () => {
@@ -45,6 +45,6 @@ test("legacy BFF retirement rejects inherited object keys as unknown skills", ()
     assert.equal(result.code, "legacy_skill_run_retired")
     assert.equal(result.skillKey, skill)
     assert.equal(Object.hasOwn(result, "replacementPath"), false)
-    assert.match(result.error, /register and certify/)
+    assert.match(result.error, /has no governed execution adapter/)
   }
 })

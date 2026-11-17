@@ -80,12 +80,14 @@ export function useProjects(
 export function useTasks(
   organizationId: bigint,
   initialData?: ProjectTask[],
+  options?: { enabled?: boolean },
 ) {
   return useQuery<ProjectTask[]>({
     queryKey: ['tasks', rqBigIntKey(organizationId)],
     queryFn: () => fetchQueryList('/api/query/tasks', 'Failed to fetch tasks'),
     staleTime: 30_000,
     initialData,
+    enabled: options?.enabled ?? true,
   })
 }
 

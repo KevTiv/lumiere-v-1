@@ -5,6 +5,7 @@ import type { BusinessHistoryCoverage, BusinessHistoryEntry } from "@lumiere/que
 import type { ReactNode } from "react";
 import { Button } from "../components/button";
 import { cn } from "../lib/utils";
+import { HistoryFieldDiff } from "./history-field-diff";
 
 export type RecordChangeHistoryState = "loading" | "denied" | "error" | "ready";
 
@@ -14,12 +15,20 @@ export interface RecordChangeHistoryProps {
   variant?: "accounting" | "record" | "activity";
   coverage?: BusinessHistoryCoverage;
   renderRecordLink?: (entry: BusinessHistoryEntry) => ReactNode;
+  renderEventLink?: (entry: BusinessHistoryEntry) => ReactNode;
+  selectedEventId?: string;
   hasMore?: boolean;
   loadingMore?: boolean;
   isRefreshing?: boolean;
   onLoadMore?: () => void;
   onRefresh?: () => void;
   className?: string;
+}
+
+function openSelectedEvent(details: HTMLDetailsElement | null) {
+  if (!details) return;
+  details.open = true;
+  details.querySelector("summary")?.focus();
 }
 
 /** Only render authorized server-projected deltas, never differences inferred from a current record. */
@@ -29,6 +38,8 @@ export function RecordChangeHistory({
   variant = "accounting",
   coverage,
   renderRecordLink,
+  renderEventLink,
+  selectedEventId,
   hasMore,
   loadingMore = false,
   isRefreshing = false,
@@ -148,10 +159,14 @@ export function RecordChangeHistory({
           {entries.map((entry) => (
             <li
               key={entry.id}
+              id={`history-event-${variant}-${entry.id}`}
               className="min-w-0"
               data-testid={`record-change-${entry.id}`}
             >
-              <details className="min-w-0">
+              <details
+                className="min-w-0"
+                ref={entry.id === selectedEventId ? openSelectedEvent : undefined}
+              >
                 <summary className="min-w-0 cursor-pointer space-y-1 rounded-lg p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                   <span
                     className="block break-words font-medium"
@@ -166,7 +181,12 @@ export function RecordChangeHistory({
                       ),
                     })}
                   </span>
-                  <span className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    {entry.changes.length > 0 && (
+                      <span className="rounded bg-muted px-1.5 py-0.5 font-medium text-foreground">
+                        {t("recordChanges.savedChange", { defaultValue: "Saved change" })}
+                      </span>
+                    )}
                     <span className="min-w-0 break-all">
                       {variant === "accounting" ? t("recordChanges.lineReference", { id: entry.changedRecordId }) : t("businessHistory.recordReference", { resource: entry.changedResource.replace(/[-_]/g, " "), id: entry.changedRecordId })}
                     </span>
@@ -182,46 +202,24 @@ export function RecordChangeHistory({
                     </span>
                   </span>
                 </summary>
-                <div className="min-w-0 border-t border-border px-4 pb-3">
-                  {entry.changes.length === 0 && <p className="py-3 text-sm text-muted-foreground">{t("businessHistory.noComparisons")}</p>}
+                <div className="min-w-0 space-y-3 border-t border-border px-3 py-3">
+                  {entry.changes.length === 0 && (
+                    <p className="text-sm text-muted-foreground">{t("businessHistory.noComparisons")}</p>
+                  )}
                   {renderRecordLink?.(entry)}
-                  <dl className="min-w-0 divide-y divide-border">
-                    {entry.changes.map((change) => (
-                      <div key={change.field} className="min-w-0 space-y-2 py-3">
-                        <dt className="break-words text-sm font-medium">
-                          {fieldLabels[change.field] ?? change.field}
-                        </dt>
-                        <dd className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-                          <div className="min-w-0 space-y-1">
-                            <span className="block text-xs text-muted-foreground">
-                              {t("recordChanges.beforeThisSave")}
-                            </span>
-                            <span
-                              className="block whitespace-pre-wrap break-all text-sm tabular-nums text-muted-foreground"
-                              data-testid="record-change-before"
-                            >
-                              {change.before === ""
-                                ? t("recordChanges.emptyText")
-                                : (change.before ?? t("recordChanges.noValue"))}
-                            </span>
-                          </div>
-                          <div className="min-w-0 space-y-1 sm:border-l sm:border-border sm:pl-3">
-                            <span className="block text-xs text-muted-foreground">
-                              {t("recordChanges.afterThisSave")}
-                            </span>
-                            <span
-                              className="block whitespace-pre-wrap break-all text-sm tabular-nums"
-                              data-testid="record-change-after"
-                            >
-                              {change.after === ""
-                                ? t("recordChanges.emptyText")
-                                : (change.after ?? t("recordChanges.noValue"))}
-                            </span>
-                          </div>
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
+                  <HistoryFieldDiff
+                    fields={entry.changes.map((change) => ({
+                      id: change.field,
+                      label: fieldLabels[change.field] ?? change.field,
+                      before:
+                        entry.operation === "add_account_move_line"
+                          ? { kind: "absent" }
+                          : { kind: "value", value: change.before },
+                      after: { kind: "value", value: change.after },
+                    }))}
+                    valueTestIdPrefix="record-change"
+                  />
+                  {renderEventLink?.(entry)}
                   <details className="min-w-0 border-t border-border pt-3 text-xs text-muted-foreground">
                     <summary className="w-fit max-w-full cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                       {t("recordChanges.userIdentity")}

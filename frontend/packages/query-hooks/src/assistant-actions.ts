@@ -1,4 +1,13 @@
-import { moduleTabHref } from "@lumiere/erp-shared/record-links"
+import {
+  fleetVehicleHref,
+  invoiceRecordPageHref,
+  moduleTabHref,
+  ownerQueueHref,
+  purchaseOrderRecordPageHref,
+  saleOrderRecordPageHref,
+  stockTransferRecordPageHref,
+  type OwnerQueue,
+} from "@lumiere/erp-shared/record-links"
 import { resolveAiSourceHref } from "@lumiere/erp-shared/ai-source-links"
 import {
   PERSONAL_PAGE_MODULES,
@@ -104,6 +113,7 @@ export const ALPHA_ASSISTANT_MODULES = [
   "subscriptions",
   "products",
   "warehouse",
+  "farm-batches",
   "fleet",
 ] as const
 export const ASSISTANT_SUPPORT_SURFACES = [
@@ -139,6 +149,7 @@ function surfaceReadResource(
 ): string {
   if (["products", "warehouse", "distributor"].includes(module))
     return "module:inventory"
+  if (module === "farm-batches") return "farm_batch"
   if (module === "trackers") return "dashboard:analytics"
   if (["overview", "tasks", "settings"].includes(module))
     return `dashboard:${module}`
@@ -154,6 +165,7 @@ interface EntityBinding {
   aliases: readonly string[]
   create?: true | "generate"
   review?: readonly string[]
+  reviewLabels?: Readonly<Record<string, string>>
 }
 
 /** Bindings to existing native tab owners, not a second form schema or execution registry. */
@@ -167,6 +179,10 @@ const ENTITIES: readonly EntityBinding[] = [
     aliases: ["invoice", "invoices"],
     create: true,
     review: ["post", "pay", "review"],
+    reviewLabels: {
+      post: "Review invoice posting",
+      pay: "Review invoice payment",
+    },
   },
   {
     key: "accounting.bill",
@@ -184,6 +200,10 @@ const ENTITIES: readonly EntityBinding[] = [
     ],
     create: true,
     review: ["post", "pay", "review"],
+    reviewLabels: {
+      post: "Review vendor bill posting",
+      pay: "Review vendor bill payment",
+    },
   },
   {
     key: "accounting.entry",
@@ -194,6 +214,9 @@ const ENTITIES: readonly EntityBinding[] = [
     aliases: ["journal entry", "journal entries"],
     create: true,
     review: ["post", "review"],
+    reviewLabels: {
+      post: "Review journal entry posting",
+    },
   },
   {
     key: "expenses.expense",
@@ -213,6 +236,11 @@ const ENTITIES: readonly EntityBinding[] = [
     aliases: ["expense report", "expense reports"],
     create: true,
     review: ["submit", "approve", "reimburse", "review"],
+    reviewLabels: {
+      submit: "Review expense report submission",
+      approve: "Review expense report approval",
+      reimburse: "Review expense reimbursement",
+    },
   },
   {
     key: "reports.report",
@@ -243,6 +271,10 @@ const ENTITIES: readonly EntityBinding[] = [
     ],
     create: true,
     review: ["confirm", "cancel", "review"],
+    reviewLabels: {
+      confirm: "Review sales order confirmation",
+      cancel: "Review sales order cancellation",
+    },
   },
   {
     key: "crm.contact",
@@ -269,6 +301,10 @@ const ENTITIES: readonly EntityBinding[] = [
     aliases: ["lead", "leads"],
     create: true,
     review: ["qualify", "convert", "review"],
+    reviewLabels: {
+      qualify: "Review lead qualification",
+      convert: "Review lead conversion",
+    },
   },
   {
     key: "crm.opportunity",
@@ -279,6 +315,9 @@ const ENTITIES: readonly EntityBinding[] = [
     aliases: ["opportunity", "opportunities"],
     create: true,
     review: ["convert", "review"],
+    reviewLabels: {
+      convert: "Review opportunity conversion",
+    },
   },
   {
     key: "purchasing.order",
@@ -289,6 +328,11 @@ const ENTITIES: readonly EntityBinding[] = [
     aliases: ["purchase order", "purchase orders", "order", "orders"],
     create: true,
     review: ["confirm", "receive", "cancel", "review"],
+    reviewLabels: {
+      confirm: "Review purchase order confirmation",
+      receive: "Review purchase receipt",
+      cancel: "Review purchase order cancellation",
+    },
   },
   {
     key: "subscriptions.subscription",
@@ -299,6 +343,12 @@ const ENTITIES: readonly EntityBinding[] = [
     aliases: ["subscription", "subscriptions"],
     create: true,
     review: ["renew", "amend", "close", "cancel", "review"],
+    reviewLabels: {
+      renew: "Review subscription renewal",
+      amend: "Review subscription amendment",
+      close: "Review subscription closure",
+      cancel: "Review subscription cancellation",
+    },
   },
   {
     key: "products.product",
@@ -318,6 +368,10 @@ const ENTITIES: readonly EntityBinding[] = [
     aliases: ["stock transfer", "stock transfers", "transfer", "transfers"],
     create: true,
     review: ["validate", "receive", "review"],
+    reviewLabels: {
+      validate: "Review stock transfer validation",
+      receive: "Review stock transfer receipt",
+    },
   },
   {
     key: "warehouse.count",
@@ -342,6 +396,15 @@ const ENTITIES: readonly EntityBinding[] = [
     create: true,
   },
   {
+    key: "farm.batch",
+    module: "farm-batches",
+    tab: "batches",
+    entityType: "farm_batch",
+    label: "farm batch",
+    aliases: ["farm batch", "farm batches", "flock", "flocks"],
+    create: true,
+  },
+  {
     key: "fleet.vehicle",
     module: "fleet",
     tab: "fleet-vehicles",
@@ -350,6 +413,46 @@ const ENTITIES: readonly EntityBinding[] = [
     aliases: ["vehicle", "vehicles", "truck", "trucks"],
     create: true,
     review: ["service", "maintain", "inspect", "review"],
+    reviewLabels: {
+      service: "Review vehicle service",
+      maintain: "Review vehicle maintenance",
+      inspect: "Review vehicle inspection",
+    },
+  },
+  {
+    key: "tasks.task",
+    module: "tasks",
+    tab: "tasks",
+    entityType: "project_task",
+    label: "task",
+    aliases: ["project task", "project tasks", "task", "tasks"],
+    review: ["review", "edit", "assign", "reschedule"],
+    reviewLabels: {
+      edit: "Review task changes",
+      assign: "Review task assignment",
+      reschedule: "Review task due date",
+    },
+  },
+  {
+    key: "approvals.request",
+    module: "approvals",
+    tab: "dashboard",
+    entityType: "workflow_human_task",
+    label: "approval request",
+    aliases: ["approval request", "approval requests", "approval"],
+    review: ["review", "approve", "reject"],
+    reviewLabels: {
+      approve: "Review approval decision",
+      reject: "Review rejection decision",
+    },
+  },
+  {
+    key: "documents.file",
+    module: "documents",
+    tab: "documents",
+    entityType: "document",
+    label: "document",
+    aliases: ["document", "documents", "file", "files"],
   },
   {
     key: "documents.article",
@@ -378,23 +481,54 @@ export interface AssistantCapability {
   tab?: string
   entityType?: string
   label: string
-  permission: { resource: string; action: "read" | "create" }
+  permission: { resource: string; action: "read" | "create" | "write" }
 }
 
 const SURFACES: readonly AssistantSurface[] = [
   ...ALPHA_ASSISTANT_MODULES,
   ...ASSISTANT_SUPPORT_SURFACES,
 ]
+export const assistantSurfaceNavigationKey = (module: string) =>
+  `${module.replaceAll("-", "_")}.navigate`
+
+const FARM_ACTIONS = [
+  { suffix: "intake", label: "Record intake", formKind: "intake", aliases: ["intake"] },
+  { suffix: "weigh_in", label: "Record weigh-in", formKind: "weighIn", aliases: ["weigh-in", "weigh in", "weight"] },
+  { suffix: "mortality", label: "Record mortality", formKind: "mortality", aliases: ["mortality", "deaths", "death"] },
+  { suffix: "feed_usage", label: "Record feed usage", formKind: "feedUsage", aliases: ["feed usage", "feed consumption"] },
+  { suffix: "processing", label: "Record processing", formKind: "processing", aliases: ["processing", "processing run"] },
+  { suffix: "costs", label: "Open flock costs", view: "costs", aliases: ["costs", "expenses"] },
+  { suffix: "metrics", label: "Open flock metrics", view: "metrics", aliases: ["metrics", "farm metrics"] },
+] as const
+
+const farmActionKey = (suffix: string) => `farm.batch.${suffix}`
+const OWNER_QUEUE_ACTIONS = [
+  { key: "accounting.overdue_invoices.navigate", queue: "overdueInvoices", aliases: ["overdue invoices", "overdue customer balances"], label: "Open overdue invoices", module: "accounting", resource: "account_move" },
+  { key: "accounting.draft_bills.navigate", queue: "draftBills", aliases: ["draft bills", "draft vendor bills"], label: "Open draft vendor bills", module: "accounting", resource: "account_move" },
+  { key: "warehouse.low_stock.navigate", queue: "lowStockProducts", aliases: ["low stock", "low stock alerts", "low-stock alerts"], label: "Open low-stock alerts", module: "warehouse", resource: "module:inventory" },
+] as const satisfies readonly { key: string; queue: OwnerQueue; aliases: readonly string[]; label: string; module: AssistantSurface; resource: string }[]
+
 const capabilities: AssistantCapability[] = SURFACES.map((module) => ({
-  key: `${module}.navigate`,
+  key: assistantSurfaceNavigationKey(module),
   kind: "navigate",
   module,
-  label: `Open ${module}`,
+  label: module === "farm-batches" ? "Open Farm Batches" : `Open ${module}`,
   permission: {
     resource: surfaceReadResource(module),
     action: "read",
   },
 }))
+capabilities.push({
+  key: "settings.imports.navigate",
+  kind: "navigate",
+  module: "settings",
+  tab: "imports",
+  label: "Open data import",
+  permission: { resource: "dashboard:settings", action: "read" },
+})
+for (const { key, label, module, resource } of OWNER_QUEUE_ACTIONS) {
+  capabilities.push({ key, label, module, kind: "navigate", permission: { resource, action: "read" } })
+}
 for (const entity of ENTITIES) {
   const base = {
     module: entity.module,
@@ -405,7 +539,7 @@ for (const entity of ENTITIES) {
     ...base,
     key: `${entity.key}.list`,
     kind: "navigate",
-    label: `Open ${entity.label} list`,
+    label: entity.key === "warehouse.count" ? "Open cycle count wizard" : `Open ${entity.label} list`,
     permission: { resource: entity.entityType, action: "read" },
   })
   // Count wizard has no exact-record presentation contract.
@@ -425,14 +559,32 @@ for (const entity of ENTITIES) {
       label: `${entity.create === "generate" ? "Prepare" : "Create"} ${entity.label}`,
       permission: { resource: entity.entityType, action: "create" },
     })
-  if (entity.review)
-    capabilities.push({
-      ...base,
-      key: `${entity.key}.review`,
-      kind: "prepare_workflow",
-      label: `Review ${entity.label} workflow`,
-      permission: { resource: entity.entityType, action: "read" },
-    })
+  if (entity.review) {
+    const reviews = {
+      review: `Review ${entity.label} workflow`,
+      ...entity.reviewLabels,
+    }
+    for (const [verb, label] of Object.entries(reviews)) {
+      capabilities.push({
+        ...base,
+        key: `${entity.key}.${verb}`,
+        kind: "prepare_workflow",
+        label,
+        permission: { resource: entity.entityType, action: "read" },
+      })
+    }
+  }
+}
+for (const farm of FARM_ACTIONS) {
+  capabilities.push({
+    key: farmActionKey(farm.suffix),
+    kind: "formKind" in farm ? "prepare_workflow" : "open_record",
+    module: "farm-batches",
+    ...("formKind" in farm ? { tab: "event" } : {}),
+    entityType: "farm_batch",
+    label: farm.label,
+    permission: { resource: "farm_batch", action: "formKind" in farm ? "write" : "read" },
+  })
 }
 
 export const ALPHA_ASSISTANT_CAPABILITIES: readonly AssistantCapability[] =
@@ -670,7 +822,62 @@ export function assistantActionHref(
 ): string | undefined {
   if (!decodeAssistantAction(action, action.scope)) return undefined
   const capability = getAssistantCapability(action.capabilityKey)!
+  if (capability.key === "settings.imports.navigate") return "/settings?section=imports"
+  if (capability.module === "farm-batches") {
+    if (action.kind === "open_form") return "/farm-batches?form=new-batch"
+    if (!action.recordId) return "/farm-batches"
+    const href = `/farm-batches/${action.recordId}`
+    const farm = FARM_ACTIONS.find(({ suffix }) => farmActionKey(suffix) === capability.key)
+    if (farm && "formKind" in farm) return `${href}?form=new-event&eventKind=${farm.formKind}`
+    return farm && "view" in farm ? `${href}?view=${farm.view}` : href
+  }
+  const ownerQueue = OWNER_QUEUE_ACTIONS.find(({ key }) => key === capability.key)
+  if (ownerQueue) return ownerQueueHref(ownerQueue.queue)
+  if (capability.module === "tasks" && capability.entityType === "project_task") {
+    const params = new URLSearchParams({ source: "projects" })
+    if (action.recordId) {
+      params.set("taskId", action.recordId)
+      params.set("taskCompany", action.scope.companyId)
+      if (action.kind === "prepare_workflow") {
+        params.set("taskView", capability.key.endsWith(".assign") ? "assign" : "edit")
+      }
+    }
+    return `/tasks?${params}`
+  }
+  if (capability.module === "approvals" && capability.entityType === "workflow_human_task" && action.recordId) {
+    return `/approvals?${new URLSearchParams({
+      taskId: action.recordId,
+      taskCompany: action.scope.companyId,
+    })}`
+  }
   if (action.recordId && capability.entityType) {
+    switch (capability.entityType) {
+      case "account_move":
+        if (capability.tab === "invoices" || capability.tab === "bills")
+          return invoiceRecordPageHref(action.recordId)
+        break
+      case "sale_order":
+        return saleOrderRecordPageHref(action.recordId)
+      case "purchase_order": {
+        const href = purchaseOrderRecordPageHref(action.recordId)
+        return capability.key === "purchasing.order.receive" ? `${href}?tab=lines` : href
+      }
+      case "subscription":
+        if (capability.key === "subscriptions.subscription.amend")
+          return `/subscriptions/${action.recordId}?tab=amendments`
+        break
+    }
+    if (capability.module === "warehouse" && capability.entityType === "stock_picking") {
+      return action.kind === "prepare_workflow"
+        ? stockTransferRecordPageHref(action.recordId, "operations")
+        : moduleTabHref("warehouse", "transfers", { id: action.recordId })
+    }
+    if (capability.entityType === "fleet_vehicle") {
+      const tab = capability.key === "fleet.vehicle.inspect" ? "inspections"
+        : capability.key === "fleet.vehicle.service" || capability.key === "fleet.vehicle.maintain" ? "service"
+        : undefined
+      return fleetVehicleHref(action.recordId, tab)
+    }
     return (
       resolveAiSourceHref({
         entity_type: capability.entityType,
@@ -792,7 +999,7 @@ export function resolveAssistantActionRequest(
   const pageAction = resolvePageActionRequest(command, text.trim(), context)
   if (pageAction) return pageAction
   const match =
-    /^(?:(open|show(?: me)?|view|find|go to|take me to|navigate to)|(create|add|new|draft|prepare|generate|@create)|(submit|approve|confirm|post|pay|renew|amend|close|cancel|receive|validate|service|maintain|inspect|qualify|convert|review|reimburse))\s+(?:(?:a|an|the|new|existing)\s+)?(.+)$/i.exec(
+    /^(?:(open|show(?: me)?|view|find|go to|take me to|navigate to)|(create|add|new|draft|prepare|generate|@create)|(submit|approve|confirm|post|pay|renew|amend|close|cancel|receive|validate|service|maintain|inspect|qualify|convert|review|reimburse|reject|edit|assign|reschedule|record|log))\s+(?:(?:a|an|the|new|existing)\s+)?(.+)$/i.exec(
       command,
     )
   if (!match) return { kind: "none" }
@@ -836,7 +1043,35 @@ export function resolveAssistantActionRequest(
       ? { kind: "action", action }
       : { kind: "clarify", reason: "unavailable", candidates: [] }
   }
-  if (surface && mode === "open") return finish(`${surface}.navigate`)
+  const farmCommand = command.split(/:\s+/, 1)[0]!.replace(/\s+on\s+\d{4}-\d{2}-\d{2}[.!?]?$/i, "")
+  const farmRequest = /^(record|log|add|prepare|show(?: me)?|open|view)\s+(?:a\s+|the\s+)?(.+?)(?:\s+(?:for|on)\s+(?:(?:the|this)\s+)?(?:flock|farm batch)(?:\s+#?([1-9][0-9]*))?)?[.!?]*$/i.exec(farmCommand)
+  if (farmRequest) {
+    const [, requestVerb, requestedEvent, recordId] = farmRequest
+    const selectedBatch = context.selection?.entityType === "farm_batch"
+      ? context.selection.entityId
+      : undefined
+    const identifiesBatch = Boolean(recordId || selectedBatch || context.module === "farm-batches")
+    const writes = /^(record|log|add|prepare)$/i.test(requestVerb ?? "")
+    const operation = FARM_ACTIONS.find((entry) =>
+      ("formKind" in entry) === writes &&
+      entry.aliases.some((alias) => alias === requestedEvent?.toLowerCase()),
+    )
+    if (operation && identifiesBatch) {
+      const id = parseAssistantActionId(recordId ?? selectedBatch)
+      return id
+        ? finish(farmActionKey(operation.suffix), id)
+        : { kind: "clarify", reason: "record_required", candidates: ["farm.batch.open"] }
+    }
+  }
+  if (surface && mode === "open") return finish(assistantSurfaceNavigationKey(surface))
+  if (mode === "open" && target === "my work") return finish("tasks.navigate")
+  if (mode === "open" || verb === "review") {
+    const ownerQueue = OWNER_QUEUE_ACTIONS.find(({ aliases }) => aliases.some((alias) => target === alias))
+    if (ownerQueue) return finish(ownerQueue.key)
+  }
+  if (mode === "open" && /^(?:data import|saved imports|import settings|imports)$/.test(target)) {
+    return finish("settings.imports.navigate")
+  }
   const matches = ENTITIES.flatMap((entity) =>
     entity.aliases
       .filter(
@@ -903,6 +1138,8 @@ export function resolveAssistantActionRequest(
       `${entity.key}.${entity.create === "generate" ? "generate" : "create"}`,
     )
   const rest = target.slice(alias.length).trim()
+  if (mode === "open" && entity.key === "warehouse.count" && rest === "wizard")
+    return finish(`${entity.key}.list`)
   const idMatch = /^(?:#\s*|(?:id|number)\s*#?\s*)?([1-9][0-9]*)(?:\s|$)/.exec(
     rest,
   )
@@ -921,8 +1158,14 @@ export function resolveAssistantActionRequest(
       reason: "unsupported_action",
       candidates: [`${entity.key}.list`],
     }
-  if (id)
-    return finish(`${entity.key}.${mode === "review" ? "review" : "open"}`, id)
+  if (id) {
+    const capability = mode === "open"
+      ? "open"
+      : entity.reviewLabels && Object.hasOwn(entity.reviewLabels, verb)
+        ? verb
+        : "review"
+    return finish(`${entity.key}.${capability}`, id)
+  }
   if (
     mode === "open" &&
     (rest === "list" || rest === "page" || (alias.endsWith("s") && rest === ""))

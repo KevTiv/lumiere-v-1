@@ -19,7 +19,7 @@ export type ProductSurfaceTarget =
 export type FirstOrgExposure = "enabled" | "admin-only" | "hidden" | "review"
 
 export interface BoundedAlphaAdmission {
-  scope: "product-catalog" | "warehouse-operations" | "fleet-register-and-history"
+  scope: "product-catalog" | "warehouse-operations" | "inventory-workspace" | "fleet-register-and-history" | "farm-operations"
   decisionRecord: `docs/plans/${string}`
 }
 
@@ -163,6 +163,11 @@ export const PRODUCT_SURFACES: readonly ProductSurfaceDefinition[] = [
     "t0-business",
     "COV-06",
     "module:inventory",
+    undefined,
+    {
+      scope: "inventory-workspace",
+      decisionRecord: "docs/plans/product-fleet-alpha-2026-10-31.md",
+    },
   ),
   pendingU5(
     "distributor",
@@ -179,6 +184,10 @@ export const PRODUCT_SURFACES: readonly ProductSurfaceDefinition[] = [
     "COV-07",
     "module:manufacturing",
   ),
+  pendingU5("farm-batches", "/farm-batches", "t0-business", "Farm Operations", "farm_batch", "farm-operations", {
+    scope: "farm-operations",
+    decisionRecord: "docs/plans/farm-batches-alpha.md",
+  }),
   pendingU5(
     "fleet",
     "/fleet",
@@ -455,7 +464,6 @@ export function isFirstOrgNavigationAdmitted(
 
 const FIRST_ORG_FINANCE_SUPPORT_ROUTE_IDS = new Set([
   "tasks",
-  "inventory",
   "workflows",
   "approvals",
   "documents",

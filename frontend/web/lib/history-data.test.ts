@@ -149,3 +149,13 @@ test("partial confirmation preserves unresolved facts and rejects invented field
   for (const invalid of [["made_up_field"], ["quantity", "quantity"], "quantity", null])
     assert.throws(() => parse(invalid), /invalid data/)
 })
+
+test("module, search, and exact source row filters are retained without numeric ID coercion", () => {
+  const scoped: HistoryFilters = { ...filters, batchId: "11", rowId: "9007199254740993", view: "sales", search: "Kicukiro" }
+  const query = params(historyRowsUrl(7, scoped, "next", "snapshot"))
+  assert.equal(query.get("view"), "sales")
+  assert.equal(query.get("rowId"), "9007199254740993")
+  assert.equal(query.get("search"), "Kicukiro")
+  assert.equal(query.get("cursor"), "next")
+  assert.notDeepEqual(historyQueryKey("rows", scope, scoped), historyQueryKey("rows", scope, { ...scoped, view: "warehouse" }))
+})

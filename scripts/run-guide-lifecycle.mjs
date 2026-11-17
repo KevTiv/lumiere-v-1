@@ -339,12 +339,12 @@ async function main() {
   await operation(admin, 'append_ai_chat_message', { companyId, params: { session_key: chatKey, role: 'assistant',
     content: 'Saved guide reference', sources_json: none, ui_context_json: none, model: none, duration_ms: none,
     status: 'complete', metadata: some(JSON.stringify(metadata)) } })
-  const receipt = (await request('/v1/query/ai-chat-messages', admin)).data.find((row) => (row.sessionKey ?? row.session_key) === chatKey)
+  const receipt = (await request(`/v1/query/ai-chat-messages?companyId=${companyId}&sessionKey=${chatKey}`, admin)).data.find((row) => (row.sessionKey ?? row.session_key) === chatKey)
   assert.deepEqual(JSON.parse(receipt.metadata), metadata)
   const freshChatKey = `fresh-${randomBytes(8).toString('hex')}`
   await operation(admin, 'create_ai_chat_session', { companyId, params: { session_key: freshChatKey, title: some('Fresh conversation'),
     route: some('/accounting'), module: some('accounting'), active_tab: none, archived: false, metadata: none } })
-  assert.equal((await request('/v1/query/ai-chat-messages', admin)).data.filter((row) => (row.sessionKey ?? row.session_key) === freshChatKey).length, 0)
+  assert.equal((await request(`/v1/query/ai-chat-messages?companyId=${companyId}&sessionKey=${freshChatKey}`, admin)).data.filter((row) => (row.sessionKey ?? row.session_key) === freshChatKey).length, 0)
 
   const fixture = { apiBase, orgId: session.organizationId, companyId, otherCompanyId,
     guideId: first.guideId, revision: 2, query: keyword,
@@ -363,7 +363,7 @@ async function main() {
   admin = await login('test@email.com')
   assert.equal((await request(guidePath(first.guideId, companyId, 1), admin)).guide.markdown, draft.markdown)
   assert.equal((await request(guidePath(first.guideId, companyId, 2), admin)).guide.markdown, update.markdown)
-  const reloaded = (await request('/v1/query/ai-chat-messages', admin)).data.find((row) => (row.sessionKey ?? row.session_key) === chatKey)
+  const reloaded = (await request(`/v1/query/ai-chat-messages?companyId=${companyId}&sessionKey=${chatKey}`, admin)).data.find((row) => (row.sessionKey ?? row.session_key) === chatKey)
   assert.deepEqual(JSON.parse(reloaded.metadata), metadata)
   await probe({ ...fixture, token: admin.token, identity: admin.identity }, env)
   await operation(admin, 'remove_article_member', { articleId: Number(first.guideId), member: { __identity__: `0x${admin.identity.replace(/^0x/, '')}` } })

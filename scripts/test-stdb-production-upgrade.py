@@ -16,6 +16,11 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "scripts/tests/fixtures/stdb-production-upgrade"
 TABLE_COLUMNS = json.loads((FIXTURE / "columns.json").read_text())
+BUILTIN_SKILLS = {
+    skill["skill_key"]
+    for catalog in ("ai-builtin-skills.json", "ai-infrastructure-skills.json")
+    for skill in json.loads((ROOT / "spacetimedb/assets" / catalog).read_text())
+}
 
 
 def run(*args):
@@ -104,6 +109,14 @@ def main():
                     before[table] = query(f"SELECT {', '.join(columns)} FROM {table}")
                     if len(before[table]) != 1:
                         raise RuntimeError(f"baseline must contain one sentinel row in {table}")
+                catalog_sql = "SELECT skill_key, id, is_active FROM ai_skill WHERE organization_id = 0"
+                before_catalog = query(catalog_sql)
+                if before_catalog != [["report_composer", 42, True]]:
+                    raise RuntimeError(f"expected a partially provisioned catalog: {before_catalog}")
+                company_config_sql = "SELECT * FROM ai_skill_config WHERE organization_id = 42"
+                before_config = query(company_config_sql)
+                if len(before_config) != 1:
+                    raise RuntimeError("baseline must contain the company skill disablement")
                 config = tomllib.loads((temp / "cli.toml").read_text())
                 environment = dict(os.environ, STDB_HOST=host, STDB_MODULE=database,
                                    STDB_SERVER_TOKEN=config["spacetimedb_token"],
@@ -118,6 +131,13 @@ def main():
                     )
                 if "SpacetimeDB publish and schema verification passed" not in publisher.stdout:
                     raise RuntimeError("publisher did not verify the published schema")
+                catalog = query(catalog_sql)
+                if len(catalog) != len(BUILTIN_SKILLS) or {
+                    key for key, _, active in catalog if active
+                } != BUILTIN_SKILLS:
+                    raise RuntimeError("publisher did not reconcile every built-in skill")
+                if before_catalog[0] not in catalog or query(company_config_sql) != before_config:
+                    raise RuntimeError("publisher changed existing skill IDs or company disablements")
                 print("Production publisher verified the migrated schema")
                 for table, columns in TABLE_COLUMNS.items():
                     after = query(f"SELECT {', '.join(columns)} FROM {table}")

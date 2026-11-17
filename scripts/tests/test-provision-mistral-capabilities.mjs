@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { planCapabilities, provisionCapabilities, validateManifest } from '../provision-mistral-capabilities.mjs'
+import { planCapabilities, provisionCapabilities, provisionChatRetrieval, validateManifest } from '../provision-mistral-capabilities.mjs'
 import { httpClient } from '../provision-ai-harness.mjs'
 
 const now = new Date('2026-11-04T12:00:00Z')
@@ -32,10 +32,6 @@ function fixture() {
     profiles: ['primary', 'review'].map(key => ({ organization_id: 9, profile_key: key, profile_version: 1,
       is_active: true, provider: 'mistral', model: `fixture-${key}`, max_tokens: 1024, context_window: 16000,
       max_retries: 0, allowed_roles: key === 'review' ? ['review'] : ['decision', 'reasoning', 'generation'] })),
-    release: { id: 20, organization_id: 9, skill_id: 5, is_active: true, skill_version_id: 30 },
-    version: { id: 30, organization_id: 9, skill_id: 5, skill_key: 'rag_generation', source_hash: digest },
-    evidence: [{ id: 40, fixture_id: 41, organization_id: 9, company_id: 3, skill_id: 5, skill_version_id: 30,
-      source_hash: digest, status: { Passed: [] } }],
     bindings: [], prices: [], ownerPools: [],
     writers: [{ organization_id: 9, service_name: 'ai_spend_writer', is_active: true, identity: ['b'.repeat(64)] }],
     writerIdentity: 'b'.repeat(64),
@@ -51,16 +47,12 @@ function fixture() {
       if (sql.includes('FROM ai_agent ')) return [state.agent]
       if (sql.includes('FROM ai_spend_budget_read ')) { assert.equal(role, 'spend'); return state.budgets }
       if (sql.includes('FROM ai_owner_configuration_read ')) { assert.equal(role, 'spend'); return state.ownerPools }
-      if (sql.includes('FROM ai_skill_fixture ')) return [{ id: 41, organization_id: 9, skill_id: 5 }]
       if (sql.includes('FROM ai_intelligence_policy ')) return [state.policy]
       if (sql.includes('FROM ai_model_profile ')) return state.profiles.filter(row => sql.includes(`'${row.profile_key}'`))
       if (sql.includes('FROM ai_skill ')) {
         const surface = config.surfaces.find(surface => sql.endsWith(`= ${surface.skillId}`))
         return surface ? [{ id: surface.skillId, organization_id: 0, skill_key: surface.skillKey, is_active: true }] : []
       }
-      if (sql.includes('FROM ai_skill_release ')) return [state.release]
-      if (sql.includes('FROM ai_skill_version ')) return [state.version]
-      if (sql.includes('FROM ai_skill_certification_evidence ')) return state.evidence
       if (sql.includes('FROM ai_skill_config ')) return state.bindings.filter(row => sql.endsWith(`= ${row.skill_id}`))
       if (sql.includes('FROM ai_metered_price_read ')) {
         assert.equal(role, 'spend')
@@ -111,6 +103,98 @@ function reviewedRepair() {
   return f
 }
 
+function chatRetrievalFixture() {
+  const f = reviewedRepair()
+  const globalSkill = { id: 5, organization_id: 0, skill_key: 'rag_generation', is_active: true }
+  f.state.chatCatalog = [globalSkill]
+  f.state.bindings = [{
+    organization_id: 9, company_id: { some: 3 }, skill_id: 5, is_enabled: true,
+    config_json: JSON.stringify({ defaultAgentId: 12, intelligencePolicyRef: 'fixture-policy@1' }),
+  }]
+  const sql = f.client.sql.bind(f.client)
+  f.client.sql = async (statement, role) => {
+    if (statement.includes('FROM ai_skill ') && statement.includes('skill_key = ')) {
+      return f.state.chatCatalog.filter(row => statement.includes(`organization_id = ${row.organization_id} AND`)
+        && statement.includes(`skill_key = '${row.skill_key}'`))
+    }
+    if (statement.startsWith('SELECT * FROM ai_skill WHERE id = ')) {
+      return f.state.chatCatalog.filter(row => statement.endsWith(`= ${row.id}`))
+    }
+    return sql(statement, role)
+  }
+  f.input = { version: 1, organizationId: 9, companyId: 3, agentId: 12, currency: 'USD', pricesReviewedAt: '2026-11-01', unitsPer1k: 123 }
+  return f
+}
+
+test('chat retrieval adds only the missing embedding allowlist entries and meter', async () => {
+  for (const scope of [0, 9]) {
+    const f = chatRetrievalFixture()
+    if (scope === 9) {
+      f.state.chatCatalog.push({ ...f.state.chatCatalog[0], organization_id: 9, id: 15 })
+      f.state.bindings[0].skill_id = 15
+    }
+    const before = structuredClone(f.state)
+    const check = await provisionChatRetrieval(f.input, f.client, false, now)
+    assert.deepEqual(check.missing, ['set_ai_agent_model:mistral-embed', 'set_ai_agent_action:embedding_query', 'meter:mistral-embed:tokens'])
+    assert.deepEqual(f.writes, [])
+    const result = await provisionChatRetrieval(f.input, f.client, true, now)
+    assert.equal(result.ready, true)
+    assert.deepEqual(f.writes.map(write => write.name), ['set_ai_agent_model', 'set_ai_agent_action', 'configure_ai_metered_price'])
+    assert.deepEqual(f.state.agent.allowed_actions, [...before.agent.allowed_actions, 'embedding_query'])
+    assert.deepEqual(f.state.agent.allowed_models, [...before.agent.allowed_models, 'mistral-embed'])
+    assert.deepEqual(f.state.budgets, before.budgets)
+    assert.deepEqual(f.state.bindings, before.bindings)
+    await provisionChatRetrieval(f.input, f.client, true, now)
+    assert.equal(f.writes.length, 3)
+  }
+})
+
+test('chat retrieval honors disabled or mismatched tenant bindings', async () => {
+  for (const [modify, expected] of [
+    [f => f.state.chatCatalog.push({ ...f.state.chatCatalog[0], organization_id: 9, id: 15, is_active: false }), /effective rag_generation skill must be active/],
+    [f => { f.state.bindings[0].is_enabled = false }, /company chat binding must be active/],
+    [f => { f.input.agentId = 13 }, /company chat binding must use the requested agent/],
+    [f => { f.state.bindings = [] }, /company chat binding must resolve exactly once/],
+  ]) {
+    const f = chatRetrievalFixture()
+    modify(f)
+    await assert.rejects(provisionChatRetrieval(f.input, f.client, true, now), expected)
+    assert.deepEqual(f.writes, [])
+  }
+})
+
+test('an existing tenant can opt in to indexing with the same agent, meter and unchanged chat binding', async () => {
+  const f = chatRetrievalFixture()
+  f.input.indexDocuments = true
+  f.state.chatCatalog.push({ id: 7, organization_id: 0, skill_key: 'document_embeddings', is_active: true })
+  const priorChatBinding = structuredClone(f.state.bindings[0])
+  const plan = await provisionChatRetrieval(f.input, f.client, false, now)
+  assert.ok(plan.missing.includes('set_ai_agent_action:embedding_index'))
+  assert.ok(plan.missing.includes('binding:document_embeddings'))
+  assert.deepEqual(f.writes, [])
+  await provisionChatRetrieval(f.input, f.client, true, now)
+  assert.deepEqual(f.state.bindings[0], priorChatBinding)
+  const installed = f.state.bindings.find(row => row.skill_id === 7)
+  assert.deepEqual(installed.company_id, { some: 3 })
+  assert.deepEqual(JSON.parse(installed.config_json), { defaultAgentId: 12, intelligencePolicyRef: 'fixture-policy@1' })
+  const count = f.writes.length
+  installed.is_enabled = false
+  await assert.rejects(provisionChatRetrieval(f.input, f.client, true, now), /skill is explicitly disabled/)
+  assert.equal(f.writes.length, count)
+})
+
+test('chat retrieval rechecks pricing authority when recovering a partial apply', async () => {
+  const f = chatRetrievalFixture()
+  f.state.agent.allowed_models.push('mistral-embed')
+  f.state.agent.allowed_actions.push('embedding_query')
+  f.client.verifyActivationAuthority = async (_org, _agent, configureMeter) => {
+    assert.equal(configureMeter, true)
+    throw new Error('pricing authority denied')
+  }
+  await assert.rejects(provisionChatRetrieval(f.input, f.client, true, now), /pricing authority denied/)
+  assert.deepEqual(f.writes, [])
+})
+
 test('reviewed missing-only toggles preserve agent and pool; replay is empty', async () => {
   const f = reviewedRepair(), before = structuredClone(f.state)
   await provisionCapabilities(f.config, f.client, true, now)
@@ -128,7 +212,6 @@ test('default strict behavior and all structural/authority failures precede writ
     f => { f.config.agentCapabilities.addModels.push('unknown') },
     f => { f.config.agentCapabilities.addActions.push('embedding_query') },
     f => { f.state.agent.company_id = { some: 99 } },
-    f => { f.state.evidence[0].status = [1, []] },
     f => { f.state.policy.is_active = false },
     f => { f.client.verifyActivationAuthority = async () => { throw new Error('authority denied') } },
     f => { f.client.verifyActivationAuthority = async () => { throw new Error('schema mismatch') } },
@@ -199,19 +282,12 @@ test('read-only check finds missing prices/bindings using dedicated monetary rea
   assert.ok(reads.filter(row => /_read /.test(row.sql)).every(row => row.role === 'spend'))
 })
 
-test('certification accepts raw SQL unit variants and rejects failed or malformed tuples before writes', async () => {
-  const passed = fixture()
-  passed.state.evidence[0].status = [0, []]
-  const result = await provisionCapabilities(passed.config, passed.client, false, now)
-  assert.equal(result.missing.length, 7)
-  assert.deepEqual(passed.writes, [])
-  for (const status of [[1, []], [0], [0, [], 'extra'], [0, null], [0, ['payload']], ['0', []]]) {
-    const failed = fixture()
-    failed.state.evidence[0].status = status
-    await assert.rejects(provisionCapabilities(failed.config, failed.client, true, now),
-      /matching current passed company certification is required/)
-    assert.deepEqual(failed.writes, [])
-  }
+test('built-in setup works without skill releases or certificates', async () => {
+  const { config, client, reads } = fixture()
+  delete config.surfaces[0].sourceHash
+  const result = await provisionCapabilities(config, client, true, now)
+  assert.equal(result.ready, true)
+  assert.ok(reads.every(({ sql }) => !/FROM ai_skill_(release|version|fixture|certification)/u.test(sql)))
 })
 
 test('explicit apply is idempotent and preserves budget, settings, instructions and overrides', async () => {
@@ -269,7 +345,7 @@ test('apply accepts an agent scoped to the requested company and preserves that 
   assert.ok(state.bindings.every(binding => binding.company_id.some === config.companyId))
 })
 
-test('structural and certification blockers make zero writes even when setup is missing', async () => {
+test('structural blockers make zero writes even when setup is missing', async () => {
   const cases = {
     writerMissing: f => { f.state.writers = [] },
     writerAmbiguous: f => { f.state.writers.push({ ...f.state.writers[0] }) },
@@ -296,12 +372,6 @@ test('structural and certification blockers make zero writes even when setup is 
     profile: f => { f.state.profiles[0].provider = 'gemini' },
     review: f => { f.state.profiles[1].model = 'fixture-primary' },
     retry: f => { f.state.profiles[0].max_retries = 1 },
-    staleSource: f => { f.state.version.source_hash = `sha256:${'b'.repeat(64)}` },
-    missingCert: f => { f.state.evidence = [] },
-    foreignCert: f => { f.state.evidence[0].company_id = 4 },
-    staleCert: f => { f.state.evidence[0].source_hash = `sha256:${'b'.repeat(64)}` },
-    failedCert: f => { f.state.evidence[0].status = { Failed: [] } },
-    laterFailedCert: f => { f.state.evidence.push({ ...f.state.evidence[0], id: 42, status: { Failed: [] } }) },
     disabled: f => { f.state.bindings.push({ organization_id: 9, skill_id: 5, company_id: { some: 3 }, is_enabled: false, config_json: '{}' }) },
     disabledOrg: f => { f.state.bindings.push({ organization_id: 9, skill_id: 5, company_id: { none: [] }, is_enabled: false, config_json: '{}' }) },
     otherAgent: f => { f.state.bindings.push({ organization_id: 9, skill_id: 5, company_id: { some: 3 }, is_enabled: true, config_json: '{"defaultAgentId":99}' }) },
@@ -358,13 +428,13 @@ test('ambiguous mutation stops without retry or later writes', async () => {
   assert.equal(writes.length, 1); assert.equal(writes[0].name, 'configure_ai_metered_price')
 })
 
-test('manifest rejects secret fields, unsafe identity, arbitrary units and missing source bindings', () => {
+test('manifest rejects secret fields, unsafe identity, arbitrary units and malformed legacy hashes', () => {
   for (const mutate of [
     c => { c.apiKey = 'secret' }, c => { c.organizationId = 0 }, c => { c.agentId = Number.MAX_SAFE_INTEGER + 1 },
     c => { c.intelligencePolicyRef = "x' OR true" }, c => { c.meters[0].unit = 'characters' },
     c => { c.meters[1].model = 'mistral-ocr-latest' }, c => { c.meters[0].unitsPer1k = 0 },
-    c => { c.meters[0].price = 0.01 }, c => { delete c.surfaces[0].sourceHash },
-    c => { c.surfaces[1].sourceHash = digest }, c => { c.surfaces.push(c.surfaces[0]) },
+    c => { c.meters[0].price = 0.01 }, c => { c.surfaces[0].sourceHash = "invalid" },
+    c => { c.surfaces.push(c.surfaces[0]) },
     c => { c.pricesReviewedAt = '2026-02-30' }, c => { c.meters = [] },
   ]) {
     const config = manifest(); mutate(config); assert.throws(() => validateManifest(config))

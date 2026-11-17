@@ -45,6 +45,8 @@ jobs:
         run: node scripts/tests/test-compose-readiness.mjs
       - name: Test operational Node scripts
         run: node --test scripts/tests/test_production_identity_bootstrap.mjs scripts/tests/inventory-workflow-cancellations.test.mjs scripts/tests/test_mistral_alpha_preflight.mjs scripts/tests/test-provision-ai-harness.mjs scripts/tests/test-provision-mistral-capabilities.mjs
+      - name: Test chat rollout, upgrade and release acceptance
+        run: node --test scripts/tests/configure-ai-platform.test.mjs scripts/tests/verify-grounded-chat.test.mjs
       - name: Test ordered Railway release orchestration
         run: |
           bash scripts/tests/test-railway-stack-release.sh
@@ -166,6 +168,13 @@ jobs:
       - name: Query authorization and field projection tests
         run: cargo test --locked -p stdb-auth --lib
 
+      - name: Assistant history pagination and context checkpoint tests
+        run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p stdb-client --lib chat_history::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::chat_history::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::chat_context::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::assistant_chat_references::tests
+
       - name: WorkOS session and profile synchronization regressions
         run: |
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib session::workos::tests
@@ -189,6 +198,11 @@ jobs:
       - name: Presentation contracts and draft validator
         run: cargo test --locked -p lumiere-presentation-core
 
+      - name: Owner report wall-clock scheduling
+        run: |
+          cargo test --locked -p lumiere-report-schedule
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::reports::owner_schedule_tests
+
       - name: Presentation discovery and authorized preview
         run: python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib presentation
 
@@ -198,6 +212,8 @@ jobs:
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib generated_pdf
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::documents::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::company_scope::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::tests::inventory_resource_classification
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::tests::domain_postfilters
 
       - name: Complete-file admission and source identity
         run: |
@@ -205,6 +221,7 @@ jobs:
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib file_extraction::
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib import_admissions::
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::import_inspection::
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::import_jobs::tests
           python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --bin gateway skills::import::
 
       - name: Saved import chat context and authority freshness
@@ -309,6 +326,13 @@ jobs:
 
       - name: ai-gateway unit tests
         run: cargo test --locked -p ai-gateway --bin gateway
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: AI gateway web wire contract
+        run: python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --bin gateway wire_contract_tests -- --ignored
 
   contracts-module:
     name: Contracts module
@@ -505,6 +529,9 @@ jobs:
       - name: Unit tests (accounting and cross-module overview models)
         run: pnpm --dir web test:accounting-ui:models
 
+      - name: Unit tests (full-history dashboard ranges)
+        run: pnpm --dir web test:history-ranges
+
       - name: Unit tests (productivity workspace models)
         run: pnpm --dir web test:productivity:models
 
@@ -541,6 +568,9 @@ jobs:
       - name: Reports workflow browser regressions
         run: pnpm --dir web test:e2e:reports-ui
 
+      - name: Payment Operations read-state browser regressions
+        run: pnpm --dir web test:e2e:accounting-operations --grep "payment operations distinguish"
+
       - name: Report readiness browser regressions
         run: pnpm --dir web test:e2e:report-readiness
 
@@ -565,6 +595,11 @@ jobs:
         working-directory: frontend/web
         run: >-
           pnpm exec playwright test --config playwright.overflow.config.ts
+
+      - name: History ranges and company-remount browser regressions
+        env:
+          ACCOUNTING_UI_WARMUP_ROUTES: /insights,/module-insights
+        run: pnpm --dir web test:e2e:history-ranges
 
       - name: Assistant document modal and dedicated-page browser regressions
         run: pnpm --dir web test:e2e:assistant-guides

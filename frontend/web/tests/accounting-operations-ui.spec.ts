@@ -199,6 +199,46 @@ for (const width of [390, 1440]) {
       await expect(page.getByRole("region", { name: "Retained bank recovery" })).toHaveCount(0)
     })
 
+    test("payment operations distinguish denied and failed reads from successful empty lists", async ({ page }) => {
+      let fail = true
+      await page.route("**/api/query/payment-accounts?**", (route) => route.fulfill({
+        status: fail ? 503 : 200,
+        json: { data: [] },
+      }))
+      await page.route("**/api/query/payment-transactions?**", (route) => route.fulfill({
+        status: fail ? 503 : 200,
+        json: { data: [] },
+      }))
+      await page.route("**/api/accounting/bank-statement-imports/11", (route) => route.fulfill({
+        status: fail ? 403 : 200,
+        json: { imports: [], lines: [] },
+      }))
+      await page.getByRole("button", { name: "Payment allocation", exact: true }).click()
+      const panel = page.getByRole("region", { name: "Retained payment allocation" })
+      await expect(panel.getByText("Synthetic EUR bank", { exact: true })).toBeVisible()
+      await expect(panel.getByTestId("payment-operation-301")).toBeVisible()
+      await control(page, "payment-sources-refresh")
+
+      const accounts = panel.locator('[data-slot="card"]').filter({ hasText: "Payment accounts" })
+      const imports = panel.locator('[data-slot="card"]').filter({ hasText: "Bank statement imports" })
+      const transactions = panel.locator('[data-slot="card"]').filter({ hasText: "Transactions & reconciliation" })
+      await expect(accounts.getByRole("alert")).toContainText("Records could not be loaded")
+      await expect(transactions.getByRole("alert")).toContainText("Records could not be loaded")
+      await expect(imports.getByRole("status")).toContainText("You do not have access")
+      await expect(panel.getByText(/^No (payment accounts|statement imports|payment transactions)$/)).toHaveCount(0)
+      await expect(panel.getByRole("button", { name: "Add account", exact: true })).toHaveCount(0)
+      await expect(panel.getByRole("button", { name: "Import CSV", exact: true })).toHaveCount(0)
+      await expect(panel.getByRole("button", { name: "Record payment", exact: true })).toBeDisabled()
+
+      fail = false
+      await accounts.getByRole("button", { name: "Retry", exact: true }).click()
+      await transactions.getByRole("button", { name: "Retry", exact: true }).click()
+      await expect(accounts.getByText("No payment accounts", { exact: true })).toBeVisible()
+      await expect(transactions.getByText("No payment transactions", { exact: true })).toBeVisible()
+      await control(page, "payment-sources-refresh")
+      await expect(imports.getByText("No statement imports", { exact: true })).toBeVisible()
+    })
+
     test("actual payment allocation retains its pending request and exact retry after a lost synthetic response", async ({ page }, testInfo) => {
       const requests: unknown[] = []
       let pendingRoute: Route | undefined

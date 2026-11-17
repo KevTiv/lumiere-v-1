@@ -5,13 +5,17 @@ mod admin;
 mod ai_capabilities;
 mod ai_certifications;
 mod ai_evidence;
+mod ai_skill_user_access;
+mod assistant_chat_references;
 pub(crate) mod auth;
 mod billing;
 mod bootstrap;
+mod chat_context;
 mod country_packs;
 mod crm;
 mod documents;
 mod evidence_inspection;
+pub(crate) mod farm_batches;
 mod finance_reviews;
 pub(crate) mod health;
 mod history;
@@ -47,9 +51,13 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(ai_capabilities::router())
         .merge(ai_certifications::router())
         .merge(ai_evidence::router())
+        .merge(ai_skill_user_access::router())
+        .merge(assistant_chat_references::router())
+        .merge(chat_context::router())
         .merge(crate::evidence_ingestion::router())
         .merge(evidence_inspection::router())
         .merge(finance_reviews::router())
+        .merge(farm_batches::router())
         .merge(auth::router())
         .merge(session::router())
         .merge(crm::router())

@@ -118,3 +118,20 @@ test("import mappings do not invent original rows or review decisions", () => {
   for (const review of [{ batchId: "24", itemId: "700", revision: 0 }, { batchId: 24, itemId: "700", revision: 3 }])
     assert.throws(() => parseBusinessHistorySourcesPage({ ...page(), data: [{ ...source(), review }] }, scope));
 });
+
+test("exact activity reads bind the event to scope and reject mismatched or paginated results", () => {
+  const all = { ...scope, module: "inventory" };
+  const exact = { ...all, eventId: "org:9007199254740993" };
+  const path = new URL(businessHistoryActivityQueryPath(exact, null), "https://example.test");
+  assert.equal(path.searchParams.get("eventId"), exact.eventId);
+  assert.equal(path.searchParams.get("companyId"), scope.companyId);
+  assert.equal(path.searchParams.get("limit"), "1");
+  assert.throws(() => businessHistoryActivityQueryPath(exact, "cursor"));
+  assert.notDeepEqual(businessHistoryActivityQueryKey(all), businessHistoryActivityQueryKey(exact));
+  const data = [{ ...entry, id: exact.eventId, resource: "product", recordId: "20" }];
+  const response = { ...page(), module: all.module, data };
+  assert.equal(parseBusinessHistoryActivityPage(response, exact).data[0]?.id, exact.eventId);
+  assert.deepEqual(parseBusinessHistoryActivityPage({ ...response, data: [] }, exact).data, []);
+  assert.throws(() => parseBusinessHistoryActivityPage({ ...response, data: [{ ...data[0], id: "5" }] }, exact));
+  assert.throws(() => parseBusinessHistoryActivityPage({ ...response, nextCursor: "cursor" }, exact));
+});

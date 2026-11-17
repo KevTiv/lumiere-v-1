@@ -3,6 +3,7 @@
 import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { toCreateAiSkillParams } from "@lumiere/erp-shared/ai-create-params"
 import { Button, DashboardHeader, FormModal, MissingOrganization, useRBAC, type FormConfig } from "@lumiere/ui"
@@ -11,8 +12,6 @@ import {
   useAiTeamMemberSkills,
   useAiTeamMembers,
   useAssignTeamMemberSkill,
-  useAiAgentRuns,
-  useCancelAiAgentRun,
   useCreateAiSkill,
   useProvisionAiSurfaces,
   useSetAiSkillActive,
@@ -21,10 +20,14 @@ import {
   useUpsertAiSkillConfig,
   type AiSkillListItem,
 } from "@lumiere/query-hooks/hooks/ai-skills"
+import { agentRunCanBeCancelled, useAiAgentRuns, useCancelAiAgentRun } from "@lumiere/query-hooks/hooks/ai-agent-runs"
+import { moduleQueryState, mergeModuleStates } from "@lumiere/ui/lib/module-data-state"
+import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 
 import { SkillRegistryPanel } from "./skill-registry-panel"
+import { SkillUserAccessPanel } from "./skill-user-access-panel"
 
 export { AI_SKILLS_UI_REDUCERS } from "@/lib/ai-skills-ui-reducers"
 
@@ -213,12 +216,21 @@ export function AiSkillsClient({ organizationId }: { organizationId?: number }) 
 function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
   const { t } = useTranslation()
   const { checkPermission, permissionsReady } = useRBAC()
+  const { activeCompanyReady, identity } = useErpSession()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyId(organizationId)
-  const { data: skills = [], isLoading, error } = useRegisteredAiSkills(organizationId)
-  const { data: teamMembers = [] } = useAiTeamMembers(orgId)
-  const { data: memberSkills = [] } = useAiTeamMemberSkills(orgId)
+  const skillsQuery = useRegisteredAiSkills(organizationId)
+  const membersQuery = useAiTeamMembers(orgId)
+  const assignmentsQuery = useAiTeamMemberSkills(orgId)
+  const { data: skills = [], isLoading, error } = skillsQuery
+  const { data: teamMembers = [] } = membersQuery
+  const assignmentsState = moduleQueryState(assignmentsQuery)
+  const assignmentInputsState = mergeModuleStates([moduleQueryState(membersQuery), moduleQueryState(skillsQuery)])
+  const canManageAssignments = permissionsReady === true && checkPermission("ai_team_member", "write").allowed
+  const canAssignSkill = canManageAssignments
+    && assignmentInputsState.status === "ready"
+    && assignmentsState.status === "ready"
   const syncSkills = useSyncAiSkills(organizationId)
   const provisionSurfaces = useProvisionAiSurfaces(organizationId, operatingCompanyId ?? undefined)
   const companySetup = operatingCompanyId != null && provisionSurfaces.data?.company_setup?.company_id === operatingCompanyId
@@ -228,13 +240,23 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
     && checkPermission("ai_skill", "create").allowed
     && checkPermission("ai_skill", "write").allowed
     && checkPermission("ai_agent", "write").allowed
+  const canManageSkillAccess = permissionsReady === true
+    && checkPermission("role", "write").allowed
+    && checkPermission("user_organization", "write").allowed
+    && checkPermission("user_role_assignment", "create").allowed
+    && checkPermission("user_role_assignment", "delete").allowed
+    && checkPermission("org_permission", "create").allowed
+    && checkPermission("org_permission", "delete").allowed
   const createSkill = useCreateAiSkill(organizationId)
   const setSkillActive = useSetAiSkillActive(organizationId)
   const upsertConfig = useUpsertAiSkillConfig()
   const assignSkill = useAssignTeamMemberSkill(organizationId)
   const unassignSkill = useUnassignTeamMemberSkill(organizationId)
-  const { data: agentRuns = [] } = useAiAgentRuns(organizationId)
-  const cancelRun = useCancelAiAgentRun(organizationId, operatingCompanyId ?? undefined)
+  const selectedRunCompanyId = activeCompanyReady ? operatingCompanyId : null
+  const agentRunsQuery = useAiAgentRuns(organizationId, selectedRunCompanyId, identity)
+  const agentRunsState = moduleQueryState(agentRunsQuery)
+  const canCancelRun = permissionsReady === true && checkPermission("ai_agent_run", "write").allowed
+  const cancelRun = useCancelAiAgentRun(organizationId)
 
   const [modal, setModal] = useState<"create" | "assign" | "config" | "active" | null>(null)
   const [configSkill, setConfigSkill] = useState<{ id: number; name: string } | null>(null)
@@ -314,6 +336,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
         setModal(null)
         setConfigSkill(null)
       } else if (modal === "assign") {
+        if (!canAssignSkill) throw new Error(t("aiSkills.assignments.unavailable", { defaultValue: "Skill assignments are unavailable." }))
         await assignSkill.mutateAsync({
           teamMemberId: BigInt(Number(formData.teamMemberId)),
           skillId: BigInt(Number(formData.skillId)),
@@ -371,7 +394,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1 space-y-1">
             <h2 id="ai-feature-setup-title" className="text-sm font-semibold">AI binding and catalog setup</h2>
-            <p className="text-sm text-muted-foreground">Apply eligible company defaults without replacing custom or disabled bindings. This does not activate or verify chat execution.</p>
+            <p className="text-sm text-muted-foreground">Apply eligible company defaults while preserving custom settings and disabled skills.</p>
           </div>
           <Button
             type="button"
@@ -383,7 +406,6 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
             {provisionSurfaces.isPending ? "Applying bindings…" : "Apply binding/catalog defaults"}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">Platform activation is managed by the platform administrator, not tenants. No model calls are made by this setup check.</p>
         {!operatingCompanyId ? (
           <p className="text-sm text-muted-foreground">{t("aiSkills.setup.companyRequired")}</p>
         ) : null}
@@ -392,7 +414,6 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
         ) : null}
         {companySetup ? (
           <div role="status" className="space-y-2 text-sm">
-            <p>Platform activation required — chat execution not verified.</p>
             <p>{companySetup.message}</p>
             <ul className="space-y-1">
               {provisionSurfaces.data?.skills.map((skill) => (
@@ -471,13 +492,17 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
         ))}
       </div>
 
+      {canManageSkillAccess ? (
+        <SkillUserAccessPanel key={organizationId} organizationId={organizationId} skills={sortedSkills} />
+      ) : null}
+
       <SkillRegistryPanel
         organizationId={orgId}
         companyId={operatingCompanyId}
-        skills={sortedSkills.filter((skill) => skill.id > 0)}
+        skills={sortedSkills.filter((skill) => !skill.is_system && !skill.execution_route)}
       />
 
-      <section className="rounded-xl border border-border bg-card">
+      <section className="rounded-xl border border-border bg-card" data-testid="ai-skill-assignments-panel">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4">
           <div>
             <h2 className="text-base font-semibold">{t("aiSkills.assignments.title")}</h2>
@@ -488,6 +513,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           <button
             type="button"
             data-testid="ai-skills-assign"
+            disabled={!canAssignSkill}
             className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted/50"
             onClick={() => {
               setSubmitError(null)
@@ -498,10 +524,14 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           </button>
         </div>
         <div className="divide-y divide-border">
-          {memberSkills.length === 0 ? (
+          {assignmentsState.status === "loading" ? (
+            <p role="status" className="px-4 py-6 text-sm text-muted-foreground">{t("common.loading")}</p>
+          ) : assignmentsState.status !== "ready" ? (
+            <ModuleDataNotice state={{ ...assignmentsState, message: t("aiSkills.assignments.unavailable", { defaultValue: "Skill assignments are unavailable." }) }} />
+          ) : !assignmentsQuery.data?.length ? (
             <p className="px-4 py-6 text-sm text-muted-foreground">{t("aiSkills.assignments.empty")}</p>
           ) : (
-            memberSkills.map((row) => {
+            assignmentsQuery.data.map((row) => {
               const assignmentId = Number(row.id)
               const memberId = Number(row.teamMemberId)
               const skillId = Number(row.skillId)
@@ -519,23 +549,31 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
                       {t("aiSkills.labels.assignmentNumber", { id: assignmentId })}
                       {row.isDefault ? t("aiSkills.labels.defaultSuffix") : ""}
                     </p>
+                    {unassignSkill.isError && unassignSkill.variables === assignmentId ? (
+                      <p role="alert" className="mt-1 text-xs text-destructive">{unassignSkill.error.message}</p>
+                    ) : null}
                   </div>
-                  <button
-                    type="button"
-                    className="text-xs text-destructive hover:underline"
-                    disabled={unassignSkill.isPending}
-                    onClick={async () => {
-                      if (!(await confirmDialog({ description: t("aiSkills.confirm.removeAssignment") }))) return
-                      unassignSkill.mutateAsync(assignmentId).catch((e) => setSubmitError(String(e)))
-                    }}
-                  >
-                    {t("aiSkills.actions.unassign")}
-                  </button>
+                  {canManageAssignments ? (
+                    <button
+                      type="button"
+                      className="text-xs text-destructive hover:underline"
+                      disabled={unassignSkill.isPending}
+                      onClick={async () => {
+                        if (!(await confirmDialog({ description: t("aiSkills.confirm.removeAssignment") }))) return
+                        unassignSkill.mutate(assignmentId)
+                      }}
+                    >
+                      {t("aiSkills.actions.unassign")}
+                    </button>
+                  ) : null}
                 </div>
               )
             })
           )}
         </div>
+        {assignmentsState.status === "ready" && assignmentInputsState.status !== "ready" && assignmentInputsState.status !== "loading" ? (
+          <ModuleDataNotice state={{ ...assignmentInputsState, message: t("aiSkills.assignments.inputsUnavailable", { defaultValue: "The skill or team-member list is unavailable." }) }} />
+        ) : null}
       </section>
 
       {modal === "create" ? (
@@ -597,27 +635,35 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
       <section className="rounded-xl border border-border bg-card p-4 space-y-3" data-testid="ai-agent-runs-panel">
         <h2 className="text-base font-semibold">{t("aiSkills.agentRuns.title")}</h2>
         <p className="text-sm text-muted-foreground">{t("aiSkills.agentRuns.description")}</p>
-        {agentRuns.length === 0 ? (
+        {!identity || !activeCompanyReady || agentRunsState.status === "loading" ? (
+          <p role="status" className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        ) : selectedRunCompanyId === null ? (
+          <p role="status" className="text-sm text-muted-foreground">{t("aiSkills.agentRuns.chooseCompany", { defaultValue: "Select a company to view its agent runs." })}</p>
+        ) : agentRunsState.status !== "ready" ? (
+          <ModuleDataNotice state={{ ...agentRunsState, message: t("aiSkills.agentRuns.unavailable", { defaultValue: "Agent runs could not be loaded for this company." }) }} />
+        ) : !agentRunsQuery.data?.length ? (
           <p className="text-sm text-muted-foreground">{t("aiSkills.agentRuns.empty")}</p>
         ) : (
           <ul className="space-y-2">
-            {agentRuns.map((run) => (
+            {agentRunsQuery.data.map((run) => (
               <li key={run.id} className="flex items-center justify-between gap-3 rounded border px-3 py-2 text-sm">
                 <div>
-                  <p className="font-medium">{run.run_key || t("aiSkills.labels.number", { id: run.id })}</p>
+                  <p className="font-medium">{run.runKey || t("aiSkills.labels.number", { id: run.id })}</p>
                   <p className="text-xs text-muted-foreground">
                     {agentRunStatusLabel(t, run.status)}
                     {run.summary ? ` — ${run.summary}` : ""}
-                    {run.step_count != null ? t("aiSkills.agentRuns.stepCount", { count: run.step_count }) : ""}
+                    {run.stepCount != null ? t("aiSkills.agentRuns.stepCount", { count: run.stepCount }) : ""}
                   </p>
+                  {cancelRun.isError && cancelRun.variables?.runId === run.id && cancelRun.variables.companyId === run.companyId ? (
+                    <p role="alert" className="mt-1 text-xs text-destructive">{cancelRun.error.message}</p>
+                  ) : null}
                 </div>
-                {["running", "pending", "awaiting_approval", "agent_settled"].includes(run.status) ? (
+                {canCancelRun && agentRunCanBeCancelled(run.status) ? (
                   <button
                     type="button"
                     className="text-xs underline"
-                    onClick={() =>
-                      void cancelRun.mutateAsync(run.id).catch((e) => setSubmitError(String(e)))
-                    }
+                    disabled={cancelRun.isPending}
+                    onClick={() => cancelRun.mutate({ companyId: run.companyId, runId: run.id })}
                   >
                     {t("aiSkills.actions.cancel")}
                   </button>

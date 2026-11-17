@@ -146,6 +146,7 @@
     "bootstrap_new_tenant": "erp.bootstrap_new_tenant",
     "cancel_account_move": "erp.cancel_account_move",
     "cancel_ai_agent_run": "erp.cancel_ai_agent_run",
+    "cancel_ai_embedding_job": "erp.cancel_ai_embedding_job",
     "cancel_budget": "erp.cancel_budget",
     "cancel_consolidation": "erp.cancel_consolidation",
     "cancel_contract": "erp.cancel_contract",
@@ -1530,6 +1531,7 @@
     "register_ai_platform_template": "erp.register_ai_platform_template",
     "set_ai_platform_default": "erp.set_ai_platform_default",
     "publish_ai_platform_skill": "erp.publish_ai_platform_skill",
-    "ensure_ai_managed_allowance": "erp.ensure_ai_managed_allowance"
+    "ensure_ai_managed_allowance": "erp.ensure_ai_managed_allowance",
+    "enroll_persistent_platform_operator": "erp.enroll_persistent_platform_operator"
   }
 }

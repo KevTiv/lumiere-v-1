@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { confirmedOrderTrend, overviewFinancialInputsComplete, overviewMoneySummary } from "./financial-summary"
 import {
-  clearOwnerQueueHref, isDraftVendorBill, isOwnerQueue, lowStockQuants, overduePostedInvoices, ownerQueueHref,
+  clearOwnerQueueHref, isDraftVendorBill, isOwnerQueue, overduePostedInvoices, ownerQueueHref,
 } from "../../../lib/owner-queues"
 
 describe("overview financial meaning", () => {
@@ -108,29 +108,5 @@ describe("owner work queues", () => {
     assert.deepEqual(rows.filter(isDraftVendorBill).map((row) => row.id), [1, 2])
   })
 
-  it("counts only matching stock rows with verified products, company and eligibility", () => {
-    const scope = { organizationId: 7n, companyId: 3n }
-    const base = { ...scope, productId: 2n, availableQuantity: 5, isOutdated: false }
-    const products = [
-      { organizationId: 7n, id: 2n, reorderingMinQty: { some: 4 } },
-      { organizationId: 7n, id: 3n },
-      { organizationId: 7n, id: 4n, reorderingMinQty: { none: [] } },
-      { organizationId: 9n, id: 5n },
-    ]
-    const stock = [
-      { ...base, id: 1, availableQuantity: 4 },
-      { ...base, id: 2, isOutdated: { tag: "True" } },
-      { ...base, id: 3, isOutdated: { tag: "False" } },
-      { ...base, id: 4, availableQuantity: undefined, isOutdated: undefined },
-      { ...base, id: 5, productId: 3n, availableQuantity: 0 },
-      { ...base, id: 6, productId: 4n, availableQuantity: 0 },
-      { ...base, id: 7, productId: 0n, isOutdated: true },
-      { ...base, id: 8, productId: 5n, isOutdated: true },
-      { ...base, id: 9, organizationId: 9n, isOutdated: true },
-      { ...base, id: 10, companyId: 4n, isOutdated: true },
-      { ...base, id: 11, availableQuantity: "" },
-    ]
-    assert.deepEqual(lowStockQuants(stock, products, scope).map((row) => row.id), [1, 2, 5])
-    assert.deepEqual(lowStockQuants(stock, products, { ...scope, companyId: null }), [])
-  })
+
 })

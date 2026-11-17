@@ -52,14 +52,26 @@ export function resolveWorkspaceNavigation(tabs: readonly ModuleTab[], config: M
   return { workspaces, overflow }
 }
 
-/** Keep company and other route context while clearing filters from the previous collection. */
-export function moduleTabHref(pathname: string, search: string, tabId: string, defaultTab: string) {
+export type ModuleTabFilter = { key: string; value: string }
+
+/** Keep shared route context and optionally narrow the destination to a specific value. */
+export function moduleTabHref(
+  pathname: string,
+  search: string,
+  tabId: string,
+  defaultTab: string,
+  filter?: ModuleTabFilter,
+) {
   const params = new URLSearchParams(search)
   params.delete("filter")
   params.delete("highlight")
   params.delete("ownerQueue")
+  params.delete("backfillTask")
+  params.delete("backfillCompany")
+  params.delete("backfillRecord")
   if (tabId === defaultTab) params.delete("tab")
   else params.set("tab", tabId)
+  if (filter) params.append("filter", `${filter.key}:${filter.value}`)
   const query = params.toString()
   return query ? `${pathname}?${query}` : pathname
 }

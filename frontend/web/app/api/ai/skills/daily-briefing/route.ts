@@ -40,16 +40,16 @@ export async function POST(request: NextRequest) {
     const gw = await fetchAiGateway("/v1/skills/daily-briefing", {
       method: "POST",
       body: JSON.stringify({
-        org_id: orgId,
-        company_id: companyId,
-        since_micros: body.sinceMicros ?? body.since_micros ?? null,
-        until_micros: body.untilMicros ?? body.until_micros ?? null,
-        allowed_modules: body.allowedModules ?? body.allowed_modules ?? [],
-        activity_query: body.activityQuery ?? body.activity_query ?? null,
-        top_k: body.topK ?? body.top_k ?? null,
-        stdb_token: session.stdbToken,
-        identity_hex: session.identityHex,
-        org_privacy_policy: resolveAiPrivacyPolicy(session.fieldAccess),
+        orgId,
+        companyId,
+        sinceMicros: body.sinceMicros ?? body.since_micros ?? null,
+        untilMicros: body.untilMicros ?? body.until_micros ?? null,
+        allowedModules: body.allowedModules ?? body.allowed_modules ?? [],
+        activityQuery: body.activityQuery ?? body.activity_query ?? null,
+        topK: body.topK ?? body.top_k ?? null,
+        stdbToken: session.stdbToken,
+        identityHex: session.identityHex,
+        orgPrivacyPolicy: resolveAiPrivacyPolicy(session.fieldAccess),
       }),
     })
     const payload = gw.text

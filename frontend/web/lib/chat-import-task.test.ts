@@ -36,6 +36,27 @@ test("saved tasks reopen outside their original conversation without crossing co
   await assert.rejects(readSavedImportTask(async () => json(original), 4, id), /company/)
 })
 
+test("saved workbook coverage accepts separate sheets bound to one exact original", () => {
+  const workbook = { ...source, fileName: "farm.xlsx" }
+  const worksheet = {
+    fileName: workbook.fileName, sourceSha256: workbook.sha256, byteCount: workbook.size,
+    status: "prepared" as const, worksheet: "Intake", availableWorksheets: ["Intake", "Growth"],
+    recordCount: 0, reviewRecords: 0, blankRecords: 0, headerRecords: 0, records: [],
+    sections: [], layoutSha256: null, error: null,
+  }
+  const files = [worksheet, { ...worksheet, worksheet: "Growth" }]
+  const saved = task({
+    files: [{ ...workbook, ordinal: 0 }],
+    coverage: { version: 1, complete: true, files, reconciliation: [] },
+  })
+  assert.equal(parseSavedImportTask(saved, 3).coverage?.files.length, 2)
+  for (const conflict of [worksheet, { ...files[1]!, byteCount: workbook.size + 1 }, { ...files[1]!, worksheet: "Unknown" }]) {
+    assert.throws(() => parseSavedImportTask({
+      ...saved, coverage: { ...saved.coverage, files: [worksheet, conflict] },
+    }, 3), /coverage/)
+  }
+})
+
 test("saved task pagination omits conversation and keeps the opaque cursor", async () => {
   const page = await listSavedImportTasks(async url => {
     const parsed = new URL(url, "https://app.example")
@@ -313,4 +334,58 @@ test("invalid decisions and unavailable receipt storage stop before dispatch", a
     fetcher: async () => { calls++; return json(acknowledged()) } }), /storage unavailable/)
   assert.equal(calls, 0)
   assert.throws(() => parseChatImportTask(task({ reviews: [{ id: "8", targetEntity: "product", title: "Unapproved", total: 1, pending: 1, confirmed: 0, excluded: 0 }] }), scope), /decision is inconsistent/)
+})
+
+
+test("a lost initial-mode submission retains its original intent and verifies that revision", async () => {
+  const saved = storage()
+  const args = { files: [file()], scope, storage: saved, isCurrent: () => true, createRequestId: () => id }
+  const inspected = acknowledged("inspect_only")
+  await assert.rejects(submitChatImportFiles({
+    ...args, initialMode: "inspect_only",
+    fetcher: async (_url, init) => {
+      if (init?.method === "POST") throw new Error("lost reply")
+      return new Response(null, { status: 404 })
+    },
+  }), /uncertain/)
+  assert.equal(readChatImportPointer(saved, scope)?.initialMode, "inspect_only")
+  const retry = {
+    ...args, initialMode: "prepare_import" as const,
+    fetcher: async (_url: string, init?: RequestInit) => {
+      assert.equal(JSON.parse(String(init?.body)).initialMode, "inspect_only")
+      return json({ ...inspected, status: "saved" })
+    },
+  }
+  await assert.rejects(recoverChatImportPointer({
+    ...args, fetcher: async () => json(acknowledged("prepare_import")),
+  }), /does not match/)
+  const task = await submitChatImportFiles(retry)
+  assert.equal(task.status, "saved")
+  assert.equal(task.decision.selectedOptionId, "inspect_only")
+  assert.equal(saved.values.size, 0)
+})
+
+test("preparation can follow a completed inspection at the revision of the same task", async () => {
+  const inspected = acknowledged("inspect_only")
+  const first = inspected.decisionReceipt!
+  const next = { ...first, decisionId: "f".repeat(32), revision: first.revision + 1, optionId: "prepare_import" as const }
+  const result = await submitChatImportDecision({
+    task: inspected, scope, storage: storage(), isCurrent: () => true, createDecisionId: () => next.decisionId,
+    answer: { requestId: inspected.decision.id, expectedRevision: first.revision, optionId: "prepare_import" },
+    fetcher: async (url, init) => {
+      assert.equal(url, `/api/import-tasks/${id}/decision`)
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        companyId: scope.companyId, decisionId: next.decisionId,
+        expectedRevision: first.revision, optionId: next.optionId,
+      })
+      return json({
+        ...inspected, status: "needs_review",
+        decision: { ...inspected.decision, revision: next.revision, decisionId: next.decisionId, selectedOptionId: next.optionId },
+        decisionReceipt: next, decisionHistory: [next, first],
+      })
+    },
+  })
+  assert.equal(result.requestId, inspected.requestId)
+  assert.equal(result.decision.selectedOptionId, "prepare_import")
+  assert.deepEqual(result.decisionHistory, [next, first])
 })

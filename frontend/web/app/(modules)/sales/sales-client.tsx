@@ -1,6 +1,9 @@
 'use client';
 
+import { OrderSummaryNotices } from './order-summary-notices';
 import { saleOrderListFieldAliases } from '@lumiere/ui/lib/sales-entity-configs';
+import { ModuleBackfillRecords, useCanReadModuleBackfill } from "../../../components/module-backfill-records"
+import { moduleBackfillTabs } from "@/lib/module-backfill-navigation"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
 import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
 import { useCurrencyFormat } from "@lumiere/ui"
@@ -111,7 +114,7 @@ import {
 } from '@lumiere/erp-shared/csv-import-bundles';
 import {
   planPartialDelivery,
-  withOrderCashSummary,
+  withAvailableOrderCashSummary,
   type TransitionNotice,
 } from '@lumiere/erp-workflows';
 import { fetchQueryList } from '@lumiere/query-hooks/http';
@@ -831,7 +834,25 @@ function SalesClientLoaded({
     return csvImportForm(t, t(titleKey[csvKind]));
   }, [csvKind, t]);
 
-  const moduleConfig = useMemo(() => salesModuleConfig(t), [t]);
+  const canReadBackfill = useCanReadModuleBackfill(organizationId);
+  const moduleConfig = useMemo((): ModuleConfig => {
+    const config = salesModuleConfig(t);
+    if (!canReadBackfill) return config;
+    return {
+      ...config,
+      tabs: [...config.tabs, {
+        id: moduleBackfillTabs.sales,
+        label: t('moduleRecords.sales'),
+        type: 'custom',
+        customContent: <ModuleBackfillRecords organizationId={organizationId} module="sales" />,
+      }, {
+        id: moduleBackfillTabs.shop_sales,
+        label: t('moduleRecords.shopSales'),
+        type: 'custom',
+        customContent: <ModuleBackfillRecords organizationId={organizationId} module="shop_sales" />,
+      }],
+    };
+  }, [canReadBackfill, organizationId, t]);
 
   const salesTabIds = useMemo(() => {
     const workTabId = moduleWorkBoardTabId(moduleConfig);
@@ -2469,12 +2490,11 @@ function SalesClientLoaded({
   const data = useMemo(
     () => ({
       // Delivery / invoice / payment / balance are derived from canonical lines and invoices.
-      orders: withOrderCashSummary(
-        orders as EntityRow[],
-        orderLines as unknown as EntityRow[],
-        accountMoves as unknown as EntityRow[],
-        stockPickings as unknown as EntityRow[],
-      ).map((row) => ({
+      orders: withAvailableOrderCashSummary(orders as EntityRow[], {
+        lines: orderLinesRead.state.status === 'ready' ? orderLines as unknown as EntityRow[] : undefined,
+        moves: accountMovesRead.state.status === 'ready' ? accountMoves as unknown as EntityRow[] : undefined,
+        pickings: stockPickingsRead.state.status === 'ready' ? stockPickings as unknown as EntityRow[] : undefined,
+      }).map((row) => ({
         ...row,
         partnerName: partnerNameById.get(String(getRowField(row, 'partnerId'))) ?? '',
         sheetTitle: saleOrderPrimaryLabel(row) || String(row.reference ?? row.id ?? ''),
@@ -2503,6 +2523,9 @@ function SalesClientLoaded({
       orderLines,
       accountMoves,
       stockPickings,
+      orderLinesRead.state.status,
+      accountMovesRead.state.status,
+      stockPickingsRead.state.status,
       partnerNameById,
       pricelists,
       pricelistItems,
@@ -2713,6 +2736,11 @@ function SalesClientLoaded({
         { model: 'sale_order', canRead: permissionsReady === true && checkPermission('sale_order', 'read').allowed && ordersRead.state.status === 'ready' },
       ]} />
       {savedQuotationNotice && <p role="status" className="mx-4 mb-3 rounded-lg border p-4 text-sm">{t('sales.workspace.savedOpenQuotation', { defaultValue: 'Quotation saved. Open it from Quotations & orders to add products.' })}</p>}
+      {activeTab === 'orders' && ordersRead.state.status === 'ready' ? (
+        <div className="mx-4 empty:hidden [&:not(:empty)]:mb-3">
+          <OrderSummaryNotices lines={orderLinesRead.state} transfers={stockPickingsRead.state} invoices={accountMovesRead.state} />
+        </div>
+      ) : null}
       <ModuleWorkView
         organizationId={organizationId}
         assistantFormBlocked={quickActionForm !== null || partialDeliveryPicking !== null || cancelPickingTarget !== null || creditReturnOrderId !== null || openReturnForm || chatterTarget !== null}

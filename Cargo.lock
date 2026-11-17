@@ -167,7 +167,9 @@ dependencies = [
  "lumiere-contracts",
  "lumiere-file-inspection",
  "lumiere-finance-review-core",
+ "lumiere-policy-core",
  "lumiere-presentation-core",
+ "lumiere-report-schedule",
  "openssl",
  "printpdf",
  "pulldown-cmark",
@@ -2156,7 +2158,7 @@ dependencies = [
 
 [[package]]
 name = "lumiere-contracts"
-version = "0.3.179"
+version = "0.3.184"
 dependencies = [
  "serde_json",
  "sha2 0.10.9",
@@ -2187,6 +2189,9 @@ dependencies = [
 [[package]]
 name = "lumiere-policy-core"
 version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
 
 [[package]]
 name = "lumiere-presentation-core"
@@ -2196,6 +2201,14 @@ dependencies = [
  "schemars 1.2.1",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "lumiere-report-schedule"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "chrono-tz",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "skill_key": "finance_variance_review",
-  "version": "1.0.4",
+  "version": "1.0.7",
   "risk": "green",
   "limits": {
     "max_steps": 5,
@@ -14,5 +14,5 @@
   "output_types": [
     "finance.variance_review.result.v1"
   ],
-  "source_hash": "sha256:840f22149a2b4df987dfa00d761a96b9e773970c65c266dd45409ffd81bd17ca"
+  "source_hash": "sha256:56f3a1a6e120697be72a347498143329aafadde4327159d46befaf42e91f8e0d"
 }

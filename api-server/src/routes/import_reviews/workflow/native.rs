@@ -387,6 +387,82 @@ fn metadata_matches(row: &Value, expected: &Value) -> bool {
         .is_some_and(|value| value[SOURCE_KEY] == *expected)
 }
 
+pub(super) async fn read_posting_status(
+    context: &TrustedOperationContext,
+    scope: StorageScope<'_>,
+    task: &str,
+    proposal: &SavedProposal,
+    result: &VerifiedResult,
+) -> Result<Value, ApiError> {
+    let ids = result
+        .record_ids
+        .iter()
+        .map(|id| positive_id(id))
+        .collect::<Result<Vec<_>, _>>()?;
+    let filter = id_filter("id", &ids)?;
+    let company = scope.company;
+    let org = scope.organization;
+    let moves = context.client().query_sql(&format!("SELECT id, organization_id, company_id, state, move_type, metadata FROM account_move WHERE organization_id = {org} AND company_id = {company} AND ({filter})")).await.map_err(ApiError::internal)?;
+    posting_status(scope, task, proposal, result, &moves)
+}
+
+pub(super) fn posting_status(
+    scope: StorageScope<'_>,
+    task: &str,
+    proposal: &SavedProposal,
+    result: &VerifiedResult,
+    moves: &[Value],
+) -> Result<Value, ApiError> {
+    let ids = result
+        .record_ids
+        .iter()
+        .map(|id| positive_id(id))
+        .collect::<Result<Vec<_>, _>>()?;
+    if result.company_id != scope.company.to_string()
+        || ids.len() != result.record_count
+        || ids.len() != proposal.definition.entries.len()
+        || ids.iter().collect::<BTreeSet<_>>().len() != ids.len()
+    {
+        return Err(ApiError::Conflict(
+            "the saved draft receipt does not identify the approved journal entries".into(),
+        ));
+    }
+    let mut draft = 0;
+    let mut posted = 0;
+    let mut other = 0;
+    let mut unavailable = 0;
+    for (move_id, entry) in ids.iter().zip(&proposal.definition.entries) {
+        let mut matching = moves
+            .iter()
+            .filter(|row| id(row, "id", "id") == Some(*move_id));
+        let row = matching.next().filter(|row| {
+            matching.next().is_none()
+                && in_company(row, scope.organization, scope.company)
+                && field(row, "moveType", "move_type")
+                    .as_str()
+                    .is_some_and(|value| value.eq_ignore_ascii_case("entry"))
+                && metadata_matches(row, &source_binding(scope, task, proposal, entry, "header"))
+        });
+        let state = row.and_then(|row| row["state"].as_str());
+        match state.map(str::to_ascii_lowercase).as_deref() {
+            Some("draft") => draft += 1,
+            Some("posted") => posted += 1,
+            Some(_) => other += 1,
+            None => unavailable += 1,
+        }
+    }
+    Ok(json!({
+        "companyId": scope.company.to_string(),
+        "proposalId": proposal.id.to_string(),
+        "recordCount": ids.len(),
+        "draftCount": draft,
+        "postedCount": posted,
+        "otherCount": other,
+        "unavailableCount": unavailable,
+        "checkedAt": chrono::Utc::now().to_rfc3339()
+    }))
+}
+
 fn date_matches(value: &Value, expected: &str) -> bool {
     let value = value
         .get("microsSinceUnixEpoch")
