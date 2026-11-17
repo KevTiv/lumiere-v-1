@@ -20,7 +20,6 @@ import {
 } from "./guided-import-wizard"
 import { ImportReviewWorkspace } from "./import-review-workspace"
 import { ImportTaskExecutionPanel } from "./import-task-execution-panel"
-import { chatImportReceiptKey } from "./chat-import-receipt"
 import {
   ImportDestinationSupport,
   ImportTaskProgress,
@@ -38,6 +37,7 @@ import {
 import type { ReviewedImportSource } from "./import-review-model"
 import {
   canPrepareInspectedImport,
+  chatImportReceiptKey,
   type ChatImportTask,
 } from "./chat-import-task"
 import { DocumentViewerDialog } from "../components/document-viewer-dialog"

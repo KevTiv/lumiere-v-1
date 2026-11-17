@@ -12,7 +12,7 @@ import {
   type BackfillModule,
 } from "./module-backfill-navigation"
 import { apiFetch } from "./api-fetch"
-import { chatImportReceiptKey } from "./chat-import-receipt"
+import { chatImportReceiptKey } from "./chat-import-task"
 import { importAmountUnits } from "./import-workflow"
 import type {
   ReviewDetail,

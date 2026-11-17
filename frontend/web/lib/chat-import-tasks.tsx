@@ -10,14 +10,14 @@ import { FileIdentity } from "@lumiere/ui/components/file-identity"
 import { Button } from "@lumiere/ui/components/button"
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
 import { apiFetch } from "./api-fetch"
-import { ChatImportReceipt, chatImportReceiptKey } from "./chat-import-receipt"
+import { ChatImportReceipt } from "./chat-import-receipt"
 import { ChatReconciliationPreview } from "./chat-reconciliation-preview"
 import { DataImportWorkspace } from "./data-import-workspace"
 import { SavedImportTaskPicker, useSavedImportTaskList } from "./saved-import-task-picker"
 import { importTaskHref, type ImportTaskView } from "./import-task-navigation"
 import type { ImportPreparation } from "./import-preparation"
 import {
-  canPrepareInspectedImport, chatImportScopeKey, listChatImportTasks, parseChatImportTask,
+  canPrepareInspectedImport, chatImportReceiptKey, chatImportScopeKey, listChatImportTasks, parseChatImportTask,
   readChatImportTask, recoverChatImportPointer, recoverChatImportDecision,
   retryChatImportDecision, submitChatImportDecision, submitChatImportFiles,
   type ChatImportDecisionAnswer, type ChatImportDecisionPointer, type ChatImportPointer, type ChatImportScope, type ChatImportTask,

@@ -6,26 +6,13 @@ import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { ImportTaskStatusCard } from "@lumiere/ui/ai-chat/import-task-status-card"
 import { Button } from "@lumiere/ui/components/button"
 import { CurrencyFormatProvider } from "@lumiere/ui"
-import type { ChatImportScope } from "./chat-import-task"
+import { chatImportReceiptKey, type ChatImportScope } from "./chat-import-task"
 import { apiFetch } from "./api-fetch"
 import {
   readChatImportPostingStatus,
   readChatImportTaskStatus,
 } from "./import-task-status"
 import type { ImportTaskView } from "./import-task-navigation"
-
-export function chatImportReceiptKey(
-  scope: Pick<ChatImportScope, "identity" | "organizationId" | "companyId">,
-  taskId?: string,
-) {
-  const scopeKey = [
-    "assistant-import-receipt",
-    scope.identity,
-    scope.organizationId,
-    scope.companyId,
-  ]
-  return taskId ? [...scopeKey, taskId] : scopeKey
-}
 
 export function ChatImportReceipt({
   scope,

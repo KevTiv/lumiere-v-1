@@ -1054,12 +1054,23 @@ mod tests {
             confirmed: &[],
             fully_confirmed: true,
         };
-        assert_eq!(review.explicit_line_identity(), Ok((Some("Kicukiro POS"), Some("0010"))));
-        let unconfirmed = ReviewedFacts { fully_confirmed: false, ..review };
+        assert_eq!(
+            review.explicit_line_identity(),
+            Ok((Some("Kicukiro POS"), Some("0010")))
+        );
+        let unconfirmed = ReviewedFacts {
+            fully_confirmed: false,
+            ..review
+        };
         assert!(unconfirmed.explicit_line_identity().is_err());
         let mut revised = row.proposed.clone();
         revised.insert("sale_line_reference".into(), Some("10".into()));
-        assert!(ReviewedFacts { values: &revised, ..review }.explicit_line_identity().is_err());
+        assert!(ReviewedFacts {
+            values: &revised,
+            ..review
+        }
+        .explicit_line_identity()
+        .is_err());
     }
 
     #[test]
