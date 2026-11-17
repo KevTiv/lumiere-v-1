@@ -2,10 +2,32 @@ import { stbTimestampMicros } from "@lumiere/erp-shared/stb-timestamp"
 import { parseAssistantActionId } from "@lumiere/query-hooks/assistant-actions"
 import { parseWorkBoardPage, workStatus, type WorkBoardScope } from "@lumiere/query-hooks/hooks/work-board-model"
 import type { ChatMessageSourceRef } from "@lumiere/ui/lib/ai-chat-types"
+import { z } from "zod"
 import { apiFetch } from "./api-fetch"
 
 type Kind = "calendar_event" | "workflow_human_task" | "document"
-type Row = Record<string, unknown>
+const recordResponse = z.object({
+  data: z.object({
+    id: z.unknown(),
+    organizationId: z.unknown(),
+    organization_id: z.unknown(),
+    companyId: z.unknown(),
+    company_id: z.unknown(),
+    name: z.unknown(),
+    privacy: z.unknown(),
+    allday: z.unknown(),
+    start: z.unknown(),
+    stop: z.unknown(),
+    state: z.unknown(),
+    location: z.unknown(),
+    fileSize: z.unknown(),
+    file_size: z.unknown(),
+    fileName: z.unknown(),
+    file_name: z.unknown(),
+    mimetype: z.unknown(),
+  }),
+})
+type Row = z.infer<typeof recordResponse>["data"]
 
 export type AssistantSupportRecordRequest = { kind: Kind; id: string }
 
@@ -41,20 +63,15 @@ export function parseAssistantSupportRecord(query: string): AssistantSupportReco
   return { kind, id }
 }
 
-function row(value: unknown): Row | undefined {
-  return value != null && typeof value === "object" && !Array.isArray(value) ? value as Row : undefined
-}
-
 function rowId(value: unknown): string | undefined {
   return parseAssistantActionId(typeof value === "number" && Number.isSafeInteger(value) ? String(value) : value)
 }
 
-function field(record: Row, camel: string, snake = camel): unknown {
+function field(record: Row, camel: keyof Row, snake = camel): unknown {
   const value = Object.hasOwn(record, camel) ? record[camel] : record[snake]
-  const option = row(value)
-  if (option && Object.keys(option).length === 1) {
-    if (Object.hasOwn(option, "some")) return option.some
-    if (Object.hasOwn(option, "none")) return null
+  if (value && typeof value === "object" && Object.keys(value).length === 1) {
+    if ("some" in value && Object.hasOwn(value, "some")) return value.some
+    if ("none" in value && Object.hasOwn(value, "none")) return null
   }
   return value
 }
@@ -150,7 +167,8 @@ export async function readAssistantSupportRecord(
       details = [["Status", workStatus(task) ?? undefined], ["Module", task.workModule]]
       href = `/approvals?taskId=${id}&taskCompany=${companyId}`
     } else {
-      const record = row(row(payload)?.data)
+      const parsedRecord = recordResponse.safeParse(payload)
+      const record = parsedRecord.success ? parsedRecord.data.data : undefined
       if (!record || rowId(record.id) !== id
         || String(field(record, "organizationId", "organization_id")) !== String(organizationId)) return unavailable
       if (kind === "calendar_event" && field(record, "privacy") !== "public") return unavailable

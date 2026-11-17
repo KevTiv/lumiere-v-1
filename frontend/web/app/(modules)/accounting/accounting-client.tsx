@@ -25,6 +25,7 @@ import { currencyCatalogContainsId } from "@/lib/accounting-setup-reference"
 import { useInvoicePersonalization } from "@lumiere/query-hooks/hooks/invoice-personalization"
 import { useExplainErpError, useOpenErpAiChat } from "@/lib/erp-ai-context"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
+import type { AccountMove as LedgerMove } from "@lumiere/ui/lib/accounting-types"
 import { invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSellerIdentityReady } from "@lumiere/erp-shared/invoice-personalization"
 import { formatInvoiceMoney, resolveDraftInvoiceDocument } from "../../../../packages/ui/src/accounting-components/invoice-document"
 import { ReconciliationWorkbench, type ReconciliationOutcome, type ReconciliationStatusResult } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench"
@@ -721,7 +722,7 @@ function AccountingClientReady({
     { history: "push" },
   )
   const openErpAiChat = useOpenErpAiChat()
-  const askAboutMove = useCallback((move: AccountMove) => {
+  const askAboutMove = useCallback((move: LedgerMove) => {
     const recordId = parseStrictU64(move.id)
     if (!companyAvailable || recordId == null || recordId === 0n ||
       String(move.companyId) !== String(operatingCompanyId) ||

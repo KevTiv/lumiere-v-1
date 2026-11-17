@@ -348,7 +348,7 @@ import {
 } from './cycle-count-wizard';
 import { buildEntitySelection } from '@lumiere/query-hooks/ai-ui-context';
 import { useOpenErpAiChat } from '@/lib/erp-ai-context';
-import { AskAboutRecordButton } from '@/components/ask-about-record-button';
+import { AskAboutRecordButton } from '../../../components/ask-about-record-button';
 import type {
   Product,
   StockQuant,

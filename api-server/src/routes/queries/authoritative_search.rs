@@ -26,13 +26,7 @@ pub(crate) async fn get_authoritative_search(
     )
     .await?
     .ok_or(ApiError::Unauthorized)?;
-    let session_client = state.client_with_token(&session.stdb_token);
-    let context = TrustedOperationContext::from_session_with_placement(
-        &session,
-        session_client,
-        RESOURCE_QUERY_OPERATION_ID,
-        &state.organization_placements,
-    )?;
+    let context = TrustedOperationContext::for_resource_read(&state, &session)?;
     let organization_id = context.organization_id();
     context.require_current_placement(&state.organization_placements)?;
     let owner_read = crate::query_exec::crm_resource(&resource);

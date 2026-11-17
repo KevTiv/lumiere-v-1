@@ -1,6 +1,6 @@
 "use client"
 
-import { AskAboutRecordButton } from "@/components/ask-about-record-button"
+import { AskAboutRecordButton } from "../../../components/ask-about-record-button"
 
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
