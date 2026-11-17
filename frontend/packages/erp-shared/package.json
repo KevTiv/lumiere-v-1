@@ -46,6 +46,7 @@
     "./iot-create-params": "./src/iot-create-params.ts",
     "./warehouse-3d-from-api": "./src/warehouse-3d-from-api.ts",
     "./ai-ui-context": "./src/ai-ui-context.ts",
+    "./ai-chat-attachments": "./src/ai-chat-attachments.ts",
     "./ai-source-links": "./src/ai-source-links.ts",
     "./ai-entity-type-resolver": "./src/ai-entity-type-resolver.ts",
     "./action-draft-links": "./src/action-draft-links.ts",

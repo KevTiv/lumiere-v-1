@@ -77,6 +77,7 @@ import {
 } from "@/lib/assistant-turn"
 import { i18n } from "@lumiere/i18n"
 import { assistantHistoryScope, saveAssistantHistory, scopedAssistantSession } from "@/lib/assistant-history"
+import { readChatAttachments, readStoredChatAttachmentNames } from "@/lib/ai-chat-attachments"
 import { useChatImportTasks } from "@/lib/chat-import-tasks"
 import {
   DocumentSelectionActionsContext, documentSelectionAnalysisReference,
@@ -264,6 +265,7 @@ function ErpAiChatPanel({
           ? row.role
           : "assistant",
       content: row.content,
+      attachmentNames: readStoredChatAttachmentNames(row.metadata),
       timestamp: dateFromStored(row.createDate ?? row.create_date),
       sources: parseStoredSources(row.sourcesJson ?? row.sources_json),
       actions: [...(parseStoredChatActions(row.metadata) ?? []), ...parseNativeChatActions(row.metadata, actionScope)] as ChatAction[],
@@ -296,6 +298,7 @@ function ErpAiChatPanel({
   const persistExchange = useCallback(
     async (args: {
       userText: string
+      attachmentNames?: string[]
       assistantText: string
       sources: ChatMessageSourceRef[]
       uiContext: unknown
@@ -314,6 +317,7 @@ function ErpAiChatPanel({
           session_key: sessionKey,
           role: "user",
           content: args.userText,
+          metadata: args.attachmentNames?.length ? JSON.stringify({ attachmentNames: args.attachmentNames }) : undefined,
           ui_context_json: JSON.stringify(args.uiContext ?? null),
         }) },
         appendAssistant: async () => { await appendMessage.mutateAsync({
@@ -512,22 +516,27 @@ function ErpAiChatPanel({
   )
 
   const runTurn = useCallback(
-    async (userText: string, stream = false, guideRefs?: GuideReference[], questionGuide?: GuideDraft, hasUnsavedGuideEdits = false) => {
+    async (userText: string, stream = false, guideRefs?: GuideReference[], questionGuide?: GuideDraft, hasUnsavedGuideEdits = false, files: readonly File[] = []) => {
       if (!orgReady || operatingCompanyId == null || operatingCompanyId <= 0) {
         return {
           content: companiesQuery.isLoading
             ? i18n.t("aiChat.turn.loadingCompany")
             : i18n.t("aiChat.turn.companyRequired"),
           sources: [] as ChatMessageSourceRef[],
+          attachmentsConsumed: false,
         }
       }
       const started = performance.now()
       const requestScope = historyScope
       const isCurrent = () => currentHistoryScope.current === requestScope
+      const attachments = await readChatAttachments(files)
+      if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[], attachmentsConsumed: false }
+      const attachmentNames = attachments.length ? attachments.map(file => file.name) : undefined
       const selectedDocument = !questionGuide && scopedSelectionDraft && userText.includes(scopedSelectionDraft.text)
         ? scopedSelectionDraft
         : null
       if (selectedDocument) {
+        if (attachments.length) throw new Error("Ask about text attachments separately from a managed spreadsheet selection.")
         if (!documentSelectionMatchesScope(selectedDocument.selection, orgId, operatingCompanyId)) {
           throw new Error("The company changed. Reopen the file before asking.")
         }
@@ -558,7 +567,7 @@ function ErpAiChatPanel({
       const importTaskRefs = focusedImport?.companyId === String(operatingCompanyId)
         ? [{ taskId: focusedImport.requestId, companyId: focusedImport.companyId }]
         : undefined
-      let presentationResolution = !questionGuide && !isAssistantErrorQuestion(userText) && actionScope
+      let presentationResolution = !attachments.length && !questionGuide && !isAssistantErrorQuestion(userText) && actionScope
         ? resolveAssistantActionRequest(userText, {
           scope: actionScope,
           module: workspaceScope.usesCurrentPage ? module : workspaceScope.pathname.split("/")[1],
@@ -587,6 +596,7 @@ function ErpAiChatPanel({
           if (!stream) return assistantAnswer(await rag.mutateAsync({
             query: questionGuide ? guideDraftQuestion(questionGuide, userText, hasUnsavedGuideEdits) : userText, companyId: operatingCompanyId,
             include_types: includeTypes, ui_context: uiContext, guide_refs: guideRefs, import_task_refs: importTaskRefs,
+            attachments,
             ...(requestedAgentId ? { agent_id: requestedAgentId } : {}),
           }))
           const response = await fetch("/api/ai/rag/stream", {
@@ -599,14 +609,16 @@ function ErpAiChatPanel({
               ...(uiContext ? { ui_context: uiContext } : {}),
               ...(guideRefs?.length ? { guide_refs: guideRefs } : {}),
               ...(importTaskRefs?.length ? { import_task_refs: importTaskRefs } : {}),
+              ...(attachments.length ? { attachments } : {}),
             }),
           })
           // Never fall back after dispatch: a missing reply does not prove no run occurred.
           return readAssistantStream(response, (data) => assistantAnswerMetadata(JSON.parse(data)))
         },
-        drafts: !questionGuide && !isAssistantErrorQuestion(userText) && looksLikeActionDraftRequest(userText) ? () => resolveActionDrafts(userText, uiContext) : undefined,
+        // File contents are answer context, not a source for the separate draft writer.
+        drafts: !attachments.length && !questionGuide && !isAssistantErrorQuestion(userText) && looksLikeActionDraftRequest(userText) ? () => resolveActionDrafts(userText, uiContext) : undefined,
       })
-      if ("kind" in turn) return { content: "", sources: [] as ChatMessageSourceRef[] }
+      if ("kind" in turn) return { content: "", sources: [] as ChatMessageSourceRef[], attachmentsConsumed: false }
       const out = turn.answer.kind === "ready" ? turn.answer.value : undefined
       const sources = (out?.sources ?? []).map(mapRagSourceToChatSource)
       const guides = out?.guides
@@ -631,18 +643,18 @@ function ErpAiChatPanel({
       const recoveryPath = answerRecovery?.recoveryPath ?? draftRecovery?.recoveryPath
       const content = parts.join("\n\n")
       void persistExchange({
-        userText, assistantText: content, sources, uiContext, guides,
+        userText, attachmentNames, assistantText: content, sources, uiContext, guides,
         durationMs: Math.round(performance.now() - started), model: out?.model ?? null,
         actions: actions.length ? actions : undefined, runId: out?.run_id, recoveryPath,
       })
-      return { content, runId: out?.run_id, sources, guides, recoveryPath, importTasks: taskStatuses, actions: actions.length ? actions : undefined }
+      return { content, attachmentsConsumed: turn.answer.kind === "ready", runId: out?.run_id, sources, guides, recoveryPath, importTasks: taskStatuses, actions: actions.length ? actions : undefined }
     },
     [orgId, orgReady, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, historyScope, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft],
   )
-  const onSendMessage = useCallback((text: string, guideRefs?: GuideReference[], questionGuide?: GuideDraft, hasUnsavedGuideEdits = false) => runTurn(text, false, guideRefs, questionGuide, hasUnsavedGuideEdits), [runTurn])
+  const onSendMessage = useCallback((text: string, files?: readonly File[]) => runTurn(text, false, undefined, undefined, false, files), [runTurn])
   const onStreamMessage = useCallback<NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>>(
-    async (text, handlers) => {
-      const reply = await runTurn(text, true)
+    async (text, handlers, files) => {
+      const reply = await runTurn(text, true, undefined, undefined, false, files)
       handlers.onDelta(reply.content)
       handlers.onSources(reply.sources)
       if (reply.actions) handlers.onActions?.(reply.actions)
@@ -677,10 +689,10 @@ function ErpAiChatPanel({
       references = [{ guideId: guide.guideId, revision: guide.revision }]
     }
     if (draftOverride) currentGuide = guideQuestionEdits(currentGuide, draftOverride)
-    const reply = await onSendMessage(question, references, currentGuide, Boolean(draftOverride))
+    const reply = await runTurn(question, false, references, currentGuide, Boolean(draftOverride))
     if (activeScope.current !== scope) throw new Error("The company changed while answering. Reopen the guide in the current company.")
     return reply.content
-  }, [onSendMessage, operatingCompanyId, actorHistoryScope, sessionKey])
+  }, [runTurn, operatingCompanyId, actorHistoryScope, sessionKey])
 
   useEffect(() => guideConversation.register(askAboutGuide), [guideConversation.register, askAboutGuide])
 
@@ -710,6 +722,7 @@ function ErpAiChatPanel({
       onAgentChange={setSelectedAgent}
       onSendMessage={onSendMessage}
       onStreamMessage={onStreamMessage}
+      enableChatAttachments
       onImportFiles={importTasks.onImportFiles}
       importFileNames={importTasks.fileNames}
       showWorkbench={!firstOrgProfile && permissionsReady && checkPermission("dashboard:analytics", "read").allowed}

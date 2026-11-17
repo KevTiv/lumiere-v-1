@@ -26,6 +26,103 @@ import { AIChatPanel } from "./ai-chat-panel"
 afterEach(cleanup)
 
 describe("AI chat workspace", () => {
+  it("stages text separately from imports, sends it with a question, and shows filenames in history", async () => {
+    const onSendMessage = vi.fn(async () => ({ content: "According to counts.txt, there are 42 eggs." }))
+    const onImportFiles = vi.fn()
+    const files = [new File(["42 eggs"], "counts.txt"), new File(["notes"], "notes.md")]
+    render(<AIChatPanel open onClose={vi.fn()} enableChatAttachments config={{ enableFileUpload: true }}
+      onImportFiles={onImportFiles} onSendMessage={onSendMessage} />)
+    fireEvent.click(screen.getByRole("button", { name: /^aiChat\.workspace\.files/ }))
+    const chooser = screen.getByTestId("erp-ai-chat-context-file-input") as HTMLInputElement
+    fireEvent.change(chooser, { target: { files } })
+    expect(chooser.value).toBe("")
+    expect(onSendMessage).not.toHaveBeenCalled()
+    expect(onImportFiles).not.toHaveBeenCalled()
+    // Reaching the limit does not disable removal.
+    fireEvent.change(chooser, { target: { files: [new File(["x"], "third.tsv")] } })
+    fireEvent.click(screen.getAllByRole("button", { name: "aiChat.attachments.remove" })[2]!)
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "Summarize these files" } })
+    fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
+    await waitFor(() => expect(onSendMessage).toHaveBeenCalledExactlyOnceWith("Summarize these files", files))
+    await screen.findByText("According to counts.txt, there are 42 eggs.")
+    expect(screen.queryByRole("button", { name: "aiChat.attachments.remove" })).toBeNull()
+    expect(screen.getByTestId("erp-ai-chat-message-user").textContent).toContain("counts.txt")
+    expect(onImportFiles).not.toHaveBeenCalled()
+  })
+
+  it("passes staged text files to the streaming transport without falling back", async () => {
+    const onStreamMessage = vi.fn(async () => ({ content: "File summarized." }))
+    const onSendMessage = vi.fn()
+    const files = [new File(["notes"], "notes.txt")]
+    render(<AIChatPanel open onClose={vi.fn()} enableChatAttachments onStreamMessage={onStreamMessage} onSendMessage={onSendMessage} />)
+    fireEvent.click(screen.getByRole("button", { name: /^aiChat\.workspace\.files/ }))
+    fireEvent.change(screen.getByTestId("erp-ai-chat-context-file-input"), { target: { files } })
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "Summarize" } })
+    fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
+    await waitFor(() => expect(onStreamMessage).toHaveBeenCalledExactlyOnceWith("Summarize", expect.any(Object), files))
+    await screen.findByText("File summarized.")
+    expect(onSendMessage).not.toHaveBeenCalled()
+  })
+
+  it("keeps attachments and the question on read, transport or reported answer failure", async () => {
+    for (const reply of [
+      async () => { throw new Error("Cannot read notes.txt") },
+      async () => ({ content: "Service unavailable", attachmentsConsumed: false }),
+    ]) {
+      const onSendMessage = vi.fn(reply)
+      render(<AIChatPanel open onClose={vi.fn()} enableChatAttachments onSendMessage={onSendMessage} />)
+      fireEvent.click(screen.getByRole("button", { name: /^aiChat\.workspace\.files/ }))
+      const files = [new File(["notes"], "notes.txt")]
+      fireEvent.change(screen.getByTestId("erp-ai-chat-context-file-input"), { target: { files } })
+      fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "Summarize" } })
+      fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
+      await waitFor(() => expect(onSendMessage).toHaveBeenCalledOnce())
+      await waitFor(() => expect((screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value).toBe("Summarize"))
+      expect(screen.getByRole("button", { name: "aiChat.attachments.remove" })).toBeTruthy()
+      expect(onSendMessage).toHaveBeenCalledOnce()
+      cleanup()
+    }
+  })
+
+  it("rejects unsupported, oversized, empty and excessive context files without sending or importing", () => {
+    const send = vi.fn(), imports = vi.fn()
+    render(<AIChatPanel open onClose={vi.fn()} enableChatAttachments onSendMessage={send} onImportFiles={imports} />)
+    fireEvent.click(screen.getByRole("button", { name: /^aiChat\.workspace\.files/ }))
+    for (const files of [
+      [new File(["pdf"], "bad.pdf")],
+      [new File(["x".repeat(4097)], "big.txt")],
+      [new File([], "empty.txt")],
+      Array.from({ length: 4 }, () => new File(["notes"], "notes.txt")),
+    ]) {
+      fireEvent.change(screen.getByTestId("erp-ai-chat-context-file-input"), { target: { files } })
+      expect(screen.getByRole("alert").textContent).toBe("aiChat.attachments.invalid")
+      expect(screen.queryByRole("button", { name: "aiChat.attachments.remove" })).toBeNull()
+    }
+    expect(send).not.toHaveBeenCalled()
+    expect(imports).not.toHaveBeenCalled()
+  })
+
+  it("clears staged text and validation errors when the actor or company changes", () => {
+    const props = { open: true, onClose: vi.fn(), enableChatAttachments: true, onSendMessage: vi.fn() }
+    const view = render(<AIChatPanel {...props} context={{ companyId: 7 }} importScopeKey="actor-a" />)
+    fireEvent.click(screen.getByRole("button", { name: /^aiChat\.workspace\.files/ }))
+    fireEvent.change(screen.getByTestId("erp-ai-chat-context-file-input"), { target: { files: [new File(["private"], "private.txt")] } })
+    expect(screen.getByRole("button", { name: "aiChat.attachments.remove" })).toBeTruthy()
+    view.rerender(<AIChatPanel {...props} context={{ companyId: 8 }} importScopeKey="actor-b" />)
+    expect(screen.queryByText("private.txt")).toBeNull()
+    expect(screen.queryByRole("button", { name: "aiChat.attachments.remove" })).toBeNull()
+    expect(props.onSendMessage).not.toHaveBeenCalled()
+  })
+
+  it("restores attachment display names from saved messages without staging them for resend", () => {
+    render(<AIChatPanel open onClose={vi.fn()} enableChatAttachments initialMessages={[
+      { id: "saved", role: "user", content: "Summarize", timestamp: new Date(), attachmentNames: ["saved.txt"] },
+    ]} />)
+    expect(screen.getByTestId("erp-ai-chat-message-user").textContent).toContain("saved.txt")
+    fireEvent.click(screen.getByRole("button", { name: /^aiChat\.workspace\.files/ }))
+    expect(screen.queryByRole("button", { name: "aiChat.attachments.remove" })).toBeNull()
+  })
+
   it("keeps the shell composer mounted when a dock becomes a modal", async () => {
     const host = document.createElement("div")
     document.body.append(host)

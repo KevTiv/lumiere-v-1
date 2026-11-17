@@ -53,6 +53,8 @@ export interface ChatMessage {
   guides?: GuideReference[]
   /** Fresh, deterministic server status cards; never restored as current from chat text. */
   importTasks?: ChatImportTaskStatus[]
+  /** Display names only; attachment contents are scoped to the submitted turn. */
+  attachmentNames?: string[]
   metadata?: {
     model?: string
     tokens?: number

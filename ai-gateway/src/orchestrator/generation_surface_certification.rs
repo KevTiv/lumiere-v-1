@@ -70,6 +70,10 @@ const RELEASE_HELPERS: &[(&str, &[u8])] = &[
     ("audit.rs", include_bytes!("../harness/audit.rs")),
     ("rag_context.rs", include_bytes!("../routes/rag_context.rs")),
     (
+        "rag_attachments.rs",
+        include_bytes!("../routes/rag_attachments.rs"),
+    ),
+    (
         "rag_spreadsheet.rs",
         include_bytes!("../routes/rag_spreadsheet.rs"),
     ),
@@ -953,6 +957,7 @@ mod tests {
     fn inventory_covers_release_children_and_local_authority_implementations() {
         for required in [
             "rag_context.rs",
+            "rag_attachments.rs",
             "rag_spreadsheet.rs",
             "rag_import_tasks.rs",
             "evidence.rs",

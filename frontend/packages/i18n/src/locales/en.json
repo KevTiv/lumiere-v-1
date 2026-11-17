@@ -13756,6 +13756,12 @@
     }
   },
   "aiChat": {
+    "attachments": {
+      "choose": "Attach text to this question",
+      "help": "Up to 3 UTF-8 text files (.txt, .md, .csv, .tsv, .json), 4 KB each. Sent with your next question as user-provided context, not imported ERP records. History keeps filenames only.",
+      "remove": "Remove {{name}}",
+      "invalid": "Choose up to 3 non-empty text files (.txt, .md, .csv, .tsv, .json), up to 4 KB each."
+    },
     "workspace": {
       "context": "Workspace context",
       "modules": "Modules",

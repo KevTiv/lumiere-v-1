@@ -7,6 +7,7 @@ import { z } from "zod"
 
 import type { QueryResourceState } from "@lumiere/api-client"
 import * as uiContext from "@lumiere/erp-shared/ai-ui-context"
+import * as chatAttachments from "@lumiere/erp-shared/ai-chat-attachments"
 import * as assistantActions from "@lumiere/query-hooks/assistant-actions"
 import type { ApiSession } from "@/lib/api-session"
 import * as agentSelection from "../rag/agent-selection"
@@ -242,6 +243,7 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
       "next/server": { NextResponse: Response },
       zod: { z },
       "@lumiere/erp-shared/ai-ui-context": uiContext,
+      "@lumiere/erp-shared/ai-chat-attachments": chatAttachments,
       "./route-helpers": {
         positiveInteger,
         boundedInteger: () => 20,
@@ -265,6 +267,7 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
   )
   const body = {
     query: "Show sales trends and add a chart",
+    attachments: [{ name: "notes.txt", text: "User-supplied observations", org_id: 999 }],
     company_id: 12,
     org_id: 99,
     import_task_refs: [
@@ -294,6 +297,13 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
   if (!result.ok) throw new Error("Expected a prepared RAG request")
   assert.equal(result.payload.org_id, 7)
   assert.equal(result.payload.company_id, 12)
+  assert.deepEqual(plain(result.payload.attachments), [{ name: "notes.txt", text: "User-supplied observations" }])
+  for (const attachments of [null, {}, [{ name: "a.pdf", text: "text" }], [{ name: "a.txt", text: "é".repeat(2049) }], Array(4).fill({ name: "a.txt", text: "text" })]) {
+    const invalid = await request.prepareRagPayload({ body: { ...body, attachments }, session, orgId: 7 })
+    assert.equal(invalid.ok, false)
+    if (invalid.ok) throw new Error("Expected attachment validation failure")
+    assert.equal(invalid.response.status, 400)
+  }
   assert.deepEqual(plain(result.payload.import_task_refs), [
     { taskId: "b".repeat(32), companyId: "12" },
   ])
@@ -348,6 +358,7 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
   }
   const spreadsheetBody = {
     ...body,
+    attachments: undefined,
     query: "Check the selected spreadsheet cells for issues.",
     spreadsheet_selection: spreadsheetSelection,
   }
@@ -367,6 +378,7 @@ test("shared JSON and SSE preparation preserves scoped import selectors and auth
   assert.equal(requests.length, 1)
 
   for (const badBody of [
+    { ...spreadsheetBody, attachments: body.attachments },
     { ...spreadsheetBody, query: "Create a product." },
     {
       ...spreadsheetBody,

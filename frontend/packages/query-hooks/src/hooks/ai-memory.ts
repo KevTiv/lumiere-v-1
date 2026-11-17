@@ -316,6 +316,7 @@ export function useAiMemoryRag() {
       ui_context?: AiUiContext
       guide_refs?: AiGuideReference[]
       import_task_refs?: AiImportTaskReference[]
+      attachments?: import("@lumiere/erp-shared/ai-chat-attachments").AiChatAttachment[]
       spreadsheet_selection?: AiSpreadsheetSelectionReference
     }) => {
       const r = await apiFetch("/api/ai/rag", {
@@ -330,6 +331,7 @@ export function useAiMemoryRag() {
           ...(args.ui_context ? { ui_context: args.ui_context } : {}),
           ...(args.guide_refs?.length ? { guide_refs: args.guide_refs } : {}),
           ...(args.import_task_refs?.length ? { import_task_refs: args.import_task_refs } : {}),
+          ...(args.attachments?.length ? { attachments: args.attachments } : {}),
           ...(args.spreadsheet_selection ? { spreadsheet_selection: args.spreadsheet_selection } : {}),
         }),
       })

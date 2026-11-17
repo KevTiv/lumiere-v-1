@@ -9,6 +9,7 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   useAppendAiChatMessage,
   useCreateAiChatSession,
+  useAiMemoryRag,
 } from "./ai-memory"
 
 type CreateSessionInput = Parameters<
@@ -34,7 +35,7 @@ function fixture() {
     "../http": {
       apiFetch: async (path: string, init: RequestInit) => {
         requests.push({ path, body: JSON.parse(String(init.body)) })
-        return new Response(null, { status: 200 })
+        return Response.json({ answer: "According to the supplied file: notes.", sources: [] })
       },
     },
   }
@@ -57,6 +58,7 @@ function fixture() {
         organizationId: number,
         companyId: number | null,
       ): Mutation<AppendMessageInput>
+      useAiMemoryRag(): Mutation<Parameters<ReturnType<typeof useAiMemoryRag>["mutateAsync"]>[0]>
     },
   }
   runInNewContext(compiled, {
@@ -74,8 +76,19 @@ function fixture() {
     requests,
     create: module.exports.useCreateAiChatSession(7, 42).mutationFn,
     append: module.exports.useAppendAiChatMessage(7, 42).mutationFn,
+    rag: module.exports.useAiMemoryRag().mutationFn,
   }
 }
+
+test("JSON chat forwards text attachments separately from the question and ERP scope", async () => {
+  const f = fixture()
+  const attachments = [{ name: "notes.txt", text: "notes" }]
+  await f.rag({ query: "Summarize the file", companyId: 42, attachments })
+  assert.deepEqual(f.requests, [{
+    path: "/api/ai/rag",
+    body: { query: "Summarize the file", companyId: 42, attachments },
+  }])
+})
 
 test("chat creation sends present context as SATS options through the immutable operation", async () => {
   const f = fixture()
