@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
+import { Sparkles } from "lucide-react";
 import { useErpSession } from "@lumiere/erp-session";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "@lumiere/i18n";
+import { buildEntitySelection } from "@lumiere/query-hooks/ai-ui-context";
 import {
   ModuleView,
   fleetVehiclesTableConfig,
@@ -17,6 +19,7 @@ import { mergeModuleStates } from "@lumiere/ui/lib/module-data-state";
 import { fleetModuleConfig } from "@/lib/module-dashboard-configs";
 import { useFleetModuleSubscription } from "@/lib/module-subscription-hooks";
 import { hasValidOrganizationId } from "@/lib/org-scoped";
+import { useOpenErpAiChat } from "@/lib/erp-ai-context";
 import {
   accountAccountRowsToSelectOptions,
   accountJournalRowsToSelectOptions,
@@ -41,6 +44,7 @@ function FleetClientLoaded({
   const { t } = useTranslation();
   const { checkPermission, permissionsReady } = useRBAC();
   const searchParams = useSearchParams();
+  const openErpAiChat = useOpenErpAiChat();
   useFleetModuleSubscription();
   const workspace = useFleetWorkspace(organizationId, initialVehicles);
   const fleetActions = useFleetActions(
@@ -78,6 +82,32 @@ function FleetClientLoaded({
     return {
       ...base,
       tabs: base.tabs.map((tab) => {
+        const historyEntity =
+          tab.id === "fleet-service-records" ? "fleet_service_record" :
+          tab.id === "fleet-inspections" ? "fleet_inspection" : undefined;
+        const entityConfig = tab.entityConfig;
+        if (historyEntity && entityConfig?.view.mode === "table") {
+          tab = {
+            ...tab,
+            entityConfig: {
+              ...entityConfig,
+              view: {
+                ...entityConfig.view,
+                rowActions: [
+                  ...entityConfig.view.rowActions ?? [],
+                  {
+                    id: "ask-about-record",
+                    label: t("aiChat.workspace.askAboutRecord", { defaultValue: "Ask Lumière" }),
+                    icon: Sparkles,
+                    onClick: (row) => openErpAiChat({
+                      selection: buildEntitySelection({ activeTab: tab.id, entityType: historyEntity, row }),
+                    }),
+                  },
+                ],
+              },
+            },
+          };
+        }
         const formReady =
           tab.id === "fleet-vehicles"
             ? workspace.states.vehicles.status === "ready"
@@ -156,6 +186,7 @@ function FleetClientLoaded({
     workspace.serviceReady,
     workspace.inspectionReady,
     workspace.scopeState.status,
+    openErpAiChat,
   ]);
 
   if (workspace.scopeState.status !== "ready")

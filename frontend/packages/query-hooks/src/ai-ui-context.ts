@@ -30,6 +30,7 @@ export type AiEntitySelection = {
   entityType: string
   entityId?: string
   selectionSummary?: string
+  explicit?: true
 }
 
 /** Map default @ data commands to known SearchEmbedding content_type values only. */
@@ -83,6 +84,7 @@ export function buildAiUiContext(args: {
     atCommands: args.atCommands,
     entityType: args.selection?.entityType,
     entityId: args.selection?.entityId,
+    explicitRecord: args.selection?.explicit,
     selectionSummary: args.selection?.selectionSummary,
   })
 }

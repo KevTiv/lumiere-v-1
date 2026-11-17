@@ -5,26 +5,27 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { accountMoveDetailHref, accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { decodeAccountMovesQueryResponse } from "@lumiere/stdb/resource-reads"
 
 import { GeneralLedgerView } from "./general-ledger-view"
 
-const search = vi.hoisted(() => ({ params: null as URLSearchParams | null }))
-vi.mock("next/navigation", () => ({ useSearchParams: () => search.params }))
+const search = vi.hoisted(() => ({ params: null as URLSearchParams | null, replace: vi.fn() }))
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/accounting",
+  useRouter: () => ({ replace: search.replace }),
+  useSearchParams: () => search.params,
+}))
 
 vi.mock("@lumiere/i18n", () => ({
   useTranslation: () => ({
     t: (key: string, options?: { defaultValue?: string; id?: string }) =>
       options?.defaultValue?.replace("{{id}}", options.id ?? "") ?? key,
   }),
-}))
-
-vi.mock("../lib/module-url-filters", () => ({
-  useModuleUrlFilters: () => ({}),
-  useClearModuleUrlFilter: () => vi.fn(),
 }))
 
 vi.mock("../lib/currency-context", () => ({
@@ -36,10 +37,52 @@ vi.mock("../lib/currency-context", () => ({
 
 afterEach(() => {
   search.params = null
+  search.replace.mockClear()
   cleanup()
 })
 
 describe("GeneralLedgerView accounting migration actions", () => {
+  it("opens the exact cited entry and passes it to Assistant once", async () => {
+    const move = { id: 7n, companyId: 3n, name: "Posted purchase", state: "Posted", moveType: "Entry" }
+    const onAskAboutMove = vi.fn()
+    search.params = new URL(accountMoveDetailHref(move.id), "https://lumiere.test").searchParams
+
+    render(
+      <GeneralLedgerView
+        moves={[move, { ...move, id: 8n, name: "Another entry" }]}
+        onAskAboutMove={onAskAboutMove}
+      />,
+    )
+
+    const entry = await screen.findByRole("dialog", { name: move.name })
+    expect(onAskAboutMove).not.toHaveBeenCalled()
+    fireEvent.click(within(entry).getByRole("button", { name: "Ask Lumière" }))
+    expect(onAskAboutMove).toHaveBeenCalledExactlyOnceWith(move)
+    expect(search.replace).toHaveBeenCalledWith(accountMoveHref(move.id), { scroll: false })
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+    expect(screen.queryByText("Another entry")).toBeNull()
+  })
+
+  it("does not open another loaded entry when the citation is unavailable", () => {
+    search.params = new URL(accountMoveDetailHref(42), "https://lumiere.test").searchParams
+    render(
+      <GeneralLedgerView
+        moves={[{ id: 7, companyId: 3, name: "Another entry", state: "Posted", moveType: "Entry" }]}
+      />,
+    )
+
+    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(screen.queryByText("Another entry")).toBeNull()
+  })
+
+  it("leaves an ordinary filter link on the journal list", () => {
+    search.params = new URL(accountMoveHref(7), "https://lumiere.test").searchParams
+    render(<GeneralLedgerView moves={[{ id: 7, companyId: 3, name: "Posted entry", state: "Posted", moveType: "Entry" }]} />)
+
+    expect(screen.getByRole("button", { name: "Posted entry" })).toBeTruthy()
+    expect(screen.queryByRole("dialog")).toBeNull()
+  })
+
   it("shows only the authorized-company journal rows in an import batch link", () => {
     search.params = new URLSearchParams(
       "importEntryCompany=3&importEntryIds=7,8",

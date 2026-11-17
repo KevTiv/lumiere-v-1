@@ -17,6 +17,10 @@ pub(super) fn app(state: Arc<AppState>, cors: CorsLayer) -> Router {
             "/authoritative/:resource/:id",
             get(queries::get_authoritative_resource),
         )
+        .route(
+            "/authoritative-search/:resource",
+            get(queries::get_authoritative_search),
+        )
         .route("/operations/:operation", post(operations::post_operation))
         .route(
             "/compat/reducer/:reducer",

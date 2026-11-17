@@ -224,8 +224,25 @@ they expire.
 The check runs against the public chat streaming route after edge cutover. It
 requires a completed provider response, healthy retrieval, the expected fact and
 persisted claim support from the expected document version in both companies.
-It makes one chat attempt per fixture and prints only outcome labels. The same
-check can be run from the configured environment with `node scripts/verify-grounded-chat.mjs`.
+It makes one chat attempt per configured case and prints only outcome labels.
+Run the check from the configured environment with
+`node scripts/verify-grounded-chat.mjs`.
+
+Add a `journal` object to the same secret to verify a posted journal entry
+through live Accounting chat. Supply `companyId`, `cookie`, `accountMoveId` as
+a decimal string, `question`, `expectedAmountText`, and `expectedDebitText`.
+Use a dedicated test company's posted entry with a stable reference and a
+known debit account. Match the amount and debit wording to the requested
+format in the question, such as `RWF 600` and
+`Debit account: Test electricity expense`. The check requires a current
+source for that exact entry and verified support for both facts.
+
+The optional `journal.ambiguous` case takes a `question` matching multiple
+test entries and `expectedClarificationText`. The optional `journal.foreign`
+case takes an inaccessible `accountMoveId`, a `question` about the selected
+entry, and a synthetic `forbiddenText` marker from that entry. Both cases use
+the journal fixture's signed-in company and check that the assistant
+withholds generation and evidence.
 
 ## Document and activity flows
 

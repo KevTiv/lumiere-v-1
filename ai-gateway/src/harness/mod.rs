@@ -18,6 +18,7 @@ pub mod manifest;
 pub mod named_read_run;
 pub mod policy_engine;
 pub mod privacy_guard;
+pub mod record_lookup;
 pub mod red_action_drafts;
 pub mod release_registry;
 pub mod report_composer;

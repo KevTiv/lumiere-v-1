@@ -67,7 +67,7 @@ pub struct EntityRef {
     pub priority: f32,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct RelationSnapshot {
     pub relation_key: String,
     pub rows: Vec<Value>,
@@ -213,23 +213,26 @@ pub async fn fetch_authorized_live_snapshots(
             "{api_base}/v1/authoritative/{}/{}",
             spec.api_resource, candidate.entity_id
         );
-        let response = state
+        let request = state
             .http
             .get(url)
             .bearer_auth(actor.stdb_token.trim())
             .header("x-stdb-identity", actor.identity_hex.trim())
-            .query(&[("companyId", company_id)])
-            .send()
-            .await
-            .map_err(|error| {
-                tracing::warn!(
-                    entity_type = spec.entity_type,
-                    entity_id = candidate.entity_id,
-                    error = %error,
-                    "Authoritative resolver request failed"
-                );
-                resolver_unavailable_error()
-            })?;
+            .query(&[("companyId", company_id)]);
+        let request = if spec.relations.is_empty() && spec.derived_prompt_fields.is_empty() {
+            request
+        } else {
+            request.query(&[("includeRelations", true)])
+        };
+        let response = request.send().await.map_err(|error| {
+            tracing::warn!(
+                entity_type = spec.entity_type,
+                entity_id = candidate.entity_id,
+                error = %error,
+                "Authoritative resolver request failed"
+            );
+            resolver_unavailable_error()
+        })?;
 
         if resolver_status_hides_candidate(response.status()) {
             continue;
@@ -284,14 +287,111 @@ pub async fn fetch_authorized_live_snapshots(
             entity_id: candidate.entity_id,
             label: format_snapshot_label(spec.label_template, candidate.entity_id),
             snapshot_at: snapshot_at.clone(),
-            row: filter_prompt_fields(row, spec.prompt_fields),
-            // Relation policies are resource-specific; omit them until each relation
-            // has an actor-authorized resolver contract.
-            relations: Vec::new(),
+            row: filter_prompt_fields(
+                row,
+                spec.prompt_fields.iter().chain(spec.derived_prompt_fields),
+            ),
+            relations: project_authorized_relations(
+                spec,
+                envelope.get("relations"),
+                org_id,
+                company_id,
+                candidate.entity_id,
+            )?,
         });
     }
 
     Ok(snapshots)
+}
+
+fn project_authorized_relations(
+    spec: &EntitySnapshotSpec,
+    relations: Option<&Value>,
+    org_id: u64,
+    company_id: u64,
+    parent_id: u64,
+) -> Result<Vec<RelationSnapshot>> {
+    let Some(relations) = relations else {
+        return Ok(Vec::new());
+    };
+    let relations = relations
+        .as_object()
+        .ok_or_else(resolver_unavailable_error)?;
+    let mut snapshots = Vec::new();
+    for relation in spec.relations {
+        let Some(rows) = relations.get(relation.relation_key) else {
+            continue;
+        };
+        let rows = rows.as_array().ok_or_else(resolver_unavailable_error)?;
+        if rows.len() > relation.limit {
+            return Err(resolver_unavailable_error());
+        }
+        let mut projected = Vec::with_capacity(rows.len());
+        for row in rows {
+            let field_id = |field: &str| {
+                let camel = snake_to_camel(field);
+                json_u64(row.get(field).or_else(|| row.get(&camel)))
+            };
+            let Some(id) = field_id("id").filter(|id| *id > 0) else {
+                return Err(resolver_unavailable_error());
+            };
+            if !row.is_object()
+                || field_id(relation.foreign_key) != Some(parent_id)
+                || relation
+                    .org_column
+                    .is_some_and(|field| field_id(field) != Some(org_id))
+                || !row_matches_relation_scope(relation, row, org_id, company_id)
+            {
+                return Err(resolver_unavailable_error());
+            }
+            let fields = relation
+                .prompt_fields
+                .iter()
+                .chain(relation.derived_prompt_fields);
+            projected.push((id, filter_prompt_fields(row, fields)));
+        }
+        projected.sort_unstable_by_key(|(id, _)| *id);
+        if projected.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+            return Err(resolver_unavailable_error());
+        }
+        snapshots.push(RelationSnapshot {
+            relation_key: relation.relation_key.to_string(),
+            rows: projected.into_iter().map(|(_, row)| row).collect(),
+        });
+    }
+    Ok(snapshots)
+}
+
+/// Confirm the actor still has the same authoritative evidence immediately before release.
+pub async fn recheck_live_snapshots(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org_id: u64,
+    company_id: u64,
+    snapshots: &[LiveSnapshot],
+) -> bool {
+    if snapshots.is_empty() {
+        return true;
+    }
+    let candidates: Vec<_> = snapshots
+        .iter()
+        .map(|snapshot| EntityRef {
+            entity_type: snapshot.entity_type.clone(),
+            entity_id: snapshot.entity_id,
+            priority: 1.0,
+        })
+        .collect();
+    fetch_authorized_live_snapshots(state, actor, org_id, company_id, &candidates)
+        .await
+        .is_ok_and(|current| {
+            current.len() == snapshots.len()
+                && current.iter().zip(snapshots).all(|(fresh, original)| {
+                    fresh.entity_type == original.entity_type
+                        && fresh.entity_id == original.entity_id
+                        && fresh.row == original.row
+                        && fresh.relations == original.relations
+                })
+        })
 }
 
 pub async fn fetch_live_snapshots(
@@ -468,8 +568,8 @@ fn row_matches_relation_scope(
             let col = relation.company_column.unwrap_or("company_id");
             let camel = snake_to_camel(col);
             match row.get(col).or_else(|| row.get(&camel)) {
-                None | Some(Value::Null) => true,
-                Some(value) => json_u64(Some(value)).is_none_or(|cid| cid == company_id),
+                None => true,
+                Some(value) => is_null_option(value) || json_u64(Some(value)) == Some(company_id),
             }
         }
     }
@@ -531,14 +631,14 @@ fn row_matches_scope(spec: &EntitySnapshotSpec, row: &Value, org_id: u64, compan
             let col = spec.company_column.unwrap_or("company_id");
             let camel = snake_to_camel(col);
             match row.get(col).or_else(|| row.get(&camel)) {
-                None | Some(Value::Null) => true,
-                Some(value) => json_u64(Some(value)).is_none_or(|cid| cid == company_id),
+                None => true,
+                Some(value) => is_null_option(value) || json_u64(Some(value)) == Some(company_id),
             }
         }
     }
 }
 
-fn filter_prompt_fields(row: &Value, fields: &[&str]) -> Value {
+fn filter_prompt_fields<'a>(row: &Value, fields: impl IntoIterator<Item = &'a &'a str>) -> Value {
     let Some(obj) = row.as_object() else {
         return row.clone();
     };
@@ -577,18 +677,28 @@ pub fn format_live_context_block(snapshots: &[LiveSnapshot]) -> String {
         .join("\n\n")
 }
 
-fn json_u64(value: Option<&Value>) -> Option<u64> {
+fn is_null_option(value: &Value) -> bool {
+    value.is_null()
+        || value.as_object().is_some_and(|object| {
+            object.len() == 1
+                && object
+                    .get("none")
+                    .is_some_and(|tag| tag.is_null() || tag.as_array().is_some_and(Vec::is_empty))
+        })
+}
+
+pub(crate) fn json_u64(value: Option<&Value>) -> Option<u64> {
     let value = value?;
-    if let Some(n) = value.as_u64() {
-        return Some(n);
-    }
-    if let Some(n) = value.as_i64() {
-        return (n >= 0).then_some(n as u64);
-    }
-    if let Some(s) = value.as_str() {
-        return s.parse().ok();
-    }
-    None
+    let value = match value
+        .as_object()
+        .filter(|object| object.len() == 1)
+        .and_then(|object| object.get("some"))
+    {
+        Some(Value::Array(values)) if values.len() == 1 => &values[0],
+        Some(value) => value,
+        None => value,
+    };
+    value.as_u64().or_else(|| value.as_str()?.parse().ok())
 }
 
 use crate::wire_decode::snake_to_camel;
@@ -627,6 +737,36 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn authoritative_relations_keep_only_scoped_allowlisted_facts() {
+        let spec = lookup_entity_spec("account_move").unwrap();
+        let envelope = json!({"lines": [
+            {"id": 8, "organizationId": 42, "companyId": 7, "moveId": 9, "debit": 0, "accountName": "Clearing", "secret": "ignored"},
+            {"id": 5, "organization_id": 42, "company_id": 7, "move_id": 9, "debit": 600, "account_name": "Electricity"},
+        ], "unknown": [{"secret": "ignored"}]});
+        let relations = project_authorized_relations(spec, Some(&envelope), 42, 7, 9).unwrap();
+        assert_eq!(relations.len(), 1);
+        assert_eq!(relations[0].rows[0]["accountName"], "Electricity");
+        assert_eq!(relations[0].rows[1]["accountName"], "Clearing");
+        assert!(relations[0].rows[1].get("secret").is_none());
+    }
+
+    #[test]
+    fn authoritative_relations_reject_wrong_parent_or_scope_and_decode_optional_keys() {
+        let spec = lookup_entity_spec("stock_picking").unwrap();
+        let mut envelope = json!({"moves": [{"id": 1, "organization_id": 42,
+            "company_id": {"some": 7}, "picking_id": {"some": [9]}}]});
+        assert!(project_authorized_relations(spec, Some(&envelope), 42, 7, 9).is_ok());
+        for (org, company, parent) in [(43, 7, 9), (42, 8, 9), (42, 7, 10)] {
+            assert!(
+                project_authorized_relations(spec, Some(&envelope), org, company, parent).is_err()
+            );
+        }
+        envelope["moves"][0]["company_id"] = json!({"some": [7, 8]});
+        assert!(project_authorized_relations(spec, Some(&envelope), 42, 7, 9).is_err());
+    }
 
     #[test]
     fn unauthorized_resolver_statuses_hide_candidates() {

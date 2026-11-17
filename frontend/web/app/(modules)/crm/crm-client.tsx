@@ -24,6 +24,7 @@ import { ContactRelationshipsPanel } from "./contact-relationships-panel"
 import { OpportunityPresenceBanner } from "./opportunity-presence-banner"
 import { CrmMyWorkPanel } from "./crm-my-work-panel"
 import { CrmRecordActions } from "./crm-record-actions"
+import { AskAboutRecordButton } from "@/components/ask-about-record-button"
 import { EntityRecordSheet } from "@lumiere/ui/entity-views/entity-record-sheet"
 import { crmWorkflowActions, crmLeadState, crmOpportunityClosed, crmOpportunityStatus, type CrmRecordKind, type CrmActionContext, type CrmActionId } from "./crm-workflow"
 import { useQuery } from "@tanstack/react-query"
@@ -1227,14 +1228,24 @@ function CrmClientLoaded({
   }, [recordActionContext, t, organizationId, updateLead, openConvertLeadModal, openChangeStageModal, markOpportunityWon,
     markOpportunityLost, openConvertOppModal, activityForm, openEditLeadDetailsModal, openEditOpportunityModal, openEditContactModal])
 
-  const renderRecordActions = useCallback((kind: CrmRecordKind, row: EntityRow) => (
-    <CrmRecordActions kind={kind} record={row} context={recordActionContext(kind)} onAction={(action, record) => handleRecordAction(kind, action, record)} />
-  ), [recordActionContext, handleRecordAction])
+  const renderRecordActions = useCallback((kind: CrmRecordKind, row: EntityRow, close: () => void) => {
+    const tab = kind === "opportunity" ? "opportunities" : `${kind}s`
+    return <>
+      <CrmRecordActions kind={kind} record={row} context={recordActionContext(kind)} onAction={(action, record) => handleRecordAction(kind, action, record)} />
+      <AskAboutRecordButton
+        entityType={kind}
+        recordId={row.id}
+        label={crmRowChatterLabel(tab, row)}
+        activeTab={tab}
+        closeRecord={close}
+      />
+    </>
+  }, [recordActionContext, handleRecordAction])
 
   const leadRecordSheet = useMemo(
     (): EntityRecordSheetConfig => ({
       titleKey: "contactName",
-      actions: (record) => renderRecordActions("lead", record),
+      actions: (record, close) => renderRecordActions("lead", record, close),
       statusKey: "state",
       statusBadgeVariants: {
         new: "secondary",
@@ -1292,7 +1303,7 @@ function CrmClientLoaded({
   const opportunityRecordSheet = useMemo(
     (): EntityRecordSheetConfig => ({
       titleKey: "name",
-      actions: (record) => renderRecordActions("opportunity", record),
+      actions: (record, close) => renderRecordActions("opportunity", record, close),
       statusKey: "workflowStatus",
       statusBadgeVariants: { open: "info", won: "success", lost: "destructive" },
       statusBadgeLabels: {
@@ -1329,7 +1340,7 @@ function CrmClientLoaded({
   const contactRecordSheet = useMemo(
     (): EntityRecordSheetConfig => ({
       titleKey: "name",
-      actions: (record) => renderRecordActions("contact", record),
+      actions: (record, close) => renderRecordActions("contact", record, close),
       detailConfig: contactDetailConfig(t),
       wide: true,
       auditTableName: "contact",

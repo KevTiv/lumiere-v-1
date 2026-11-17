@@ -1,4 +1,6 @@
 //! Reviewed sales, including daily shop sales, and physical counts have durable module records.
+pub(super) mod sales_summary;
+
 use std::{collections::BTreeMap, sync::Arc};
 
 use axum::{

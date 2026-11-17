@@ -518,7 +518,7 @@
     },
     {
       "path": "api-server/src/routes/farm_batches/mod.rs",
-      "sha256": "b1493982cdf755ef263bb2437956557339bba33ab9ea59b2a85fc05005adf317"
+      "sha256": "77d325a4ceabff02590175a5419412940d7e5b908aff299bca2fa82d60243b86"
     },
     {
       "path": "api-server/src/routes/farm_batches/native_links.rs",
@@ -542,7 +542,7 @@
     },
     {
       "path": "api-server/src/routes/import_reviews/mod.rs",
-      "sha256": "60bbbc87b7dcb1da1840422005f355293b9556aa7ab7b96b1ad0088f5e93db65"
+      "sha256": "a61990cf7547f437ad767380412550faab449e53cb0ab5c85f9b80ed6fca1873"
     },
     {
       "path": "api-server/src/routes/import_reviews/tasks.rs",
@@ -1719,7 +1719,7 @@
       "surface": "farm-batches",
       "source": "api-server/src/routes/farm_batches/mod.rs",
       "function": "create",
-      "line": 218,
+      "line": 240,
       "owner": "Farm Operations API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "scoped-farm-revision-or-exact-native-link-owner-review-required",
@@ -1732,7 +1732,7 @@
       "surface": "farm-batches",
       "source": "api-server/src/routes/farm_batches/mod.rs",
       "function": "append_event",
-      "line": 274,
+      "line": 296,
       "owner": "Farm Operations API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "scoped-farm-revision-or-exact-native-link-owner-review-required",
@@ -1745,7 +1745,7 @@
       "surface": "farm-batches",
       "source": "api-server/src/routes/farm_batches/mod.rs",
       "function": "revise_event",
-      "line": 299,
+      "line": 321,
       "owner": "Farm Operations API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "scoped-farm-revision-or-exact-native-link-owner-review-required",
@@ -1758,7 +1758,7 @@
       "surface": "farm-batches",
       "source": "api-server/src/routes/farm_batches/mod.rs",
       "function": "history",
-      "line": 325,
+      "line": 347,
       "owner": "Farm Operations API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "scoped-farm-revision-or-exact-native-link-owner-review-required",

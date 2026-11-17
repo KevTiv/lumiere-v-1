@@ -348,6 +348,7 @@ import {
 } from './cycle-count-wizard';
 import { buildEntitySelection } from '@lumiere/query-hooks/ai-ui-context';
 import { useOpenErpAiChat } from '@/lib/erp-ai-context';
+import { AskAboutRecordButton } from '@/components/ask-about-record-button';
 import type {
   Product,
   StockQuant,
@@ -1558,6 +1559,15 @@ function InventoryClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig: workspace === 'products' ? productCatalogDetail(productDetailConfig(t), t) : productDetailConfig(t),
       auditTableName: 'product',
+      actions: (record, close) => (
+        <AskAboutRecordButton
+          entityType="product"
+          recordId={record.id}
+          label={String(record.sheetTitle ?? '')}
+          activeTab="products"
+          closeRecord={close}
+        />
+      ),
       discussion: {},
       customTabs: [
         {
@@ -1585,12 +1595,30 @@ function InventoryClientLoaded({
     titleKey: 'sheetTitle',
     detailConfig: warehouseStockDetail(stockQuantDetailConfig(t), t),
     auditTableName: 'stock_quant',
+    actions: (record, close) => (
+      <AskAboutRecordButton
+        entityType="stock_quant"
+        recordId={record.id}
+        label={String(record.sheetTitle ?? '')}
+        activeTab="stock"
+        closeRecord={close}
+      />
+    ),
   }), [t]);
 
   const locationRecordSheet = useMemo((): EntityRecordSheetConfig => ({
     titleKey: 'name',
     detailConfig: stockLocationDetailConfig(t),
     auditTableName: 'stock_location',
+    actions: (record, close) => (
+      <AskAboutRecordButton
+        entityType="stock_location"
+        recordId={record.id}
+        label={String(record.name ?? '')}
+        activeTab="locations"
+        closeRecord={close}
+      />
+    ),
   }), [t]);
 
   const transferRecordSheet = useMemo((): EntityRecordSheetConfig => {
@@ -1654,6 +1682,15 @@ function InventoryClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig,
       auditTableName: 'stock_picking',
+      actions: (record, close) => (
+        <AskAboutRecordButton
+          entityType="stock_picking"
+          recordId={record.id}
+          label={String(record.sheetTitle ?? '')}
+          activeTab="transfers"
+          closeRecord={close}
+        />
+      ),
       discussion: {},
       openHref: transferRecordHref,
       customTabs: [

@@ -161,7 +161,7 @@ export function useOpenErpAiChat(): (options?: OpenErpAiChatOptions) => void {
 
   return useCallback(
     (options?: OpenErpAiChatOptions) => {
-      if (options?.selection != null) reporter?.setSelection(options.selection)
+      if (options?.selection != null) reporter?.setSelection({ ...options.selection, explicit: true })
       controller?.open()
     },
     [controller, reporter],
