@@ -113,7 +113,10 @@ test("import mappings do not invent original rows or review decisions", () => {
   const linked = parseBusinessHistorySourcesPage({ ...page(), data: [{ ...source(), review: workflow }] }, scope);
   assert.equal(linked.data[0]?.review?.taskRequestId, workflow.taskRequestId);
   assert.equal(linked.data[0]?.review?.source?.row, 7);
-  for (const invalid of [{ ...workflow, proposalDigest: undefined }, { ...workflow, source: { ...workflow.source, row: 0 } }, { ...workflow, taskRequestId: "https://example.test" }])
+  const worksheet = { ...workflow, source: { ...workflow.source, sheet: "Kicukiro" } };
+  const linkedSheet = parseBusinessHistorySourcesPage({ ...page(), data: [{ ...source(), review: worksheet }] }, scope);
+  assert.equal(linkedSheet.data[0]?.review?.source?.sheet, "Kicukiro");
+  for (const invalid of [{ ...workflow, proposalDigest: undefined }, { ...workflow, source: { ...workflow.source, row: 0 } }, { ...workflow, taskRequestId: "https://example.test" }, { ...workflow, source: { ...workflow.source, sheet: "" } }])
     assert.throws(() => parseBusinessHistorySourcesPage({ ...page(), data: [{ ...source(), review: invalid }] }, scope));
   for (const review of [{ batchId: "24", itemId: "700", revision: 0 }, { batchId: 24, itemId: "700", revision: 3 }])
     assert.throws(() => parseBusinessHistorySourcesPage({ ...page(), data: [{ ...source(), review }] }, scope));

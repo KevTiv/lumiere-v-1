@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  importCoverageSchema,
   importPreparationIdentity,
   importPreparationSchema,
   importRecipeSchema,
@@ -35,6 +36,55 @@ const preparation: ImportPreparation = {
     },
   ],
 }
+
+test("coverage preserves exact report differences and remains compatible with older receipts", () => {
+  const control = {
+    sectionKey: "shop-sales",
+    label: "Reported shop sales subtotal",
+    row: 1_048_575,
+    reportRow: 1_048_560,
+    reported: "1000.05",
+    computed: "1000.04",
+    difference: "0.01",
+    currency: "RWF",
+    missingLineValues: 1,
+  }
+  const file = {
+    fileName: "farm.xlsx",
+    sourceSha256: "a".repeat(64),
+    byteCount: 500,
+    status: "prepared",
+    worksheet: "Kicukiro",
+    recordCount: 0,
+    reviewRecords: 0,
+    blankRecords: 0,
+    headerRecords: 0,
+    records: [],
+    sections: [],
+    layoutSha256: null,
+    error: null,
+  }
+  const coverage = { version: 1, complete: true, reconciliation: [] }
+  assert.equal(
+    importCoverageSchema.parse({ ...coverage, files: [file] }).files[0]
+      .controls,
+    undefined,
+  )
+  assert.deepEqual(
+    importCoverageSchema.parse({
+      ...coverage,
+      files: [{ ...file, controls: [control] }],
+    }).files[0].controls,
+    [control],
+  )
+  assert.equal(
+    importCoverageSchema.safeParse({
+      ...coverage,
+      files: [{ ...file, controls: [{ ...control, difference: 0.01 }] }],
+    }).success,
+    false,
+  )
+})
 
 test("source-bound mixed-language rules remain explicit and cannot approve business facts", () => {
   assert.deepEqual(importPreparationSchema.parse(preparation), preparation)

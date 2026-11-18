@@ -298,12 +298,111 @@ class PreparationTests(unittest.TestCase):
         fields = {field["key"]: field for field in line["fields"]}
         self.assertEqual(fields["currency_code"]["sourceValue"], "Frw")
         self.assertEqual(fields["sale_amount"]["sourceValue"], "32,500")
+        self.assertEqual(fields["sale_amount"]["sourceColumn"], 12)
         self.assertFalse(fields["source_unit"]["required"])
         self.assertTrue(all(not field["export"] for field in fields.values()))
         self.assertIn("reported sales subtotal differs", line["issue"])
         self.assertNotIn("observation_kind", subtotal["proposed"])
         self.assertEqual(json.loads(subtotal["proposed"]["source_cells"]), rows[-1])
+        self.assertEqual(subtotal["proposed"]["sales_subtotal_difference"], "0.01")
+        self.assertEqual(result["coverage"]["files"][0]["controls"], [{
+            "sectionKey": "table-1", "label": "Reported shop sales subtotal", "row": 4, "reportRow": 1,
+            "reported": "32500.01", "computed": "32500", "difference": "0.01",
+            "currency": "RWF", "missingLineValues": 0,
+        }])
         self.assertEqual(result, self.prepare(selected))
+
+    def test_mixed_language_report_keeps_localized_headers_and_totals_as_source_evidence(self):
+        rows = daily_shop_report()
+        rows[1][1:3] = ["Igicuruzwa", "Stock initial"]
+        rows[1][9:12] = ["Ingano yagurishijwe", "Prix unitaire", "Amafaranga yose"]
+        rows[2][1] = "INKOKO   WHOLE"
+        rows[3][1] = "Igiteranyo"
+        result = self.prepare(csv_source("KIMIRONKO.csv", rows))
+        _, _, line, control = result["datasets"][0]["items"]
+        self.assertEqual(line["proposed"]["observation_kind"], "historical_shop_sale")
+        self.assertEqual(line["proposed"]["product_label"], "INKOKO WHOLE")
+        product = next(value for value in line["fields"] if value["key"] == "product_label")
+        self.assertEqual(product["sourceValue"], "INKOKO   WHOLE")
+        self.assertEqual(product["sourceColumn"], 2)
+        self.assertEqual(control["proposed"]["reported_sales_subtotal"], "32500.01")
+        self.assertNotIn("sale_amount", control["proposed"])
+
+    def test_duplicate_sales_columns_and_conflicting_currency_do_not_propose_sales(self):
+        cases = (("duplicate", "ambiguous or duplicated"), ("currency", "conflicting currency"))
+        for ambiguous, explanation in cases:
+            with self.subTest(ambiguous=ambiguous):
+                rows = daily_shop_report()
+                if ambiguous == "duplicate":
+                    rows[1].append("Sale amount")
+                    rows[2].append("32500")
+                else:
+                    rows[1][-1] = "Montant USD"
+                result = self.prepare(csv_source("KIMIRONKO.csv", rows))
+                line = result["datasets"][0]["items"][2]
+                self.assertNotIn("observation_kind", line["proposed"])
+                self.assertIn(explanation, line["issue"])
+                self.assertNotIn("controls", result["coverage"]["files"][0])
+
+    def test_reviewed_sales_section_uses_exact_locale_and_preserves_stable_reference(self):
+        headers = ["Boutique", "Itariki", "Produit", "Ingano yagurishijwe", "Prix unitaire",
+                   "Amafaranga yose", "Devise", "Issuer", "Ligne POS"]
+        rows = [
+            headers,
+            ["Kimironko", "12/4/2024", "INKOKO", "2", "1 000,25", "2 000,50", "Frw", "caisse-a", "00007"],
+            ["Kimironko", "12/4/2024", "CHICKEN", "2", "1", "3", "RWF", "caisse-a", "00008"],
+            ["Igiteranyo", "", "", "", "", "2 010", "", "", ""],
+        ]
+        upload = csv_source("mixed.csv", rows)
+        digest = hashlib.sha256(base64.b64decode(upload["contentBase64"])).hexdigest()
+        options = {"fileName": "mixed.csv", "sourceSha256": digest, "dateOrder": "dmy",
+                   "decimalSeparator": ",", "groupingSeparator": " ", "sections": [{
+                       "key": "sales", "targetEntity": "source_observation",
+                       "headerRecord": 1, "firstRecord": 2, "lastRecord": 4,
+                       "expectedHeaders": headers,
+                       "headerMap": dict(zip(headers, ["shop", "sale_date", "product_label", "sold_quantity",
+                                                       "sale_unit_price", "sale_amount", "currency_code",
+                                                       "sale_line_issuer", "sale_line_reference"])),
+                   }]}
+        result = module.prepare({"mode": "prepare_import", "files": [upload],
+                                 "preparation": {"version": 1, "files": [options]}})
+        first, conflicting = result["datasets"][0]["items"]
+        self.assertEqual(first["businessDate"]["from"], "2024-04-12")
+        self.assertEqual(first["proposed"]["currency_code"], "RWF")
+        self.assertEqual(first["proposed"]["sale_amount"], "2000.5")
+        self.assertEqual(first["proposed"]["sale_line_reference"], "00007")
+        reference = next(field for field in first["fields"] if field["key"] == "sale_line_reference")
+        self.assertEqual(reference["sourceValue"], "00007")
+        self.assertEqual(reference["sourceColumn"], 9)
+        self.assertIsNone(conflicting["proposed"]["sale_amount"])
+        self.assertIn("Reconcile positive quantity", conflicting["issue"])
+        self.assertEqual(result["coverage"]["files"][0]["controls"], [{
+            "sectionKey": "sales", "label": "Reported shop sales subtotal", "row": 4,
+            "reported": "2010", "computed": "2003.5", "difference": "6.5",
+            "currency": "RWF", "missingLineValues": 0,
+        }])
+        control = result["datasets"][1]["items"][0]
+        self.assertNotIn("sale_amount", control["proposed"])
+        self.assertEqual(control["proposed"]["reported_sales_subtotal"], "2010")
+
+    def test_managed_selection_preserves_actual_workbook_scope_in_source_reference(self):
+        cells = '<row r="7"><c r="B7" t="inlineStr"><is><t>Evidence</t></is></c></row>'
+        for count in (1, 2):
+            with self.subTest(count=count):
+                data = workbook(cells, sheet_count=count)
+                upload = source("qualified.xlsx", data)
+                digest = hashlib.sha256(data).hexdigest()
+                options = {"fileName": "qualified.xlsx", "sourceSha256": digest, "managedSelection": {
+                    "documentId": "3", "versionId": "4", "current": False, "sheetName": "Sheet 1",
+                    "firstRow": 7, "lastRow": 7, "firstColumn": 2, "lastColumn": 2,
+                }}
+                result = module.prepare({"mode": "inspect_only", "files": [upload],
+                                         "preparation": {"version": 1, "files": [options]}})
+                reference = result["datasets"][0]["items"][0]["source"]
+                self.assertEqual(reference["sha256"], digest)
+                self.assertEqual(reference["sheet"], "Sheet 1")
+                self.assertEqual(reference["row"], 7)
+                self.assertEqual(reference.get("multiWorksheet", False), count > 1)
 
     def test_shop_sale_holds_missing_currency_for_review(self):
         rows = daily_shop_report("AUDIT KIMIRONKO 12/4/2024")

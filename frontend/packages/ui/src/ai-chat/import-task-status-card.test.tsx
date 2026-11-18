@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, expect, it, vi } from "vitest"
 import type {
   ChatImportNativeResult,
@@ -70,7 +70,7 @@ it("renders authoritative draft totals separately from source confirmation and l
   render(<ImportTaskStatusCard status={status()} companyId={3} />)
   expect(
     screen.getByText(
-      "3 confirmed source rows · 1 need a decision · 1 excluded",
+      "5 source rows · 3 confirmed · 1 need a decision · 1 excluded",
     ),
   ).toBeTruthy()
   expect(
@@ -87,6 +87,70 @@ it("renders authoritative draft totals separately from source confirmation and l
   expect(
     screen.getByRole("link", { name: "Open saved task" }).getAttribute("href"),
   ).toContain("importTask=" + "a".repeat(32) + "&importCompany=3")
+})
+
+it("keeps confirmed source rows separate from verified Shop Sales and links the exact scoped record", () => {
+  const saved: ChatImportTaskStatus = {
+    ...status(),
+    proposalCount: 0,
+    proposals: [],
+    reviewedRecords: {
+      counts: { verified: 2, alreadyPresent: 1 },
+      records: [
+        {
+          id: "9007199254740993",
+          module: "shop_sales",
+          periodStart: "2024-04-09",
+          displayLabel: "Poultry",
+        },
+      ],
+      more: true,
+      salesTotals: [
+        { currency: "RWF", amount: "9007199254740993.45", count: 2 },
+      ],
+    },
+  }
+  const open = vi.fn()
+  render(<ImportTaskStatusCard status={saved} companyId={3} onOpen={open} />)
+  expect(
+    screen.getByText(
+      "5 source rows · 3 confirmed · 1 need a decision · 1 excluded",
+    ),
+  ).toBeTruthy()
+  expect(
+    screen.getByRole("heading", { name: "2 verified ERP records" }),
+  ).toBeTruthy()
+  expect(
+    screen.getByText("2 verified ERP records · 1 already present"),
+  ).toBeTruthy()
+  expect(
+    screen.getByText("RWF 9,007,199,254,740,993.45 · 2 verified shop sales"),
+  ).toBeTruthy()
+  fireEvent.click(screen.getByText("Exact ERP records"))
+  expect(
+    screen
+      .getByRole("link", { name: "Shop Sales · 2024-04-09 · Poultry" })
+      .getAttribute("href"),
+  ).toBe(
+    "/sales?tab=shop-sales&backfillCompany=3&backfillRecord=9007199254740993",
+  )
+  fireEvent.click(screen.getByRole("button", { name: "Open saved task" }))
+  expect(open).toHaveBeenLastCalledWith("results")
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review remaining source rows" }),
+  )
+  expect(open).toHaveBeenLastCalledWith("decisions")
+})
+
+it("offers both conflict review and the independent ready preview before any ERP writes", () => {
+  const saved = { ...status(), proposalCount: 0, proposals: [] }
+  const open = vi.fn()
+  render(<ImportTaskStatusCard status={saved} companyId={3} onOpen={open} />)
+  expect(screen.queryByText(/verified ERP records/)).toBeNull()
+  fireEvent.click(screen.getByRole("button", { name: "Review source rows" }))
+  expect(open).toHaveBeenLastCalledWith("decisions")
+  fireEvent.click(screen.getByRole("button", { name: "Preview ready rows" }))
+  expect(open).toHaveBeenLastCalledWith("preview")
 })
 
 it("reopens the exact journal batch and labels posting only from live readback", () => {

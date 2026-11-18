@@ -38,6 +38,7 @@ export type DataImportWorkspaceProps = {
   initialReviewId?: string
   taskId?: string
   initialView?: ImportTaskView
+  resumeAtNextStep?: boolean
   inspectionOnly?: boolean
   syncUrl?: boolean
   sourceHistory?: ReactNode
@@ -90,6 +91,7 @@ function ScopedWorkspace({
   initialReviewId,
   taskId,
   initialView,
+  resumeAtNextStep = false,
   inspectionOnly,
   syncUrl = true,
   sourceHistory,
@@ -102,6 +104,7 @@ function ScopedWorkspace({
     () => ({ identity, organizationId, companyId }),
     [identity, organizationId, companyId],
   )
+  const [resumeSavedTask, setResumeSavedTask] = useState(resumeAtNextStep)
   const [location, setLocation] = useState<ImportTaskLocation | null>(() => {
     if (taskId)
       return {
@@ -169,13 +172,15 @@ function ScopedWorkspace({
           preparationTarget={preparationTarget}
           taskId={location.taskId}
           view={location.view}
+          resumeAtNextStep={resumeSavedTask}
           initialReviewId={location.reviewId}
           inspectionOnly={
             location.taskId === taskId ? inspectionOnly : undefined
           }
-          onNavigate={(view, reviewId) =>
+          onNavigate={(view, reviewId) => {
+            setResumeSavedTask(false)
             navigate({ ...location, view, reviewId })
-          }
+          }}
           onTaskChange={(task) => {
             if (task.companyId !== String(companyId)) return
             navigate({ taskId: task.requestId, companyId, view: "sources" })
@@ -244,14 +249,22 @@ function ScopedWorkspace({
       {!initialReviewId || taskId ? (
         <SavedImportEntries
           scope={scope}
-          onSelect={(id) =>
+          onSaved={(id) => {
+            setResumeSavedTask(false)
             navigate({ taskId: id, companyId, view: "sources" })
-          }
+          }}
+          onSelect={(id) => {
+            setResumeSavedTask(true)
+            navigate({ taskId: id, companyId, view: "sources" })
+          }}
         />
       ) : null}
       {history}
       {preparationTarget ? null : (
-        <LegacyWorkspace organizationId={organizationId} initialReviewId={initialReviewId} />
+        <LegacyWorkspace
+          organizationId={organizationId}
+          initialReviewId={initialReviewId}
+        />
       )}
     </div>
   )
@@ -259,9 +272,11 @@ function ScopedWorkspace({
 
 function SavedImportEntries({
   scope,
+  onSaved,
   onSelect,
 }: {
   scope: SavedImportScope
+  onSaved: (id: string) => void
   onSelect: (id: string) => void
 }) {
   const query = useSavedImportTaskList(scope)
@@ -271,7 +286,7 @@ function SavedImportEntries({
     <>
       <SavedImportTaskIntake
         scope={scope}
-        onSaved={onSelect}
+        onSaved={onSaved}
         available={canUseIntake}
       />
       <SavedImportTaskPicker query={query} onSelect={onSelect} />

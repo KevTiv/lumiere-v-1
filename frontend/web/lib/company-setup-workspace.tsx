@@ -13,12 +13,12 @@ import { useUoms } from "@lumiere/query-hooks/hooks/inventory/uom"
 import { toCreateCompanyParams } from "@lumiere/erp-shared/settings-create-params"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { Label } from "@lumiere/ui/components/label"
-import type { CompanyQueryRow } from "@lumiere/stdb/resource-reads"
 import { currencyOptionsFromRows } from "./form-lookup"
 import { CompanySetupPanel } from "./company-setup-panel"
 import { FarmOperationsSetting } from "./farm-operations-setting"
 import {
   CompanySetupAdmissionError,
+  companySetupFromQuery,
   companySetupMetadata,
   companySetupStorageKey,
   findSubmittedCompany,
@@ -26,20 +26,6 @@ import {
   type CompanySetupCompany,
   type CompanySetupDraft,
 } from "./company-setup-model"
-
-function setupCompany(row: CompanyQueryRow): CompanySetupCompany {
-  return {
-    id: String(row.id),
-    name: row.name ?? "",
-    code: row.code ?? "",
-    countryCode: row.addressCountryCode ?? "",
-    currencyId: String(row.currencyId ?? ""),
-    taxId: row.taxId ?? "",
-    fiscalYearEndMonth: Number(row.fiscalYearEndMonth),
-    fiscalYearEndDay: Number(row.fiscalYearEndDay),
-    metadata: row.metadata ?? undefined,
-  }
-}
 
 function savedCompanyMatches(
   company: CompanySetupCompany | undefined,
@@ -70,7 +56,7 @@ export function CompanySetupWorkspace({
     selection ??
     (session.activeCompanyId ? String(session.activeCompanyId) : "new")
   const companies = useMemo(
-    () => (companiesQuery.data ?? []).map(setupCompany),
+    () => (companiesQuery.data ?? []).map(companySetupFromQuery),
     [companiesQuery.data],
   )
   const company = companies.find((row) => row.id === companyId)
@@ -159,7 +145,7 @@ export function CompanySetupWorkspace({
       throw new Error(
         "Could not verify company details. Check the connection and try again.",
       )
-    return result.data.map(setupCompany)
+    return result.data.map(companySetupFromQuery)
   }
   const save = async (
     reviewed: CompanySetupDraft,

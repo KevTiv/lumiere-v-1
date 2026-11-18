@@ -341,30 +341,61 @@ export function reviewedImportSource(
   }
 }
 
-export function reviewArithmetic(values: {
+type ReviewSaleValues = {
   quantity?: unknown
   unit_price?: unknown
-}): string | null {
-  const parse = (value: unknown): bigint | null => {
-    if (typeof value !== "string" || !/^-?\d{1,12}(?:\.\d{1,6})?$/.test(value))
-      return null
-    const negative = value.startsWith("-")
-    const [whole, fraction = ""] = (negative ? value.slice(1) : value).split(
-      ".",
-    )
-    const result = BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, "0"))
-    return negative ? -result : result
-  }
-  const quantity = parse(values.quantity),
-    price = parse(values.unit_price)
-  if (quantity == null || price == null) return null
-  const product = quantity * price
-  const negative = product < 0n
-  const absolute = negative ? -product : product
-  const whole = absolute / 1_000_000_000_000n
-  const fraction = (absolute % 1_000_000_000_000n)
+  amount?: unknown
+  sold_quantity?: unknown
+  sale_unit_price?: unknown
+  sale_amount?: unknown
+}
+
+const reviewDecimalScale = 1_000_000n
+
+function exactReviewDecimal(value: unknown): bigint | null {
+  if (typeof value !== "string" || !/^-?\d{1,12}(?:\.\d{1,6})?$/.test(value))
+    return null
+  const negative = value.startsWith("-")
+  const [whole, fraction = ""] = (negative ? value.slice(1) : value).split(".")
+  const result =
+    BigInt(whole) * reviewDecimalScale + BigInt(fraction.padEnd(6, "0"))
+  return negative ? -result : result
+}
+
+function formatReviewProduct(value: bigint): string {
+  const scale = reviewDecimalScale * reviewDecimalScale
+  const absolute = value < 0n ? -value : value
+  const whole = absolute / scale
+  const fraction = (absolute % scale)
     .toString()
     .padStart(12, "0")
     .replace(/0+$/, "")
-  return `${negative ? "-" : ""}${whole}${fraction ? `.${fraction}` : ""}`
+  return `${value < 0n ? "-" : ""}${whole}${fraction ? `.${fraction}` : ""}`
+}
+
+/** Compare only like-for-like fields, including the Shop Sales source shape. */
+export function reviewSaleReconciliation(values: ReviewSaleValues) {
+  const shopSale = "sold_quantity" in values || "sale_unit_price" in values
+  const quantity = exactReviewDecimal(
+    shopSale ? values.sold_quantity : values.quantity,
+  )
+  const price = exactReviewDecimal(
+    shopSale ? values.sale_unit_price : values.unit_price,
+  )
+  if (quantity == null || price == null) return null
+  const product = quantity * price
+  const sourceAmount = shopSale ? values.sale_amount : values.amount
+  const recorded = exactReviewDecimal(sourceAmount)
+  return {
+    calculated: formatReviewProduct(product),
+    recorded: recorded == null ? null : String(sourceAmount),
+    difference:
+      recorded == null
+        ? null
+        : formatReviewProduct(recorded * reviewDecimalScale - product),
+  }
+}
+
+export function reviewArithmetic(values: ReviewSaleValues): string | null {
+  return reviewSaleReconciliation(values)?.calculated ?? null
 }

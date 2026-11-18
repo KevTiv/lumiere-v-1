@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { accountMoveBatchHref } from "@lumiere/erp-shared/record-links"
+import {
+  accountMoveBatchHref,
+  moduleBackfillRecordHref,
+} from "@lumiere/erp-shared/record-links"
 import { Button, buttonVariants } from "../components/button"
 import { useCurrencyFormat } from "../lib/currency-context"
 import { AssistantActionCard } from "./assistant-action-card"
@@ -13,7 +16,7 @@ import {
   type ChatImportTaskStatus,
 } from "../lib/import-task-status"
 
-function formatAmount(amount: string, locale?: string) {
+export function formatImportAmount(amount: string, locale?: string) {
   const [integer, decimals] = amount.split(".")
   const formatted = Intl.NumberFormat(locale, {
     maximumFractionDigits: 0,
@@ -23,6 +26,26 @@ function formatAmount(amount: string, locale?: string) {
       .formatToParts(1.1)
       .find((part) => part.type === "decimal")?.value ?? "."
   return formatted + (decimals ? separator + decimals : "")
+}
+
+export function importTaskNextView({
+  preparationStatus,
+  sourceRows,
+  hasPreparedProposal,
+  hasResults,
+}: Pick<ChatImportTaskStatus, "preparationStatus" | "sourceRows"> & {
+  hasPreparedProposal: boolean
+  hasResults: boolean
+}): "sources" | "decisions" | "preview" | "results" {
+  if (preparationStatus === "inspection_ready") {
+    return sourceRows.total ? "decisions" : "sources"
+  }
+  if (preparationStatus !== "needs_review") return "sources"
+  if (hasResults) return "results"
+  if (hasPreparedProposal || (sourceRows.ready > 0 && sourceRows.held === 0)) {
+    return "preview"
+  }
+  return sourceRows.total ? "decisions" : "sources"
 }
 
 export function ImportTaskStatusCard({
@@ -69,42 +92,50 @@ export function ImportTaskStatusCard({
     ),
   ]
   const hasBatchLink = recordIds.length > 0 && recordIds.length <= 200
-  const hasResults = status.proposals.length > 0 || nativeResults.length > 0
-  const view = hasResults
-    ? "results"
-    : status.preparationStatus === "needs_review"
-      ? "decisions"
-      : "sources"
-  const href = `/settings?section=imports&importTask=${status.taskId}&importCompany=${status.companyId}&importView=${view}#import-task`
+  const reviewed = status.reviewedRecords
+  const verifiedRecords = reviewed?.counts.verified ?? 0
+  const hasResults =
+    verifiedRecords > 0 ||
+    status.proposals.some((proposal) => proposal.status !== "prepared") ||
+    nativeResults.length > 0
+  const view = importTaskNextView({
+    ...status,
+    hasPreparedProposal: status.proposals.some(
+      (proposal) => proposal.status === "prepared",
+    ),
+    hasResults,
+  })
   const taskActionLabel =
-    hasResults || status.preparationStatus !== "needs_review"
-      ? t("settings.importTask.openTask", { defaultValue: "Open saved task" })
-      : t("settings.importTask.openSourceReview", {
+    view === "decisions"
+      ? t("settings.importTask.openSourceReview", {
           defaultValue: "Review source rows",
         })
-  const taskAction = onOpen ? (
-    <Button
-      size="sm"
-      variant="outline"
-      type="button"
-      onClick={() => onOpen(view)}
+      : view === "preview"
+        ? t("settings.importTask.cardReviewPreview", {
+            defaultValue: "Review ERP preview",
+          })
+        : t("settings.importTask.openTask", { defaultValue: "Open saved task" })
+  const taskAction = (
+    <TaskStageLink
+      taskId={status.taskId}
+      companyId={status.companyId}
+      view={view}
+      onOpen={onOpen}
     >
       {taskActionLabel}
-    </Button>
-  ) : (
-    <a
-      href={href}
-      className={buttonVariants({ size: "sm", variant: "outline" })}
-    >
-      {taskActionLabel}
-    </a>
+    </TaskStageLink>
   )
+  const canReviewRemaining = hasResults && status.sourceRows.held > 0
+  const canPreviewReady =
+    view === "decisions" &&
+    status.preparationStatus === "needs_review" &&
+    status.sourceRows.ready > 0
   const current = postingStatuses.find(
     (posting) => posting.proposalId === proposalSummary?.id,
   )
   const blocked = status.proposals.some((item) => item.status === "blocked")
   const partial =
-    verifiedProposals.length > 0 &&
+    (verifiedProposals.length > 0 || verifiedRecords > 0) &&
     (status.sourceRows.held > 0 ||
       status.sourceRows.excluded > 0 ||
       Boolean(proposalSummary?.heldRecords))
@@ -179,23 +210,28 @@ export function ImportTaskStatusCard({
       ? t("settings.importTask.cardAccountingTitle", {
           defaultValue: "Accounting drafts",
         })
-      : nativeResults.length === 1 && nativeResult
-        ? t("settings.importTask.cardNativeResultTitle", {
-            defaultValue: "{{entity}} import · {{state}}",
-            entity: nativeEntities[nativeResult.entity],
-            state: nativeLabel,
+      : verifiedRecords > 0
+        ? t("settings.importTask.cardVerifiedRecordsTitle", {
+            defaultValue: "{{count}} verified ERP records",
+            count: verifiedRecords,
           })
-        : nativeResults.length > 0
-          ? t("settings.importTask.cardNativeTitle", {
-              defaultValue: "Native import job receipts",
+        : nativeResults.length === 1 && nativeResult
+          ? t("settings.importTask.cardNativeResultTitle", {
+              defaultValue: "{{entity}} import · {{state}}",
+              entity: nativeEntities[nativeResult.entity],
+              state: nativeLabel,
             })
-          : stateLabels[status.preparationStatus]
+          : nativeResults.length > 0
+            ? t("settings.importTask.cardNativeTitle", {
+                defaultValue: "Native import job receipts",
+              })
+            : stateLabels[status.preparationStatus]
   const summary =
     result && currency
       ? t("settings.importTask.cardDraftTotals", {
           defaultValue: "{{currency}} {{amount}} · {{lines}} balanced lines",
           currency,
-          amount: formatAmount(result.totalDebit, locale),
+          amount: formatImportAmount(result.totalDebit, locale),
           lines: result.lineCount,
         })
       : undefined
@@ -258,11 +294,11 @@ export function ImportTaskStatusCard({
       <p>
         {t("settings.importTask.cardSourceCounts", {
           defaultValue:
-            "{{ready}} confirmed source rows · {{held}} need a decision · {{excluded}} excluded",
+            "{{total}} source rows · {{ready}} confirmed · {{held}} need a decision · {{excluded}} excluded",
           ...status.sourceRows,
         })}
       </p>
-      {!result ? (
+      {verifiedRecords === 0 && !result ? (
         <p className="text-xs text-muted-foreground">
           {t("settings.importTask.cardReceiptBoundary", {
             defaultValue:
@@ -376,12 +412,8 @@ export function ImportTaskStatusCard({
           )}
         </div>
       ))}
-      {!status.proposalCount && !nativeResults.length ? (
-        <p>
-          {t("settings.importTask.cardNoAccountingProposal", {
-            defaultValue: "No saved Accounting draft proposal yet.",
-          })}
-        </p>
+      {reviewed && verifiedRecords > 0 && companyId ? (
+        <ReviewedImportRecords reviewed={reviewed} companyId={companyId} />
       ) : null}
       {status.proposalCount > status.proposals.length ? (
         <p className="text-xs text-muted-foreground">
@@ -459,9 +491,33 @@ export function ImportTaskStatusCard({
           timestamp: new Date(status.readAt).toLocaleString(),
         })}
       </p>
-      {hasBatchLink || onRefresh ? (
+      {hasBatchLink || onRefresh || canReviewRemaining || canPreviewReady ? (
         <div className="flex flex-wrap items-center gap-2">
           {hasBatchLink ? taskAction : null}
+          {canReviewRemaining ? (
+            <TaskStageLink
+              taskId={status.taskId}
+              companyId={status.companyId}
+              view="decisions"
+              onOpen={onOpen}
+            >
+              {t("settings.importTask.reviewRemainingRows", {
+                defaultValue: "Review remaining source rows",
+              })}
+            </TaskStageLink>
+          ) : null}
+          {canPreviewReady ? (
+            <TaskStageLink
+              taskId={status.taskId}
+              companyId={status.companyId}
+              view="preview"
+              onOpen={onOpen}
+            >
+              {t("settings.importTask.previewReadyRows", {
+                defaultValue: "Preview ready rows",
+              })}
+            </TaskStageLink>
+          ) : null}
           {onRefresh ? (
             <Button
               type="button"
@@ -482,5 +538,114 @@ export function ImportTaskStatusCard({
         </div>
       ) : null}
     </AssistantActionCard>
+  )
+}
+
+function TaskStageLink({
+  taskId,
+  companyId,
+  view,
+  onOpen,
+  children,
+}: {
+  taskId: string
+  companyId: string
+  view: ReturnType<typeof importTaskNextView>
+  onOpen?: (view: ReturnType<typeof importTaskNextView>) => void
+  children: string
+}) {
+  return onOpen ? (
+    <Button
+      size="sm"
+      variant="outline"
+      type="button"
+      onClick={() => onOpen(view)}
+    >
+      {children}
+    </Button>
+  ) : (
+    <a
+      className={buttonVariants({ size: "sm", variant: "outline" })}
+      href={`/settings?section=imports&importTask=${taskId}&importCompany=${companyId}&importView=${view}#import-task`}
+    >
+      {children}
+    </a>
+  )
+}
+
+export function ReviewedImportRecords({
+  reviewed,
+  companyId,
+}: {
+  reviewed: NonNullable<ChatImportTaskStatus["reviewedRecords"]>
+  companyId: number
+}) {
+  const { t, i18n } = useTranslation()
+  const labels = {
+    sales: t("settings.importTask.reviewedCustomerSales", {
+      defaultValue: "Customer Sales",
+    }),
+    shop_sales: t("settings.importTask.reviewedShopSales", {
+      defaultValue: "Shop Sales",
+    }),
+    warehouse: t("settings.importTask.reviewedInventoryCounts", {
+      defaultValue: "Recorded Counts",
+    }),
+  }
+  return (
+    <div className="space-y-1 border-t pt-2 text-sm">
+      <p className="font-medium">
+        {t("settings.importTask.cardReviewedCounts", {
+          defaultValue:
+            "{{count}} verified ERP records · {{matched}} already present",
+          count: reviewed.counts.verified,
+          matched: reviewed.counts.alreadyPresent,
+        })}
+      </p>
+      {reviewed.salesTotals?.map(({ currency, amount, count }) => (
+        <p key={currency} className="tabular-nums">
+          {t("settings.importTask.cardVerifiedSalesTotal", {
+            defaultValue:
+              "{{currency}} {{amount}} · {{count}} verified shop sales",
+            currency,
+            amount: formatImportAmount(amount, i18n?.language),
+            count,
+          })}
+        </p>
+      ))}
+      {reviewed.records.length ? (
+        <details>
+          <summary className="cursor-pointer text-muted-foreground">
+            {t("settings.importTask.cardExactErpRecords", {
+              defaultValue: "Exact ERP records",
+            })}
+          </summary>
+          <ul className="space-y-1 py-2">
+            {reviewed.records.map((record) => (
+              <li key={`${record.module}:${record.id}`}>
+                <a
+                  href={moduleBackfillRecordHref(record.module, {
+                    companyId,
+                    recordId: record.id,
+                  })}
+                  className="text-primary underline underline-offset-4"
+                >
+                  {labels[record.module]} · {record.periodStart} ·{" "}
+                  {record.displayLabel ?? `#${record.id}`}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+      {reviewed.more ? (
+        <p className="text-xs text-muted-foreground">
+          {t("settings.importTask.cardMoreReviewedRecords", {
+            defaultValue:
+              "Open task Results to view the full set in its ERP modules.",
+          })}
+        </p>
+      ) : null}
+    </div>
   )
 }

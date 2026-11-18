@@ -4404,8 +4404,48 @@
     }
   },
   "settings": {
+    "importTask": {
+      "progressVerifiedRecordCounts": "{{records}} nyandiko z’amateka zemejwe · {{drafts}} nyandiko z’agateganyo zagenzuwe · {{receipts}} nyemezabikorwa zo kwinjiza amakuru",
+      "cardSourceCounts": "Imirongo {{total}} yo mu nkomoko · {{ready}} yemejwe · {{held}} ikeneye icyemezo · {{excluded}} yakuwemo",
+      "cardReviewPreview": "Suzuma ibizandikwa muri ERP",
+      "reviewRemainingRows": "Suzuma imirongo isigaye",
+      "previewReadyRows": "Reba imirongo yiteguye kwinjizwa",
+      "previewReviewGroup": "Itsinda ry’imirongo ushaka kureba",
+      "previewReviewOption": "{{title}} · {{confirmed}} yemejwe · {{pending}} ikeneye gusuzumwa",
+      "cardVerifiedRecordsTitle": "Inyandiko {{count}} za ERP zagenzuwe",
+      "cardReviewedCounts": "Inyandiko {{count}} za ERP zagenzuwe · {{matched}} zisanzwe zirimo",
+      "cardVerifiedSalesTotal": "{{currency}} {{amount}} · ibyagurishijwe mu iduka {{count}} byagenzuwe",
+      "cardExactErpRecords": "Inyandiko za ERP zihuye n’imirongo",
+      "cardMoreReviewedRecords": "Fungura ibisubizo by’iki gikorwa kugira ngo urebe inyandiko zose mu bice bya ERP zibarizwamo.",
+      "reviewedCustomerSales": "Ibyagurishijwe kuri buri mukiriya",
+      "reviewedShopSales": "Ibyagurishijwe mu iduka",
+      "reviewedInventoryCounts": "Ibarura ry’ibicuruzwa ryanditswe",
+      "shopSalesPreviewUnavailable": "Igiteranyo cy’ibyagurishijwe mu iduka nticyashoboye kugenzurwa. Ongera ufungure isuzuma mbere yo kubika.",
+      "shopSalesPreviewCounts": "Isuzuma · {{newCount}} bishya · {{existingCount}} bisanzwe birimo · {{heldCount}} birategereje",
+      "shopSalesPreviewAmounts": "{{currency}} {{newAmount}} azandikwa · {{currency}} {{existingAmount}} asanzwe yanditswe"
+    },
+    "importWorkflow": {
+      "operationExplanation": "Suzuma imirongo y’umwimerere n’impinduka ziteganyijwe mbere yo kubika. Reba ibyabitswe mu bisubizo.",
+      "companySetup": "Igenamiterere ry’ikigo kuri iyi dosiye",
+      "countryUnspecified": "Igihugu nticyanditswe",
+      "currencyUnknown": "Ifaranga ry’ibanze ntiriboneka",
+      "historicalModeOpenings": "Icyemezo cyabitswe ku mateka: imisigire y’intangiriro ku itariki yo kwimuka.",
+      "historicalModeFull": "Icyemezo cyabitswe ku mateka: amateka arambuye.",
+      "historicalModeUnknown": "Nta cyemezo cyabitswe ku mateka. Suzuma amatariki y’umwimerere n’itariki yo kwimuka mbere yo gutegura imisigire y’intangiriro cyangwa kwandika mu bitabo.",
+      "sourceOptionsStillRequired": "Emeza imiterere y’amatariki, ibipimo n’ifaranga mu nyandiko y’umwimerere. Ifaranga ryakoreshejwe mu mateka rishobora gutandukana n’ifaranga ry’ibanze ry’ikigo.",
+      "companySetupUnavailable": "Igenamiterere ntiryasomwe. Reba ikigo cyatoranyijwe wongere ufungure.",
+      "openCompanySetup": "Fungura igenamiterere ry’ikigo mu rupapuro rushya"
+    },
     "importReview": {
+      "blankCell": "Akazu ko mu nyandiko y’umwimerere kari ubusa",
+      "initialProposal": "Agaciro kateguwe · {{value}}",
+      "saleMismatch": "Banza ukemure ikinyuranyo hagati y’amafaranga yanditswe n’ayabazwe mbere yo kwemeza uyu murongo.",
+      "saleReconciliation": "Amafaranga yanditswe {{amount}} · ikinyuranyo {{difference}}",
       "grouped": {
+        "nextIssue": "Ikibazo gikurikira kitarakemuka",
+        "reviewNextIssue": "Suzuma ikibazo gikurikira kitarakemuka",
+        "issueExamples": "Ingero zo mu nyandiko y’umwimerere · imirongo {{count}} yo gusuzuma",
+        "issueExample": "Agaciro k’umwimerere {{original}} · agaciro katanzwe {{proposed}}",
         "rowStatus": "Imiterere y’umurongo",
         "fieldConfirmation": "Kwemeza {{field}}",
         "noDecisionChanges": "Nta gaciro kanditswe cyangwa imiterere y’isuzuma byahindutse.",
@@ -4431,6 +4471,25 @@
       "errorRows": "Amakosa"
     },
     "importPreparation": {
+      "computedTotal": "Igiteranyo cy’imirongo ifite imibare",
+      "controlCurrency": "Ifaranga",
+      "controlRow": "Umurongo {{row}}",
+      "missingLineValues": "Imirongo idafite amafaranga ashobora gukoreshwa",
+      "reportControlPurpose": "Koresha ibi biteranyo kugira ngo ugenzure imirongo yabazwe kandi usuzume ibinyuranyo biri muri raporo y’umwimerere.",
+      "reportControls": "Ibiteranyo byanditswe n’ibyabazwe ({{count}})",
+      "reportedTotal": "Igiteranyo cyanditswe",
+      "totalDifference": "Igiteranyo cyanditswe ukuyemo icyabazwe",
+      "fields": {
+        "currency_code": "Ifaranga ryakoreshejwe mu kugurisha",
+        "sale_amount": "Amafaranga y’ubugurisha yanditswe",
+        "sale_date": "Itariki yo kugurisha",
+        "sale_line_issuer": "Uwatangaje nimero y’umurongo w’ubugurisha",
+        "sale_line_reference": "Nimero y’umurongo w’ubugurisha yaturutse ahandi",
+        "sale_unit_price": "Igiciro cya buri kimwe mu gihe cyashize",
+        "shop": "Iduka",
+        "sold_quantity": "Ingano yagurishijwe",
+        "source_unit": "Igipimo cy’ingano cyanditswe"
+      },
       "worksheet": "Urupapuro",
       "worksheetHint": "Hitamo impapuro ushaka gushyiramo. Buri rupapuro rugumana imirongo yarwo y’umwimerere kandi rushobora kugira uburyo bwarwo bwo guhuza inkingi.",
       "worksheets": "Impapuro zo gutegura"

@@ -140,6 +140,92 @@ fn partial_confirmation_uses_only_known_facts_and_exact_decimal_totals() -> Resu
 }
 
 #[test]
+fn worksheet_provenance_distinguishes_rows_and_survives_a_native_retry() -> Result<()> {
+    let sheet = |id, name: &str, amount| -> Result<ReviewedRow> {
+        let mut row = reviewed(id, 8, amount)?;
+        row.source.source.file = "farm.xlsx".into();
+        row.source.source.sheet = Some(name.into());
+        row.source.source.multi_worksheet = true;
+        Ok(row)
+    };
+    let mut renamed_upload = sheet(3, "Kicukiro", "30")?;
+    renamed_upload.source.source.file = "renamed.xlsx".into();
+    let definition = build_definition(
+        &[
+            sheet(1, "Kicukiro", "100")?,
+            sheet(2, "Kimironko", "200")?,
+            renamed_upload,
+        ],
+        &configuration(),
+        0,
+    )?;
+    ensure!(definition.entries.len() == 2);
+    ensure!(definition.issues[0].code == "repeated_source");
+    let [first, second] = definition.entries.as_slice() else {
+        anyhow::bail!("expected both worksheets in the proposal");
+    };
+    ensure!(first.reference != second.reference);
+    ensure!(first.source_sheet.as_deref() == Some("Kicukiro"));
+    let proposal = saved(definition);
+    let restored = saved(serde_json::from_value(serde_json::to_value(
+        &proposal.definition,
+    )?)?);
+    let task = "a".repeat(32);
+    let original = native::header_request(scoped(), &task, &proposal)?;
+    let retry = native::header_request(scoped(), &task, &restored)?;
+    ensure!(original.request_id == retry.request_id && original.csv == retry.csv);
+    ensure!(original.csv.contains("sourceSheet") && original.csv.contains("Kimironko"));
+    Ok(())
+}
+
+#[test]
+fn legacy_sheet_claims_keep_their_identity_and_guard_against_double_writes() -> Result<()> {
+    let mut legacy = reviewed(1, 8, "100")?;
+    legacy.source.source.sheet = Some("Kicukiro".into());
+    let legacy_only = build_definition(&[legacy], &configuration(), 0)?;
+    let entry = &legacy_only.entries[0];
+    let bare_key =
+        hash(format!("{KIND}\0{}\0{}", entry.source_sha256, entry.source_row).as_bytes());
+    ensure!(claim_key(entry) == bare_key);
+    let serialized = serde_json::to_value(entry)?;
+    ensure!(serialized.get("sourceSheet").is_none());
+    let restored = serde_json::from_value::<Entry>(serialized)?;
+    ensure!(claim_key(&restored) == bare_key);
+    ensure!(native::source_binding(
+        scoped(),
+        "task",
+        &saved(legacy_only.clone()),
+        &restored,
+        "header"
+    )
+    .get("sourceSheet")
+    .is_none());
+
+    let mut qualified = reviewed(2, 8, "200")?;
+    qualified.source.source.multi_worksheet = true;
+    let missing_sheet =
+        build_definition(&[reviewed(10, 9, "100")?, qualified], &configuration(), 0)?;
+    ensure!(missing_sheet.issues[0].code == "worksheet_scope_missing");
+    let mut qualified = reviewed(2, 8, "200")?;
+    qualified.source.source.sheet = Some("Kicukiro".into());
+    qualified.source.source.multi_worksheet = true;
+    let qualified = build_definition(&[qualified], &configuration(), 0)?;
+    ensure!(compatible_claim_key(&qualified.entries[0]) == Some(bare_key));
+    ensure!(compatible_claim_key(entry) == Some(claim_key(&qualified.entries[0])));
+
+    let mut both = legacy_only;
+    both.entries.extend(qualified.entries);
+    both.sources.extend(qualified.sources);
+    overlap::apply_candidate_holds(scoped(), &mut both, BTreeMap::new())?;
+    ensure!(both.entries.is_empty());
+    ensure!(both
+        .issues
+        .iter()
+        .all(|issue| issue.resolution.is_none() && issue.candidates[0].reason == "same_source"));
+    Ok(())
+}
+
+#[test]
 fn unknown_meaning_amount_excluded_and_coarse_dates_stay_held() -> Result<()> {
     let mut meaning = reviewed(1, 8, "100")?;
     meaning.confirmed.remove("observation_kind");
@@ -650,10 +736,22 @@ async fn exercise_storage(pool: &deadpool_postgres::Pool) -> Result<()> {
     .await
     .is_err());
     storage::validate_sources(&tx, scoped(), &task, &stored, 0).await?;
-    // A changed export cannot evade company-wide admission by getting a new
-    // hash, task, actor or row number. It is a candidate hold, never a merge.
+    // Even with a changed amount, a saved legacy claim holds the source row.
+    let mut worksheet = reviewed(98, 8, "1235")?;
+    worksheet.source.source.sheet = Some("Kicukiro".into());
+    worksheet.source.source.multi_worksheet = true;
+    let mut legacy_overlap = build_definition(&[worksheet], &configuration(), 0)?;
+    overlap::hold_candidates(&tx, scoped(), &mut legacy_overlap, None).await?;
+    ensure!(legacy_overlap.entries.is_empty());
+    ensure!(legacy_overlap.issues[0].candidates[0].reason == "same_source");
+    ensure!(legacy_overlap.issues[0].resolution.is_none());
+
+    // A regenerated workbook remains a candidate if the source period and
+    // amount overlap, even when its hash, task, actor, sheet and row change.
     let mut changed = reviewed(99, 21, "1234")?;
     changed.source.source.sha256 = "1".repeat(64);
+    changed.source.source.sheet = Some("Renamed worksheet".into());
+    changed.source.source.multi_worksheet = true;
     let mut candidate = build_definition(&[changed], &configuration(), 0)?;
     let unchanged = candidate.clone();
     overlap::hold_candidates(
