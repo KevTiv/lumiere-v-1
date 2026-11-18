@@ -1,3 +1,5 @@
+> Superseded for repository-owned skills by [skill ownership and lifecycle](../plan/skill-ownership-and-lifecycle.md) (2026-11-17). Historical record only for those steps.
+
 # Alpha AI acceptance and prepaid usage plan
 
 Status: source repair locally validated; current-tenant activation blocked. Updated 2026-11-11.

@@ -1,3 +1,5 @@
+> Superseded for repository-owned skills by [skill ownership and lifecycle](../plan/skill-ownership-and-lifecycle.md) (2026-11-17). Historical record only for those steps.
+
 # Alpha harness reusable work and Railway delivery plan
 
 Status: proposed execution plan, 2026-11-01.

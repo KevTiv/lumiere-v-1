@@ -1,3 +1,5 @@
+> Superseded for repository-owned skills by [skill ownership and lifecycle](skill-ownership-and-lifecycle.md) (2026-11-17). Historical record only for those steps.
+
 # Alpha AI skill qualification preparation (AA-06)
 
 Historical qualification record. The current

@@ -1,3 +1,5 @@
+> Superseded for repository-owned skills by [skill ownership and lifecycle](skill-ownership-and-lifecycle.md) (2026-11-17). Historical record only for those steps.
+
 # ERP skill usability implementation status
 
 Current lifecycle policy: [repository-owned versus user-created skills](skill-ownership-and-lifecycle.md).

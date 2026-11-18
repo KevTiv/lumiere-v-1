@@ -1,3 +1,5 @@
+> Superseded for repository-owned skills by [skill ownership and lifecycle](../plan/skill-ownership-and-lifecycle.md) (2026-11-17). Historical record only for those steps.
+
 # AI Harness Completion Plan (Mistral/Gemini-first)
 
 **Status:** Proposed; deferred from the first deployable core.
