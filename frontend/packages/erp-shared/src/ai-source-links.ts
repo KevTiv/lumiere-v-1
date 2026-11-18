@@ -1,6 +1,6 @@
 /** Map RAG / activity source identifiers to in-app ERP routes (metadata only). */
 
-import { fleetVehicleHref, moduleTabHref, reportWorkspaceHref } from "./record-links"
+import { accountMoveDetailHref, fleetVehicleHref, moduleTabHref, reportWorkspaceHref, stockTransferRecordPageHref } from "./record-links"
 import { parseStrictU64, type ScalarId } from "./u64"
 
 export type AiSourceLinkInput = {
@@ -20,8 +20,6 @@ type ModuleTabTarget = {
   recordPrefix?: string
   /** Existing native result view with its own record-selection contract. */
   recordHref?: (recordId: string) => string
-  /** Exact-record list when the normal destination is a custom, unfiltered view. */
-  recordTab?: string
 }
 
 type PathPrefixTarget = {
@@ -44,8 +42,8 @@ const SOURCE_ROUTE_MAP: Record<string, SourceRouteTarget> = {
   article: { kind: "module_tab", module: "documents", tab: "knowledge-base" },
   knowledge_article: { kind: "module_tab", module: "documents", tab: "knowledge-base" },
   // The invoice/bill custom lists do not apply id filters; the ledger does.
-  invoice: { kind: "module_tab", module: "accounting", tab: "invoices", recordTab: "journal-entries" },
-  bill: { kind: "module_tab", module: "accounting", tab: "bills", recordTab: "journal-entries" },
+  invoice: { kind: "module_tab", module: "accounting", tab: "invoices", recordHref: accountMoveDetailHref },
+  bill: { kind: "module_tab", module: "accounting", tab: "bills", recordHref: accountMoveDetailHref },
   proposal: { kind: "path_prefix", prefix: "/proposals" },
 
   // Activity memory (context_worker entity_type)
@@ -55,19 +53,24 @@ const SOURCE_ROUTE_MAP: Record<string, SourceRouteTarget> = {
   project_project: { kind: "module_tab", module: "projects", tab: "projects" },
   hr_leave: { kind: "module_tab", module: "hr", tab: "leaves" },
   iot_telemetry: { kind: "module_tab", module: "iot", tab: "iot-telemetry" },
-  account_move: { kind: "module_tab", module: "accounting", tab: "journal-entries" },
+  account_move: { kind: "module_tab", module: "accounting", tab: "journal-entries", recordHref: accountMoveDetailHref },
+  account_move_line: { kind: "module_tab", module: "accounting", tab: "move-lines" },
+  account_account: { kind: "module_tab", module: "accounting", tab: "accounts" },
   account_payment: { kind: "module_tab", module: "accounting", tab: "payments" },
   hr_expense: { kind: "module_tab", module: "expenses", tab: "expenses" },
   expense: { kind: "module_tab", module: "expenses", tab: "expenses" },
   hr_expense_sheet: { kind: "module_tab", module: "expenses", tab: "expense-sheets", recordPrefix: "/expenses/reports" },
+  expense_sheet: { kind: "module_tab", module: "expenses", tab: "expense-sheets", recordPrefix: "/expenses/reports" },
   financial_report: { kind: "module_tab", module: "reports", tab: "reports", recordHref: (id) => reportWorkspaceHref("", id) },
   subscription: { kind: "module_tab", module: "subscriptions", tab: "subscriptions", recordPrefix: "/subscriptions" },
   fleet_vehicle: { kind: "module_tab", module: "fleet", tab: "fleet-vehicles", recordHref: fleetVehicleHref },
+  fleet_inspection: { kind: "module_tab", module: "fleet", tab: "fleet-inspections" },
+  fleet_service_record: { kind: "module_tab", module: "fleet", tab: "fleet-service-records" },
   calendar_event: { kind: "module_tab", module: "calendar", tab: "calendar", recordPrefix: "/calendar/events" },
   mrp_production: { kind: "module_tab", module: "manufacturing", tab: "orders" },
   purchase_order: { kind: "module_tab", module: "purchasing", tab: "orders" },
   purchase_requisition: { kind: "module_tab", module: "purchasing", tab: "requisitions" },
-  stock_picking: { kind: "module_tab", module: "inventory", tab: "transfers" },
+  stock_picking: { kind: "module_tab", module: "inventory", tab: "transfers", recordHref: stockTransferRecordPageHref },
   stock_quant: { kind: "module_tab", module: "inventory", navigationModule: "warehouse", tab: "stock" },
   stock_production_serial: { kind: "module_tab", module: "inventory", navigationModule: "warehouse", tab: "serials" },
   stock_production_lot: { kind: "module_tab", module: "inventory", navigationModule: "warehouse", tab: "lots" },
@@ -114,7 +117,7 @@ function resolveTarget(target: SourceRouteTarget, recordId?: string): string | u
   if (recordId && target.recordPrefix) return `${target.recordPrefix}/${recordId}`
   return moduleTabHref(
     target.navigationModule ?? target.module,
-    recordId ? target.recordTab ?? target.tab : target.tab,
+    target.tab,
     recordId ? { id: recordId } : undefined,
   )
 }

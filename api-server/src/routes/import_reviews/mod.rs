@@ -525,6 +525,10 @@ pub fn router() -> Router<Arc<AppState>> {
         )
         .route("/module-backfill/:module", get(module_backfill::read))
         .route(
+            "/module-backfill/:module/sales-summary",
+            get(module_backfill::sales_summary::read),
+        )
+        .route(
             "/import-reviews/:batch/farm-events",
             post(farm_import::write),
         )

@@ -41,6 +41,7 @@ export const stockPickingHref = byId("inventory", "transfers")
  * applies it over every move.
  */
 export const accountMoveHref = byId("accounting", "journal-entries")
+export const accountMoveDetailHref = (id: RecordId) => `${accountMoveHref(id)}&openRecord=1`
 /** A verified import can link its batch without opening any records for editing. */
 export function accountMoveBatchHref(ids: readonly string[], companyId: number): string {
   const params = new URLSearchParams({

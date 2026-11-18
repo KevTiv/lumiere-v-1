@@ -70,6 +70,10 @@ const RELEASE_HELPERS: &[(&str, &[u8])] = &[
     ("audit.rs", include_bytes!("../harness/audit.rs")),
     ("rag_context.rs", include_bytes!("../routes/rag_context.rs")),
     (
+        "rag_record_reply.rs",
+        include_bytes!("../routes/rag_record_reply.rs"),
+    ),
+    (
         "rag_conversation.rs",
         include_bytes!("../routes/rag_conversation.rs"),
     ),
@@ -96,6 +100,10 @@ const RELEASE_HELPERS: &[(&str, &[u8])] = &[
     ),
     ("stdb_embed.rs", include_bytes!("../stdb_embed.rs")),
     ("snapshot.rs", include_bytes!("../harness/snapshot.rs")),
+    (
+        "record_lookup.rs",
+        include_bytes!("../harness/record_lookup.rs"),
+    ),
     ("harness/mod.rs", include_bytes!("../harness/mod.rs")),
     (
         "action_draft_bridge.rs",
@@ -964,6 +972,8 @@ mod tests {
     fn inventory_covers_release_children_and_local_authority_implementations() {
         for required in [
             "rag_context.rs",
+            "rag_record_reply.rs",
+            "record_lookup.rs",
             "rag_conversation.rs",
             "rag_history_references.rs",
             "rag_spreadsheet.rs",

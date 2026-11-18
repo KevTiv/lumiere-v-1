@@ -1,4 +1,5 @@
 import {
+  accountMoveHref,
   fleetVehicleHref,
   invoiceRecordPageHref,
   moduleTabHref,
@@ -855,7 +856,7 @@ export function assistantActionHref(
       case "account_move":
         if (capability.tab === "invoices" || capability.tab === "bills")
           return invoiceRecordPageHref(action.recordId)
-        break
+        return accountMoveHref(action.recordId)
       case "sale_order":
         return saleOrderRecordPageHref(action.recordId)
       case "purchase_order": {

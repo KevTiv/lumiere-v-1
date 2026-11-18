@@ -217,6 +217,90 @@ pub(crate) async fn read_documents(
     Ok(rows)
 }
 
+const DOCUMENT_METADATA_FIELDS: &[(&str, &str)] = &[
+    ("name", "name"),
+    ("file_name", "fileName"),
+    ("file_size", "fileSize"),
+    ("mimetype", "mimetype"),
+];
+
+/// Read an exact document's display metadata under its native owner and folder policy.
+pub(crate) async fn read_authoritative_document_metadata(
+    context: &crate::trusted_context::TrustedOperationContext,
+    company_id: u64,
+    document_id: u64,
+) -> Result<Value, ApiError> {
+    let organization_id = context.organization_id();
+    let actor = context.actor_identity();
+    let access = Some(context.field_access());
+    let identity = require_read_context("documents", organization_id, actor, access)?;
+    let unavailable = || ApiError::NotFound("Authoritative resource not found".into());
+    if document_id == 0
+        || ["id", "organization_id", "company_id"]
+            .iter()
+            .any(|field| !has_resource_field_read_permission(access, "documents", field))
+    {
+        return Err(unavailable());
+    }
+    context.require_company_scope(&[company_id])?;
+    let fields: Vec<_> = DOCUMENT_METADATA_FIELDS
+        .iter()
+        .filter(|(field, _)| has_resource_field_read_permission(access, "documents", field))
+        .collect();
+    if fields.is_empty() {
+        return Err(unavailable());
+    }
+    // Visibility columns are required for the owner check. Only the authorized
+    // display projection is serialized in the response.
+    let mut columns = vec![
+        "id",
+        "organization_id",
+        "company_id",
+        "folder_id",
+        "owner_id",
+        "is_deleted",
+    ];
+    columns.extend(fields.iter().map(|(field, _)| *field));
+    let client = context.client();
+    let rows = client
+        .query_sql(&format!(
+            "SELECT {} FROM document WHERE organization_id = {organization_id} AND id = {document_id} AND is_deleted = false AND owner_id = {identity}",
+            columns.join(", ")
+        ))
+        .await
+        .map_err(ApiError::internal)?;
+    let [document] = rows.as_slice() else {
+        return Err(unavailable());
+    };
+    let tree = tree::read_tree(client, organization_id, actor, Some(company_id)).await?;
+    if document_row_id(document, "id", "id") != Some(document_id)
+        || !tree.document_visible(document, false)
+    {
+        return Err(unavailable());
+    }
+    let mut result = serde_json::Map::from_iter([
+        ("id".into(), Value::String(document_id.to_string())),
+        (
+            "organizationId".into(),
+            Value::String(organization_id.to_string()),
+        ),
+        (
+            "companyId".into(),
+            document
+                .get("companyId")
+                .or_else(|| document.get("company_id"))
+                .cloned()
+                .ok_or_else(unavailable)?,
+        ),
+    ]);
+    for (field, alias) in fields {
+        if let Some(value) = document.get(*alias).or_else(|| document.get(*field)) {
+            result.insert((*alias).into(), value.clone());
+        }
+    }
+    Ok(Value::Object(result))
+}
+
 pub(crate) async fn read_document_versions(
     client: &StdbClient,
     organization_id: u64,

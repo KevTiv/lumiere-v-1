@@ -77,6 +77,8 @@ import { isAssistantErrorQuestion } from "@/lib/assistant-error-help"
 import { AI_WORKSPACE_SCOPES, aiWorkspaceScopesForProfile, resolveAiWorkspaceScope } from "@/lib/ai-workspace-scope"
 import { useFarmOperationsEnabled } from "@/lib/use-farm-operations-enabled"
 import { parseFarmComparisonRequest, readAssistantFarmMetrics } from "@/lib/assistant-farm-metrics"
+import { parseAssistantDomainRead, readAssistantDomainRead } from "@/lib/assistant-domain-reads"
+import { parseAssistantSupportRecord, readAssistantSupportRecord } from "@/lib/assistant-support-records"
 import { useErpAiSelectionReporter } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { performSignOut } from "@/lib/auth-sign-out"
 import {
@@ -294,6 +296,9 @@ function ErpAiChatPanel({
     readonly: history.archived || !availableHistory,
   })
   const [selectedScope, setSelectedScope] = useState("current")
+  useEffect(() => {
+    if (selection?.explicit) setSelectedScope("current")
+  }, [selection])
   const [openGuide, setOpenGuide] = useState<{ scope: string; request: OpenGuideRequest } | null>(null)
   const guideConversation = useAssistantGuideConversation()
   const errorQuestion = useErpAiErrorQuestion()
@@ -740,6 +745,29 @@ function ErpAiChatPanel({
         ? [{ taskId: focusedImport.requestId, companyId: focusedImport.companyId }]
         : undefined
       const importTaskIds = importTaskRefs?.map(reference => reference.taskId)
+      const supportRecord = !questionGuide && !selectedReferences?.length && identity
+        ? parseAssistantSupportRecord(userText)
+        : undefined
+      if (supportRecord && identity) {
+        const result = await readAssistantSupportRecord(supportRecord, {
+          organizationId: orgId, companyId: operatingCompanyId, actorIdentity: identity,
+          locale: i18n.resolvedLanguage ?? "en", signal,
+        })
+        if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
+        await saveReply({ userText, assistantText: result.content, sources: result.sources, uiContext })
+        return result
+      }
+      const domainRead = !questionGuide && !selectedReferences?.length
+        ? parseAssistantDomainRead(userText, { farmEnabled: farmOperationsEnabled })
+        : undefined
+      if (domainRead) {
+        const result = await readAssistantDomainRead(domainRead, {
+          companyId: operatingCompanyId, locale: i18n.resolvedLanguage ?? "en", signal,
+        })
+        if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
+        await saveReply({ userText, assistantText: result.content, sources: result.sources, uiContext })
+        return result
+      }
       const farmComparison = !questionGuide && !selectedReferences?.length
         ? parseFarmComparisonRequest(userText)
         : undefined
@@ -874,7 +902,7 @@ function ErpAiChatPanel({
       if (out && selectedReferences?.length && isCurrent()) clearReferences(sessionKey)
       return { content, runId: out?.run_id, sources, guides, recoveryPath, importTaskIds, importTasks: taskStatuses, actions: actions.length ? actions : undefined, earlierContextUnavailable: out?.earlierContextUnavailable }
     },
-    [orgId, orgReady, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, sessionKey, actorHistoryScope, history.archived, availableHistory, historyRefs, clearReferences, ensureSession, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft, farmOperationsEnabled],
+    [orgId, orgReady, identity, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, sessionKey, actorHistoryScope, history.archived, availableHistory, historyRefs, clearReferences, ensureSession, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft, farmOperationsEnabled],
   )
   const sendTurn = useCallback(async (text: string, onDelta?: (delta: string) => void, turnId?: string, guideRefs?: GuideReference[], guide?: GuideDraft, hasUnsavedGuideEdits = false) => {
     if (inFlight.current.has(historyScope) || inFlight.current.size >= 2) {

@@ -2,7 +2,9 @@ use serde_json::{json, Value};
 
 use crate::{
     harness::{
-        fetch_authorized_live_snapshots, resolve_snapshot_candidates, HARNESS_MAX_LIVE_SNAPSHOTS,
+        fetch_authorized_live_snapshots,
+        record_lookup::{lookup_record_candidates, RecordLookup},
+        resolve_snapshot_candidates, HARNESS_MAX_LIVE_SNAPSHOTS,
     },
     retrieval_policy::optional_retrieval,
     tools::types::{live_snapshot_citation, ToolContext, ToolOutput, ToolResult},
@@ -52,6 +54,32 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .ok_or_else(|| anyhow::anyhow!("query is required"))?;
+
+    match lookup_record_candidates(&ctx.state, actor, ctx.org_id, ctx.company_id, query, None)
+        .await?
+    {
+        RecordLookup::NotRequested => {}
+        RecordLookup::Match(candidate) => {
+            let snapshots = fetch_authorized_live_snapshots(
+                &ctx.state,
+                actor,
+                ctx.org_id,
+                ctx.company_id,
+                &[candidate],
+            )
+            .await?;
+            return Ok(build_authorized_output(snapshots, false));
+        }
+        result @ (RecordLookup::NotFound | RecordLookup::Ambiguous) => {
+            let mut output = build_authorized_output(Vec::new(), false);
+            output.summary = if matches!(result, RecordLookup::Ambiguous) {
+                "More than one record matches. Use the exact record reference.".into()
+            } else {
+                "No matching record was available in this company.".into()
+            };
+            return Ok(output);
+        }
+    }
 
     let limit = input
         .get("limit")

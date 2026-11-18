@@ -4,6 +4,7 @@ mod linked_costs;
 mod metrics;
 mod model;
 pub(crate) mod native_links;
+mod portfolio;
 #[cfg(test)]
 mod postgres_tests;
 mod storage;
@@ -140,6 +141,13 @@ struct ScopeQuery {
     before_id: Option<i64>,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct ReferenceQuery {
+    company_id: u64,
+    reference: String,
+}
+
 impl ScopeQuery {
     fn as_of(&self, local_date: NaiveDate) -> Result<NaiveDate, ApiError> {
         self.as_of
@@ -213,6 +221,20 @@ async fn list(
     Ok(Json(
         json!({"data": data, "asOf": as_of.to_string(), "nextBeforeId": next}),
     ))
+}
+
+async fn resolve_reference(
+    State(state): State<Arc<AppState>>,
+    OrgSession { session, .. }: OrgSession,
+    Query(query): Query<ReferenceQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let scope = authorize(&state, &session, query.company_id, FarmAccess::Read).await?;
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let db = pool.get().await.map_err(ApiError::internal)?;
+    let batch = storage::find_batch_by_reference(&db, &scope, &query.reference)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("farm batch not found".into()))?;
+    Ok(Json(json!({ "data": { "id": batch.id.to_string() } })))
 }
 
 async fn create(
@@ -340,6 +362,8 @@ async fn history(
 pub(super) fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/farm-batches", get(list).post(create))
+        .route("/farm-batches/resolve", get(resolve_reference))
+        .route("/farm-batches/portfolio", get(portfolio::read))
         .route("/farm-batches/:batch_id", get(detail))
         .route("/farm-batches/:batch_id/events", post(append_event))
         .route(

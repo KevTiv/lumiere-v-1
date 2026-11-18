@@ -6,6 +6,8 @@ export type RagUiContext = {
   active_tab?: string
   entity_type?: string
   entity_id?: string
+  /** A record explicitly picked for the assistant. The gateway reauthorizes access. */
+  explicit_record?: true
   selection_summary?: string
   permissions?: string[]
   /** Echo of scoped company (informational; authoritative id is the top-level request field). */
@@ -44,6 +46,7 @@ export function buildRagUiContext(args: {
   permissions?: readonly string[]
   entityType?: string
   entityId?: string
+  explicitRecord?: true
   selectionSummary?: string
 }): RagUiContext | undefined {
   const { route, module } = deriveErpModuleFromPathname(args.pathname)
@@ -69,6 +72,7 @@ export function buildRagUiContext(args: {
 
   const entityId = trimField(args.entityId, 128)
   if (entityId) ctx.entity_id = entityId
+  if (args.explicitRecord === true && entityType && entityId) ctx.explicit_record = true
 
   const selectionSummary = trimField(args.selectionSummary)
   if (selectionSummary) ctx.selection_summary = selectionSummary
@@ -206,6 +210,7 @@ export function sanitizeRagUiContext(raw: unknown): RagUiContext | undefined {
     atCommands,
     entityType: trimField(input.entity_type, 128),
     entityId: trimField(input.entity_id, 128),
+    explicitRecord: input.explicit_record === true ? true : undefined,
     selectionSummary: trimField(input.selection_summary),
     permissions: Array.isArray(input.permissions)
       ? input.permissions.filter((p): p is string => typeof p === "string")

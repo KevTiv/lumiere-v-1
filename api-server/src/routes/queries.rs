@@ -2,8 +2,9 @@
 
 use crate::error::ApiError;
 use crate::query_exec::{
-    execute_authorized_resource_record, execute_resource_query_for_company, resolve_crm_company_id,
-    resolve_sales_company_id,
+    enrich_authoritative_currency, execute_authorized_resource_record,
+    execute_authorized_resource_relations, execute_resource_query_for_company,
+    resolve_crm_company_id, resolve_sales_company_id,
 };
 use crate::session::resolve_api_session;
 use crate::state::AppState;
@@ -21,6 +22,8 @@ use stdb_auth::{has_resource_read_permission, registry_get};
 
 pub(crate) mod action_drafts;
 mod activity_work;
+mod authoritative_search;
+pub(crate) use authoritative_search::get_authoritative_search;
 mod chat_history;
 mod expense_allocations;
 mod import_jobs;
@@ -79,6 +82,8 @@ pub(crate) struct OrgQuery {
 pub(crate) struct AuthoritativeQuery {
     #[serde(rename = "companyId", alias = "company_id")]
     company_id: u64,
+    #[serde(default, rename = "includeRelations")]
+    include_relations: bool,
 }
 
 fn owner_read_permission_resource(resource: &str) -> Option<&str> {
@@ -462,7 +467,17 @@ pub(crate) async fn get_authoritative_resource(
     };
     let scoped_context = context.with_company_scope(vec![company_id])?;
     scoped_context.require_company_scope(&[company_id])?;
-    let row = execute_authorized_resource_record(
+    if resource == "documents" {
+        let row = crate::query_exec::read_authoritative_document_metadata(
+            &scoped_context,
+            company_id,
+            record_id,
+        )
+        .await?;
+        scoped_context.require_current_placement(&state.organization_placements)?;
+        return Ok(Json(json!({ "data": row })));
+    }
+    let mut row = execute_authorized_resource_record(
         &client,
         &resource,
         organization_id,
@@ -473,6 +488,30 @@ pub(crate) async fn get_authoritative_resource(
     .await?
     .ok_or_else(|| ApiError::NotFound("Authoritative resource not found".into()))?;
 
+    if query.include_relations {
+        let mut relations = execute_authorized_resource_relations(
+            &client,
+            &resource,
+            organization_id,
+            company_id,
+            record_id,
+            &row,
+            scoped_context.field_access(),
+        )
+        .await;
+        if matches!(resource.as_str(), "account-moves" | "account-payments") {
+            enrich_authoritative_currency(
+                &client,
+                organization_id,
+                &mut row,
+                &mut relations,
+                scoped_context.field_access(),
+            )
+            .await;
+        }
+        scoped_context.require_current_placement(&state.organization_placements)?;
+        return Ok(Json(json!({ "data": row, "relations": relations })));
+    }
     Ok(Json(json!({ "data": row })))
 }
 

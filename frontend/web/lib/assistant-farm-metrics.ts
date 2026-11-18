@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { parseAssistantActionId } from "@lumiere/query-hooks/assistant-actions"
+import { isHistoryDate } from "@lumiere/erp-shared/history-period"
 
 type NumberFormat = (value: number) => string
 
@@ -18,8 +19,9 @@ const monetaryBasis = {
 const farmResponse = z.object({
   data: z.object({
     id: z.string(),
+    reference: z.string().optional(),
     metrics: z.object({
-      asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      asOf: z.string().refine(isHistoryDate),
       recordedDeaths: z.number().int().nonnegative(),
       liveHeadcount: numericMetric,
       mortalityRate: numericMetric,
@@ -65,7 +67,11 @@ function verifiedFarmMetrics(payload: unknown, batchId: string, locale: string) 
     `- Cost per sellable kg — ${cost ? new Intl.NumberFormat(locale, { style: "currency", currency: cost.currency }).format(cost.amountMinorPerKg / 10 ** cost.minorUnitDigits) : "Insufficient records"}`,
     `- Margin — ${margin ? formatMinorUnits(BigInt(margin.amountMinor), margin.currency, margin.minorUnitDigits) : "Insufficient records"}`,
   ].join("\n")
-  return { content, asOf: metrics.asOf }
+  return {
+    content,
+    asOf: metrics.asOf,
+    reference: result.data.data.reference,
+  }
 }
 
 export function farmMetricsReply(payload: unknown, batchId: string, locale: string) {
