@@ -36,6 +36,8 @@ export type AiRagSource = {
   instruction_trust?: "untrusted"
   entity_type?: string
   entity_id?: string
+  /** Set by the gateway for records read through the previous answer. */
+  from_anchor?: boolean
   source_kind?: string
   source_key?: string
   source_version?: string
@@ -441,6 +443,7 @@ export function useAiMemoryRag() {
       /** BCP-47 UI language; recorded with the run, never used for authority. */
       locale?: string
       history_refs?: AiChatHistoryReference[]
+      clear_anchors?: boolean
       signal?: AbortSignal
       import_task_refs?: AiImportTaskReference[]
       attachments?: import("@lumiere/erp-shared/ai-chat-attachments").AiChatAttachment[]
@@ -461,6 +464,7 @@ export function useAiMemoryRag() {
           ...(args.chat_session_key ? { chat_session_key: args.chat_session_key } : {}),
           ...(args.locale ? { locale: args.locale } : {}),
           ...(args.history_refs?.length ? { history_refs: args.history_refs } : {}),
+          ...(args.clear_anchors ? { clear_anchors: true } : {}),
           ...(args.import_task_refs?.length ? { import_task_refs: args.import_task_refs } : {}),
           ...(args.attachments?.length ? { attachments: args.attachments } : {}),
           ...(args.spreadsheet_selection ? { spreadsheet_selection: args.spreadsheet_selection } : {}),

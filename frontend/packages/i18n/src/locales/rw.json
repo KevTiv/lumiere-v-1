@@ -1,5 +1,12 @@
 {
   "aiChat": {
+    "followUp": {
+      "using": "Hakoreshejwe: {{label}} biturutse ku kibazo cyawe cya nyuma",
+      "usingMore": "Hakoreshejwe: {{label}} n’ibindi {{more}} biturutse ku kibazo cyawe cya nyuma",
+      "clear": "Reka kubikoresha",
+      "clearLabel": "Reka gukoresha inyandiko zibanza ku kibazo gikurikira",
+      "cleared": "Ntibizakoreshwa"
+    },
     "draft": {
       "applied": "Byashyizwe mu bikorwa",
       "proposedValue": "Agaciro kasabwe",
@@ -4422,7 +4429,9 @@
       "reviewedInventoryCounts": "Ibarura ry’ibicuruzwa ryanditswe",
       "shopSalesPreviewUnavailable": "Igiteranyo cy’ibyagurishijwe mu iduka nticyashoboye kugenzurwa. Ongera ufungure isuzuma mbere yo kubika.",
       "shopSalesPreviewCounts": "Isuzuma · {{newCount}} bishya · {{existingCount}} bisanzwe birimo · {{heldCount}} birategereje",
-      "shopSalesPreviewAmounts": "{{currency}} {{newAmount}} azandikwa · {{currency}} {{existingAmount}} asanzwe yanditswe"
+      "shopSalesPreviewAmounts": "{{currency}} {{newAmount}} azandikwa · {{currency}} {{existingAmount}} asanzwe yanditswe",
+      "importsPaused": "Kwinjiza amakuru byahagaritswe kubera ivugurura",
+      "importsPausedResume": "Ibyo winjije byabitswe birabitswe. Ongera ugerageze igihe kwinjiza bizaba byasubukuwe; imirongo yamaze kubikwa ntizongera kwandikwa."
     },
     "importWorkflow": {
       "operationExplanation": "Suzuma imirongo y’umwimerere n’impinduka ziteganyijwe mbere yo kubika. Reba ibyabitswe mu bisubizo.",

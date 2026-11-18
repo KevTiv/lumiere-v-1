@@ -17,6 +17,10 @@ Status: draft. The gateway suite passed in the Cloud Runner after preparing the 
 - Reconciled the branch with `main` at #448: the initial gate and any shape repair
   share the same attachment evidence, the browser sends both attachments and the
   locale, and typed withhold reasons still use the shared history notice.
+- Synced with `main` through #451. The assistant request retains attachments,
+  history references, and the session-scoped `clear_anchors` flag alongside
+  `locale`. The skill catalog check, web typecheck, 40 focused web tests, Rust
+  check of API and gateway test targets, and 72 gateway RAG tests passed locally.
 
 ## Remaining
 - Confirm the full hosted CI run on the updated draft.

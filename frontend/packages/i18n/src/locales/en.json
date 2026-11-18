@@ -13889,6 +13889,13 @@
     }
   },
   "aiChat": {
+    "followUp": {
+      "using": "Using: {{label}} from your last question",
+      "usingMore": "Using: {{label}} and {{more}} more from your last question",
+      "clear": "Stop using",
+      "clearLabel": "Stop using earlier records for my next question",
+      "cleared": "Won't be used next"
+    },
     "attachments": {
       "choose": "Attach text to this question",
       "help": "Up to 3 UTF-8 text files (.txt, .md, .csv, .tsv, .json), 4 KB each. Sent with your next question as user-provided context, not imported ERP records. History keeps filenames only.",
@@ -16758,6 +16765,8 @@
       "shopSalesPreviewUnavailable": "Shop Sales totals could not be verified. Refresh the preview before saving.",
       "shopSalesPreviewCounts": "Preview · {{newCount}} new · {{existingCount}} already present · {{heldCount}} held",
       "shopSalesPreviewAmounts": "{{currency}} {{newAmount}} to create · {{currency}} {{existingAmount}} already present",
+      "importsPaused": "Imports are paused for an update",
+      "importsPausedResume": "Your saved import is kept. Try again when imports resume; rows already saved are matched, not repeated.",
       "cardBoundary": "Source confirmation does not create ERP records. The receipts below describe verified ERP drafts.",
       "cardVerified": "{{records}} verified draft journal entries · {{lines}} lines",
       "cardTotals": "Debit {{debit}} · credit {{credit}} · currency #{{currency}}",

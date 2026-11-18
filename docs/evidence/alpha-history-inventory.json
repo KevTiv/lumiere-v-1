@@ -542,7 +542,7 @@
     },
     {
       "path": "api-server/src/routes/import_reviews/mod.rs",
-      "sha256": "a61990cf7547f437ad767380412550faab449e53cb0ab5c85f9b80ed6fca1873"
+      "sha256": "978b38563fed97aa6d3c10e597e962b515e4bf6412b7a3929b970686dea7989f"
     },
     {
       "path": "api-server/src/routes/import_reviews/tasks.rs",
@@ -1602,7 +1602,7 @@
       "surface": "settings",
       "source": "api-server/src/routes/import_reviews/mod.rs",
       "function": "create",
-      "line": 162,
+      "line": 163,
       "owner": "source-review/import API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "review-store-or-exact-native-receipt-owner-review-required",
@@ -1615,7 +1615,7 @@
       "surface": "settings",
       "source": "api-server/src/routes/import_reviews/mod.rs",
       "function": "decide",
-      "line": 246,
+      "line": 247,
       "owner": "source-review/import API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "review-store-or-exact-native-receipt-owner-review-required",
@@ -1628,7 +1628,7 @@
       "surface": "settings",
       "source": "api-server/src/routes/import_reviews/mod.rs",
       "function": "decide_bulk",
-      "line": 365,
+      "line": 366,
       "owner": "source-review/import API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "review-store-or-exact-native-receipt-owner-review-required",

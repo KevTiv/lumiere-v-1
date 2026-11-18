@@ -5,11 +5,18 @@ use futures::StreamExt;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::{error::AppError, harness::ActorCredentials, state::AppState};
+use crate::{
+    error::AppError,
+    harness::{follow_up_reference::parse_anchor_refs, ActorCredentials, EntityRef},
+    state::AppState,
+};
 
 use super::history_references::HistoryReference;
 
 const MAX_CONTEXT_RESPONSE_BYTES: usize = 16 * 1024;
+/// Envelope versions this gateway reads. Version 2 adds `anchorRefs`; keep
+/// reading 1 so the gateway can deploy before the history owner.
+const SUPPORTED_SCHEMA_VERSIONS: [u8; 2] = [1, 2];
 const CONTEXT_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Default)]
@@ -17,6 +24,9 @@ pub(super) struct Conversation {
     pub prompt: Option<Value>,
     pub references: Vec<HistoryReference>,
     pub earlier_context_unavailable: bool,
+    /// Identities of the previous grounded answer's records. Hints only: they
+    /// are never evidence until freshly authorized for this turn.
+    pub anchors: Vec<EntityRef>,
 }
 
 pub(super) fn trim(prompt: &mut Option<Value>) -> bool {
@@ -52,6 +62,8 @@ struct ContextEnvelope {
     summary: Value,
     recent_turns: Vec<Value>,
     history_refs: Vec<Value>,
+    #[serde(default)]
+    anchor_refs: Vec<Value>,
 }
 
 pub(super) async fn recheck_scope(
@@ -155,7 +167,7 @@ pub(super) async fn retrieve(
 }
 
 fn assemble(context: ContextEnvelope, org_id: u64, company_id: u64, key: &str) -> Conversation {
-    if context.schema_version != 1
+    if !SUPPORTED_SCHEMA_VERSIONS.contains(&context.schema_version)
         || context.organization_id != org_id.to_string()
         || context.company_id != company_id.to_string()
         || context.session_key != key
@@ -176,10 +188,17 @@ fn assemble(context: ContextEnvelope, org_id: u64, company_id: u64, key: &str) -
             "recent_messages": context.recent_turns,
         })
     });
+    // Version 1 never carries anchors; ignore any that appear regardless.
+    let anchors = if context.schema_version >= 2 {
+        parse_anchor_refs(&context.anchor_refs)
+    } else {
+        Vec::new()
+    };
     Conversation {
         prompt,
         references,
         earlier_context_unavailable: context.earlier_context_unavailable,
+        anchors,
     }
 }
 
@@ -188,8 +207,12 @@ mod tests {
     use super::*;
 
     fn envelope(revision: u8) -> ContextEnvelope {
+        envelope_version(revision, 1)
+    }
+
+    fn envelope_version(revision: u8, version: u8) -> ContextEnvelope {
         serde_json::from_value(json!({
-            "schemaVersion": 1, "organizationId": "7", "companyId": "9", "sessionKey": "thread",
+            "schemaVersion": version, "organizationId": "7", "companyId": "9", "sessionKey": "thread",
             "revision": revision, "coveredThrough": "23", "earlierContextUnavailable": false,
             "summary": {
                 "objective": { "messageId": "1", "role": "user", "text": "Preserve opening balances" },
@@ -270,5 +293,45 @@ mod tests {
         assert!(unauthorized.prompt.is_none());
         assert!(unauthorized.references.is_empty());
         assert!(unauthorized.earlier_context_unavailable);
+    }
+
+    #[test]
+    fn v1_and_v2_envelopes_are_accepted_and_only_v2_carries_anchors() {
+        let v1 = assemble(envelope(2), 7, 9, "thread");
+        assert!(v1.prompt.is_some() && v1.anchors.is_empty());
+        assert!(!v1.earlier_context_unavailable);
+
+        let mut v2 = envelope_version(2, 2);
+        v2.anchor_refs = vec![
+            json!({"entityType":"account_move","entityId":"123"}),
+            json!({"entityType":"bogus","entityId":"1"}),
+            json!({"entityType":"contact","entityId":"-4"}),
+            json!(17),
+        ];
+        let context = assemble(v2, 7, 9, "thread");
+        assert!(context.prompt.is_some());
+        assert_eq!(context.anchors.len(), 1);
+        assert_eq!(context.anchors[0].entity_type, "account_move");
+        assert_eq!(context.anchors[0].entity_id, 123);
+
+        // A version-1 envelope that smuggles anchors gets none.
+        let mut smuggled = envelope(2);
+        smuggled.anchor_refs = vec![json!({"entityType":"contact","entityId":"4"})];
+        assert!(assemble(smuggled, 7, 9, "thread").anchors.is_empty());
+
+        // Unknown future versions still fail closed.
+        let unknown = assemble(envelope_version(2, 3), 7, 9, "thread");
+        assert!(unknown.prompt.is_none() && unknown.earlier_context_unavailable);
+    }
+
+    #[test]
+    fn envelope_without_anchor_field_still_parses() {
+        let parsed: ContextEnvelope = serde_json::from_value(json!({
+            "schemaVersion": 2, "organizationId": "7", "companyId": "9", "sessionKey": "t",
+            "revision": 0, "coveredThrough": "0", "earlierContextUnavailable": false,
+            "summary": {}, "recentTurns": [], "historyRefs": [],
+        }))
+        .expect("anchorRefs is optional");
+        assert!(parsed.anchor_refs.is_empty());
     }
 }

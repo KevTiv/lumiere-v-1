@@ -144,6 +144,8 @@ export interface RagPayload extends RagAgentSelection {
   chat_session_key?: string
   locale?: string
   history_refs?: AssistantHistoryReference[]
+  /** Narrowing only: skip the previous answer's records for this question. */
+  clear_anchors?: true
   spreadsheet_selection?: z.infer<typeof spreadsheetSelection>
   ui_action_offers: RagUiActionOffer[]
 }
@@ -276,6 +278,7 @@ export async function prepareRagPayload(params: {
   if (sessionKey) payload.chat_session_key = sessionKey
   if (locale) payload.locale = locale
   if (historyRefs) payload.history_refs = historyRefs
+  if (sessionKey && body.clear_anchors === true) payload.clear_anchors = true
 
   return { ok: true, payload }
 }

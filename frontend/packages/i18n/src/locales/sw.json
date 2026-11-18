@@ -1,5 +1,12 @@
 {
   "aiChat": {
+    "followUp": {
+      "using": "Inatumia: {{label}} kutoka swali lako la mwisho",
+      "usingMore": "Inatumia: {{label}} na {{more}} zaidi kutoka swali lako la mwisho",
+      "clear": "Acha kutumia",
+      "clearLabel": "Acha kutumia rekodi za awali kwa swali langu linalofuata",
+      "cleared": "Haitatumika tena"
+    },
     "draft": {
       "applied": "Imetekelezwa",
       "proposedValue": "Thamani iliyopendekezwa",

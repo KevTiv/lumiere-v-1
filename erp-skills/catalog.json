@@ -815,6 +815,11 @@
             "required": false
           },
           {
+            "name": "clear_anchors",
+            "rustType": "bool",
+            "required": false
+          },
+          {
             "name": "ui_action_offers",
             "rustType": "Vec<UiActionOffer>",
             "required": false

@@ -142,6 +142,7 @@ jobs:
             exit 1
           }
           : "${RAILWAY_TOKEN:?Configure RAILWAY_TOKEN on the selected GitHub Environment}"
+          : "${API_READINESS_URL:?Configure RAILWAY_API_READINESS_URL on the selected GitHub Environment}"
           if [[ "$RAILWAY_ENVIRONMENT" == production && -z "$EDGE_READINESS_URL" ]]; then
             echo "Production releases require edge_readiness_url" >&2
             exit 1
@@ -244,6 +245,13 @@ jobs:
         shell: bash
         run: bash scripts/railway-stack-release.sh promote-publisher spacetimedb-publisher
 
+      # Import writes stay paused from before the schema changes until the new
+      # API server serves the expected catalog. A failure in any step between
+      # these two leaves the pause on; it is only lifted by the step below.
+      - name: Phase 2b — pause Sales and Warehouse import writes
+        shell: bash
+        run: bash scripts/railway-stack-release.sh set-import-pause api-server on
+
       - name: Phase 3 — apply PostgreSQL storage migrations from shared runtime image
         shell: bash
         run: bash scripts/railway-stack-release.sh redeploy-storage storage-migrate
@@ -262,9 +270,19 @@ jobs:
         run: bash scripts/railway-stack-release.sh redeploy-source api-server
 
       - name: Phase 5 gate — API readiness
-        if: env.API_READINESS_URL != ''
         shell: bash
         run: bash scripts/railway-stack-release.sh probe "api-server=$API_READINESS_URL"
+
+      - name: Phase 5 gate — served migration catalog version
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(jq -er '.durable_postgres.application_catalog_version' release-compatibility-manifest.json)"
+          bash scripts/railway-stack-release.sh verify-catalog "api-server=$API_READINESS_URL" "$expected"
+
+      - name: Phase 5 resume — lift import pause
+        shell: bash
+        run: bash scripts/railway-stack-release.sh set-import-pause api-server off
 
       - name: Phase 6 — deploy AI gateway from shared runtime image
         if: inputs.enable_ai

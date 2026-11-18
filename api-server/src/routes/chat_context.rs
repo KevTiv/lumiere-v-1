@@ -26,6 +26,38 @@ const MAX_RECENT_TURNS: usize = 7;
 const MAX_EXCERPT_BYTES: usize = 768;
 const MAX_REFERENCES: usize = 8;
 const MAX_REFERENCE_BYTES: usize = 512;
+/// Envelope version. 2 adds `anchorRefs`; the stored checkpoint stays at 1.
+const CONTEXT_SCHEMA_VERSION: u8 = 2;
+const MAX_ANCHOR_REFS: usize = 8;
+/// Live entity types the gateway can re-read. The gateway still re-authorizes
+/// every anchor for the asking actor; this only bounds what is carried over.
+const ANCHOR_ENTITY_TYPES: &[&str] = &[
+    "sale_order",
+    "purchase_order",
+    "project_task",
+    "account_move",
+    "mrp_production",
+    "product",
+    "contact",
+    "account_move_line",
+    "account_account",
+    "account_payment",
+    "stock_move",
+    "stock_move_line",
+    "stock_picking",
+    "stock_cycle_count",
+    "stock_quant",
+    "stock_location",
+    "fleet_inspection",
+    "fleet_service_record",
+    "fleet_vehicle",
+    "lead",
+    "opportunity",
+    "hr_expense",
+    "hr_expense_sheet",
+    "subscription_line",
+    "subscription",
+];
 const MAX_HIGHLIGHTS: usize = 5;
 const MAX_QUESTIONS: usize = 3;
 const MIN_CONTEXT_BYTES: usize = 4 * 1024;
@@ -80,6 +112,14 @@ impl Default for Checkpoint {
     }
 }
 
+/// Identity of a record cited by the last grounded answer. Never its content.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct AnchorRef {
+    entity_type: String,
+    entity_id: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ContextResponse {
@@ -93,6 +133,7 @@ struct ContextResponse {
     summary: Summary,
     recent_turns: Vec<Excerpt>,
     history_refs: Vec<Value>,
+    anchor_refs: Vec<AnchorRef>,
 }
 
 struct Message<'a> {
@@ -102,6 +143,7 @@ struct Message<'a> {
     metadata: Value,
     turn_id: Option<&'a str>,
     safe_assistant_excerpt: bool,
+    sources_json: &'a str,
 }
 
 impl<'a> Message<'a> {
@@ -132,6 +174,7 @@ impl<'a> Message<'a> {
             metadata,
             turn_id: row["turnId"].as_str().filter(|id| !id.is_empty()),
             safe_assistant_excerpt,
+            sources_json: row["sourcesJson"].as_str().unwrap_or("[]"),
         })
     }
 
@@ -190,6 +233,57 @@ fn complete_turns<'a>(messages: &'a [Message<'a>]) -> Vec<Turn<'a>> {
         }
     }
     turns
+}
+
+/// `(entity_type, entity_id)` pairs of the newest grounded assistant answer.
+///
+/// Only identities are read from the saved sources: no prose, snippet, label or
+/// field value is carried. Turns without sources (fixed replies, errors) are
+/// skipped so they do not erase the last grounded subject. The gateway treats
+/// every pair as a hint and re-authorizes it for the current actor.
+fn anchor_refs(turns: &[Turn<'_>]) -> Vec<AnchorRef> {
+    for turn in turns.iter().rev() {
+        let Ok(Value::Array(sources)) = serde_json::from_str::<Value>(turn.assistant.sources_json)
+        else {
+            continue;
+        };
+        if sources.is_empty() {
+            continue;
+        }
+        let mut anchors: Vec<AnchorRef> = Vec::new();
+        for source in &sources {
+            if source["kind"].as_str() != Some("live")
+                || source["trust"].as_str() != Some("authoritative")
+            {
+                continue;
+            }
+            let (Some(entity_type), Some(entity_id)) =
+                (source["entity_type"].as_str(), source["entity_id"].as_str())
+            else {
+                continue;
+            };
+            let entity_type = entity_type.trim().to_ascii_lowercase().replace('-', "_");
+            let valid_id = !entity_id.is_empty()
+                && entity_id.len() <= 20
+                && entity_id.bytes().all(|byte| byte.is_ascii_digit())
+                && entity_id.bytes().any(|byte| byte != b'0');
+            if !valid_id || !ANCHOR_ENTITY_TYPES.contains(&entity_type.as_str()) {
+                continue;
+            }
+            let anchor = AnchorRef {
+                entity_type,
+                entity_id: entity_id.trim_start_matches('0').to_owned(),
+            };
+            if !anchors.contains(&anchor) {
+                anchors.push(anchor);
+            }
+            if anchors.len() == MAX_ANCHOR_REFS {
+                break;
+            }
+        }
+        return anchors;
+    }
+    Vec::new()
 }
 
 fn track_unfinished(checkpoint: &mut Checkpoint, messages: &[Message<'_>], through: u64) -> bool {
@@ -390,7 +484,7 @@ async fn assemble(
     if request.scope_only {
         recheck_context_scope(state, &auth, company).await?;
         return Ok(ContextResponse {
-            schema_version: 1,
+            schema_version: CONTEXT_SCHEMA_VERSION,
             organization_id: org.to_string(),
             company_id: company.to_string(),
             session_key: request.session_key,
@@ -400,6 +494,7 @@ async fn assemble(
             summary: Summary::default(),
             recent_turns: Vec::new(),
             history_refs: Vec::new(),
+            anchor_refs: Vec::new(),
         });
     }
     let latest = state
@@ -517,7 +612,7 @@ async fn assemble(
         add_references(&mut refs, &turn.user.metadata);
     }
     let mut output = ContextResponse {
-        schema_version: 1,
+        schema_version: CONTEXT_SCHEMA_VERSION,
         organization_id: org_text,
         company_id: company_text,
         session_key: request.session_key,
@@ -527,6 +622,7 @@ async fn assemble(
         summary: checkpoint.summary,
         recent_turns: recent,
         history_refs: refs,
+        anchor_refs: anchor_refs(&turns),
     };
     let budget = request
         .context_byte_budget
@@ -542,7 +638,8 @@ async fn assemble(
         } else if !output.recent_turns.is_empty() {
             output.recent_turns.remove(0);
         } else if output.summary.questions.pop().is_some() {
-        } else if output.history_refs.pop().is_none() {
+        } else if output.history_refs.pop().is_some() {
+        } else if output.anchor_refs.pop().is_none() {
             break;
         }
         output.earlier_context_unavailable = true;
@@ -588,6 +685,7 @@ mod tests {
                 metadata: json!({"turnId":turn_id,"historyRefs":[reference]}),
                 turn_id: Some(turn_id),
                 safe_assistant_excerpt: false,
+                sources_json: "[]",
             };
             let assistant = Message {
                 id: 2 * index + 2,
@@ -596,6 +694,7 @@ mod tests {
                 metadata: json!({"turnId":turn_id}),
                 turn_id: Some(turn_id),
                 safe_assistant_excerpt: false,
+                sources_json: "[]",
             };
             assert_eq!(
                 compact(&mut checkpoint, &complete_turns(&[user, assistant])),
@@ -623,6 +722,7 @@ mod tests {
             metadata: json!({"turnId":"fbf63d6e-0160-4658-8ba5-846b57ced04c"}),
             turn_id: Some("fbf63d6e-0160-4658-8ba5-846b57ced04c"),
             safe_assistant_excerpt: false,
+            sources_json: "[]",
         };
         let assistant = Message {
             id: 2,
@@ -631,7 +731,129 @@ mod tests {
             metadata: json!({"turnId":"c795112d-1ab2-4a23-9cd0-ccca1ff2996e"}),
             turn_id: Some("c795112d-1ab2-4a23-9cd0-ccca1ff2996e"),
             safe_assistant_excerpt: false,
+            sources_json: "[]",
         };
         assert!(complete_turns(&[user, assistant]).is_empty());
+    }
+
+    fn grounded_turn<'a>(
+        base: u64,
+        turn_id: &'a str,
+        sources: &'a str,
+        text: &'a str,
+    ) -> [Message<'a>; 2] {
+        [
+            Message {
+                id: base,
+                role: "user",
+                text: "question?",
+                metadata: json!({"turnId":turn_id}),
+                turn_id: Some(turn_id),
+                safe_assistant_excerpt: false,
+                sources_json: "[]",
+            },
+            Message {
+                id: base + 1,
+                role: "assistant",
+                text,
+                metadata: json!({"turnId":turn_id}),
+                turn_id: Some(turn_id),
+                safe_assistant_excerpt: false,
+                sources_json: sources,
+            },
+        ]
+    }
+
+    fn anchors_of(messages: &[Message<'_>]) -> Vec<AnchorRef> {
+        anchor_refs(&complete_turns(messages))
+    }
+
+    const TURN_A: &str = "fbf63d6e-0160-4658-8ba5-846b57ced04c";
+    const TURN_B: &str = "c795112d-1ab2-4a23-9cd0-ccca1ff2996e";
+
+    #[test]
+    fn anchors_are_identities_from_the_newest_grounded_answer_never_prose() {
+        let older = grounded_turn(
+            1,
+            TURN_A,
+            r#"[{"kind":"live","trust":"authoritative","entity_type":"sale_order","entity_id":"5","text_snippet":"x"}]"#,
+            "older",
+        );
+        let sources = r#"[
+            {"kind":"live","trust":"authoritative","entity_type":"account-move","entity_id":"123","label":"Invoice INV-0123","text_snippet":"SECRET-AMOUNT"},
+            {"kind":"live","trust":"authoritative","entity_type":"account_move","entity_id":"0123"},
+            {"kind":"passage","trust":"retrieved","entity_type":"sale_order","entity_id":"9","text_snippet":"p"},
+            {"kind":"live","trust":"authoritative","entity_type":"import_task","entity_id":"7"},
+            {"kind":"live","trust":"authoritative","entity_type":"contact","entity_id":"abc"},
+            {"kind":"live","trust":"authoritative","entity_type":"contact","entity_id":"0"},
+            {"kind":"live","trust":"authoritative","entity_type":"contact","entity_id":"44"}
+        ]"#;
+        let newest = grounded_turn(3, TURN_B, sources, "The invoice total is 9,000 EUR");
+        let [a_user, a_assistant] = older;
+        let [b_user, b_assistant] = newest;
+        let anchors = anchors_of(&[a_user, a_assistant, b_user, b_assistant]);
+        assert_eq!(
+            anchors,
+            vec![
+                AnchorRef {
+                    entity_type: "account_move".into(),
+                    entity_id: "123".into()
+                },
+                AnchorRef {
+                    entity_type: "contact".into(),
+                    entity_id: "44".into()
+                },
+            ]
+        );
+        let encoded = serde_json::to_string(&anchors).unwrap();
+        assert!(
+            !encoded.contains("SECRET") && !encoded.contains("9,000") && !encoded.contains("INV")
+        );
+    }
+
+    #[test]
+    fn anchors_are_capped_deduplicated_and_skip_unsourced_replies() {
+        let many = (1..=20)
+            .map(|id| format!(r#"{{"kind":"live","trust":"authoritative","entity_type":"product","entity_id":"{id}"}}"#))
+            .collect::<Vec<_>>()
+            .join(",");
+        let sources = format!("[{many}]");
+        let grounded = grounded_turn(1, TURN_A, &sources, "answer");
+        // A later fixed reply without sources must not erase the last subject.
+        let fixed = grounded_turn(3, TURN_B, "[]", "No authorized data");
+        let [g_user, g_assistant] = grounded;
+        let [f_user, f_assistant] = fixed;
+        let anchors = anchors_of(&[g_user, g_assistant, f_user, f_assistant]);
+        assert_eq!(anchors.len(), MAX_ANCHOR_REFS);
+        assert_eq!(anchors[0].entity_id, "1");
+        assert!(anchors_of(&grounded_turn(1, TURN_A, "not json", "x")).is_empty());
+    }
+
+    #[test]
+    fn anchored_envelope_stays_within_the_context_budget() {
+        let anchors = (1..=MAX_ANCHOR_REFS)
+            .map(|id| AnchorRef {
+                entity_type: "stock_move_line".into(),
+                entity_id: id.to_string(),
+            })
+            .collect::<Vec<_>>();
+        let output = ContextResponse {
+            schema_version: CONTEXT_SCHEMA_VERSION,
+            organization_id: "1".into(),
+            company_id: "2".into(),
+            session_key: "k".into(),
+            revision: 0,
+            covered_through: "0".into(),
+            earlier_context_unavailable: false,
+            summary: Summary::default(),
+            recent_turns: Vec::new(),
+            history_refs: Vec::new(),
+            anchor_refs: anchors,
+        };
+        let bytes = serde_json::to_vec(&output).unwrap();
+        assert!(bytes.len() < MIN_CONTEXT_BYTES);
+        assert!(String::from_utf8(bytes)
+            .unwrap()
+            .contains(r#""schemaVersion":2"#));
     }
 }
