@@ -58,6 +58,9 @@ pub struct TextEvidence {
     pub refs: Vec<EvidenceRef>,
     /// Every number in that evidence.
     pub figures: Vec<f64>,
+    /// Exact request-scoped text available to the semantic reviewer. These have
+    /// no persisted passage row id and cannot become persisted-passage citations.
+    pub(crate) request_sources: Vec<SourcePassage>,
 }
 
 impl TextEvidence {
@@ -320,10 +323,9 @@ impl GatedTextAnswer {
 
     /// What to show in place of a withheld candidate.
     pub fn withheld_notice(&self) -> String {
-        match &self.verification.reason {
-            Some(reason) => format!("This answer could not be verified and was withheld: {reason}"),
-            None => "This answer could not be verified and was withheld.".to_string(),
-        }
+        lumiere_policy_core::withheld_answer::withheld_answer_notice(
+            self.verification.reason.as_deref(),
+        )
     }
 }
 
@@ -676,12 +678,13 @@ async fn gate_candidate(
         calculations: structured.calculations.clone(),
     };
     let (report, durable_provenance) = gate
-        .evaluate(
+        .evaluate_with_request_sources(
             &draft,
             &AdmissionEvidence {
                 known: &known,
                 data_figures: &evidence.figures,
             },
+            &evidence.request_sources,
         )
         .await?;
 

@@ -7,6 +7,11 @@ on:
         description: Full 40-character commit SHA to build and deploy
         required: true
         type: string
+      skip_grounded_chat:
+        description: Skip the grounded chat acceptance check (the use is recorded in the job summary)
+        required: false
+        default: false
+        type: boolean
 concurrency:
   group: railway-stack-production
   cancel-in-progress: false
@@ -50,6 +55,16 @@ jobs:
           ref: ${{ inputs.release_sha }}
           fetch-depth: 1
 
+      - name: Record skipped grounded chat check
+        if: inputs.skip_grounded_chat
+        shell: bash
+        env:
+          RELEASE_ACTOR: ${{ github.actor }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          echo "### Grounded chat check SKIPPED" >> "$GITHUB_STEP_SUMMARY"
+          echo "skip_grounded_chat was set by \`$RELEASE_ACTOR\` for web release \`$RELEASE_SHA\`." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Verify checked-out commit
         shell: bash
         env:
@@ -68,6 +83,13 @@ jobs:
           fi
 
       - uses: ./.github/actions/setup-frontend
+
+      - name: Validate the grounded chat release fixtures
+        if: '!inputs.skip_grounded_chat'
+        env:
+          AI_CHAT_ACCEPTANCE_URL: ${{ vars.AI_CHAT_ACCEPTANCE_URL }}
+          AI_CHAT_ACCEPTANCE_JSON: ${{ secrets.AI_CHAT_ACCEPTANCE_JSON }}
+        run: node scripts/verify-grounded-chat.mjs --check-config
 
       - name: Install frontend dependencies
         working-directory: frontend
@@ -217,3 +239,10 @@ jobs:
 
           echo "Timed out waiting for Railway deployment $deployment_id" >&2
           exit 1
+
+      - name: Verify grounded chat scenarios through the deployed web release
+        if: '!inputs.skip_grounded_chat'
+        env:
+          AI_CHAT_ACCEPTANCE_URL: ${{ vars.AI_CHAT_ACCEPTANCE_URL }}
+          AI_CHAT_ACCEPTANCE_JSON: ${{ secrets.AI_CHAT_ACCEPTANCE_JSON }}
+        run: node scripts/verify-grounded-chat.mjs

@@ -1,0 +1,49 @@
+name: Grounded chat nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: grounded-chat-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Grounded chat acceptance (production)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+    env:
+      AI_CHAT_ACCEPTANCE_URL: ${{ vars.AI_CHAT_ACCEPTANCE_URL }}
+      AI_CHAT_ACCEPTANCE_JSON: ${{ secrets.AI_CHAT_ACCEPTANCE_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Validate the grounded chat fixtures
+        run: node scripts/verify-grounded-chat.mjs --check-config
+
+      - name: Verify grounded chat scenarios against production
+        run: node scripts/verify-grounded-chat.mjs
+
+      - name: Record failure
+        if: failure()
+        shell: bash
+        run: |
+          {
+            echo "### Nightly grounded chat check failed"
+            echo "Run ID: \`$GITHUB_RUN_ID\` (attempt \`$GITHUB_RUN_ATTEMPT\`)"
+            echo "Inspect the failed step above; the likeliest cause of a sudden failure is an expired acceptance session cookie."
+          } >> "$GITHUB_STEP_SUMMARY"

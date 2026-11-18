@@ -1,3 +1,5 @@
+> Superseded for repository-owned skills by [skill ownership and lifecycle](skill-ownership-and-lifecycle.md) (2026-11-17). Historical record only for those steps.
+
 # Mistral alpha work coordination — 2026-10-23
 
 ## Scope and source

@@ -10,9 +10,9 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::Result;
 use qdrant_client::{
     qdrant::{
-        r#match::MatchValue, Condition, CreateFieldIndexCollectionBuilder, DeletePointsBuilder,
-        Distance, FieldCondition, FieldType, Filter, GetPointsBuilder, Match, PointStruct,
-        PointsIdsList, SearchPointsBuilder, UpsertPointsBuilder, VectorParamsBuilder,
+        r#match::MatchValue, Condition, CountPointsBuilder, CreateFieldIndexCollectionBuilder,
+        DeletePointsBuilder, Distance, FieldCondition, FieldType, Filter, GetPointsBuilder, Match,
+        PointStruct, PointsIdsList, SearchPointsBuilder, UpsertPointsBuilder, VectorParamsBuilder,
         VectorsConfigBuilder,
     },
     Payload, Qdrant,
@@ -23,6 +23,9 @@ use uuid::Uuid;
 
 use crate::harness::LiveSnapshot;
 use crate::{config::Config, providers::Providers, qdrant_client::SemanticIndexRecord};
+
+// A reserved non-identity namespace gives shared points disjoint Qdrant IDs.
+pub(crate) const COMPANY_REINDEX_SCOPE: &str = "company-reindex-v1";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -47,6 +50,13 @@ pub struct ActivityIndexRecord {
     pub actor_identity: String,
 }
 
+impl ActivityIndexRecord {
+    pub(crate) fn is_company_reindex(&self) -> bool {
+        self.actor_identity == COMPANY_REINDEX_SCOPE
+            && self.semantic.tags.as_slice() == [COMPANY_REINDEX_SCOPE]
+    }
+}
+
 /// A reference-only hit returned from activity search.
 #[derive(Debug, Clone, Serialize)]
 pub struct ContextHit {
@@ -63,13 +73,35 @@ pub(crate) fn activity_for_snapshot(
     actor_identity: &str,
     snapshot: &LiveSnapshot,
 ) -> Result<Activity> {
-    if !snapshot.row.is_object() || snapshot.row.as_object().is_none_or(|row| row.is_empty()) {
+    anyhow::ensure!(
+        actor_identity != COMPANY_REINDEX_SCOPE,
+        "actor identity required"
+    );
+    projected_activity(
+        org_id,
+        company_id,
+        actor_identity,
+        &snapshot.entity_type,
+        snapshot.entity_id,
+        &snapshot.row,
+    )
+}
+
+fn projected_activity(
+    org_id: u64,
+    company_id: u64,
+    actor_identity: &str,
+    kind: &str,
+    id: u64,
+    fields: &serde_json::Value,
+) -> Result<Activity> {
+    if fields.as_object().is_none_or(|row| row.is_empty()) {
         anyhow::bail!("activity projection has no authorized fields");
     }
     let text = serde_json::to_string(&serde_json::json!({
-        "resource_kind": snapshot.entity_type,
-        "resource_id": snapshot.entity_id.to_string(),
-        "fields": snapshot.row,
+        "resource_kind": kind,
+        "resource_id": id.to_string(),
+        "fields": fields,
     }))?;
     if text.len() > 16 * 1024 {
         anyhow::bail!("activity projection exceeds its byte bound");
@@ -78,11 +110,49 @@ pub(crate) fn activity_for_snapshot(
         org_id,
         company_id,
         actor_identity: actor_identity.to_owned(),
-        entity_type: snapshot.entity_type.clone(),
-        entity_id: snapshot.entity_id.to_string(),
+        entity_type: kind.to_owned(),
+        entity_id: id.to_string(),
         text,
         timestamp: chrono::Utc::now().timestamp_micros(),
     })
+}
+
+/// The only ERP fields eligible for shared embeddings. Readers must see the
+/// exact same display field on their own current authorized record read.
+pub(crate) fn company_reindex_field(kind: &str) -> Option<&'static str> {
+    match kind {
+        "sale_order" => Some("reference"),
+        "purchase_order" | "account_move" | "project_task" | "product" | "contact" => Some("name"),
+        _ => None,
+    }
+}
+
+pub(crate) fn company_reindex_activity(
+    org_id: u64,
+    company_id: u64,
+    kind: &str,
+    id: u64,
+    row: &serde_json::Value,
+) -> Option<Activity> {
+    let field = company_reindex_field(kind)?;
+    let text = row.get(field)?.as_str()?.trim();
+    if text.is_empty() || text.len() > 512 {
+        return None;
+    }
+    let mut fields = serde_json::Map::new();
+    fields.insert(field.into(), serde_json::Value::String(text.into()));
+    let mut activity = projected_activity(
+        org_id,
+        company_id,
+        COMPANY_REINDEX_SCOPE,
+        kind,
+        id,
+        &fields.into(),
+    )
+    .ok()?;
+    // A rebuild is not business activity.
+    activity.timestamp = 0;
+    Some(activity)
 }
 
 // ── RigContext ────────────────────────────────────────────────────────────────
@@ -265,6 +335,23 @@ impl RigContext {
         Ok(())
     }
 
+    /// Number of indexed activity references for one company. This is a
+    /// coverage signal only (any actor, any model); it never authorizes a read.
+    pub async fn count_company_points(&self, org_id: u64, company_id: u64) -> Result<u64> {
+        if org_id == 0 || company_id == 0 {
+            anyhow::bail!("organization and company are required");
+        }
+        let response = self
+            .qdrant
+            .count(
+                CountPointsBuilder::new(&self.collection)
+                    .filter(activity_scope_filter(org_id, company_id))
+                    .exact(true),
+            )
+            .await?;
+        Ok(response.result.map_or(0, |result| result.count))
+    }
+
     /// Exact reference read prevents a status refresh from paying to embed
     /// unchanged content again. Legacy or another model's points never match.
     pub async fn activity_is_current(&self, activity: &Activity) -> Result<bool> {
@@ -290,6 +377,10 @@ impl RigContext {
             )
             .is_some_and(|record| {
                 record.actor_identity == activity.actor_identity
+                    && record.semantic.resource_kind == activity.entity_type
+                    && record.semantic.resource_id == activity.entity_id
+                    && (activity.actor_identity != COMPANY_REINDEX_SCOPE
+                        || record.is_company_reindex())
                     && record.semantic.source_fingerprint == activity_fingerprint(activity)
                     && record.semantic.embedding_model == self.embedding_model
             })
@@ -325,6 +416,39 @@ impl RigContext {
         query_vector: Vec<f32>,
         top_k: usize,
     ) -> Result<Vec<ContextHit>> {
+        anyhow::ensure!(
+            actor_identity != COMPANY_REINDEX_SCOPE,
+            "reader identity required"
+        );
+        self.search_index_scope(org_id, company_id, actor_identity, query_vector, top_k)
+            .await
+    }
+
+    pub(crate) async fn search_company_reindex_with_vector(
+        &self,
+        org_id: u64,
+        company_id: u64,
+        query_vector: Vec<f32>,
+        top_k: usize,
+    ) -> Result<Vec<ContextHit>> {
+        self.search_index_scope(
+            org_id,
+            company_id,
+            COMPANY_REINDEX_SCOPE,
+            query_vector,
+            top_k,
+        )
+        .await
+    }
+
+    async fn search_index_scope(
+        &self,
+        org_id: u64,
+        company_id: u64,
+        index_scope: &str,
+        query_vector: Vec<f32>,
+        top_k: usize,
+    ) -> Result<Vec<ContextHit>> {
         if org_id == 0 || company_id == 0 || !(1..=50).contains(&top_k) {
             anyhow::bail!("bounded organization and company scope are required");
         }
@@ -337,7 +461,7 @@ impl RigContext {
         let mut filter = activity_scope_filter(org_id, company_id);
         filter.must.push(Condition::matches(
             "actor_identity",
-            actor_identity.to_string(),
+            index_scope.to_string(),
         ));
         filter.must.push(Condition::matches(
             "embedding_model",
@@ -360,7 +484,8 @@ impl RigContext {
             .filter_map(|hit| {
                 let record = scoped_activity_record_from_payload(&hit.payload, org_id, company_id)?;
                 if record.semantic.embedding_model != self.embedding_model
-                    || record.actor_identity != actor_identity
+                    || record.actor_identity != index_scope
+                    || (index_scope == COMPANY_REINDEX_SCOPE && !record.is_company_reindex())
                 {
                     return None;
                 }
@@ -489,7 +614,11 @@ fn activity_index_record(
             source_fingerprint: activity_fingerprint(activity),
             embedding_model: embedding_model.to_string(),
             indexed_at,
-            tags: vec!["activity".to_string()],
+            tags: vec![if activity.actor_identity == COMPANY_REINDEX_SCOPE {
+                COMPANY_REINDEX_SCOPE.to_string()
+            } else {
+                "activity".to_string()
+            }],
         },
         activity_timestamp: activity.timestamp,
         actor_identity: activity.actor_identity.clone(),

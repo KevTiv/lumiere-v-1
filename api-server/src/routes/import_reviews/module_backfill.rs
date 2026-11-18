@@ -678,14 +678,14 @@ async fn write_reviewed(
             continue;
         }
         let key = row.business_key()?;
-        let mut existing = row.settled(&tx, &key).await?;
+        let mut existing = row.existing(&tx, &key).await?;
         let mut saved_id = None;
         if !body.preview && matches!(existing, Existing::None) {
             saved_id = row
                 .save(&tx, batch, id, revision, ctx.actor_identity(), &key)
                 .await?;
             if saved_id.is_none() {
-                existing = row.settled(&tx, &key).await?;
+                existing = row.existing(&tx, &key).await?;
             }
         }
         let saved = match existing {
@@ -693,12 +693,6 @@ async fn write_reviewed(
             Existing::Matched(saved) => Some(saved),
             Existing::Held(reason) => {
                 results.push(json!({"itemId":id.to_string(),"status":"held","reason":reason}));
-                continue;
-            }
-            Existing::PendingContract => {
-                results.push(json!({"itemId":id.to_string(),"status":"held",
-                    "reason":reconciliation::PENDING_CONTRACT_REASON,
-                    "code":reconciliation::PENDING_CONTRACT_CODE}));
                 continue;
             }
             Existing::Conflict(reason) => {

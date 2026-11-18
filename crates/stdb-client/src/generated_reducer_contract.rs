@@ -1116,6 +1116,11 @@ const PARAMS_CORRECT_AI_DECISION_CASE: &[ReducerParam] = &[
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("CorrectAiDecisionCaseParams") },
 ];
+const PARAMS_CORRECT_WITHHELD_AI_AGENT_RUNS: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("CorrectWithheldAiAgentRunsParams") },
+];
 const PARAMS_CREATE_ACCOUNT_ACCOUNT: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("CreateAccountAccountParams") },
@@ -6919,6 +6924,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "convert_proposal_to_sale_order", contract_operation_id: "erp.convert_proposal_to_sale_order", params: PARAMS_CONVERT_PROPOSAL_TO_SALE_ORDER, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "convert_purchase_requisition_to_po", contract_operation_id: "erp.convert_purchase_requisition_to_po", params: PARAMS_CONVERT_PURCHASE_REQUISITION_TO_PO, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "correct_ai_decision_case", contract_operation_id: "erp.correct_ai_decision_case", params: PARAMS_CORRECT_AI_DECISION_CASE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "correct_withheld_ai_agent_runs", contract_operation_id: "erp.correct_withheld_ai_agent_runs", params: PARAMS_CORRECT_WITHHELD_AI_AGENT_RUNS, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "create_account_account", contract_operation_id: "erp.create_account_account", params: PARAMS_CREATE_ACCOUNT_ACCOUNT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "create_account_account_type", contract_operation_id: "erp.create_account_account_type", params: PARAMS_CREATE_ACCOUNT_ACCOUNT_TYPE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "create_account_asset", contract_operation_id: "erp.create_account_asset", params: PARAMS_CREATE_ACCOUNT_ASSET, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -8440,6 +8446,7 @@ pub mod reducer_names {
     pub const CONVERT_PROPOSAL_TO_SALE_ORDER: ReducerName = ReducerName::new("convert_proposal_to_sale_order");
     pub const CONVERT_PURCHASE_REQUISITION_TO_PO: ReducerName = ReducerName::new("convert_purchase_requisition_to_po");
     pub const CORRECT_AI_DECISION_CASE: ReducerName = ReducerName::new("correct_ai_decision_case");
+    pub const CORRECT_WITHHELD_AI_AGENT_RUNS: ReducerName = ReducerName::new("correct_withheld_ai_agent_runs");
     pub const CREATE_ACCOUNT_ACCOUNT: ReducerName = ReducerName::new("create_account_account");
     pub const CREATE_ACCOUNT_ACCOUNT_TYPE: ReducerName = ReducerName::new("create_account_account_type");
     pub const CREATE_ACCOUNT_ASSET: ReducerName = ReducerName::new("create_account_asset");
@@ -9946,6 +9953,7 @@ macro_rules! reducer_call {
     ("convert_proposal_to_sale_order", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CONVERT_PROPOSAL_TO_SALE_ORDER, $args) };
     ("convert_purchase_requisition_to_po", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CONVERT_PURCHASE_REQUISITION_TO_PO, $args) };
     ("correct_ai_decision_case", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CORRECT_AI_DECISION_CASE, $args) };
+    ("correct_withheld_ai_agent_runs", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CORRECT_WITHHELD_AI_AGENT_RUNS, $args) };
     ("create_account_account", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_ACCOUNT_ACCOUNT, $args) };
     ("create_account_account_type", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_ACCOUNT_ACCOUNT_TYPE, $args) };
     ("create_account_asset", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_ACCOUNT_ASSET, $args) };

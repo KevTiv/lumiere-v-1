@@ -14,13 +14,21 @@ where item.organization_id = record.organization_id
   and item.source_json #>> '{source,row}' = record.source_row::text
   and nullif(item.source_json #>> '{source,sheet}', '') is not null;
 
--- Expand only. The original five-column unique constraint stays in place so an
--- earlier api-server that names it as its conflict target keeps working. The
--- worksheet-aware writer holds a second worksheet that reuses a row number until
--- module_backfill_provenance_contract drops that constraint.
 alter table lumiere_platform.module_backfill_record
     add constraint module_backfill_source_coordinate_unique
         unique (organization_id, company_id, module, source_sha256, source_worksheet, source_row);
+
+do $$
+declare original_key text;
+begin
+    select conname into strict original_key
+    from pg_constraint
+    where conrelid = 'lumiere_platform.module_backfill_record'::regclass
+      and contype = 'u'
+      and pg_get_constraintdef(oid) = 'UNIQUE (organization_id, company_id, module, source_sha256, source_row)';
+    execute format('alter table lumiere_platform.module_backfill_record drop constraint %I', original_key);
+end
+$$;
 
 create unique index module_backfill_business_key_unique
     on lumiere_platform.module_backfill_record (organization_id, company_id, module, business_key)

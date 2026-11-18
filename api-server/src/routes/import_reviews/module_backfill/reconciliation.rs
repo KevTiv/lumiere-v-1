@@ -19,15 +19,8 @@ pub(super) enum Existing {
     None,
     Matched(SavedRecord),
     Held(&'static str),
-    /// A saved row from another worksheet of the same file still occupies this
-    /// row number under the original source constraint, which the contract
-    /// migration drops. Hold the row rather than fail the whole request.
-    PendingContract,
     Conflict(&'static str),
 }
-
-pub(super) const PENDING_CONTRACT_CODE: &str = "schema_contract_pending";
-pub(super) const PENDING_CONTRACT_REASON: &str = "Another sheet of this file is saved at the same row number. This row can be saved after the pending database update finishes. Try again later.";
 
 pub(super) struct SavedRecord {
     pub id: i64,
@@ -71,50 +64,6 @@ impl BackfillRow<'_> {
             item: saved.get("item_id"),
             revision: saved.get("source_revision"),
         })
-    }
-
-    /// `existing`, plus the one case it cannot see: a different worksheet saved
-    /// at this row number while the original five-column source constraint is
-    /// still present (migration 51 applied, migration 52 not yet).
-    pub async fn settled(
-        &self,
-        tx: &Transaction<'_>,
-        key: &Option<String>,
-    ) -> Result<Existing, ApiError> {
-        let existing = self.existing(tx, key).await?;
-        if matches!(existing, Existing::None) && self.blocked_by_original_constraint(tx).await? {
-            return Ok(Existing::PendingContract);
-        }
-        Ok(existing)
-    }
-
-    async fn blocked_by_original_constraint(&self, tx: &Transaction<'_>) -> Result<bool, ApiError> {
-        let module = self.module.storage_name();
-        let blocked: bool = tx
-            .query_one(
-                "SELECT EXISTS (
-                     SELECT 1 FROM pg_constraint
-                     WHERE conrelid = 'lumiere_platform.module_backfill_record'::regclass
-                       AND contype = 'u'
-                       AND pg_get_constraintdef(oid) =
-                           'UNIQUE (organization_id, company_id, module, source_sha256, source_row)'
-                 ) AND EXISTS (
-                     SELECT 1 FROM lumiere_platform.module_backfill_record
-                     WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric
-                       AND module=$3 AND source_sha256=$4 AND source_row=$5
-                 )",
-                &[
-                    &self.organization,
-                    &self.company,
-                    &module,
-                    &self.source.sha256,
-                    &i64::from(self.source.row),
-                ],
-            )
-            .await
-            .map_err(ApiError::internal)?
-            .get(0);
-        Ok(blocked)
     }
 
     pub async fn existing(
@@ -322,21 +271,6 @@ pub(in crate::routes::import_reviews) async fn exercise_persistence(
     let other_key = other_row.business_key()?;
     ensure!(matches!(
         other_row.existing(tx, &other_key).await?,
-        Existing::None
-    ));
-    // Migration 51 alone keeps the original five-column constraint, which this
-    // second worksheet would hit. It is held, not a failed request.
-    ensure!(matches!(
-        other_row.settled(tx, &other_key).await?,
-        Existing::PendingContract
-    ));
-    // Migration 52 drops that constraint and the same row can then be saved.
-    tx.batch_execute(include_str!(
-        "../../../cold_tier/module_backfill_provenance_contract.sql"
-    ))
-    .await?;
-    ensure!(matches!(
-        other_row.settled(tx, &other_key).await?,
         Existing::None
     ));
     let other_id = other_row
