@@ -63,6 +63,7 @@ impl AuthorizedSelection {
             source_version: string("versionId"),
             passage_key: None,
             content_hash: string("checksum"),
+            from_anchor: false,
         }
     }
 }

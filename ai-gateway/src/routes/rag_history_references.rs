@@ -125,6 +125,7 @@ impl ResolvedHistoryReference {
             source_version: Some(self.digest.clone()),
             passage_key: None,
             content_hash: Some(self.digest.clone()),
+            from_anchor: false,
         }
     }
 }

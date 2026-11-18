@@ -13889,6 +13889,13 @@
     }
   },
   "aiChat": {
+    "followUp": {
+      "using": "Using: {{label}} from your last question",
+      "usingMore": "Using: {{label}} and {{more}} more from your last question",
+      "clear": "Stop using",
+      "clearLabel": "Stop using earlier records for my next question",
+      "cleared": "Won't be used next"
+    },
     "attachments": {
       "choose": "Attach text to this question",
       "help": "Up to 3 UTF-8 text files (.txt, .md, .csv, .tsv, .json), 4 KB each. Sent with your next question as user-provided context, not imported ERP records. History keeps filenames only.",

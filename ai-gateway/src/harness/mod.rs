@@ -9,6 +9,7 @@ pub mod distributor_controls;
 pub mod entity_registry;
 pub mod finance_review;
 pub mod finance_skills;
+pub mod follow_up_reference;
 pub mod governed_llm_skills;
 pub mod import_mapping;
 pub mod insights_scan;
@@ -27,6 +28,7 @@ pub mod snapshot;
 
 pub use snapshot::{
     fetch_authorized_live_snapshots, filter_entity_refs_by_allowed_types,
-    format_live_context_block, resolve_snapshot_candidates, ActorCredentials, EntityRef,
-    LiveSnapshot, SnapshotUiContext, HARNESS_MAX_LIVE_SNAPSHOTS, RAG_MAX_LIVE_SNAPSHOTS,
+    format_live_context_block, resolve_snapshot_candidates,
+    resolve_snapshot_candidates_with_anchors, ActorCredentials, EntityRef, LiveSnapshot,
+    SnapshotUiContext, HARNESS_MAX_LIVE_SNAPSHOTS, RAG_MAX_LIVE_SNAPSHOTS,
 };

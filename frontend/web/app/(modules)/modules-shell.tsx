@@ -118,6 +118,7 @@ function mapRagSourceToChatSource(s: AiRagSource): ChatMessageSourceRef {
     trust: s.trust,
     entity_type: s.entity_type,
     entity_id: s.entity_id,
+    ...(s.from_anchor === true ? { from_anchor: true } : {}),
     source_kind: s.source_kind,
     source_key: s.source_key,
     source_version: s.source_version,
@@ -265,6 +266,8 @@ function ErpAiChatPanel({
   const [, refreshSending] = useState(0)
   const inFlight = useRef(new Map<string, InFlightTurn>())
   const recentTurns = useRef(new Map<string, TurnProjection>())
+  // Set when the user dismisses "Using: ..."; held until an answer with sources lands.
+  const clearFollowUpAnchors = useRef<string | null>(null)
   const currentHistoryScope = useRef(historyScope)
   currentHistoryScope.current = historyScope
   const currentActorHistory = useRef({ scope: actorHistoryScope })
@@ -541,6 +544,7 @@ function ErpAiChatPanel({
       onOpenGuide: (request: OpenGuideRequest) => {
         if (actorHistoryScope) setOpenGuide({ scope: historyScope, request })
       },
+      onClearFollowUpAnchors: () => { clearFollowUpAnchors.current = sessionKey ?? null },
       onApproveActionDraft: async (draft: { draftId: number; companyId?: number }) => {
         return approveActionDraft.mutateAsync({
           draftId: draft.draftId,
@@ -707,7 +711,11 @@ function ErpAiChatPanel({
       const attachments = await readChatAttachments(files)
       if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[], attachmentsConsumed: false }
       const attachmentNames = attachments.length ? attachments.map(file => file.name) : undefined
-      const continuity = { chat_session_key: sessionKey, history_refs: selectedReferences?.length ? [...selectedReferences] : undefined }
+      const continuity = {
+        chat_session_key: sessionKey,
+        history_refs: selectedReferences?.length ? [...selectedReferences] : undefined,
+        ...(clearFollowUpAnchors.current !== null && clearFollowUpAnchors.current === sessionKey ? { clear_anchors: true } : {}),
+      }
       await ensureSession(userText)
       if (!isCurrent()) throw new Error("The conversation company changed.")
       const selectedDocument = !questionGuide && scopedSelectionDraft && userText.includes(scopedSelectionDraft.text)
@@ -881,6 +889,7 @@ function ErpAiChatPanel({
       if ("kind" in turn) return { content: "", sources: [] as ChatMessageSourceRef[], attachmentsConsumed: false }
       const out = turn.answer.kind === "ready" ? turn.answer.value : undefined
       const sources = (out?.sources ?? []).map(mapRagSourceToChatSource)
+      if (sources.length > 0) clearFollowUpAnchors.current = null
       const guides = out?.guides
       const taskStatuses = scopedImportTaskStatuses(out?.importTasks, { organizationId: orgId, companyId: operatingCompanyId, taskIds: importTaskIds ?? [] })
       const draftActions = turn.drafts.kind === "ready" ? turn.drafts.value : []

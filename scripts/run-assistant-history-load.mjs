@@ -498,7 +498,8 @@ async function main() {
 
   const first = (await getContext(env, admin, companyId, sessionKey)).value
   assert.equal(first.sessionKey, sessionKey)
-  assert.equal(first.schemaVersion, 1)
+  assert.equal(first.schemaVersion, 2, "The chat context endpoint must return the anchor-capable envelope")
+  assert.deepEqual(first.anchorRefs, [], "A transcript without live sources cannot supply follow-up anchors")
   assert.ok(first.revision > 0, "A long thread must publish a checkpoint")
   assert.ok(JSON.stringify(first.summary).includes("SKU-ALPHA-2026"), "The original objective must enter the checkpoint")
   assert.ok(first.summary.questions.some(({ text }) => text === question), "The original question must survive compaction")
@@ -560,6 +561,7 @@ async function main() {
   assert.equal(fresh.revision, 0)
   assert.deepEqual(fresh.recentTurns, [])
   assert.deepEqual(fresh.historyRefs, [])
+  assert.deepEqual(fresh.anchorRefs, [], "A fresh thread must not inherit follow-up anchors")
   assert.deepEqual(fresh.summary, { objective: null, questions: [], highlights: [] })
   const warehouseTransfer = await seedWarehouseOutcome(admin, companyId, `${sessionKey}-warehouse`)
   await seedAssistantAction(admin, companyId, `${sessionKey}-chart`, {
