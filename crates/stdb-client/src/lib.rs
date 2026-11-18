@@ -9,7 +9,7 @@ use serde_json::Value;
 mod chat_history;
 mod contract;
 mod id_window;
-pub use chat_history::{chat_row_id, valid_chat_key, ChatMessagePage};
+pub use chat_history::{chat_row_id, reclassify_withheld_message, valid_chat_key, ChatMessagePage};
 pub use contract::{
     company_scope_paths, reducer_contract, reducer_contract_by_operation_id, reducer_names,
     CompanyScopePath, Exposure, IntoReducerCall, ReducerCall, ReducerContract,

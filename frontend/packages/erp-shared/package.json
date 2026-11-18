@@ -43,6 +43,7 @@
     "./ai-report-composer-schemas": "./src/ai-report-composer-schemas.ts",
     "./ai-low-stock-schemas": "./src/ai-low-stock-schemas.ts",
     "./ai-skill-harness-schemas": "./src/ai-skill-harness-schemas.ts",
+    "./ai-withheld-notice": "./src/ai-withheld-notice.ts",
     "./iot-create-params": "./src/iot-create-params.ts",
     "./replenishment-stock": "./src/replenishment-stock.ts",
     "./warehouse-3d-from-api": "./src/warehouse-3d-from-api.ts",

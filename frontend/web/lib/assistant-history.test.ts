@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { assistantHistoryScope, saveAssistantHistory, scopedAssistantSession } from "./assistant-history"
+import { readFileSync } from "node:fs"
+import { assistantHistoryScope, reclassifyWithheldHistoryRow, saveAssistantHistory, scopedAssistantSession } from "./assistant-history"
+import { WITHHELD_ANSWER_NOTICE, WITHHELD_VERIFICATION_OUTCOMES } from "../../packages/erp-shared/src/ai-withheld-notice"
 
 test("browser conversation keys stay separate by actor, organization and company", () => {
   const data = new Map([["lumiere:erp-ai-chat-session-key", "legacy-unscoped"]])
@@ -50,4 +52,30 @@ test("switching actor/company while saving stops the remaining history writes", 
     isCurrent: () => current,
   }), "scope-changed")
   assert.deepEqual(calls, ["session", "user"])
+})
+
+test("withheld notices and blocked verdicts saved as completed read as failed", () => {
+  const notice = `${WITHHELD_ANSWER_NOTICE}: structured answer must identify at least one material claim`
+  const old = { id: 1, role: "assistant", status: "completed", content: notice, metadata: null }
+  assert.equal(reclassifyWithheldHistoryRow(old).status, "failed")
+  assert.equal(old.status, "completed")
+  for (const outcome of ["blocked", "requires_review"]) {
+    const row = { role: "assistant", status: "completed", content: "text", metadata: JSON.stringify({ answerVerification: { outcome } }) }
+    assert.equal(reclassifyWithheldHistoryRow(row).status, "failed", outcome)
+  }
+})
+
+test("released answers, user messages and unreadable metadata keep their status", () => {
+  const admitted = { role: "assistant", status: "completed", content: "Stock is 4", metadata: JSON.stringify({ answerVerification: { outcome: "admitted" } }) }
+  assert.equal(reclassifyWithheldHistoryRow(admitted), admitted)
+  const user = { role: "user", status: "completed", content: `${WITHHELD_ANSWER_NOTICE}.`, metadata: null }
+  assert.equal(reclassifyWithheldHistoryRow(user), user)
+  const broken = { role: "assistant", status: "completed", content: "ok", metadata: "{nope" }
+  assert.equal(reclassifyWithheldHistoryRow(broken), broken)
+})
+
+test("TypeScript withheld constants mirror the Rust gate source of truth", () => {
+  const rust = readFileSync(new URL("../../../crates/policy-core/src/withheld_answer.rs", import.meta.url), "utf8")
+  assert.ok(rust.includes(`WITHHELD_ANSWER_NOTICE: &str = "${WITHHELD_ANSWER_NOTICE}"`))
+  assert.ok(rust.includes(`WITHHELD_VERIFICATION_OUTCOMES: [&str; 2] = [${WITHHELD_VERIFICATION_OUTCOMES.map(o => `"${o}"`).join(", ")}]`))
 })

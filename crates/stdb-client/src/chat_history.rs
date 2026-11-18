@@ -1,6 +1,9 @@
 //! Bounded SQL reads over the private Assistant transcript tables.
 
 use anyhow::{ensure, Context, Result};
+use lumiere_policy_core::withheld_answer::{
+    is_withheld_answer_notice, WITHHELD_VERIFICATION_OUTCOMES,
+};
 use serde_json::Value;
 
 use crate::{normalize_spacetime_identity_header, StdbClient, StdbClientError};
@@ -41,6 +44,53 @@ pub fn chat_row_id(row: &Value) -> Result<u64> {
         .and_then(|id| id.as_u64().or_else(|| id.as_str()?.parse().ok()))
         .filter(|id| *id > 0)
         .context("chat history row has no numeric ID")
+}
+
+/// Gate rejections saved before #442 were stored as completed. Transcript rows
+/// are append-only, so history is corrected on read: an assistant message whose
+/// saved verification outcome is blocked/requires_review, or whose text is a
+/// withheld notice, is reported as failed. Stored rows are never rewritten.
+/// Returns true when the row was reclassified.
+pub fn reclassify_withheld_message(row: &mut Value) -> bool {
+    let Some(fields) = row.as_object_mut() else {
+        return false;
+    };
+    if fields
+        .get("role")
+        .and_then(Value::as_str)
+        .is_some_and(|role| role != "assistant")
+    {
+        return false;
+    }
+    let notice = fields
+        .get("content")
+        .and_then(Value::as_str)
+        .is_some_and(is_withheld_answer_notice);
+    let blocked = fields
+        .get("metadata")
+        .and_then(Value::as_str)
+        .and_then(|raw| serde_json::from_str::<Value>(raw).ok())
+        .is_some_and(|metadata| {
+            ["answerVerification", "verification"].iter().any(|key| {
+                metadata[*key]["outcome"]
+                    .as_str()
+                    .is_some_and(|outcome| WITHHELD_VERIFICATION_OUTCOMES.contains(&outcome))
+            })
+        });
+    if !(notice || blocked) {
+        return false;
+    }
+    if fields.contains_key("status") || fields.contains_key("content") {
+        fields.insert("status".into(), Value::String("failed".into()));
+    }
+    fields.insert("withheldReclassified".into(), Value::Bool(true));
+    true
+}
+
+fn reclassify_withheld(rows: &mut [Value]) {
+    for row in rows {
+        reclassify_withheld_message(row);
+    }
 }
 
 fn actor_scope(org: u64, company: u64, actor: &str, actor_column: &str) -> Result<String> {
@@ -314,7 +364,7 @@ impl StdbClient {
         id: u64,
     ) -> Result<Option<Value>> {
         let scope = thread_scope(org, company, actor, key, "created_by")?;
-        let rows = read_ids(
+        let mut rows = read_ids(
             self,
             "ai_chat_message",
             MESSAGE_COLUMNS,
@@ -323,6 +373,7 @@ impl StdbClient {
             MAX_PAGE_BYTES,
         )
         .await?;
+        reclassify_withheld(&mut rows);
         Ok(rows.into_iter().next())
     }
 
@@ -347,6 +398,7 @@ impl StdbClient {
             MAX_CONTEXT_BYTES,
         )
         .await?;
+        reclassify_withheld(&mut rows);
         rows.reverse();
         Ok(rows)
     }
@@ -384,6 +436,17 @@ impl StdbClient {
         )
         .await?;
         let next_cursor = newest_page_cursor(&rows, selected, remaining)?;
+        if search {
+            // Withheld notices are not answers a user can find by searching.
+            // The cursor was taken first so skipped rows still advance paging.
+            rows.retain(|row| {
+                !row.get("content")
+                    .and_then(Value::as_str)
+                    .is_some_and(is_withheld_answer_notice)
+            });
+        } else {
+            reclassify_withheld(&mut rows);
+        }
         rows.reverse();
         Ok(ChatMessagePage { rows, next_cursor })
     }
@@ -412,7 +475,7 @@ impl StdbClient {
             false,
         )
         .await?;
-        read_ids(
+        let mut rows = read_ids(
             self,
             "ai_chat_message",
             CONTEXT_COLUMNS,
@@ -420,7 +483,9 @@ impl StdbClient {
             ids,
             MAX_CONTEXT_BYTES,
         )
-        .await
+        .await?;
+        reclassify_withheld(&mut rows);
+        Ok(rows)
     }
 }
 
@@ -568,6 +633,106 @@ mod tests {
             .unwrap();
         assert_eq!(third.rows[0]["id"], 1);
         assert_eq!(third.next_cursor, None);
+        server.abort();
+    }
+
+    #[test]
+    fn withheld_notice_or_blocked_verification_reads_as_failed() {
+        let notice = "This answer could not be verified and was withheld: structured answer must identify at least one material claim";
+        let mut old = json!({ "id": 1, "role": "assistant", "status": "completed", "content": notice, "metadata": null });
+        assert!(reclassify_withheld_message(&mut old));
+        assert_eq!(old["status"], "failed");
+        assert_eq!(old["withheldReclassified"], true);
+        assert_eq!(old["content"], notice);
+
+        for outcome in ["blocked", "requires_review"] {
+            let metadata = json!({ "answerVerification": { "outcome": outcome } }).to_string();
+            let mut row = json!({ "id": 2, "role": "assistant", "status": "completed", "content": "text", "metadata": metadata });
+            assert!(reclassify_withheld_message(&mut row), "{outcome}");
+            assert_eq!(row["status"], "failed");
+        }
+    }
+
+    #[test]
+    fn released_and_user_messages_keep_their_status() {
+        let notice = "This answer could not be verified and was withheld.";
+        for outcome in ["admitted", "qualified"] {
+            let metadata = json!({ "answerVerification": { "outcome": outcome } }).to_string();
+            let mut row = json!({ "id": 3, "role": "assistant", "status": "completed", "content": "Totals are ready", "metadata": metadata });
+            assert!(!reclassify_withheld_message(&mut row));
+            assert_eq!(row["status"], "completed");
+            assert!(row.get("withheldReclassified").is_none());
+        }
+        let mut user = json!({ "id": 4, "role": "user", "status": "completed", "content": notice });
+        assert!(!reclassify_withheld_message(&mut user));
+        assert_eq!(user["status"], "completed");
+        let mut malformed = json!({ "id": 5, "role": "assistant", "status": "completed", "content": "ok", "metadata": "{not json" });
+        assert!(!reclassify_withheld_message(&mut malformed));
+    }
+
+    #[tokio::test]
+    async fn message_pages_and_search_apply_withheld_reclassification() {
+        let notice = "This answer could not be verified and was withheld.";
+        let app = Router::new().route(
+            "/v1/database/test/sql",
+            post(move |sql: String| async move {
+                let limit = number_after(&sql, "LIMIT ") as usize;
+                let text = |name: &str| json!({ "name": { "some": name }, "algebraic_type": { "String": [] } });
+                let id_field = json!({ "name": { "some": "id" }, "algebraic_type": { "U64": [] } });
+                let (columns, rows) = if sql.starts_with("SELECT id FROM") {
+                    let low = number_after(&sql, "id >= ");
+                    let high = number_after(&sql, "id <= ");
+                    let rows = (1..=2u64)
+                        .filter(|id| (low..=high).contains(id))
+                        .take(limit)
+                        .map(|id| json!([id]))
+                        .collect::<Vec<_>>();
+                    (vec![id_field], rows)
+                } else if sql.starts_with("SELECT id, content FROM") {
+                    (vec![id_field, text("content")], vec![json!([1, "Stock summary"]), json!([2, notice])])
+                } else {
+                    (
+                        vec![id_field, text("role"), text("status"), text("content")],
+                        vec![json!([1, "assistant", "completed", "Stock summary"]), json!([2, "assistant", "completed", notice])],
+                    )
+                };
+                axum::Json(json!([{ "schema": { "elements": columns }, "rows": rows }]))
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let client = StdbClient::new(format!("http://{address}"), "test".into(), "owner".into());
+        let actor = "ab".repeat(32);
+        let page = client
+            .chat_message_page_with_cursor(1, 4, &actor, "thread", None, 5, false)
+            .await
+            .unwrap();
+        let statuses = page
+            .rows
+            .iter()
+            .map(|row| {
+                (
+                    row["id"].as_u64().unwrap(),
+                    row["status"].as_str().unwrap().to_string(),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            statuses,
+            vec![(1, "completed".into()), (2, "failed".into())]
+        );
+        let found = client
+            .chat_message_page_with_cursor(1, 4, &actor, "thread", None, 5, true)
+            .await
+            .unwrap();
+        assert_eq!(found.rows.len(), 1);
+        assert_eq!(found.rows[0]["id"], 1);
+        let context = client
+            .chat_message_page(1, 4, &actor, "thread", None, 5)
+            .await
+            .unwrap();
+        assert_eq!(context[1]["status"], "failed");
         server.abort();
     }
 

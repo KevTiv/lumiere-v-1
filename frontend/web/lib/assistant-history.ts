@@ -1,3 +1,5 @@
+import { WITHHELD_VERIFICATION_OUTCOMES, isWithheldAnswerNotice } from "@lumiere/erp-shared/ai-withheld-notice"
+
 export type AssistantHistoryResult = "saved" | "failed" | "scope-changed"
 
 function assistantSessionStorageKey(scope: string) {
@@ -41,4 +43,27 @@ export async function saveAssistantHistory({ ensureSession, appendUser, appendAs
   } catch {
     return isCurrent() ? "failed" : "scope-changed"
   }
+}
+
+type HistoryRow = { role?: string; content?: unknown; status?: string; metadata?: string | null }
+
+/**
+ * Answers withheld by the gate before #442 were saved as completed. History is
+ * append-only, so a withheld notice or a saved blocked/requires_review verdict
+ * reads as failed. Mirrors `reclassify_withheld_message` in stdb-client.
+ */
+export function reclassifyWithheldHistoryRow<T extends HistoryRow>(row: T): T {
+  if (row.role !== undefined && row.role !== "assistant") return row
+  if (row.status === "failed") return row
+  let blocked = false
+  if (typeof row.metadata === "string") {
+    try {
+      const metadata = JSON.parse(row.metadata) as Record<string, { outcome?: unknown } | null> | null
+      blocked = ["answerVerification", "verification"].some(key => {
+        const outcome = metadata?.[key]?.outcome
+        return (WITHHELD_VERIFICATION_OUTCOMES as readonly unknown[]).includes(outcome)
+      })
+    } catch { /* Unreadable metadata cannot establish a withheld verdict. */ }
+  }
+  return blocked || isWithheldAnswerNotice(row.content) ? { ...row, status: "failed" } : row
 }
