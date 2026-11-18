@@ -40,7 +40,8 @@ concurrency:
 
 jobs:
   semantic-index-q0:
-    runs-on: ubuntu-latest
+    # Match the main Rust and frontend test jobs while ubuntu-latest rolls forward.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
       qdrant:
@@ -87,7 +88,7 @@ jobs:
         run: cargo test -p ai-gateway qdrant_client::tests -- --include-ignored
 
   frontend-contracts:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=6144

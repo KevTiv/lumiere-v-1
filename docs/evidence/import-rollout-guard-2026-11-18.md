@@ -12,11 +12,13 @@
 - Frontend: `import-write-pause.ts` (+ test), `module-backfill-action.tsx` shows the paused message and keeps the task retryable; i18n keys `settings.importTask.importsPaused*` in en/fr/rw (rw-x-en has no importTask keys from #444, so none added).
 - Release script and workflow: `set-import-pause` uses a scoped Railway patch, waits for a new successful API deployment, and reads the applied setting back. An already-configured value still requires a fresh deploy. `verify-catalog` requires a ready response with both the applied and expected versions matching before the workflow resumes imports. An unset `RAILWAY_API_READINESS_URL` stops the release before any mutation.
 - Regenerated the alpha-history inventory after the import-review module changed, fixing the stale-inventory check on this PR.
+- Follow-up CI fixes: the frontend job timed out installing Chromium on an EC2 regional Ubuntu mirror, and Semantic Index Q0's frontend job could not install `ripgrep` on `ubuntu-latest` (26.04). The browser jobs now share the HTTPS archive installer, and Semantic Index Q0 uses Ubuntu 24.04, matching the main Rust and frontend test jobs.
 
 ## Validated
 - Rust 1.100.0: verified the vendored contracts first, then passed `cargo check --locked -p api-server --tests`. With `C4_TEST_PG=1` and local PostgreSQL 15.20, the migration unit tests (23), PostgreSQL compatibility tests (18), and import-review suite (73) passed. The compatibility job in GitHub Actions uses PostgreSQL 18.
 - Reviewed the pinned Railway CLI v5.67.1 source: piped JSON is deserialized as `EnvironmentConfig`, with variables at `services.<service-id>.variables.<key>.value` and values typed as strings. `bash scripts/tests/test-railway-stack-release.sh`, `bash -n`, and `actionlint` passed. The shell tests use mocked Railway and HTTP responses, including failed deploys, failed config reads, and stale catalog reports.
 - Node 26.13.1: `import-write-pause.test.ts` passed 3/3, `pnpm --dir frontend i18n:check` passed, and web and UI `tsc --noEmit` passed. The web typecheck needed `NODE_OPTIONS=--max-old-space-size=8192` after the default heap limit was exhausted. The release manifest and alpha-history inventory checks passed.
+- `actionlint` passed for the changed CI workflows. A local installer fixture confirmed that Azure and EC2 archive entries are rewritten, the security archive is preserved, and the pinned Playwright install is still called. The fixture did not download Chromium or exercise a hosted runner.
 
 ## First rollout gates
 
