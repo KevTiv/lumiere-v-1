@@ -23,7 +23,9 @@ import { AccountantOverview } from "./accountant-overview"
 import { BillDocumentIntake } from "./bill-document-intake"
 import { currencyCatalogContainsId } from "@/lib/accounting-setup-reference"
 import { useInvoicePersonalization } from "@lumiere/query-hooks/hooks/invoice-personalization"
-import { useExplainErpError } from "@/lib/erp-ai-context"
+import { useExplainErpError, useOpenErpAiChat } from "@/lib/erp-ai-context"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
+import type { AccountMove as LedgerMove } from "@lumiere/ui/lib/accounting-types"
 import { invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSellerIdentityReady } from "@lumiere/erp-shared/invoice-personalization"
 import { formatInvoiceMoney, resolveDraftInvoiceDocument } from "../../../../packages/ui/src/accounting-components/invoice-document"
 import { ReconciliationWorkbench, type ReconciliationOutcome, type ReconciliationStatusResult } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench"
@@ -719,6 +721,19 @@ function AccountingClientReady({
     accountingTabIds,
     { history: "push" },
   )
+  const openErpAiChat = useOpenErpAiChat()
+  const askAboutMove = useCallback((move: LedgerMove) => {
+    const recordId = parseStrictU64(move.id)
+    if (!companyAvailable || recordId == null || recordId === 0n ||
+      String(move.companyId) !== String(operatingCompanyId) ||
+      String(move.organizationId) !== String(organizationId)) return
+    openErpAiChat({ selection: {
+      activeTab: "journal-entries",
+      entityType: "account_move",
+      entityId: recordId.toString(),
+      selectionSummary: move.name || `#${recordId}`,
+    } })
+  }, [companyAvailable, openErpAiChat, operatingCompanyId, organizationId])
   const askForm = useCallback(async (request: Parameters<typeof showForm>[0]) => {
     setPromptWorkspace(accountingActiveTab)
     try { return await showForm(request) }
@@ -4801,7 +4816,7 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <ChartOfAccountsView
-                    accounts={accounts}
+                    accounts={invoiceFilters.id ? accounts.filter((account) => String(account.id) === invoiceFilters.id) : accounts}
                     chartStructureContent={chartStructurePanel}
                     onImportAccountsCsv={canImportCsv("account") ? () => setCsvKind("account") : undefined}
                     onAccountClick={(account) => setGlDrilldownAccount(account)}
@@ -4829,6 +4844,7 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <GeneralLedgerView
+                    key={`${organizationId}:${operatingCompanyId}`}
                     moves={allMoves}
                     accountLabels={accountLabelMap}
                     partnerLabels={partnerLabelMap}
@@ -4850,6 +4866,7 @@ function AccountingClientReady({
                         : undefined
                     }
                     onImportMoveLinesCsv={canImportCsv("accountMoveLine") ? openAccountingMoveLineImport : undefined}
+                    onAskAboutMove={allMovesRead.state.status === "ready" ? askAboutMove : undefined}
                     onCreate={checkPermission("account_move", "create").allowed
                       ? () => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })
                       : undefined}
@@ -5468,6 +5485,7 @@ function AccountingClientReady({
       paymentRecordSheet,
       bankStatementRecordSheet,
       accountMoveRecordSheet,
+      askAboutMove,
       paymentTermsEntityConfig,
       paymentTermLineFormConfig,
       paymentTermLinesEntityConfig,

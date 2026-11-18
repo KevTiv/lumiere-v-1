@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
-import { useSearchParams } from "next/navigation"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Search, Plus, Upload, Calculator, X } from "lucide-react"
+import { Search, Plus, Upload, Calculator, Sparkles, X } from "lucide-react"
 import type { AccountMove } from "../lib/accounting-types"
 import {
   moveStateIsDraft,
@@ -76,6 +76,7 @@ interface GeneralLedgerViewProps {
   onImportOutstandingDocumentsCsv?: () => void
   onImportHistoricalDocumentsForPaymentReplayCsv?: () => void
   onImportMoveLinesCsv?: () => void
+  onAskAboutMove?: (move: AccountMove) => void
   onPostMove?: (move: AccountMove) => void
   onCancelMove?: (move: AccountMove) => void
   /** Recompute invoice totals from lines (draft invoice/refund moves only). */
@@ -95,6 +96,7 @@ export function GeneralLedgerView({
   onImportOutstandingDocumentsCsv,
   onImportHistoricalDocumentsForPaymentReplayCsv,
   onImportMoveLinesCsv,
+  onAskAboutMove,
   onPostMove,
   onCancelMove,
   onComputeInvoiceTotals,
@@ -116,6 +118,8 @@ export function GeneralLedgerView({
       ? currency.money(value, currencyId)
       : "—"
   const urlFilters = useModuleUrlFilters()
+  const pathname = usePathname()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const importEntries = useMemo(
     () =>
@@ -131,10 +135,7 @@ export function GeneralLedgerView({
     AccountMove["id"] | null
   >(null)
   const moveTrigger = useRef<HTMLButtonElement | null>(null)
-  const selectedMove =
-    selectedMoveId == null
-      ? null
-      : (moves.find((move) => move.id === selectedMoveId) ?? null)
+  const openedLinkedMove = useRef<string | null>(null)
   const linesByMove = useMemo(() => {
     const grouped = new Map<string, LedgerMoveLine[]>()
     for (const line of moveLines ?? []) {
@@ -203,6 +204,30 @@ export function GeneralLedgerView({
     })
     return matchesSearch && matchesUrlFilters
   })
+  const requestedMoveId =
+    searchParams?.get("openRecord") === "1" ? urlFilters.id : undefined
+  const linkedMoveId =
+    requestedMoveId && /^[1-9]\d*$/.test(requestedMoveId)
+      ? filtered.find((move) => String(move.id) === requestedMoveId)?.id
+      : undefined
+  useEffect(() => {
+    if (openedLinkedMove.current !== requestedMoveId) {
+      openedLinkedMove.current = null
+    }
+    if (!requestedMoveId || linkedMoveId == null || openedLinkedMove.current) return
+    openedLinkedMove.current = requestedMoveId
+    setSelectedMoveId(linkedMoveId)
+  }, [linkedMoveId, requestedMoveId])
+  const selectedMove = selectedMoveId == null
+    ? null
+    : (filtered.find((move) => move.id === selectedMoveId) ?? null)
+  const closeMoveDetails = () => {
+    setSelectedMoveId(null)
+    if (linkedMoveId == null || selectedMoveId !== linkedMoveId) return
+    const query = new URLSearchParams(searchParams?.toString())
+    query.delete("openRecord")
+    router.replace(`${pathname}?${query}`, { scroll: false })
+  }
 
   const stats = {
     total: filtered.length,
@@ -434,7 +459,7 @@ export function GeneralLedgerView({
       <Dialog
         open={!!selectedMove}
         onOpenChange={(open) => {
-          if (!open) setSelectedMoveId(null)
+          if (!open) closeMoveDetails()
         }}
       >
         <DialogContent size="review" layout="bounded" finalFocus={moveTrigger}>
@@ -574,11 +599,27 @@ export function GeneralLedgerView({
                   </section>
                 ) : null}
               </DialogBody>
-              {(selected.draft &&
+              {onAskAboutMove ||
+              (selected.draft &&
                 (onPostMove ||
                   (selected.paymentApplies && onComputeInvoiceTotals))) ||
               selected.cancellable ? (
                 <DialogFooter>
+                  {onAskAboutMove ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        closeMoveDetails()
+                        onAskAboutMove(selectedMove)
+                      }}
+                    >
+                      <Sparkles className="size-4" aria-hidden="true" />
+                      {t("aiChat.workspace.askAboutRecord", {
+                        defaultValue: "Ask Lumière",
+                      })}
+                    </Button>
+                  ) : null}
                   {selected.draft &&
                   selected.paymentApplies &&
                   onComputeInvoiceTotals ? (

@@ -65,8 +65,7 @@ process.env.LUMIERE_AI_GATEWAY_INTERNAL_SECRET = 'test-gateway-secret'
 if (process.argv[2] === 'bindings') {
   const payload = {
     bindings: JSON.parse(readFileSync(0, 'utf8')),
-    runtimeHash: null,
-    certificationConfigured: false,
+    managedBy: 'application',
   }
   let requests = 0
   globalThis.fetch = async (url, init) => {

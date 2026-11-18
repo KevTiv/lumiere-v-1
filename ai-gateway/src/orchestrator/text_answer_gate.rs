@@ -220,6 +220,29 @@ struct StructuredTextClaim {
     passage_support: Vec<PassageCitation>,
 }
 
+/// Provider contract validation only. The ordinary answer gate still binds
+/// every support, verifies claim coverage and controls publication.
+pub(super) fn validate_rag_generation(candidate: &str) -> Result<(), &'static str> {
+    let (answer, _) = crate::routes::rag_ui_actions::split_candidate(candidate);
+    let draft: StructuredTextDraft =
+        serde_json::from_str(&answer).map_err(|_| "RAG answer contract is malformed")?;
+    if draft.content.trim().is_empty() || !(1..=6).contains(&draft.claims.len()) {
+        return Err("RAG answer must contain content and one to six material claims");
+    }
+    if draft.claims.iter().any(|claim| {
+        claim.text.trim().is_empty()
+            || claim.support_refs.is_empty()
+            || !claim.passage_support.is_empty()
+            || claim
+                .support_refs
+                .iter()
+                .any(|reference| reference.validate().is_err())
+    }) {
+        return Err("RAG claims require explicit support references");
+    }
+    Ok(())
+}
+
 fn empty_provenance(reason: &str) -> TextAnswerProvenance {
     TextAnswerProvenance::withheld(reason)
 }

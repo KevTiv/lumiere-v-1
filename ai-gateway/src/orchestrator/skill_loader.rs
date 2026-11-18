@@ -1074,7 +1074,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn built_in_generation_uses_catalog_and_company_binding_without_release_queries() {
+    async fn repository_skills_use_current_policy_without_certification_or_release_queries() {
         use axum::{extract::State, routing::post, Json, Router};
         use std::sync::{Arc, Mutex};
         async fn sql(
@@ -1098,7 +1098,26 @@ pub(crate) mod tests {
             .route("/v1/database/fixture/sql", post(sql))
             .with_state(state.clone());
         let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        for key in super::super::generation_surface_certification::KEYS {
+        for key in [
+            "report_analysis",
+            "report_composer",
+            "low_stock",
+            "import_mapping",
+            "insights_scan",
+            "daily_briefing",
+            "process_research",
+            "price_search",
+            "supplier_discovery",
+            "credit_hold_summary",
+            "delivery_run_summary",
+        ]
+        .into_iter()
+        .chain(super::super::generation_surface_certification::KEYS)
+        .chain(
+            lumiere_finance_review_core::SKILLS
+                .iter()
+                .map(|skill| skill.key),
+        ) {
             for case in ["active", "disabled", "inactive", "missing", "foreign"] {
                 *state.lock().unwrap() = (key, case);
                 let result = require_enabled_skill(&stdb, 1, 3, key).await;

@@ -73,12 +73,56 @@ async fn post_operation_inner(
     context.require_current_placement(&state.organization_placements)?;
 
     let correlation_id = context.correlation_id().to_string();
+    let index_target = crate::ai_index_queue::indexable_target(contract, &args);
     let response = execute_reducer_call(&context, contract, args).await?;
+    if let Some(target) = index_target {
+        enqueue_ai_index_job(&context, target).await;
+    }
     attach_operation_receipt(
         response,
         contract.contract_operation_id,
         correlation_id.as_str(),
     )
+}
+
+/// Queue the committed record for actor-authorized AI indexing. Strictly best
+/// effort: a queue or scope failure is logged and never fails the ERP write.
+async fn enqueue_ai_index_job(
+    context: &TrustedOperationContext,
+    target: crate::ai_index_queue::IndexTarget,
+) {
+    let organization_id = context.organization_id();
+    let company_id = match target.company_id {
+        Some(company_id) => Ok(company_id),
+        None => crate::query_exec::resolve_membership_company_id(
+            context.client(),
+            organization_id,
+            context.actor_identity(),
+            None,
+            "AI indexing company scope mismatch",
+        )
+        .await
+        .map_err(|_| ()),
+    };
+    let queued = match (company_id, crate::cold_tier::pg_pool::shared_pool()) {
+        (Ok(company_id), Some(pool)) => crate::ai_index_queue::enqueue(
+            pool,
+            organization_id,
+            company_id,
+            context.actor_identity(),
+            &target,
+        )
+        .await
+        .map_err(|_| ()),
+        _ => Err(()),
+    };
+    if queued.is_err() {
+        tracing::warn!(
+            organization_id,
+            resource_kind = target.kind,
+            "AI index job was not queued; the ERP write is unaffected"
+        );
+    }
 }
 
 /// This optional precondition can only narrow the authenticated session scope.
@@ -164,7 +208,12 @@ pub(crate) async fn post_compat_reducer(
     let company_scope = authorize_reducer_company_scope(&context, company_scope).await?;
     let context = context.with_company_scope(company_scope)?;
     context.require_current_placement(&state.organization_placements)?;
-    execute_reducer_call(&context, contract, args).await
+    let index_target = crate::ai_index_queue::indexable_target(contract, &args);
+    let response = execute_reducer_call(&context, contract, args).await?;
+    if let Some(target) = index_target {
+        enqueue_ai_index_job(&context, target).await;
+    }
+    Ok(response)
 }
 
 #[cfg(test)]

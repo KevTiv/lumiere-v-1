@@ -1,7 +1,8 @@
-import type {
-  ReviewField,
-  ReviewHistory,
-  ReviewRow,
+import {
+  reviewSaleReconciliation,
+  type ReviewField,
+  type ReviewHistory,
+  type ReviewRow,
 } from "./import-review-model"
 import { z } from "zod"
 
@@ -269,14 +270,6 @@ export function buildBulkReviewPreview(args: {
   return result
 }
 
-const exactReviewDecimal = (value: string | null | undefined): bigint | null => {
-  if (!value || !/^-?\d{1,12}(?:\.\d{1,6})?$/.test(value)) return null
-  const negative = value.startsWith("-")
-  const [whole, fraction = ""] = (negative ? value.slice(1) : value).split(".")
-  const result = BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, "0"))
-  return negative ? -result : result
-}
-
 /** Confirm each row's own values. Source cells and proposals never fill unknowns. */
 export function buildBulkConfirmationPreview(args: {
   items: ReviewRow[]
@@ -344,15 +337,8 @@ export function buildBulkConfirmationPreview(args: {
     } else {
       if (!fields.some((field) => item.values[field.key]?.trim()))
         error ??= "There are no known values to confirm."
-      const quantity = exactReviewDecimal(item.values.quantity)
-      const price = exactReviewDecimal(item.values.unit_price)
-      const amount = exactReviewDecimal(item.values.amount)
-      if (
-        quantity !== null &&
-        price !== null &&
-        amount !== null &&
-        quantity * price !== amount * 1_000_000n
-      )
+      const difference = reviewSaleReconciliation(item.values)?.difference
+      if (difference != null && difference !== "0")
         error ??= "Quantity multiplied by unit price must equal the recorded amount."
     }
     if (error) {

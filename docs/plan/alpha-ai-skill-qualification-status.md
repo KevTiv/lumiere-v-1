@@ -1,4 +1,10 @@
+> Superseded for repository-owned skills by [skill ownership and lifecycle](skill-ownership-and-lifecycle.md) (2026-11-17). Historical record only for those steps.
+
 # Alpha AI skill qualification preparation (AA-06)
+
+Historical qualification record. The current
+[skill ownership policy](skill-ownership-and-lifecycle.md) supersedes built-in
+certification and activation requirements below.
 
 Date: 2026-10-30. Base: `3d6f32c23ba4a569f83d752ac0b2257e43799397`.
 Branch: `codex/alpha-ai-skill-qualification`. Status: deterministic preparation;
@@ -20,8 +26,8 @@ executor, certification authority or release mechanism.
 | `expense_evidence_review` | 1.0.1 | Source implementation, deterministic replay and proposed manifest; no active tenant certificate established by this inspection. | Unqueried. |
 | `finance_variance_review` | 1.0.1 | Source implementation, deterministic replay and proposed manifest; no active tenant certificate established by this inspection. | Unqueried. |
 
-Candidate identities come from the [report proposal](../../infra/railway/pilots/report-analysis-certification-manifest.proposed.json)
-and [finance proposals](../../infra/skill-releases/finance/).
+The historical checked-in report/finance proposals have been retired. Current
+repository-owned execution policies are supplied by the deployed gateway.
 The [usability status](erp-skills-professional-usability-status.md) supersedes the
 older versions in the [finance implementation history](finance-skill-expansion-status.md).
 The original base pins immutable application contracts 0.3.157. The subsequent
@@ -53,7 +59,7 @@ Executed in this branch, with no tenant or provider calls:
   failed-attempt spend, forged bindings and invalid metrics.
 - The full Python script suite passes: 212 tests, no skips or failures.
 - `python3 -B scripts/erp_skill_catalog.py --check` passes.
-- `python3 -B scripts/finance-skill-manifests.py --check` passes.
+- The historical source-manifest check passed (that check has since been removed).
 - `git diff --check` passes.
 
 The existing corpus contains 40 pilot and 130 other scenario requirements.

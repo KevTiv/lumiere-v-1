@@ -33,11 +33,20 @@ export type ModuleBackfillRecord = {
   itemId: string
   sourceRevision: number
   sourceFile: string
+  sourceWorksheet?: string | null
   sourceRow: number
   periodStart: string
   periodEnd: string
   savedAt?: string
   facts: Facts
+}
+
+export function moduleBackfillSourceName(
+  source: Pick<ModuleBackfillRecord, 'sourceFile' | 'sourceWorksheet'>,
+): string {
+  return source.sourceWorksheet
+    ? `${source.sourceFile} / ${source.sourceWorksheet}`
+    : source.sourceFile
 }
 
 const labels = {

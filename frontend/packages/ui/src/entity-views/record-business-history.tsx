@@ -140,7 +140,7 @@ export function RecordHistorySources({ state, entries, coverage, companyId, hasM
         {entry.contentSha256 && <details className="min-w-0 text-xs text-muted-foreground"><summary className="cursor-pointer">{t("businessHistory.contentHash")}</summary><code className="mt-2 block break-all">{entry.contentSha256}</code></details>}
         {entry.sourceRelationship === "user_prepared_derivative" && entry.sourceSha256 && <div className="space-y-2 text-xs text-muted-foreground"><p>{t("businessHistory.sourceDerivative")}</p><details className="min-w-0"><summary className="cursor-pointer">{t("businessHistory.sourceHash")}</summary><code className="mt-2 block break-all">{entry.sourceSha256}</code></details></div>}
         {entry.review && companyId && validHistoryId(companyId) && <div className="space-y-1 text-sm"><p className="text-muted-foreground">{t("businessHistory.reviewReference", { item: entry.review.itemId, revision: entry.review.revision })}</p><a className="font-medium underline underline-offset-4" href={sourceReviewHistoryHref(companyId, entry.review)}>{t("businessHistory.openSourceReview")}</a>
-          {entry.review.source && <p>{entry.review.source.file}:{entry.review.source.row}</p>}
+          {entry.review.source && <p className="break-words">{entry.review.source.file}{entry.review.source.sheet && ` · ${entry.review.source.sheet}`}:{entry.review.source.row}</p>}
           {entry.review.taskRequestId && <a className="block font-medium underline underline-offset-4" href={sourceImportTaskHref(companyId, entry.review.taskRequestId, entry.review.batchId)}>{t("businessHistory.openImportTask", { defaultValue: "Open saved import and ERP results" })}</a>}
         </div>}
       </li>)}

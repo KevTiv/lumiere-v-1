@@ -74,6 +74,10 @@ const RELEASE_HELPERS: &[(&str, &[u8])] = &[
         include_bytes!("../routes/rag_attachments.rs"),
     ),
     (
+        "rag_record_reply.rs",
+        include_bytes!("../routes/rag_record_reply.rs"),
+    ),
+    (
         "rag_conversation.rs",
         include_bytes!("../routes/rag_conversation.rs"),
     ),
@@ -100,6 +104,10 @@ const RELEASE_HELPERS: &[(&str, &[u8])] = &[
     ),
     ("stdb_embed.rs", include_bytes!("../stdb_embed.rs")),
     ("snapshot.rs", include_bytes!("../harness/snapshot.rs")),
+    (
+        "record_lookup.rs",
+        include_bytes!("../harness/record_lookup.rs"),
+    ),
     ("harness/mod.rs", include_bytes!("../harness/mod.rs")),
     (
         "action_draft_bridge.rs",
@@ -345,7 +353,10 @@ impl GenerationProvider for Providers {
     async fn generate(&self, request: GenerationRequest) -> Result<GenerationResponse> {
         request.validate()?;
         ensure!(
-            request.response_format == GenerationResponseFormat::Text,
+            matches!(
+                request.response_format,
+                GenerationResponseFormat::Text | GenerationResponseFormat::RagAnswer
+            ),
             "unexpected generation response contract"
         );
         let mut recorded = self
@@ -966,6 +977,8 @@ mod tests {
         for required in [
             "rag_context.rs",
             "rag_attachments.rs",
+            "rag_record_reply.rs",
+            "record_lookup.rs",
             "rag_conversation.rs",
             "rag_history_references.rs",
             "rag_spreadsheet.rs",

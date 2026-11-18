@@ -23,7 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  reviewArithmetic,
+  reviewSaleReconciliation,
   type ReviewField,
   type ReviewRow,
 } from "./import-review-model"
@@ -155,6 +155,9 @@ export function ImportReviewEditor({
 }) {
   const { t } = useTranslation()
   const [decision, setDecision] = useState(() => reviewDecision(item))
+  const reconciliation = reviewSaleReconciliation(decision.values)
+  const saleMismatch =
+    reconciliation?.difference != null && reconciliation.difference !== "0"
   const interpretations = item.source.fields.flatMap((field) =>
     field.sourceValue ? interpretSourceCells(field.sourceValue) : [],
   )
@@ -182,6 +185,19 @@ export function ImportReviewEditor({
         .find(Boolean)
       if (invalid) {
         setError(invalid)
+        return
+      }
+      if (
+        decision.state === "confirmed" &&
+        "sale_amount" in decision.values &&
+        saleMismatch
+      ) {
+        setError(
+          t("settings.importReview.saleMismatch", {
+            defaultValue:
+              "Resolve the difference between the recorded and calculated sale amount before confirming the row.",
+          }),
+        )
         return
       }
       const confirmedFields =
@@ -282,8 +298,12 @@ export function ImportReviewEditor({
                 {label(field)}
                 {field.required ? " *" : ""}
               </TableCell>
-              <TableCell className="max-w-48 whitespace-normal break-words">
-                {field.sourceValue ?? t("settings.importReview.unknown")}
+              <TableCell className="max-w-48 whitespace-pre-wrap break-words">
+                {field.sourceValue === ""
+                  ? t("settings.importReview.blankCell", {
+                      defaultValue: "Blank source cell",
+                    })
+                  : (field.sourceValue ?? t("settings.importReview.unknown"))}
                 {field.sourceColumn != null ? (
                   <span className="block text-xs text-muted-foreground">
                     {t("settings.importReview.sourceColumn", { defaultValue: "Source column {{column}}", column: field.sourceColumn })}
@@ -306,6 +326,17 @@ export function ImportReviewEditor({
                   references={references}
                   item={item}
                 />
+                {item.source.proposed[field.key] != null &&
+                item.source.proposed[field.key] !== field.sourceValue &&
+                item.source.proposed[field.key] !==
+                  decision.values[field.key] ? (
+                  <span className="block whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                    {t("settings.importReview.initialProposal", {
+                      defaultValue: "Prepared value · {{value}}",
+                      value: item.source.proposed[field.key],
+                    })}
+                  </span>
+                ) : null}
               </TableCell>
               <TableCell>
                 <Checkbox
@@ -341,12 +372,28 @@ export function ImportReviewEditor({
           ))}
         </TableBody>
       </Table>
-      {reviewArithmetic(decision.values) != null ? (
-        <p className="mt-3 text-sm">
-          {t("settings.importReview.calculated", {
-            amount: reviewArithmetic(decision.values),
-          })}
-        </p>
+      {reconciliation ? (
+        <div className="mt-3 space-y-1 text-sm">
+          <p>
+            {t("settings.importReview.calculated", {
+              amount: reconciliation.calculated,
+            })}
+          </p>
+          {reconciliation.recorded != null ? (
+            <p
+              className={
+                saleMismatch ? "font-medium text-destructive" : undefined
+              }
+            >
+              {t("settings.importReview.saleReconciliation", {
+                defaultValue:
+                  "Recorded amount {{amount}} · difference {{difference}}",
+                amount: reconciliation.recorded,
+                difference: reconciliation.difference,
+              })}
+            </p>
+          ) : null}
+        </div>
       ) : null}
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm">

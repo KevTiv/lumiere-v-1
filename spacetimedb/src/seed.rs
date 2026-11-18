@@ -254,9 +254,8 @@ use crate::ai::intelligence::{
     ai_document_processing_job, ai_insight, AiDocumentProcessingJob, AiInsight,
 };
 use crate::ai::skill_registry::{
-    ai_skill_certification_environment, ai_skill_fixture, ai_skill_release, ai_skill_version,
-    certification_environment_fingerprint, AiSkillCertificationEnvironment, AiSkillFixture,
-    AiSkillRelease, AiSkillRisk, AiSkillVersion,
+    ai_skill_certification_environment, ai_skill_fixture, certification_environment_fingerprint,
+    AiSkillCertificationEnvironment, AiSkillFixture,
 };
 use crate::ai::skills::{
     ai_skill, ai_skill_config, ai_team_member_skill, AiSkill, AiSkillConfig, AiTeamMemberSkill,
@@ -525,20 +524,15 @@ fn seed_system_skill(
     })
 }
 
-/// Seed a release-gated read-only harness skill with fixture evidence. The
-/// gateway still owns executable adapters; this is the organization-scoped
-/// approval evidence that permits an adapter to run.
-fn seed_promoted_harness_skill(
+/// Register a repository-owned control and an offline example, never a tenant
+/// version, certificate or release. Deployment supplies its executable policy.
+fn seed_builtin_harness_skill(
     ctx: &ReducerContext,
     org_id: u64,
-    company_id: u64,
     seeder: Identity,
     skill_key: &str,
     name: &str,
     description: &str,
-    resource: &str,
-    output_type: &str,
-    source_hash_char: char,
     fixture_input: &str,
     fixture_output: &str,
 ) {
@@ -554,35 +548,6 @@ fn seed_promoted_harness_skill(
         None,
         vec![],
     );
-    let hash = source_hash_char.to_string().repeat(64);
-    let manifest_json = format!(
-        r#"{{"limits":{{"max_steps":1,"max_tool_calls":1}},"output_types":["{output_type}"],"permissions":["report:read"],"resources":["{resource}"],"risk":"green","schema_version":1,"skill_key":"{skill_key}","source_hash":"sha256:{hash}","version":"1.0.0"}}"#,
-    );
-    let version = ctx.db.ai_skill_version().insert(AiSkillVersion {
-        id: 0,
-        version_key: format!("{org_id}:{}:1.0.0", skill.id),
-        organization_id: org_id,
-        skill_id: skill.id,
-        skill_key: skill_key.to_string(),
-        version: "1.0.0".to_string(),
-        manifest_schema_version: 1,
-        manifest_json,
-        source_hash: format!("sha256:{hash}"),
-        risk: AiSkillRisk::Green,
-        max_steps: 1,
-        max_tool_calls: 1,
-        permissions: vec!["report:read".to_string()],
-        resources: vec![resource.to_string()],
-        output_types: vec![output_type.to_string()],
-        reviewed_by: seeder,
-        reviewed_at: ctx.timestamp,
-        review_notes: Some("Seeded Phase 5 distributor read-only control".to_string()),
-        created_by: seeder,
-        created_at: ctx.timestamp,
-        metadata: Some(format!(
-            r#"{{"seed":true,"company_id":{company_id},"purpose":"distributor_control"}}"#
-        )),
-    });
     let fixture = ctx.db.ai_skill_fixture().insert(AiSkillFixture {
         id: 0,
         fixture_key: format!("{org_id}:{}:{skill_key}-smoke", skill.id),
@@ -607,94 +572,6 @@ fn seed_promoted_harness_skill(
         "{}",
         "synthetic-empty-v1",
     );
-    let _ = ctx.db.ai_skill_release().insert(AiSkillRelease {
-        id: 0,
-        organization_id: org_id,
-        skill_id: skill.id,
-        skill_version_id: version.id,
-        release_number: 1,
-        is_active: true,
-        action: "promote".to_string(),
-        previous_release_id: None,
-        rollback_target_release_id: None,
-        released_by: seeder,
-        released_at: ctx.timestamp,
-        reason: Some("Seeded Phase 5 distributor control release".to_string()),
-    });
-}
-
-/// Promote an already-seeded system skill so harness `load_active_manifest` succeeds.
-fn seed_active_release_for_skill(
-    ctx: &ReducerContext,
-    org_id: u64,
-    seeder: Identity,
-    skill: &AiSkill,
-    resource: &str,
-    output_type: &str,
-    source_hash_char: char,
-) {
-    let existing_release = ctx
-        .db
-        .ai_skill_release()
-        .iter()
-        .any(|row| row.organization_id == org_id && row.skill_id == skill.id && row.is_active);
-    if existing_release {
-        return;
-    }
-
-    let skill_key = skill.skill_key.as_str();
-    // Development fixture only. Keep exact adapter bindings aligned with
-    // `gateway certification-bundles`; these rows are not production certificates.
-    let source_hash = if skill_key == "report_analysis" {
-        "sha256:ee5b7f00440806881d159275ef59b3b179390a2d664c1ef10ecbdf700043f2c1".to_string()
-    } else {
-        format!("sha256:{}", source_hash_char.to_string().repeat(64))
-    };
-    let version = if skill_key == "report_analysis" {
-        "1.0.11"
-    } else {
-        "1.0.0"
-    };
-    let manifest_json = format!(
-        r#"{{"limits":{{"max_steps":8,"max_tool_calls":12}},"output_types":["{output_type}"],"permissions":["report:read"],"resources":["{resource}"],"risk":"green","schema_version":1,"skill_key":"{skill_key}","source_hash":"{source_hash}","version":"{version}"}}"#,
-    );
-    let version = ctx.db.ai_skill_version().insert(AiSkillVersion {
-        id: 0,
-        version_key: format!("{org_id}:{}:{version}", skill.id),
-        organization_id: org_id,
-        skill_id: skill.id,
-        skill_key: skill_key.to_string(),
-        version: version.to_string(),
-        manifest_schema_version: 1,
-        manifest_json,
-        source_hash,
-        risk: AiSkillRisk::Green,
-        max_steps: 8,
-        max_tool_calls: 12,
-        permissions: vec!["report:read".to_string()],
-        resources: vec![resource.to_string()],
-        output_types: vec![output_type.to_string()],
-        reviewed_by: seeder,
-        reviewed_at: ctx.timestamp,
-        review_notes: Some("Seeded harness migration release".to_string()),
-        created_by: seeder,
-        created_at: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"purpose\":\"legacy_harness_migration\"}".to_string()),
-    });
-    let _ = ctx.db.ai_skill_release().insert(AiSkillRelease {
-        id: 0,
-        organization_id: org_id,
-        skill_id: skill.id,
-        skill_version_id: version.id,
-        release_number: 1,
-        is_active: true,
-        action: "promote".to_string(),
-        previous_release_id: None,
-        rollback_target_release_id: None,
-        released_by: seeder,
-        released_at: ctx.timestamp,
-        reason: Some("Seeded harness migration release".to_string()),
-    });
 }
 
 fn seed_ai_skill_certification_environment(
@@ -7993,7 +7870,7 @@ Focus on credibility, region fit, and category relevance. Always cite URLs from 
         vec![],
     );
 
-    let daily_briefing = seed_system_skill(
+    seed_system_skill(
         ctx,
         "daily_briefing",
         "Daily Briefing",
@@ -8008,7 +7885,7 @@ Use activity search results and semantic ERP hits. Group by module. Highlight it
         vec![],
     );
 
-    let import_mapping = seed_system_skill(
+    seed_system_skill(
         ctx,
         "import_mapping",
         "Import Mapping",
@@ -8023,7 +7900,7 @@ Explain mapping confidence, unmapped columns, and validation warnings."#,
         vec![],
     );
 
-    let insights_scan = seed_system_skill(
+    seed_system_skill(
         ctx,
         "insights_scan",
         "Insights Scan",
@@ -8036,70 +7913,6 @@ Explain mapping confidence, unmapped columns, and validation warnings."#,
 Prioritize high-severity findings and cite related records."#,
         None,
         vec![],
-    );
-
-    seed_active_release_for_skill(
-        ctx,
-        org_id,
-        seeder,
-        &report_analysis,
-        "analytics.report_analysis.v1",
-        "analytics.report_analysis.result.v1",
-        '1',
-    );
-    seed_active_release_for_skill(
-        ctx,
-        org_id,
-        seeder,
-        &process_research,
-        "operations.process_research.v1",
-        "operations.process_research.result.v1",
-        '2',
-    );
-    seed_active_release_for_skill(
-        ctx,
-        org_id,
-        seeder,
-        &price_search,
-        "procurement.price_search.v1",
-        "procurement.price_search.result.v1",
-        '3',
-    );
-    seed_active_release_for_skill(
-        ctx,
-        org_id,
-        seeder,
-        &supplier_discovery,
-        "procurement.supplier_discovery.v1",
-        "procurement.supplier_discovery.result.v1",
-        '4',
-    );
-    seed_active_release_for_skill(
-        ctx,
-        org_id,
-        seeder,
-        &daily_briefing,
-        "operations.daily_briefing.v1",
-        "operations.daily_briefing.result.v1",
-        '5',
-    );
-    seed_active_release_for_skill(
-        ctx,
-        org_id,
-        seeder,
-        &import_mapping,
-        "data.import_mapping.v1",
-        "data.import_mapping.result.v1",
-        '6',
-    );
-    seed_active_release_for_skill(
-        ctx,
-        org_id,
-        seeder,
-        &insights_scan,
-        "analytics.insights_scan.v1",
-        "analytics.insights_scan.result.v1",
-        '7',
     );
 
     ctx.db.ai_skill_config().insert(AiSkillConfig {
@@ -8199,36 +8012,6 @@ Prioritize high-severity findings and cite related records."#,
         None,
         vec![],
     );
-
-    let report_composer_source_hash =
-        "sha256:88ce7aa639e8e98c4f80a9d9edd315070e6ce88921ac29813064f811d79884b8";
-    let report_composer_manifest = format!(
-        r#"{{"limits":{{"max_steps":1,"max_tool_calls":1}},"output_types":["reports.daily_business_summary.summary.v1"],"permissions":["report:read"],"resources":["reports.daily_business_summary.v1"],"risk":"green","schema_version":1,"skill_key":"report_composer","source_hash":"{report_composer_source_hash}","version":"1.0.3"}}"#
-    );
-
-    let report_composer_version = ctx.db.ai_skill_version().insert(AiSkillVersion {
-        id: 0,
-        version_key: format!("{}:{}:1.0.3", org_id, report_composer.id),
-        organization_id: org_id,
-        skill_id: report_composer.id,
-        skill_key: "report_composer".to_string(),
-        version: "1.0.3".to_string(),
-        manifest_schema_version: 1,
-        manifest_json: report_composer_manifest,
-        source_hash: report_composer_source_hash.to_string(),
-        risk: AiSkillRisk::Green,
-        max_steps: 1,
-        max_tool_calls: 1,
-        permissions: vec!["report:read".to_string()],
-        resources: vec!["reports.daily_business_summary.v1".to_string()],
-        output_types: vec!["reports.daily_business_summary.summary.v1".to_string()],
-        reviewed_by: seeder,
-        reviewed_at: ctx.timestamp,
-        review_notes: Some("Seeded Phase 1 green report composer".to_string()),
-        created_by: seeder,
-        created_at: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"purpose\":\"harness_report_composer\"}".to_string()),
-    });
 
     let report_composer_expected_output = serde_json::json!({
         "reportKey": "daily_business_summary_v1",
@@ -8332,21 +8115,6 @@ Prioritize high-severity findings and cite related records."#,
         "synthetic-report-preview-v1",
     );
 
-    let _ = ctx.db.ai_skill_release().insert(AiSkillRelease {
-        id: 0,
-        organization_id: org_id,
-        skill_id: report_composer.id,
-        skill_version_id: report_composer_version.id,
-        release_number: 1,
-        is_active: true,
-        action: "promote".to_string(),
-        previous_release_id: None,
-        rollback_target_release_id: None,
-        released_by: seeder,
-        released_at: ctx.timestamp,
-        reason: Some("Seeded Phase 1 harness release".to_string()),
-    });
-
     // ── Phase 1 harness skill registry (low_stock) ──────────────────────────
     let low_stock = seed_system_skill(
         ctx,
@@ -8360,36 +8128,6 @@ Prioritize high-severity findings and cite related records."#,
         None,
         vec![],
     );
-
-    let low_stock_source_hash =
-        "sha256:7f14fe44adf71f73a6d4cf94f52c709e60c92195e9e2adc5afc0449f9fa99355";
-    let low_stock_manifest = format!(
-        r#"{{"limits":{{"max_steps":1,"max_tool_calls":1}},"output_types":["inventory.low_stock.result.v1"],"permissions":["inventory:read"],"resources":["inventory.low_stock.v1"],"risk":"green","schema_version":1,"skill_key":"low_stock","source_hash":"{low_stock_source_hash}","version":"1.0.3"}}"#
-    );
-
-    let low_stock_version = ctx.db.ai_skill_version().insert(AiSkillVersion {
-        id: 0,
-        version_key: format!("{}:{}:1.0.3", org_id, low_stock.id),
-        organization_id: org_id,
-        skill_id: low_stock.id,
-        skill_key: "low_stock".to_string(),
-        version: "1.0.3".to_string(),
-        manifest_schema_version: 1,
-        manifest_json: low_stock_manifest,
-        source_hash: low_stock_source_hash.to_string(),
-        risk: AiSkillRisk::Green,
-        max_steps: 1,
-        max_tool_calls: 1,
-        permissions: vec!["inventory:read".to_string()],
-        resources: vec!["inventory.low_stock.v1".to_string()],
-        output_types: vec!["inventory.low_stock.result.v1".to_string()],
-        reviewed_by: seeder,
-        reviewed_at: ctx.timestamp,
-        review_notes: Some("Seeded Phase 1 green low stock scanner".to_string()),
-        created_by: seeder,
-        created_at: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"purpose\":\"harness_low_stock\"}".to_string()),
-    });
 
     let low_stock_expected_output = serde_json::json!({
         "items": [{
@@ -8452,47 +8190,24 @@ Prioritize high-severity findings and cite related records."#,
         "synthetic-low-stock-v1",
     );
 
-    let _ = ctx.db.ai_skill_release().insert(AiSkillRelease {
-        id: 0,
-        organization_id: org_id,
-        skill_id: low_stock.id,
-        skill_version_id: low_stock_version.id,
-        release_number: 1,
-        is_active: true,
-        action: "promote".to_string(),
-        previous_release_id: None,
-        rollback_target_release_id: None,
-        released_by: seeder,
-        released_at: ctx.timestamp,
-        reason: Some("Seeded Phase 1 harness low stock release".to_string()),
-    });
-
     // ── Phase 5 distributor read-only controls ────────────────────────────
-    seed_promoted_harness_skill(
+    seed_builtin_harness_skill(
         ctx,
         org_id,
-        company_id,
         seeder,
         "credit_hold_summary",
         "Credit Exposure Review",
         "Summarize outstanding customer receivables for a human credit-hold review; it cannot release a hold or change an order.",
-        "distributor.credit_exposure.v1",
-        "distributor.credit_exposure.result.v1",
-        'c',
         r#"{"minimum_outstanding":0.01}"#,
         r#"{"items":[]}"#,
     );
-    seed_promoted_harness_skill(
+    seed_builtin_harness_skill(
         ctx,
         org_id,
-        company_id,
         seeder,
         "delivery_run_summary",
         "Delivery Run Review",
         "Summarize scoped outgoing pickings for a human delivery review; it cannot assign, validate, or cancel a picking.",
-        "distributor.delivery_run.v1",
-        "distributor.delivery_run.result.v1",
-        'd',
         r#"{"include_done":false}"#,
         r#"{"items":[]}"#,
     );

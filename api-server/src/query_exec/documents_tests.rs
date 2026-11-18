@@ -429,6 +429,81 @@ fn parent_response(rows: Vec<Value>) -> Value {
 }
 
 #[tokio::test]
+async fn exact_document_metadata_preserves_owner_tree_and_field_mask() {
+    let columns = [
+        "id",
+        "organization_id",
+        "company_id",
+        "folder_id",
+        "owner_id",
+        "is_deleted",
+        "name",
+    ];
+    let response = |company: u64, owner: &str| {
+        json!([{"schema": {"elements": columns.iter().map(|name| json!({"name": {"some": name}})).collect::<Vec<_>>()},
+            "rows": [[19, 7, company, null, owner, false, "Reconciliation checklist"]]}])
+    };
+    let (client, queries, server) = sql_fixture(vec![
+        response(12, ACTOR),
+        response(13, ACTOR),
+        response(12, OTHER),
+    ])
+    .await;
+    let mut field_access = access(&["document:read"]);
+    field_access.field_permissions.push(FieldPermissionLike {
+        id: None,
+        organization_id: Some(7),
+        role_id: Some(3),
+        resource: "documents".into(),
+        action: "read".into(),
+        allowed_fields: vec![
+            "id".into(),
+            "organization_id".into(),
+            "company_id".into(),
+            "name".into(),
+        ],
+        subject_user_hex: None,
+        subject_role_id: None,
+    });
+    let session = crate::session::ApiSession {
+        stdb_token: "fixture-token".into(),
+        identity_hex: ACTOR.into(),
+        organization_id: Some(7),
+        field_access: Some(field_access),
+    };
+    let context = crate::trusted_context::TrustedOperationContext::from_session(
+        &session,
+        client,
+        "erp.read_documents",
+    )
+    .unwrap()
+    .with_company_scope(vec![12])
+    .unwrap();
+    assert_eq!(
+        read_authoritative_document_metadata(&context, 12, 19)
+            .await
+            .unwrap(),
+        json!({"id":"19", "organizationId":"7", "companyId":12, "name":"Reconciliation checklist"})
+    );
+    for _ in 0..2 {
+        assert!(matches!(
+            read_authoritative_document_metadata(&context, 12, 19).await,
+            Err(ApiError::NotFound(_))
+        ));
+    }
+    server.abort();
+    let queries = queries.lock().unwrap();
+    let reads: Vec<_> = queries
+        .iter()
+        .filter(|sql| sql.contains(" FROM document "))
+        .collect();
+    assert_eq!(reads.len(), 3);
+    for sql in reads {
+        assert_eq!(sql, &format!("SELECT {} FROM document WHERE organization_id = 7 AND id = 19 AND is_deleted = false AND owner_id = 0x{ACTOR}", columns.join(", ")));
+    }
+}
+
+#[tokio::test]
 async fn real_template_reader_keeps_decoded_global_and_authorized_company_rows() {
     let response = json!([{"schema": {"elements": [
         {"name": {"some": "id"}, "algebraic_type": {"U64": []}},

@@ -210,7 +210,8 @@ managed sponsored period at UTC month rollover through normal spend admission.
 
 ### Verify a Railway release through authenticated chat
 
-Set the GitHub Environment variable `RAILWAY_VERIFY_GROUNDED_CHAT=true` and
+The check is on by default for every AI-enabled stack release and for every web
+release; there is no opt-in variable. Set the GitHub Environment variable
 `AI_CHAT_ACCEPTANCE_URL` to the application's HTTPS origin. Set the Environment
 secret `AI_CHAT_ACCEPTANCE_JSON` with `fresh` and `upgraded` fixtures in different
 dedicated test companies. Provision the fresh fixture through the version being
@@ -224,8 +225,67 @@ they expire.
 The check runs against the public chat streaming route after edge cutover. It
 requires a completed provider response, healthy retrieval, the expected fact and
 persisted claim support from the expected document version in both companies.
-It makes one chat attempt per fixture and prints only outcome labels. The same
-check can be run from the configured environment with `node scripts/verify-grounded-chat.mjs`.
+It makes one chat attempt per configured case and prints only outcome labels.
+Run the check from the configured environment with
+`node scripts/verify-grounded-chat.mjs`.
+
+Add a `journal` object to the same secret to verify a posted journal entry
+through live Accounting chat. Supply `companyId`, `cookie`, `accountMoveId` as
+a decimal string, `question`, `expectedAmountText`, and `expectedDebitText`.
+Use a dedicated test company's posted entry with a stable reference and a
+known debit account. Match the amount and debit wording to the requested
+format in the question, such as `RWF 600` and
+`Debit account: Test electricity expense`. The check requires a current
+source for that exact entry and verified support for both facts.
+
+The optional `journal.ambiguous` case takes a `question` matching multiple
+test entries and `expectedClarificationText`. The optional `journal.foreign`
+case takes an inaccessible `accountMoveId`, a `question` about the selected
+entry, and a synthetic `forbiddenText` marker from that entry. Both cases use
+the journal fixture's signed-in company and check that the assistant
+withholds generation and evidence.
+
+### Release scenarios, skip and nightly run
+
+A missing or invalid `AI_CHAT_ACCEPTANCE_URL`/`AI_CHAT_ACCEPTANCE_JSON` fails an
+AI-enabled release. The only bypass is the `skip_grounded_chat` workflow_dispatch
+input on `Release Railway stack` and `Release Railway web`; every use is written
+to the job summary with `github.actor`. The same check runs nightly at 03:17 UTC
+(`grounded-chat-nightly.yml`) against production with the same secret and, on
+failure, writes only the run ID to the job summary.
+
+Add any of the following optional top-level objects to the secret. Each carries
+its own `companyId` and `cookie` (like `journal`), is strictly validated when
+present, and may set `"expectedGap": true`: a failing scenario is then reported as
+`known-gap` (with its reason under `knownGaps`) and does not fail the release; a
+passing one reports `gap-closed`, which is the cue to remove the flag.
+
+| Key | Extra fields | Checks |
+| --- | --- | --- |
+| `namedRecord` | `question`, `entityType`, `entityId` (decimal string), `expectedText`, optional `uiContext` | Verified answer citing that live record, with the fact |
+| `followUp` | `chatSessionKey` (`[A-Za-z0-9_-]`, up to 100; a per-run suffix is added), `first` (`question`, `entityType`, `entityId`), `question`, optional `expectedText` | Second turn in the same session cites the first turn's record |
+| `nonEnglish` | `fr` and/or `rw`, each shaped like `namedRecord` | Same checks for a French or Kinyarwanda question |
+| `emptyCompany` | `question`, `expectedText` (the "not indexed yet" wording); a company different from `fresh` and `upgraded` | No generation, no sources, the wording present |
+| `summaryHandoff` | `question`, `capabilityKey`, optional `uiContext` | Verified reply offering that handoff in `ui_actions` |
+| `revoked` | `question`, `entityType`, `entityId`, `forbiddenText`, `uiContext` (`route`, `module`) | A revoked or foreign record is denied or ungrounded and never leaks `forbiddenText` |
+| `importContinuation` | `question`, `importTaskRefs` (1-4 32-hex task ids; the company is added), `expectedRecords` (`entityType`, `entityId`), optional `expectedText` | `import_task_statuses` returned and every expected reviewed record cited |
+
+Every scenario checks `retrieval_degraded`, the run status (`run_id`,
+`provider`, `model`), the verification outcome and the sources, never only the
+reply text. The gateway's chat response carries no settled-spend field today,
+so none is asserted.
+
+An optional top-level `maxWithholdRate` (0 to 1) lets a withheld verification
+outcome (`requires_review` or `blocked`) pass a scenario; the run fails when
+the share of withheld scenarios (non-gap record, follow-up, language, handoff
+and import scenarios) exceeds it. Without it, any withheld answer fails.
+
+Before the live questions, the command probes each distinct cookie with an empty
+query, which the web route rejects after authentication and before any model
+call. An expired cookie fails with a message naming the fixture to re-sign. There
+is no non-interactive production sign-in in the repository (the e2e helpers sign
+in a seeded local user), so cookies must still be rotated by hand; automating
+that sign-in for a dedicated acceptance user is a follow-up.
 
 ## Document and activity flows
 

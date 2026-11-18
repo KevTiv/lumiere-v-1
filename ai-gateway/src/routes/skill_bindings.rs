@@ -1,61 +1,38 @@
-//! Read-only discovery of native adapters in this gateway build.
-//! These templates confer no authority: certification and release recheck source,
-//! tenant permissions, fixtures, environment and the active runtime profile.
+//! Read-only discovery of repository-owned skills in this gateway build.
+//! Deployment supplies their executable policy; they have no tenant
+//! certification/activation lifecycle. Permissions and enablement still apply.
 
-use axum::{extract::State, Json};
+use axum::Json;
 use serde_json::{json, Value};
 
-use crate::{harness, orchestrator::generation_surface_certification, state::AppState};
+use crate::{harness, orchestrator::generation_surface_certification};
 
 pub(crate) fn binding(skill_key: &str) -> Option<Value> {
-    let (manifest, version, source_hash, permissions) = match skill_key {
-        "report_analysis" => (
-            harness::governed_llm_skills::report_analysis_manifest(),
-            harness::certification::REPORT_ANALYSIS_CERTIFICATION_VERSION,
-            harness::certification::report_analysis_certification_bundle_hash(),
-            vec!["report:read"],
-        ),
-        "report_composer" => (
-            harness::report_composer::manifest(),
-            harness::report_composer::REPORT_COMPOSER_RELEASE_VERSION,
-            harness::certification::report_composer_certification_bundle_hash(),
-            vec!["report:read"],
-        ),
-        "low_stock" => (
-            harness::low_stock::manifest(),
-            harness::low_stock::LOW_STOCK_RELEASE_VERSION,
-            harness::certification::low_stock_certification_bundle_hash(),
-            vec!["inventory:read"],
-        ),
-        key if lumiere_finance_review_core::skill(key).is_ok() => (
-            harness::finance_skills::manifest(key).ok()?,
-            lumiere_finance_review_core::VERSION,
-            harness::finance_skills::bundle_hash(key),
-            vec![],
-        ),
-        key if generation_surface_certification::KEYS.contains(&key) => (
-            generation_surface_certification::manifest(key).ok()?,
-            generation_surface_certification::VERSION,
-            generation_surface_certification::bundle_hash(key).ok()?,
-            vec![],
-        ),
+    let manifest = match skill_key {
+        "report_analysis" => harness::governed_llm_skills::report_analysis_manifest(),
+        "report_composer" => harness::report_composer::manifest(),
+        "low_stock" => harness::low_stock::manifest(),
+        key if lumiere_finance_review_core::skill(key).is_ok() => {
+            harness::finance_skills::manifest(key).ok()?
+        }
+        key if generation_surface_certification::KEYS.contains(&key) => {
+            generation_surface_certification::manifest(key).ok()?
+        }
         _ => return None,
     };
     Some(json!({
         "skillKey": skill_key,
         "adapterMajor": manifest.skill.version,
-        "manifest": {
-            "schema_version": 1,
-            "skill_key": skill_key,
-            "version": version,
-            "source_hash": source_hash,
+        "managedBy": "application",
+        "certificationRequired": false,
+        "activationRequired": false,
+        "policy": {
             "risk": manifest.risk,
-            "permissions": permissions,
             "resources": manifest.named_resources,
-            "output_types": [manifest.output_type],
+            "outputTypes": [manifest.output_type],
             "limits": {
-                "max_steps": manifest.limits.max_steps,
-                "max_tool_calls": manifest.limits.max_tool_calls,
+                "maxSteps": manifest.limits.max_steps,
+                "maxToolCalls": manifest.limits.max_tool_calls,
             },
         },
     }))
@@ -63,7 +40,7 @@ pub(crate) fn binding(skill_key: &str) -> Option<Value> {
 
 /// Mounted behind the gateway's internal-secret middleware. The web BFF also
 /// requires an authenticated organization session. No provider calls or writes.
-pub async fn get_bindings(State(state): State<AppState>) -> Json<Value> {
+pub async fn get_bindings() -> Json<Value> {
     let bindings: Vec<_> = [
         "report_analysis",
         "report_composer",
@@ -80,15 +57,9 @@ pub async fn get_bindings(State(state): State<AppState>) -> Json<Value> {
     .into_iter()
     .filter_map(binding)
     .collect();
-    let certification_configured = state
-        .config
-        .ai_certification_stdb_token
-        .as_ref()
-        .is_some_and(|token| !token.trim().is_empty());
     Json(json!({
         "bindings": bindings,
-        "runtimeHash": state.config.ai_certification_runtime_hash,
-        "certificationConfigured": certification_configured,
+        "managedBy": "application",
     }))
 }
 
@@ -97,40 +68,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn discovery_uses_the_current_executable_source_and_policy() {
+    fn application_skills_do_not_advertise_tenant_publication_manifests() {
         let report = binding("report_analysis").expect("native adapter");
+        assert_eq!(report["managedBy"], "application");
+        assert_eq!(report["certificationRequired"], false);
+        assert_eq!(report["activationRequired"], false);
+        assert!(report.get("manifest").is_none());
         assert_eq!(
-            report["manifest"]["source_hash"],
-            harness::certification::report_analysis_certification_bundle_hash()
-        );
-        assert_eq!(report["manifest"]["skill_key"], "report_analysis");
-        assert_eq!(
-            report["manifest"]["output_types"][0],
+            report["policy"]["outputTypes"][0],
             "analytics.report_analysis.result.v1"
         );
         assert!(binding("unregistered_code").is_none());
     }
 
     #[test]
-    fn generation_discovery_binds_each_surface_to_its_own_executable_source() {
+    fn generation_discovery_uses_deployed_policy_without_source_activation() {
         for key in generation_surface_certification::KEYS {
             let discovered = binding(key).expect("supported generation source");
             let expected = generation_surface_certification::manifest(key).unwrap();
-            assert_eq!(discovered["manifest"]["skill_key"], key);
+            assert_eq!(discovered["skillKey"], key);
+            assert_eq!(discovered["certificationRequired"], false);
+            assert_eq!(discovered["activationRequired"], false);
             assert_eq!(
-                discovered["manifest"]["version"],
-                generation_surface_certification::VERSION
-            );
-            assert_eq!(
-                discovered["manifest"]["source_hash"],
-                generation_surface_certification::bundle_hash(key).unwrap()
-            );
-            assert_eq!(
-                discovered["manifest"]["resources"],
+                discovered["policy"]["resources"],
                 json!(expected.named_resources)
             );
             assert_eq!(
-                discovered["manifest"]["output_types"],
+                discovered["policy"]["outputTypes"],
                 json!([expected.output_type])
             );
         }
@@ -138,13 +102,18 @@ mod tests {
     }
 
     #[test]
-    fn finance_discovery_uses_the_current_immutable_adapter_version() {
+    fn finance_discovery_needs_no_tenant_release_version() {
         for skill in lumiere_finance_review_core::SKILLS {
             let discovered = binding(skill.key).expect("supported Finance source");
             assert_eq!(
-                discovered["manifest"]["version"],
-                lumiere_finance_review_core::VERSION
+                discovered["adapterMajor"],
+                harness::finance_skills::manifest(skill.key)
+                    .unwrap()
+                    .skill
+                    .version
             );
+            assert!(discovered.get("manifest").is_none());
+            assert_eq!(discovered["activationRequired"], false);
         }
     }
 }

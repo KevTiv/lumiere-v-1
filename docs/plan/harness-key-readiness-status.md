@@ -1,3 +1,5 @@
+> Superseded for repository-owned skills by [skill ownership and lifecycle](skill-ownership-and-lifecycle.md) (2026-11-17). Historical record only for those steps.
+
 # Harness key readiness — 2026-10-25
 
 This status supersedes the September execution board for the bounded Mistral

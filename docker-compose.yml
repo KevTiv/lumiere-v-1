@@ -275,7 +275,9 @@ services:
     restart: unless-stopped
 
   qdrant:
-    image: qdrant/qdrant:v1.12.6
+    # Match the gateway client and Dockerfile.qdrant-health. Existing older
+    # volumes require a backed-up, staged upstream upgrade before using this image.
+    image: qdrant/qdrant:v1.17.0
     ports:
       - "127.0.0.1:6333:6333"
       - "127.0.0.1:6334:6334"

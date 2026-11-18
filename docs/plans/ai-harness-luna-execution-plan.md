@@ -1,3 +1,5 @@
+> Superseded for repository-owned skills by [skill ownership and lifecycle](../plan/skill-ownership-and-lifecycle.md) (2026-11-17). Historical record only for those steps.
+
 # AI Harness Luna Execution Plan
 
 **Historical execution board:** for the 2026-10-23 integrated runtime,

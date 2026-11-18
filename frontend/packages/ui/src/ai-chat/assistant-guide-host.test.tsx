@@ -158,13 +158,16 @@ for (const owner of ["modal", "page"] as const) describe(`${owner} guide revalid
   })
 
   it("removes protected content after an authoritative denial and can reopen when access returns", async () => {
-    render(tree())
-    await screen.findByTestId("assistant-guide-viewer")
-    controls.read.mockRejectedValueOnce(new GuideRequestError("access revoked", 403))
+    // Flush the initial read and the effect that installs the focus listener.
+    await act(async () => { render(tree()) })
+    expect(screen.getByTestId("assistant-guide-viewer")).toBeTruthy()
+    controls.read.mockRejectedValue(new GuideRequestError("access revoked", 403))
     fireEvent.focus(window)
-    await waitFor(() => expect(screen.queryByTestId("assistant-guide-viewer")).toBeNull())
+    const retry = await screen.findByRole("button", { name: "Retry access check" })
+    expect(screen.queryByTestId("assistant-guide-viewer")).toBeNull()
     expect(screen.queryByText("Original instructions")).toBeNull()
-    fireEvent.click(screen.getByRole("button", { name: "Retry access check" }))
+    controls.read.mockResolvedValue(saved)
+    fireEvent.click(retry)
     await screen.findByTestId("assistant-guide-viewer")
     expect(screen.getByText("Original instructions")).toBeTruthy()
   })

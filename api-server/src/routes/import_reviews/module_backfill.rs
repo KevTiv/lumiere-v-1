@@ -1,4 +1,6 @@
 //! Reviewed sales, including daily shop sales, and physical counts have durable module records.
+pub(super) mod sales_summary;
+
 use std::{collections::BTreeMap, sync::Arc};
 
 use axum::{
@@ -9,6 +11,11 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+
+mod reconciliation;
+
+#[cfg(test)]
+pub(super) use reconciliation::exercise_persistence;
 
 use super::{
     history_period::calendar_date,
@@ -24,6 +31,7 @@ use crate::{
     trusted_context::TrustedOperationContext,
     web_session::OrgSession,
 };
+use reconciliation::{BackfillRow, Existing};
 
 #[derive(Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -137,6 +145,10 @@ enum Facts<'a> {
         unit_price: &'a str,
         amount: &'a str,
         currency: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sale_line_issuer: Option<&'a str>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sale_line_reference: Option<&'a str>,
     },
     Warehouse {
         product: &'a str,
@@ -175,6 +187,45 @@ impl<'a> ReviewedFacts<'a> {
     fn number(&self, keys: &[&str], labels: &[&str]) -> Option<&'a str> {
         self.value(keys, labels)
             .filter(|value| decimal(value).is_some_and(|n| n >= 0))
+    }
+
+    fn explicit_line_identity(&self) -> Result<(Option<&'a str>, Option<&'a str>), &'static str> {
+        let Some((issuer, reference)) = self
+            .identity_field("sale_line_issuer")
+            .zip(self.identity_field("sale_line_reference"))
+        else {
+            return Err(
+                "Confirm the original line issuer and reference without changing their values",
+            );
+        };
+        match (issuer, reference) {
+            (None, None) | (Some(_), Some(_)) => Ok((issuer, reference)),
+            _ => Err("Supply both the stable sale line reference and its issuing source"),
+        }
+    }
+
+    /// None means the imported identity was changed, unsupported, or unconfirmed.
+    fn identity_field(&self, key: &str) -> Option<Option<&'a str>> {
+        let raw = self
+            .original
+            .fields
+            .iter()
+            .find(|field| field.key == key)
+            .and_then(|field| field.source_value.as_deref())
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let chosen = self
+            .values
+            .get(key)
+            .and_then(Option::as_deref)
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        if raw.is_none() && chosen.is_none() {
+            return Some(None);
+        }
+        let value =
+            raw.filter(|value| value.len() <= 160 && !value.chars().any(char::is_control))?;
+        (chosen == Some(value) && self.value(&[key], &[]) == Some(value)).then_some(Some(value))
     }
 }
 
@@ -275,6 +326,7 @@ fn prepare_shop_sale(
         .filter(|code| code.len() == 3 && code.bytes().all(|b| b.is_ascii_alphabetic()))
         .ok_or("Confirm the sales currency")?
         .to_uppercase();
+    let (sale_line_issuer, sale_line_reference) = row.explicit_line_identity()?;
     Ok((
         date,
         date,
@@ -286,6 +338,8 @@ fn prepare_shop_sale(
             unit_price,
             amount,
             currency,
+            sale_line_issuer,
+            sale_line_reference,
         },
     ))
 }
@@ -476,7 +530,6 @@ pub(super) async fn write(
     let ctx = scope(&state, &session, body.company_id).await?;
     let org = ctx.organization_id();
     let company = body.company_id;
-    let module = body.module.storage_name();
     if batch <= 0 || body.rows.is_empty() || body.rows.len() > 200 {
         return Err(ApiError::BadRequest("select 1–200 reviewed rows".into()));
     }
@@ -506,6 +559,9 @@ pub(super) async fn write(
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
+    if matches!(body.module, Module::ShopSales) && !body.preview {
+        reconciliation::lock_shop_sales(&tx, &org, &company).await?;
+    }
     let eligible: bool = tx
         .query_one(
             "WITH links AS (
@@ -531,20 +587,14 @@ pub(super) async fn write(
     }
     let items = tx
         .query(
-            "SELECT item.id, item.revision, item.state, item.source_json, item.proposed_json, item.confirmed_fields,
-                    existing.id AS existing_id, existing.period_start::text AS existing_start,
-                    existing.period_end::text AS existing_end, existing.facts AS existing_facts
+            "SELECT item.id, item.revision, item.state, item.source_json, item.proposed_json, item.confirmed_fields
              FROM lumiere_platform.import_review_item item
              JOIN lumiere_platform.import_review_batch batch
                ON batch.organization_id=item.organization_id AND batch.company_id=item.company_id AND batch.id=item.batch_id
-             LEFT JOIN lumiere_platform.module_backfill_record existing
-               ON $6::boolean AND existing.organization_id=item.organization_id AND existing.company_id=item.company_id
-               AND existing.module=$5 AND existing.source_sha256=item.source_json #>> '{source,sha256}'
-               AND existing.source_row=(item.source_json #>> '{source,row}')::bigint
              WHERE item.organization_id=$1::text::numeric AND item.company_id=$2::text::numeric
                AND item.batch_id=$3 AND item.id=ANY($4::bigint[]) AND batch.target_entity='source_observation'
              ORDER BY item.id FOR SHARE OF item",
-            &[&org, &company, &batch, &ids, &module, &body.preview],
+            &[&org, &company, &batch, &ids],
         )
         .await
         .map_err(ApiError::internal)?;
@@ -567,11 +617,6 @@ pub(super) async fn write(
         }
         let original: ReviewItem =
             serde_json::from_value(item.get("source_json")).map_err(ApiError::internal)?;
-        if original.source.multi_worksheet {
-            results.push(json!({"itemId":id.to_string(),"status":"held",
-                "reason":"This workflow requires a single-sheet source to distinguish rows. Select a single-sheet export for this Sales or Warehouse backfill."}));
-            continue;
-        }
         let values =
             serde_json::from_value(item.get("proposed_json")).map_err(ApiError::internal)?;
         let confirmed: Vec<String> =
@@ -601,57 +646,67 @@ pub(super) async fn write(
             serde_json::to_vec(&(id, revision, &start, &end, &facts))
                 .map_err(ApiError::internal)?,
         ));
-        if body.preview {
-            let existing_id = item.get::<_, Option<i64>>("existing_id");
-            if existing_id.is_some()
-                && (item.get::<_, Option<String>>("existing_start").as_ref() != Some(&start)
-                    || item.get::<_, Option<String>>("existing_end").as_ref() != Some(&end)
-                    || item.get::<_, Option<Value>>("existing_facts").as_ref() != Some(&facts))
-            {
-                results.push(json!({"itemId":id.to_string(),"status":"conflict","reason":"A saved record for this source row has different values."}));
-            } else {
-                results.push(json!({
-                    "itemId":id.to_string(), "status":"ready", "periodStart":start, "periodEnd":end,
-                    "facts":facts, "digest":digest, "recordId":existing_id.map(|id| id.to_string())
-                }));
-            }
-            continue;
-        }
-        if selection.expected_digest.as_deref() != Some(digest.as_str()) {
+        let row = BackfillRow {
+            organization: &org,
+            company: &company,
+            module: body.module,
+            source: &original.source,
+            period_start: &start,
+            period_end: &end,
+            facts: &facts,
+        };
+        if !body.preview && selection.expected_digest.as_deref() != Some(digest.as_str()) {
             results.push(json!({"itemId":id.to_string(),"status":"held","reason":"The mapped record changed. Preview it again."}));
             continue;
         }
-        let source = &original.source;
-        let number = i64::from(source.row);
-        let inserted = tx.execute("INSERT INTO lumiere_platform.module_backfill_record
-            (organization_id,company_id,module,batch_id,item_id,source_revision,source_sha256,source_row,source_file,period_start,period_end,facts,created_by)
-            VALUES ($1::text::numeric,$2::text::numeric,$3,$4,$5,$6,$7,$8,$9,$10::text::date,$11::text::date,$12,$13)
-            ON CONFLICT (organization_id,company_id,module,source_sha256,source_row) DO NOTHING",
-            &[&org,&company,&module,&batch,&id,&revision,&source.sha256,&number,&source.file,&start,&end,&facts,&ctx.actor_identity()]
-        ).await.map_err(ApiError::internal)?;
-        let saved = tx.query_one("SELECT id,batch_id,period_start::text,period_end::text,facts FROM lumiere_platform.module_backfill_record
-            WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND module=$3 AND source_sha256=$4 AND source_row=$5",
-            &[&org,&company,&module,&source.sha256,&number]).await.map_err(ApiError::internal)?;
-        let same = saved.get::<_, Value>("facts") == facts
-            && saved.get::<_, String>(2) == start
-            && saved.get::<_, String>(3) == end;
-        let record_id: i64 = saved.get("id");
-        if same && saved.get::<_, i64>("batch_id") != batch {
-            tx.execute(
-                "INSERT INTO lumiere_platform.module_backfill_review_match
-                 (organization_id, company_id, batch_id, item_id, source_revision, record_id)
-                 VALUES ($1::text::numeric, $2::text::numeric, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
-                &[&org, &company, &batch, &id, &revision, &record_id],
-            )
-            .await
-            .map_err(ApiError::internal)?;
+        let key = row.business_key()?;
+        let mut existing = row.existing(&tx, &key).await?;
+        let mut saved_id = None;
+        if !body.preview && matches!(existing, Existing::None) {
+            saved_id = row
+                .save(&tx, batch, id, revision, ctx.actor_identity(), &key)
+                .await?;
+            if saved_id.is_none() {
+                existing = row.existing(&tx, &key).await?;
+            }
         }
-        let status = if !same {
-            "conflict"
-        } else if inserted == 1 {
-            "saved"
+        let saved = match existing {
+            Existing::None => None,
+            Existing::Matched(saved) => Some(saved),
+            Existing::Held(reason) => {
+                results.push(json!({"itemId":id.to_string(),"status":"held","reason":reason}));
+                continue;
+            }
+            Existing::Conflict(reason) => {
+                results.push(json!({"itemId":id.to_string(),"status":"conflict","reason":reason}));
+                continue;
+            }
+        };
+        if body.preview {
+            results.push(json!({
+                "itemId":id.to_string(), "status":"ready", "periodStart":start, "periodEnd":end,
+                "facts":facts, "digest":digest, "recordId":saved.map(|record| record.id.to_string())
+            }));
+            continue;
+        }
+        let (status, record_id) = if let Some(record_id) = saved_id {
+            ("saved", record_id)
+        } else if let Some(saved) = saved {
+            if (saved.item, saved.revision) != (id, revision) {
+                tx.execute(
+                    "INSERT INTO lumiere_platform.module_backfill_review_match
+                     (organization_id, company_id, batch_id, item_id, source_revision, record_id)
+                     VALUES ($1::text::numeric, $2::text::numeric, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
+                    &[&org, &company, &batch, &id, &revision, &saved.id],
+                )
+                .await
+                .map_err(ApiError::internal)?;
+            }
+            ("matched", saved.id)
         } else {
-            "matched"
+            return Err(ApiError::Conflict(
+                "The saved import changed. Preview the affected row again.".into(),
+            ));
         };
         results.push(
             json!({"itemId":id.to_string(),"status":status,"recordId":record_id.to_string()}),
@@ -696,6 +751,86 @@ pub(super) async fn task_results(
         .collect())
 }
 
+/// Scope durable module writes and replays to batches attached to this actor's task.
+pub(super) async fn workflow_results(
+    tx: &tokio_postgres::Transaction<'_>,
+    scope: super::StorageScope<'_>,
+    task: &str,
+) -> Result<Value, ApiError> {
+    let rows = tx.query(
+        "WITH batches AS (
+            SELECT batch_id FROM lumiere_platform.import_task_review
+            WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric
+              AND actor_identity=$3 AND request_id=$4
+         ), receipts AS (
+            SELECT record.id AS record_id, true AS created_here
+            FROM lumiere_platform.module_backfill_record record JOIN batches USING (batch_id)
+            WHERE record.organization_id=$1::text::numeric AND record.company_id=$2::text::numeric
+            UNION ALL
+            SELECT matched.record_id, false
+            FROM lumiere_platform.module_backfill_review_match matched JOIN batches USING (batch_id)
+            WHERE matched.organization_id=$1::text::numeric AND matched.company_id=$2::text::numeric
+         ), scoped_records AS (
+            SELECT record_id, bool_or(created_here) AS created_here FROM receipts GROUP BY record_id
+         ), records AS (
+            SELECT record.*, scoped.created_here
+            FROM scoped_records scoped JOIN lumiere_platform.module_backfill_record record ON record.id=scoped.record_id
+            WHERE record.organization_id=$1::text::numeric AND record.company_id=$2::text::numeric
+         ), sale_amounts AS (
+            SELECT facts->>'currency' AS currency,
+                   CASE WHEN facts->>'amount' ~ '^[0-9]{1,12}([.][0-9]{1,6})?$'
+                        THEN (facts->>'amount')::numeric END AS amount
+            FROM records WHERE module='sales' AND facts->>'kind'='shop_sale'
+         ), totals AS (
+            SELECT currency, trim_scale(sum(amount))::text AS amount, count(*) AS count
+            FROM sale_amounts WHERE currency ~ '^[A-Z]{3}$' AND amount > 0 GROUP BY currency
+         ), reconciliation AS (
+            SELECT CASE WHEN count(*) <= 20 AND coalesce(sum(count), 0) = (SELECT count(*) FROM sale_amounts)
+                        THEN coalesce(jsonb_agg(to_jsonb(totals) ORDER BY currency), '[]'::jsonb) END AS sales_totals
+            FROM totals
+         )
+         SELECT record.id, CASE WHEN record.facts->>'kind'='shop_sale' THEN 'shop_sales'
+                           ELSE record.module END AS module,
+                record.period_start::text, record.facts->>'product' AS product,
+                count(*) OVER () AS verified,
+                count(*) FILTER (WHERE NOT record.created_here) OVER () AS already_present, sales_totals
+         FROM records record CROSS JOIN reconciliation
+         ORDER BY record.period_start DESC, record.id DESC LIMIT 20",
+        &[&scope.organization.to_string(), &scope.company.to_string(), &scope.actor, &task],
+    ).await.map_err(ApiError::internal)?;
+    let (verified, present) = rows.first().map_or((0i64, 0i64), |row| {
+        (row.get("verified"), row.get("already_present"))
+    });
+    let records = rows
+        .iter()
+        .map(|row| {
+            let mut record = json!({
+                "id": row.get::<_, i64>("id").to_string(),
+                "module": row.get::<_, String>("module"),
+                "periodStart": row.get::<_, String>("period_start"),
+            });
+            if let Some(product) = row
+                .get::<_, Option<&str>>("product")
+                .filter(|name| !name.is_empty())
+            {
+                record["displayLabel"] = Value::String(product.chars().take(200).collect());
+            }
+            record
+        })
+        .collect::<Vec<_>>();
+    let mut result = json!({
+        "counts": {"verified": verified, "alreadyPresent": present},
+        "more": verified > records.len() as i64,
+        "records": records,
+    });
+    if let Some(totals) = rows.first().map_or(Some(json!([])), |row| {
+        row.get::<_, Option<Value>>("sales_totals")
+    }) {
+        result["salesTotals"] = totals;
+    }
+    Ok(result)
+}
+
 pub(super) async fn read(
     State(state): State<Arc<AppState>>,
     OrgSession { session, .. }: OrgSession,
@@ -709,6 +844,7 @@ pub(super) async fn read(
     let rows = client
         .query(
             "SELECT record.id, record.batch_id, record.source_file, record.source_row,
+                    nullif(record.source_worksheet, '') AS source_worksheet,
                     record.period_start::text AS period_start, record.period_end::text AS period_end,
                     record.facts, record.item_id, record.source_revision,
                     to_char(record.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS saved_at
@@ -752,7 +888,7 @@ pub(super) async fn read(
     let next = (rows.len() > 100).then(|| rows[99].get::<_, i64>("id").to_string());
     let data = rows.iter().take(100).map(|row| json!({
         "id":row.get::<_,i64>("id").to_string(),"batchId":row.get::<_,i64>("batch_id").to_string(),
-        "sourceFile":row.get::<_,String>("source_file"),"sourceRow":row.get::<_,i64>("source_row"),
+        "sourceFile":row.get::<_,String>("source_file"),"sourceWorksheet":row.get::<_,Option<String>>("source_worksheet"),"sourceRow":row.get::<_,i64>("source_row"),
         "periodStart":row.get::<_,String>("period_start"),"periodEnd":row.get::<_,String>("period_end"),"facts":row.get::<_,Value>("facts"),
         "savedAt":row.get::<_,String>("saved_at"),
         "itemId":row.get::<_,i64>("item_id").to_string(),"sourceRevision":row.get::<_,i32>("source_revision"),
@@ -906,6 +1042,37 @@ mod tests {
         row.proposed
             .insert("sale_date".into(), Some("2024-04-13".into()));
         assert!(prepare_row(&row).is_err());
+    }
+
+    #[test]
+    fn only_confirmed_original_pos_line_identities_are_reusable() {
+        let row = source(&[
+            ("sale_line_issuer", "Issuer", "Kicukiro POS"),
+            ("sale_line_reference", "Line reference", "0010"),
+        ]);
+        let review = ReviewedFacts {
+            original: &row,
+            values: &row.proposed,
+            confirmed: &[],
+            fully_confirmed: true,
+        };
+        assert_eq!(
+            review.explicit_line_identity(),
+            Ok((Some("Kicukiro POS"), Some("0010")))
+        );
+        let unconfirmed = ReviewedFacts {
+            fully_confirmed: false,
+            ..review
+        };
+        assert!(unconfirmed.explicit_line_identity().is_err());
+        let mut revised = row.proposed.clone();
+        revised.insert("sale_line_reference".into(), Some("10".into()));
+        assert!(ReviewedFacts {
+            values: &revised,
+            ..review
+        }
+        .explicit_line_identity()
+        .is_err());
     }
 
     #[test]

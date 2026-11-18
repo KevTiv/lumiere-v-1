@@ -11,6 +11,10 @@ mod access_control;
 mod accounting;
 mod ai;
 mod authoritative;
+mod authoritative_search;
+pub(crate) use authoritative_search::{
+    execute_authorized_resource_search, AuthoritativeSearchQuery,
+};
 mod company_scope;
 mod crm;
 mod documents;
@@ -32,6 +36,9 @@ use ai::{
     read_ai_skill_releases, read_ai_skill_test_runs, read_ai_skill_versions,
 };
 pub use authoritative::execute_authorized_resource_record;
+pub(crate) use authoritative::{
+    enrich_authoritative_currency, execute_authorized_resource_relations,
+};
 #[cfg(test)]
 pub(crate) use company_scope::enforce_requested_company;
 pub(crate) use company_scope::{
@@ -45,10 +52,11 @@ pub use company_scope::{
     resolve_sales_company_id,
 };
 use crm::filter_crm_company_rows;
-use documents::{read_document_templates, read_mail_templates};
 pub(crate) use documents::{
-    read_document_versions, read_documents, read_spreadsheet_document_rows, DocumentReadProjection,
+    read_authoritative_document_metadata, read_document_versions, read_documents,
+    read_spreadsheet_document_rows, DocumentReadProjection,
 };
+use documents::{read_document_templates, read_mail_templates};
 use hr::{maybe_log_hr_pii_read, read_direct_reports, read_employees, read_my_employee};
 use messaging::read_queued_mail_messages;
 use row_values::row_company_matches;

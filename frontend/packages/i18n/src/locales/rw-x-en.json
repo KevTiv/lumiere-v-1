@@ -661,11 +661,17 @@
     }
   },
   "settings": {
+    "importWorkflow": {
+      "companySetup": "Igenamiterere ry’ikigo kuri iyi file"
+    },
     "page": {
       "description": "Gena account yawe n’imikorere ya sisitemu"
     },
     "import": {
       "file": "File ya CSV cyangwa Excel"
+    },
+    "importPreparation": {
+      "reportControlPurpose": "Koresha ibi biteranyo kugira ngo ugenzure imirongo yabazwe kandi usuzume ibinyuranyo biri muri report y’umwimerere."
     },
     "users": {
       "email": "Email"

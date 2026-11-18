@@ -69,6 +69,19 @@ export type ChatImportDecisionAnswer = Pick<ChatImportDecisionPointer, "expected
 type ReceiptStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">
 export type ImportTaskFetch = (url: string, init?: RequestInit) => Promise<Response>
 
+export function chatImportReceiptKey(
+  scope: Pick<ChatImportScope, "identity" | "organizationId" | "companyId">,
+  taskId?: string,
+) {
+  const scopeKey = [
+    "assistant-import-receipt",
+    scope.identity,
+    scope.organizationId,
+    scope.companyId,
+  ]
+  return taskId ? [...scopeKey, taskId] : scopeKey
+}
+
 export function chatImportScopeKey(scope: ChatImportScope): string {
   if (!scope.identity || !Number.isSafeInteger(scope.organizationId) || scope.organizationId < 1
     || !Number.isSafeInteger(scope.companyId) || scope.companyId < 1

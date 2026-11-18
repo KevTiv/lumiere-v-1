@@ -1,5 +1,7 @@
 "use client"
 
+import { AskAboutRecordButton } from "../../../components/ask-about-record-button"
+
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
 import { useErpSession } from "@lumiere/erp-session"
@@ -1027,6 +1029,15 @@ function ExpensesClientLoaded({
             <p className="text-xs text-muted-foreground">
               {t("expenses.workflow.actionsTitle")} · {rowAction ? rowState(rowAction.row) : ""}
             </p>
+            {rowAction?.tabId === "expenses" && (
+              <AskAboutRecordButton
+                entityType="hr_expense"
+                recordId={rowAction.row.id}
+                label={String(rowAction.row.name ?? "")}
+                activeTab="expenses"
+                closeRecord={() => setRowAction(null)}
+              />
+            )}
             {rowAction?.tabId === "expenses" && rowState(rowAction.row) === "Draft" && (
               <>
                 <Button

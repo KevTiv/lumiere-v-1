@@ -3,6 +3,7 @@ import test from "node:test"
 import { parseCsvText } from "@lumiere/erp-shared/csv-import-safety"
 import {
   reviewArithmetic,
+  reviewSaleReconciliation,
   reviewDatasetFromCsv,
   reviewedImportSource,
   type ReviewDetail,
@@ -18,6 +19,35 @@ test("review arithmetic preserves totals without guessing a weight conversion", 
   assert.equal(reviewArithmetic({ quantity: "1", unit_price: "4800" }), "4800")
   assert.equal(reviewArithmetic({ quantity: "", unit_price: "4800" }), null)
   assert.equal(reviewArithmetic({ quantity: "NaN", unit_price: "4800" }), null)
+})
+
+test("shop sales compare the recorded amount against exact sales fields", () => {
+  assert.deepEqual(
+    reviewSaleReconciliation({
+      sold_quantity: "0.100001",
+      sale_unit_price: "0.100001",
+      sale_amount: "0.01",
+      quantity: "20",
+      unit_price: "19",
+      amount: "380",
+    }),
+    {
+      calculated: "0.010000200001",
+      recorded: "0.01",
+      difference: "-0.000000200001",
+    },
+  )
+  assert.deepEqual(
+    reviewSaleReconciliation({
+      sold_quantity: "0.5",
+      sale_unit_price: "60.00",
+    }),
+    { calculated: "30", recorded: null, difference: null },
+  )
+  assert.equal(
+    reviewSaleReconciliation({ sold_quantity: "0.5", unit_price: "60.00" }),
+    null,
+  )
 })
 
 test("a review copy retains bad and missing source cells without confirming them", async () => {

@@ -246,14 +246,9 @@ test("a saved import selector reopens 11 journal drafts without the model or any
     `/api/import-tasks/${taskId}?companyId=3`,
     `/api/import-tasks/${taskId}/workflow?companyId=3`,
   ])
-  await assert.rejects(
-    readChatImportTaskStatus(
-      fetcher,
-      { ...conversation, conversationKey: "another" },
-      taskId,
-    ),
-    /conversation/,
-  )
+  const laterConversation = { ...conversation, conversationKey: "another" }
+  const reopened = await readChatImportTaskStatus(fetcher, laterConversation, taskId)
+  assert.deepEqual(reopened.proposals, restored.proposals)
   await assert.rejects(
     readChatImportTaskStatus(
       fetcher,
@@ -296,6 +291,20 @@ test("a saved import selector reopens 11 journal drafts without the model or any
     ),
     /does not match/,
   )
+})
+
+test("reviewed Sales totals count existing matches once and preserve decimals", () => {
+  const reviewedRecords = {
+    counts: { verified: 1, alreadyPresent: 1 },
+    records: [{ id: "9007199254740994", module: "shop_sales", periodStart: "2024-04-09" }],
+    salesTotals: [{ currency: "RWF", amount: "71406345.45", count: 1 }],
+    more: false,
+  }
+  assert.deepEqual(parseImportTaskStatuses([{ ...status, reviewedRecords }])?.[0]?.reviewedRecords, reviewedRecords)
+  assert.throws(() => parseImportTaskStatuses([{ ...status, reviewedRecords: {
+    ...reviewedRecords,
+    salesTotals: [...reviewedRecords.salesTotals, ...reviewedRecords.salesTotals],
+  } }]), /reviewed import record summary/)
 })
 
 test("deterministic task cards keep source decisions distinct from verified drafts", () => {

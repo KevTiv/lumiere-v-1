@@ -5,7 +5,10 @@
 //! after the existing provider-attempt owner atomically claims dispatch. Unknown
 //! outcomes retain their hold; successful private outputs survive a lost reply.
 
-use std::future::Future;
+use std::{
+    future::Future,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 #[derive(Debug)]
 pub(crate) struct MeteredRecoveryRequired;
@@ -61,6 +64,40 @@ pub(crate) struct MeteredResult<T> {
     pub units: u32,
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("reindex spend cap reached")]
+pub(crate) struct SpendCapReached;
+
+/// Per-invocation ceiling in the named billing currency's microunits. Charge
+/// the entire native reservation before dispatch; never credit back savings or
+/// assume an uncertain provider outcome is free.
+pub(crate) struct SpendCap {
+    pub currency: String,
+    remaining: AtomicU64,
+}
+
+impl SpendCap {
+    pub(crate) fn new(currency: String, limit: u64) -> Self {
+        Self {
+            currency,
+            remaining: AtomicU64::new(limit),
+        }
+    }
+
+    pub(crate) fn remaining(&self) -> u64 {
+        self.remaining.load(Ordering::Relaxed)
+    }
+
+    fn debit(&self, units: u64) -> Result<()> {
+        self.remaining
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |remaining| {
+                remaining.checked_sub(units)
+            })
+            .map(|_| ())
+            .map_err(|_| SpendCapReached.into())
+    }
+}
+
 struct StoredMeter {
     reservation_id: u64,
     run_id: u64,
@@ -72,7 +109,13 @@ struct StoredMeter {
 #[async_trait]
 trait MeteredLedger: Send + Sync {
     async fn read(&self, scope: &MeteredScope) -> Result<Option<StoredMeter>>;
+    async fn preflight(&self, _scope: &MeteredScope) -> Result<()> {
+        Ok(())
+    }
     async fn reserve(&self, scope: &MeteredScope) -> Result<()>;
+    async fn authorize_dispatch(&self, _scope: &MeteredScope, _row: &StoredMeter) -> Result<()> {
+        Ok(())
+    }
     async fn attempt(
         &self,
         scope: &MeteredScope,
@@ -100,6 +143,7 @@ trait MeteredLedger: Send + Sync {
 struct StdbMeteredLedger<'a> {
     writer: &'a StdbClient,
     reader: &'a StdbClient,
+    cap: Option<&'a SpendCap>,
 }
 
 fn optional_u32(value: &Value) -> Result<Option<u32>> {
@@ -225,11 +269,84 @@ impl MeteredLedger for StdbMeteredLedger<'_> {
             .transpose()
     }
 
+    async fn preflight(&self, scope: &MeteredScope) -> Result<()> {
+        let Some(cap) = self.cap else {
+            return Ok(());
+        };
+        let budget = SpendReader::new(self.reader)
+            .budget(
+                scope.organization_id,
+                scope.agent_id,
+                &ai_spend::billing_period(chrono::Utc::now()),
+            )
+            .await?
+            .context("current reindex budget unavailable")?;
+        anyhow::ensure!(
+            budget.currency == cap.currency,
+            "reindex cap currency differs from budget"
+        );
+        let rows = self
+            .reader
+            .with_query_limits(100, 64 * 1024)?
+            .query_sql_sats(&format!(
+                "SELECT units_per_1k, version, currency, model, unit FROM ai_metered_price_read \
+                 WHERE organization_id = {} AND agent_id = {}",
+                scope.organization_id, scope.agent_id,
+            ))
+            .await?;
+        let price = rows
+            .iter()
+            .filter(|row| {
+                row.get("currency").and_then(Value::as_str) == Some(cap.currency.as_str())
+                    && row.get("model").and_then(Value::as_str) == Some(scope.model.as_str())
+                    && row.get("unit").and_then(Value::as_str) == Some(scope.unit.as_str())
+            })
+            .map(|row| {
+                Ok::<_, anyhow::Error>((integer(row, "version")?, integer(row, "units_per_1k")?))
+            })
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .max_by_key(|(version, _)| *version)
+            .context("current reindex price unavailable")?
+            .1;
+        let quoted = (u128::from(price) * u128::from(scope.allowance)).div_ceil(1000);
+        if quoted > u128::from(cap.remaining()) {
+            return Err(SpendCapReached.into());
+        }
+        Ok(())
+    }
+
     async fn reserve(&self, scope: &MeteredScope) -> Result<()> {
         native_call(self.writer, "reserve_ai_metered_spend", json!([scope.organization_id, {
             "company_id":scope.company_id,"agent_id":scope.agent_id,"run_id":scope.run_id,
             "actor_identity":scope.actor_identity,"request_key":scope.request_key,"model":scope.model,
             "unit":scope.unit.as_str(),"allowance":scope.allowance }])).await
+    }
+
+    async fn authorize_dispatch(&self, scope: &MeteredScope, row: &StoredMeter) -> Result<()> {
+        let Some(cap) = self.cap else {
+            return Ok(());
+        };
+        let reservation = self.reader.with_query_limits(1, 8 * 1024)?
+            .query_sql_sats(&format!(
+                "SELECT id, company_id, currency, status, reserved_units FROM ai_spend_reservation_read \
+                 WHERE organization_id = {} AND run_id = {} AND id = {}",
+                 scope.organization_id, row.run_id, row.reservation_id
+            )).await?;
+        let [reservation] = reservation.as_slice() else {
+            bail!("reindex reservation unavailable");
+        };
+        anyhow::ensure!(
+            integer(reservation, "id")? == row.reservation_id
+                && integer(reservation, "company_id")? == scope.company_id
+                && reservation.get("currency").and_then(Value::as_str)
+                    == Some(cap.currency.as_str())
+                && reservation.get("status").and_then(Value::as_str) == Some("reserved"),
+            "reindex reservation does not match its spend cap"
+        );
+        // The hold is authoritative, unlike a preflight quote. If it changed,
+        // stop without claiming or dispatching and leave the hold for review.
+        cap.debit(integer(reservation, "reserved_units")?)
     }
 
     async fn attempt(
@@ -322,7 +439,40 @@ where
     F: FnOnce() -> Fut,
     Fut: Future<Output = Result<MeteredResult<T>>>,
 {
-    execute_with_ledger(&StdbMeteredLedger { writer, reader }, scope, call).await
+    execute_with_ledger(
+        &StdbMeteredLedger {
+            writer,
+            reader,
+            cap: None,
+        },
+        scope,
+        call,
+    )
+    .await
+}
+
+pub(crate) async fn execute_metered_capped<T, F, Fut>(
+    writer: &StdbClient,
+    reader: &StdbClient,
+    scope: MeteredScope,
+    cap: &SpendCap,
+    call: F,
+) -> Result<T>
+where
+    T: Serialize + DeserializeOwned,
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Result<MeteredResult<T>>>,
+{
+    execute_with_ledger(
+        &StdbMeteredLedger {
+            writer,
+            reader,
+            cap: Some(cap),
+        },
+        scope,
+        call,
+    )
+    .await
 }
 
 async fn execute_with_ledger<T, F, Fut>(
@@ -360,6 +510,9 @@ where
     }
     // A reserved request without a dispatch owner can resume safely. A unique
     // native invocation claim still decides the single eventual provider call.
+    if existing.is_none() {
+        ledger.preflight(&scope).await?;
+    }
     ledger.reserve(&scope).await?;
     let row = ledger
         .read(&scope)
@@ -368,6 +521,7 @@ where
     if row.actual_units.is_some() {
         return recover_output(&row).context(MeteredRecoveryRequired);
     }
+    ledger.authorize_dispatch(&scope, &row).await?;
     if let Some(attempt) = ledger.attempt(&scope, &row).await? {
         if attempt.status != "accepted" {
             return Err(anyhow::anyhow!(
@@ -470,6 +624,7 @@ mod tests {
         result: Option<(u32, String)>,
         claim: Option<String>,
         admission_blocked: bool,
+        cap_blocked: bool,
     }
     #[derive(Default)]
     struct TestLedger {
@@ -506,6 +661,12 @@ mod tests {
                 bail!("meter price not provisioned");
             }
             state.reserved = true;
+            Ok(())
+        }
+        async fn authorize_dispatch(&self, _: &MeteredScope, _: &StoredMeter) -> Result<()> {
+            if self.state.lock().unwrap().cap_blocked {
+                return Err(SpendCapReached.into());
+            }
             Ok(())
         }
         async fn attempt(
@@ -576,6 +737,32 @@ mod tests {
             Ok(())
         }
     }
+    #[test]
+    fn run_cap_debits_gross_reservations_without_wrapping() {
+        let cap = SpendCap::new("USD".into(), 10);
+        cap.debit(6).unwrap();
+        assert!(cap.debit(5).unwrap_err().is::<SpendCapReached>());
+        assert_eq!(cap.remaining(), 4);
+        cap.debit(4).unwrap();
+        assert!(cap.debit(1).unwrap_err().is::<SpendCapReached>());
+        assert_eq!(cap.remaining(), 0);
+    }
+
+    #[tokio::test]
+    async fn reservation_over_cap_never_accepts_claims_or_calls_provider() {
+        let ledger = TestLedger::default();
+        ledger.state.lock().unwrap().cap_blocked = true;
+        let result: Result<String> = execute_with_ledger(&ledger, scope(), || async {
+            panic!("cap rejection must happen before dispatch");
+        })
+        .await;
+        assert!(result.unwrap_err().is::<SpendCapReached>());
+        let state = ledger.state.lock().unwrap();
+        assert!(state.reserved);
+        assert!(state.status.is_empty());
+        assert!(state.claim.is_none());
+    }
+
     #[tokio::test]
     async fn setup_blocker_does_not_classify_as_uncertain_paid_dispatch() {
         let ledger = TestLedger::default();
@@ -729,6 +916,7 @@ mod tests {
         let ledger = StdbMeteredLedger {
             writer: &client,
             reader: &client,
+            cap: None,
         };
         let row = ledger.read(&scope()).await.unwrap().unwrap();
         assert_eq!(row.reservation_id, 4);

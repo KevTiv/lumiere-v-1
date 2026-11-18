@@ -102,7 +102,7 @@ impl AuthorizedImportTask {
             .as_array()
             .map(Vec::as_slice)
             .unwrap_or(&[]);
-        json!({
+        let mut card = json!({
             "taskId":self.reference.task_id,"companyId":self.reference.company_id,
             "organizationId":self.summary["organizationId"],"readAt":self.read_at,
             "preparationStatus":self.summary["preparationStatus"],
@@ -119,7 +119,11 @@ impl AuthorizedImportTask {
             }).collect::<Vec<_>>(),
             "nativeResults":self.summary["nativeResults"],
             "nativeResultsMore":self.summary["nativeResultsMore"]
-        })
+        });
+        if let Some(records) = self.summary.get("reviewedRecords") {
+            card["reviewedRecords"] = records.clone();
+        }
+        card
     }
 }
 
@@ -248,13 +252,13 @@ fn array<'a>(value: &'a Value, key: &str, limit: usize) -> Result<&'a [Value]> {
         .context("missing or oversized import collection")
 }
 
-fn decimal<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
-    let value = string(value, key, 32)?;
+fn decimal<'a>(value: &'a Value, key: &str, whole_limit: usize) -> Result<&'a str> {
+    let value = string(value, key, whole_limit + 7)?;
     let mut parts = value.split('.');
     let whole = parts.next().context("missing amount")?;
     let fraction = parts.next();
     if whole.is_empty()
-        || whole.len() > 20
+        || whole.len() > whole_limit
         || !whole.bytes().all(|byte| byte.is_ascii_digit())
         || fraction.is_some_and(|part| {
             part.is_empty() || part.len() > 6 || !part.bytes().all(|byte| byte.is_ascii_digit())
@@ -383,13 +387,16 @@ fn summarize(
     if native_results_more && native_results.len() != 20 {
         bail!("inconsistent native import coverage");
     }
-    let summary = json!({
+    let mut summary = json!({
         "taskId":reference.task_id,"organizationId":organization_id.to_string(),"companyId":company_id.to_string(),
         "preparationStatus":status,"purpose":purpose,"purposeRevision":decision_revision,
         "sources":sources,"sourceReviews":reviews,"erpProposals":proposals,
         "nativeResults":native_results,"nativeResultsMore":native_results_more,
-        "meaning":"Confirmed source rows are evidence decisions, not ERP records. Native results report job outcomes and row counts only; they do not verify current domain records. Partial or failed jobs can have imported rows. An awaiting receipt or zero verified proposals does not establish zero ERP effects. A verified Accounting proposal describes drafts and readback totals at verifiedAt; current posting state requires a fresh ERP read. Approval is saved intent; execution rechecks current source revisions and permissions. When nativeResultsMore is true, the native result list is incomplete."
+        "meaning":"Confirmed source rows are evidence decisions, not ERP records. Reviewed records are current, task-linked historical Sales and Warehouse records. Already present records are included in the verified count. Native results report job outcomes and row counts only; they do not verify current domain records. Partial or failed jobs can have imported rows. An awaiting receipt or zero verified proposals does not establish zero ERP effects. A verified Accounting proposal describes drafts and readback totals at verifiedAt; current posting state requires a fresh ERP read. Approval is saved intent; execution rechecks current source revisions and permissions. When nativeResultsMore is true, the native result list is incomplete."
     });
+    if let Some(records) = workflow.get("reviewedRecords") {
+        summary["reviewedRecords"] = reviewed_result_summary(records)?;
+    }
     let bytes = serde_json::to_vec(&summary)?;
     if bytes.len() > MAX_SUMMARY_BYTES {
         bail!("import summary exceeds its limit");
@@ -400,6 +407,63 @@ fn summarize(
         digest: format!("{:x}", Sha256::digest(bytes)),
         read_at: chrono::Utc::now().to_rfc3339(),
     })
+}
+
+fn reviewed_result_summary(result: &Value) -> Result<Value> {
+    let counts = result
+        .get("counts")
+        .context("missing reviewed record counts")?;
+    let verified = count(counts, "verified")?;
+    let already_present = count(counts, "alreadyPresent")?;
+    let records = array(result, "records", 20)?;
+    let more = result
+        .get("more")
+        .and_then(Value::as_bool)
+        .context("missing reviewed record coverage")?;
+    if already_present > verified
+        || records.len() as u64 != verified.min(20)
+        || more != (verified > records.len() as u64)
+    {
+        bail!("inconsistent reviewed record coverage");
+    }
+    let mut seen = BTreeSet::new();
+    let records = records
+        .iter()
+        .map(|record| {
+            let record_id = id(record, "id")?;
+            let module = choice(record, "module", &["sales", "shop_sales", "warehouse"])?;
+            let period_start = date(record, "periodStart")?;
+            if period_start.is_null() || !seen.insert(record_id) {
+                bail!("invalid reviewed record identity");
+            }
+            Ok(json!({"id":record_id,"module":module,"periodStart":period_start}))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut summary = json!({"counts":{"verified":verified,"alreadyPresent":already_present},"records":records,"more":more});
+    if result.get("salesTotals").is_some() {
+        let mut currencies = BTreeSet::new();
+        let mut sale_count = 0;
+        let totals = array(result, "salesTotals", 20)?
+            .iter()
+            .map(|total| {
+                let currency = string(total, "currency", 3)?;
+                let records = count(total, "count")?;
+                let amount = decimal(total, "amount", 30)?;
+                sale_count += records;
+                if currency.len() != 3
+                    || !currency.bytes().all(|byte| byte.is_ascii_uppercase())
+                    || !currencies.insert(currency)
+                    || records == 0
+                    || sale_count > verified
+                {
+                    bail!("inconsistent reviewed sales totals");
+                }
+                Ok(json!({"currency":currency,"count":records,"amount":amount}))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        summary["salesTotals"] = json!(totals);
+    }
+    Ok(summary)
 }
 
 /// This is a native job receipt, not the stronger Accounting record readback.
@@ -464,8 +528,8 @@ fn proposal_summary(proposal: &Value, company_id: u64) -> Result<Value> {
     let summary = proposal.get("summary").context("missing proposal totals")?;
     let records = count(summary, "recordCount")?;
     let lines = count(summary, "lineCount")?;
-    let debit = decimal(summary, "totalDebit")?;
-    let credit = decimal(summary, "totalCredit")?;
+    let debit = decimal(summary, "totalDebit", 20)?;
+    let credit = decimal(summary, "totalCredit", 20)?;
     let currency = id(summary, "currencyId")?;
     if records > 200 || lines != records * 2 || amount_units(debit)? != amount_units(credit)? {
         bail!("unbalanced import proposal");
@@ -503,7 +567,7 @@ fn proposal_summary(proposal: &Value, company_id: u64) -> Result<Value> {
         }
         if count(result,"recordCount")? != records || count(result,"lineCount")? != lines
             || record_ids.len() as u64 != records || line_ids.len() as u64 != lines
-            || amount_units(decimal(result,"totalDebit")?)? != amount_units(debit)? || amount_units(decimal(result,"totalCredit")?)? != amount_units(credit)?
+            || amount_units(decimal(result,"totalDebit",20)?)? != amount_units(debit)? || amount_units(decimal(result,"totalCredit",20)?)? != amount_units(credit)?
             || id(result,"currencyId")? != currency || id(result,"companyId")? != company_id.to_string() || count(result,"postedCount")? != 0 {
             bail!("import readback does not match its proposal");
         }
@@ -583,6 +647,26 @@ mod tests {
             json!({"taskId":reference.task_id,"companyId":"2","status":"verified"})
         )
         .is_err());
+    }
+
+    #[test]
+    fn reviewed_record_readback_protects_exact_identity_and_excludes_source_labels() {
+        let (reference, task, mut workflow) = fixtures();
+        let records = json!({"counts":{"verified":1,"alreadyPresent":1},"records":[
+            {"id":"40","module":"shop_sales","periodStart":"2024-04-09","displayLabel":"untrusted source text"}
+        ],"more":false,"salesTotals":[{"currency":"RWF","amount":"32500.50","count":1}]});
+        workflow["reviewedRecords"] = records;
+        let saved = summarize(&reference, 1, 2, &task, &workflow).expect("exact readback");
+        let card = saved.status_card();
+        assert_eq!(card["reviewedRecords"]["counts"]["alreadyPresent"], 1);
+        assert_eq!(card["reviewedRecords"]["records"][0]["id"], "40");
+        assert_eq!(
+            card["reviewedRecords"]["salesTotals"][0]["amount"],
+            "32500.50"
+        );
+        assert!(!saved.summary.to_string().contains("untrusted source text"));
+        workflow["reviewedRecords"]["counts"]["verified"] = json!(2);
+        assert!(summarize(&reference, 1, 2, &task, &workflow).is_err());
     }
 
     fn proposal() -> Value {

@@ -29,6 +29,20 @@ pub fn is_builtin_skill(key: &str) -> bool {
     BUILTIN_SKILL_KEYS.binary_search(&key).is_ok()
 }
 
+/// Only organization-authored skills enter the version/test/publish lifecycle.
+/// A tenant catalog copy of a built-in key remains application-owned.
+pub fn is_user_created_skill(
+    key: &str,
+    is_system: bool,
+    skill_organization_id: u64,
+    organization_id: u64,
+) -> bool {
+    organization_id > 0
+        && skill_organization_id == organization_id
+        && !is_system
+        && !is_builtin_skill(key)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -40,5 +54,17 @@ mod tests {
         assert!(!is_builtin_skill("rag_generation "));
         assert!(!is_builtin_skill("embedding_query"));
         assert!(!is_builtin_skill("tenant_skill"));
+    }
+
+    #[test]
+    fn only_user_created_skills_need_publication() {
+        assert!(is_user_created_skill("tenant_stock_review", false, 7, 7));
+        for key in BUILTIN_SKILL_KEYS {
+            assert!(!is_user_created_skill(key, false, 7, 7), "{key}");
+            assert!(!is_user_created_skill(key, true, 0, 7), "{key}");
+        }
+        assert!(!is_user_created_skill("tenant_stock_review", true, 7, 7));
+        assert!(!is_user_created_skill("tenant_stock_review", false, 8, 7));
+        assert!(!is_user_created_skill("tenant_stock_review", false, 0, 0));
     }
 }

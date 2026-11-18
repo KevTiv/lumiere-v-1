@@ -76,7 +76,7 @@ interface WorkflowSourceReview {
   taskRequestId: string;
   proposalId: string;
   proposalDigest: string;
-  source: { file: string; row: number; sha256: string };
+  source: { file: string; row: number; sha256: string; sheet?: string };
   role: "journal_header" | "journal_debit" | "journal_credit";
 }
 
@@ -291,8 +291,10 @@ function parseWorkflowSourceReview(review: WireReview): Partial<WorkflowSourceRe
     || !("row" in review.source) || typeof review.source.row !== "number" || !Number.isSafeInteger(review.source.row) || review.source.row < 1
     || !("sha256" in review.source) || typeof review.source.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(review.source.sha256)
     || (review.role !== "journal_header" && review.role !== "journal_debit" && review.role !== "journal_credit")) throw new Error("Invalid workflow source binding");
+  const sheet = "sheet" in review.source ? review.source.sheet : undefined;
+  if (sheet !== undefined && !text(sheet, 255)) throw new Error("Invalid workflow source worksheet");
   return { taskRequestId: review.taskRequestId, proposalId: review.proposalId, proposalDigest: review.proposalDigest,
-    source: { file: review.source.file, row: review.source.row, sha256: review.source.sha256 }, role: review.role };
+    source: { file: review.source.file, row: review.source.row, sha256: review.source.sha256, ...(sheet === undefined ? {} : { sheet }) }, role: review.role };
 }
 
 /** Repeated immutable identities must agree, including across sparse pages. */

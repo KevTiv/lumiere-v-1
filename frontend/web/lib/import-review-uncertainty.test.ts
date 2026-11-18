@@ -408,6 +408,39 @@ test("a complete-row preview checks quantity times price exactly without roundin
   assert.match(preview.skipped[0].reason, /multiplied by unit price/)
 })
 
+test("shop sales isolate an inconsistent sale while retaining other valid rows", () => {
+  const sales = ["40.00", "40.01"].map((amount, index) => {
+    const item = breast(index)
+    item.values = {
+      sold_quantity: "2.5",
+      sale_unit_price: "16.00",
+      sale_amount: amount,
+    }
+    item.source.fields = Object.entries(item.values).map(
+      ([key, sourceValue]) => ({
+        key,
+        label: key,
+        kind: "decimal",
+        sourceValue,
+        required: true,
+      }),
+    )
+    return item
+  })
+  const preview = buildBulkConfirmationPreview({
+    items: sales,
+    selectedIds: new Set(sales.map(({ id }) => id)),
+    mode: "complete_rows",
+    reason: "Original report values checked.",
+  })
+  assert.deepEqual(
+    preview.decisions.map(({ itemId }) => itemId),
+    [sales[0].id],
+  )
+  assert.equal(preview.skipped[0].item.id, sales[1].id)
+  assert.match(preview.skipped[0].reason, /multiplied by unit price/)
+})
+
 test("UTF-8 text boundaries isolate oversized source values before bulk save", () => {
   const valid = breast(0)
   valid.values.comment = "é".repeat(1000)

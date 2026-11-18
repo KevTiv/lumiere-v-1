@@ -318,25 +318,33 @@ function ReviewWorkspace({
     () => reviewIssueGroups(detail.data?.items ?? []),
     [detail.data],
   )
-  const activeGroup = groups.find((entry) => entry.key === group)
-  const matching = useMemo(
-    () =>
-      (detail.data?.items ?? []).filter(
-        (item) =>
-          (filter === "all" || item.state === filter) &&
-          (group === "all" ||
-            !activeGroup ||
-            activeGroup.itemIds.includes(item.id)) &&
-          `${item.source.label} ${item.source.source.file} ${item.source.issue}`
+  const activeGroupIndex = groups.findIndex((entry) => entry.key === group)
+  const activeGroup = groups[activeGroupIndex]
+  const nextGroup =
+    groups[activeGroupIndex + 1] ?? (groups.length > 1 ? groups[0] : undefined)
+  const matching = useMemo(() => {
+    const groupItems = activeGroup && new Set(activeGroup.itemIds)
+    const query = search.trim().toLocaleLowerCase()
+    return (detail.data?.items ?? []).filter(
+      (item) =>
+        (filter === "all" || item.state === filter) &&
+        (!groupItems || groupItems.has(item.id)) &&
+        (!query ||
+          `${item.source.label} ${item.source.source.file} ${item.source.source.sheet ?? ""} ${item.source.issue}`
             .toLocaleLowerCase()
-            .includes(search.trim().toLocaleLowerCase()),
-      ),
-    [detail.data, filter, group, activeGroup, search],
-  )
+            .includes(query)),
+    )
+  }, [detail.data, filter, activeGroup, search])
   const pages = Math.max(1, Math.ceil(matching.length / 50))
   const currentPage = Math.min(page, pages - 1)
   const visible = matching.slice(currentPage * 50, currentPage * 50 + 50)
   const unavailable = busy || locked || uncertainUndo
+  const chooseGroup = (key: string) => {
+    setGroup(key)
+    setPage(0)
+    setChecked(new Set())
+    if (key !== "all") setFilter("needs_review")
+  }
   const chooseBatch = (id: string) => {
     requireCurrentScope()
     if (allowedReviewIds && !allowedReviewIds.includes(id)) return
@@ -761,11 +769,7 @@ function ReviewWorkspace({
               </FieldLabel>
               <Select
                 value={activeGroup ? group : "all"}
-                onValueChange={(value) => {
-                  setGroup(value)
-                  setPage(0)
-                  setChecked(new Set())
-                }}
+                onValueChange={chooseGroup}
                 disabled={unavailable || !!selected}
               >
                 <SelectTrigger
@@ -786,6 +790,66 @@ function ReviewWorkspace({
               </Select>
             </Field>
           </div>
+          {nextGroup ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={unavailable || !!selected}
+              onClick={() => {
+                setSearch("")
+                chooseGroup(nextGroup.key)
+              }}
+            >
+              {t(
+                activeGroup
+                  ? "settings.importReview.grouped.nextIssue"
+                  : "settings.importReview.grouped.reviewNextIssue",
+                {
+                  defaultValue: activeGroup
+                    ? "Next unresolved issue"
+                    : "Review next unresolved issue",
+                },
+              )}
+            </Button>
+          ) : null}
+          {activeGroup?.fieldKey && matching.length ? (
+            <details className="rounded-md border p-3 text-sm">
+              <summary className="cursor-pointer font-medium">
+                {t("settings.importReview.grouped.issueExamples", {
+                  defaultValue: "Source examples · {{count}} to review",
+                  count: matching.length,
+                })}
+              </summary>
+              <ul className="mt-2 space-y-2">
+                {matching.slice(0, 3).map((item) => {
+                  const field = item.source.fields.find(
+                    ({ key }) => key === activeGroup.fieldKey,
+                  )
+                  if (!field) return null
+                  const unknown = t("settings.importReview.unknown")
+                  return (
+                    <li
+                      key={item.id}
+                      className="whitespace-pre-wrap break-words"
+                    >
+                      <span className="font-medium">
+                        {reviewSourceLabel(item, t)}
+                      </span>
+                      <p>
+                        {t("settings.importReview.grouped.issueExample", {
+                          defaultValue:
+                            "Original {{original}} · proposed {{proposed}}",
+                          original: field.sourceValue || unknown,
+                          proposed: item.values[field.key] || unknown,
+                        })}
+                      </p>
+                    </li>
+                  )
+                })}
+              </ul>
+            </details>
+          ) : null}
           {!matching.length ? (
             <p className="text-sm text-muted-foreground">
               {t("settings.importReview.decisionSummary.noMatches")}

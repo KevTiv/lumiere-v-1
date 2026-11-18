@@ -20,8 +20,11 @@ use crate::{
     error::{AppError, AppResult},
     harness::{
         fetch_authorized_live_snapshots, filter_entity_refs_by_allowed_types,
-        format_live_context_block, resolve_snapshot_candidates, ActorCredentials, LiveSnapshot,
-        SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
+        format_live_context_block,
+        record_lookup::{lookup_record_candidates, RecordLookup},
+        resolve_snapshot_candidates,
+        snapshot::recheck_live_snapshots,
+        ActorCredentials, LiveSnapshot, SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
     orchestrator::skill_access::ActorSkillAccess,
     orchestrator::{
@@ -35,8 +38,8 @@ use crate::{
         skill_loader::{complete_run, create_generation_surface_run, GovernedRunRef},
         spend_admission::StdbSpendLedger,
         text_answer_gate::{
-            GatedTextAnswer, PassageStatus, SourcePassage, TextAnswerProvenance,
-            TextAnswerVerification, TextEvidence,
+            GatedTextAnswer, PassageStatus, SourcePassage, TextAnswerOutcome, TextAnswerProvenance,
+            TextAnswerVerification, TextClaimProvenance, TextEvidence,
         },
     },
     retrieval_policy::optional_retrieval,
@@ -61,6 +64,8 @@ use attachments::ChatAttachment;
 mod conversation;
 #[path = "rag_history_references.rs"]
 mod history_references;
+#[path = "rag_record_reply.rs"]
+mod record_reply;
 #[path = "rag_spreadsheet.rs"]
 mod spreadsheet;
 use spreadsheet::{AuthorizedSelection, SpreadsheetAccess, SpreadsheetSelection};
@@ -97,6 +102,7 @@ pub struct UiContext {
     pub active_tab: Option<String>,
     pub entity_type: Option<String>,
     pub entity_id: Option<String>,
+    pub explicit_record: Option<bool>,
     pub selection_summary: Option<String>,
     pub permissions: Option<Vec<String>>,
     pub company_id: Option<u64>,
@@ -180,24 +186,68 @@ pub struct RagResponse {
     pub ui_actions: Vec<UiActionProposal>,
 }
 
+/// Whether the company has any indexed activity references. It only changes
+/// the wording of an empty reply; it never admits evidence.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum IndexCoverage {
+    /// Not measured (embeddings off, guides present, or retrieval degraded).
+    Unknown,
+    /// Zero indexed points for this company: nothing has been indexed yet.
+    Empty,
+    /// Points exist, so an empty result means nothing relevant was found.
+    Populated,
+}
+
 fn no_relevant_information_response(
     retrieval_degraded: bool,
     related_guides: Vec<RelatedGuide>,
     guide_retrieval_degraded: bool,
+) -> AppResult<RagResponse> {
+    no_relevant_information_with_coverage(
+        retrieval_degraded,
+        related_guides,
+        guide_retrieval_degraded,
+        IndexCoverage::Unknown,
+    )
+}
+
+const NOT_INDEXED_REPLY: &str = "This company's records haven't been indexed yet, so there is nothing to search. Open a permitted record, select spreadsheet cells, or select a saved import to ask about it now. An organization administrator can check indexing status in AI settings.";
+
+fn no_relevant_information_with_coverage(
+    retrieval_degraded: bool,
+    related_guides: Vec<RelatedGuide>,
+    guide_retrieval_degraded: bool,
+    coverage: IndexCoverage,
 ) -> AppResult<RagResponse> {
     // Saved guides are independently authorized readback cards, not grounding
     // for a generated answer. Keep them useful without claiming a healthy search.
     if (retrieval_degraded || guide_retrieval_degraded) && related_guides.is_empty() {
         return Err(AppError::RetrievalUnavailable);
     }
-    let answer = if related_guides.is_empty() {
-        "No relevant information found for your query."
+    let answer = if related_guides.is_empty() && coverage == IndexCoverage::Empty {
+        NOT_INDEXED_REPLY
+    } else if related_guides.is_empty() {
+        "No authorized data is available for this question. Open a permitted record, select spreadsheet cells, or select a saved import before asking again. For a financial summary, also specify the reporting period and report or records to review. Page labels and earlier conversation are not current ERP evidence."
     } else if retrieval_degraded {
         "Semantic retrieval is unavailable. Saved guides are available for this question. Open a guide to review its saved instructions. Draft guides have not been independently verified."
     } else {
         "Saved guides are available for this question. Open a guide to review its saved instructions. Draft guides have not been independently verified."
     };
-    Ok(RagResponse {
+    Ok(ungenerated_reply(
+        answer,
+        retrieval_degraded,
+        related_guides,
+        guide_retrieval_degraded,
+    ))
+}
+
+fn ungenerated_reply(
+    answer: &str,
+    retrieval_degraded: bool,
+    related_guides: Vec<RelatedGuide>,
+    guide_retrieval_degraded: bool,
+) -> RagResponse {
+    RagResponse {
         answer: answer.to_string(),
         sources: Vec::new(),
         retrieval_degraded,
@@ -212,7 +262,60 @@ fn no_relevant_information_response(
         verification: None,
         provenance: None,
         ui_actions: Vec::new(),
-    })
+    }
+}
+
+fn exact_record_reply(snapshot: &LiveSnapshot) -> RagResponse {
+    let record = record_reply::record_facts(snapshot);
+    let mut reply = ungenerated_reply("", false, Vec::new(), false);
+    reply.answer = format!("**{}**", snapshot.label);
+    for fact in &record.facts {
+        reply.answer.push_str("\n- ");
+        reply.answer.push_str(fact);
+    }
+    if !record.limitations.is_empty() {
+        reply.answer.push_str("\n\n");
+        reply.answer.push_str(&record.limitations.join(" "));
+    }
+    reply.sources = live_snapshots_to_rag_sources(std::slice::from_ref(snapshot));
+    if let Some(source) = reply.sources.first_mut() {
+        source.text_snippet = source_snippet(&record.facts.join(" · "));
+    }
+    let reference = EvidenceRef {
+        kind: "live_snapshot".into(),
+        id: format!("{}:{}", snapshot.entity_type, snapshot.entity_id),
+    };
+    reply.verification = Some(TextAnswerVerification {
+        outcome: if record.limitations.is_empty() {
+            TextAnswerOutcome::Admitted
+        } else {
+            TextAnswerOutcome::Qualified
+        },
+        methods: vec!["deterministic"],
+        limitations: record.limitations,
+        reason: None,
+    });
+    reply.provenance = Some(TextAnswerProvenance {
+        claims: record
+            .facts
+            .into_iter()
+            .map(|text| TextClaimProvenance {
+                text,
+                support_refs: vec![reference.clone()],
+                passage_support: Vec::new(),
+                verification_method: "deterministic",
+                verification_outcome: "supported",
+                limitations: Vec::new(),
+            })
+            .collect(),
+        citations: vec![reference],
+        calculations: Vec::new(),
+        persisted: false,
+        persistence_reason: Some("Live record readback is scoped to this response".into()),
+        contribution_id: None,
+        claim_ids: Vec::new(),
+    });
+    reply
 }
 
 /// What the server established for this answer: each live snapshot it read
@@ -439,7 +542,10 @@ pub(crate) async fn release_rag_answer(
     let mut gated = admission
         .admit(candidate, &text_evidence, &passages)
         .await?;
-    let mut run_failure: Option<&'static str> = None;
+    // A parser/coverage rejection is a withheld result too, not a successfully
+    // completed run. Later rechecks may replace this with a more specific cause.
+    let mut run_failure =
+        (!gated.is_released()).then_some("answer was withheld by the evidence gate");
     // Any answer generated with passages in its prompt depends on the actor's
     // continuing access to them, whether or not it cites one.
     let depends_on_passages = !passages.is_empty();
@@ -610,17 +716,6 @@ fn live_snapshots_to_rag_sources(snapshots: &[LiveSnapshot]) -> Vec<RagSource> {
         .iter()
         .map(|snapshot| {
             let excerpt = serde_json::to_string(&snapshot.row).unwrap_or_default();
-            let text_snippet = if excerpt.len() > 280 {
-                // Keep the existing byte bound without splitting a UTF-8
-                // character in a multilingual ERP record.
-                let mut end = 280;
-                while !excerpt.is_char_boundary(end) {
-                    end -= 1;
-                }
-                format!("{}…", &excerpt[..end])
-            } else {
-                excerpt
-            };
             RagSource {
                 kind: "live".to_string(),
                 trust: "authoritative".to_string(),
@@ -630,7 +725,7 @@ fn live_snapshots_to_rag_sources(snapshots: &[LiveSnapshot]) -> Vec<RagSource> {
                 source_kind: None,
                 passage_id: None,
                 score: 1.0,
-                text_snippet,
+                text_snippet: source_snippet(&excerpt),
                 label: Some(snapshot.label.clone()),
                 field: None,
                 snapshot_at: Some(snapshot.snapshot_at.clone()),
@@ -641,6 +736,18 @@ fn live_snapshots_to_rag_sources(snapshots: &[LiveSnapshot]) -> Vec<RagSource> {
             }
         })
         .collect()
+}
+
+fn source_snippet(text: &str) -> String {
+    const LIMIT: usize = 280;
+    if text.len() <= LIMIT {
+        return text.to_string();
+    }
+    let mut end = LIMIT;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}…", &text[..end])
 }
 
 fn normalized_include_types(include_types: Option<&[String]>) -> Vec<String> {
@@ -854,6 +961,83 @@ pub async fn post_rag(
     } else {
         None
     };
+    let allowed_types =
+        (!req.allowed_entity_types.is_empty()).then_some(req.allowed_entity_types.as_slice());
+    let snapshot_ui = snapshot_ui_from(req.ui_context.as_ref());
+    let has_other_selected_evidence = selected_spreadsheet.is_some()
+        || !req.attachments.is_empty()
+        || !req.import_task_refs.is_empty()
+        || !req.guide_refs.is_empty()
+        || !req.history_refs.is_empty();
+    let mut exact_candidate = None;
+    if !has_other_selected_evidence && agent_allows_live_read(&agent) {
+        if req
+            .ui_context
+            .as_ref()
+            .is_some_and(|ctx| ctx.explicit_record == Some(true))
+            && record_reply::is_single_record_question(&req.query)
+        {
+            exact_candidate = filter_entity_refs_by_allowed_types(
+                resolve_snapshot_candidates(snapshot_ui.as_ref(), &[], &[], 1),
+                allowed_types,
+            )
+            .pop();
+        }
+        if exact_candidate.is_none() {
+            let lookup = lookup_record_candidates(
+                &state,
+                &actor,
+                org_id,
+                req.company_id,
+                &req.query,
+                req.ui_context
+                    .as_ref()
+                    .and_then(|ctx| ctx.module.as_deref()),
+            )
+            .await;
+            let notice = match lookup {
+                Ok(RecordLookup::NotRequested) => None,
+                Ok(RecordLookup::Match(candidate)) => {
+                    exact_candidate = filter_entity_refs_by_allowed_types(vec![candidate], allowed_types).pop();
+                    None
+                }
+                Ok(RecordLookup::NotFound) => Some(
+                    "No matching record was available in this company. Check the reference or open the record and choose Ask AI.",
+                ),
+                Ok(RecordLookup::Ambiguous) => Some(
+                    "More than one record matches. Use the exact reference or open the record and choose Ask AI.",
+                ),
+                Err(_) => return Err(AppError::RetrievalUnavailable),
+            };
+            if let Some(notice) = notice {
+                let mut response = ungenerated_reply(notice, false, Vec::new(), false);
+                response.earlier_context_unavailable = earlier_context_unavailable;
+                return Ok(Json(response));
+            }
+        }
+    }
+    if let Some(candidate) = exact_candidate {
+        skill_access.require("rag_generation").await?;
+        let snapshots = fetch_authorized_live_snapshots(
+            &state,
+            &actor,
+            org_id,
+            req.company_id,
+            std::slice::from_ref(&candidate),
+        )
+        .await
+        .map_err(|_| AppError::RetrievalUnavailable)?;
+        let mut response = match snapshots.as_slice() {
+            [snapshot] => exact_record_reply(snapshot),
+            _ => ungenerated_reply(
+                "The requested record is unavailable in this company. Open it in its module to confirm access.",
+                false, Vec::new(), false,
+            ),
+        };
+        response.earlier_context_unavailable = earlier_context_unavailable;
+        return Ok(Json(response));
+    }
+
     let query_vector = if selected_spreadsheet.is_some() {
         None
     } else {
@@ -923,26 +1107,18 @@ pub async fn post_rag(
     let org_top_k = req.limit.clamp(1, RAG_ORG_ACTIVITY_TOP_K as u64) as usize;
     let org_result = match query_vector {
         Some(Ok(vector)) => {
-            state
-                .rig
-                .search_scope_with_vector(
-                    org_id,
-                    req.company_id,
-                    &actor.identity_hex,
-                    vector,
-                    org_top_k,
-                )
-                .await
+            super::context::search_authorized_activity(
+                &state,
+                &actor,
+                org_id,
+                req.company_id,
+                vector,
+                org_top_k,
+            )
+            .await
         }
         Some(Err(_)) => Err(anyhow::anyhow!("admitted activity query unavailable")),
         None => Ok(Vec::new()),
-    };
-    let org_result = match org_result {
-        Ok(hits) => {
-            super::context::reauthorize_activity_hits(&state, &actor, org_id, req.company_id, hits)
-                .await
-        }
-        Err(error) => Err(error),
     };
     if let Err(error) = &org_result {
         tracing::warn!(
@@ -959,11 +1135,9 @@ pub async fn post_rag(
     let company_hit_count = company_hits.len();
     let org_hit_count = org_hits.len();
 
-    let allowed_types =
-        (!req.allowed_entity_types.is_empty()).then_some(req.allowed_entity_types.as_slice());
     let snapshot_candidates = filter_entity_refs_by_allowed_types(
         resolve_snapshot_candidates(
-            snapshot_ui_from(req.ui_context.as_ref()).as_ref(),
+            snapshot_ui.as_ref(),
             &company_hits,
             &org_hits,
             RAG_MAX_LIVE_SNAPSHOTS,
@@ -1080,9 +1254,11 @@ pub async fn post_rag(
         && saved_imports.is_empty()
         && selected_spreadsheet.is_none()
         && req.attachments.is_empty()
-        && conversation.prompt.is_none()
         && history_references.is_empty()
     {
+        // Earlier conversation helps interpret a grounded question, but cannot
+        // turn an empty retrieval into current ERP evidence or justify a
+        // billable attempt with no support references.
         tracing::info!(
             company_id = req.company_id,
             org_id,
@@ -1099,10 +1275,29 @@ pub async fn post_rag(
             recheck_related_guides(&state, &actor, org_id, req.company_id, &related_guides).await;
         related_guides = fresh_guides.references;
         guide_retrieval_degraded |= fresh_guides.degraded;
-        let mut response = no_relevant_information_response(
+        // A healthy search that found nothing reads differently when the
+        // company has never been indexed. A failed count is a degraded index.
+        let coverage = if related_guides.is_empty()
+            && !retrieval_degraded
+            && !guide_retrieval_degraded
+            && state.config.embedding_enabled()
+        {
+            match state.rig.count_company_points(org_id, req.company_id).await {
+                Ok(0) => IndexCoverage::Empty,
+                Ok(_) => IndexCoverage::Populated,
+                Err(_) => {
+                    retrieval_degraded = true;
+                    IndexCoverage::Unknown
+                }
+            }
+        } else {
+            IndexCoverage::Unknown
+        };
+        let mut response = no_relevant_information_with_coverage(
             retrieval_degraded,
             related_guides,
             guide_retrieval_degraded,
+            coverage,
         )?;
         response.earlier_context_unavailable = earlier_context_unavailable;
         return Ok(Json(response));
@@ -1474,6 +1669,12 @@ pub async fn post_rag(
         return Err(error.into());
     }
 
+    if release.answer_released
+        && !recheck_live_snapshots(&state, &actor, org_id, req.company_id, &live_snapshots).await
+    {
+        release.withhold("the ERP record changed or its current access could not be checked");
+    }
+
     // The durable run completes only after admission and provenance
     // persistence have succeeded and the release recheck has passed.
     let ui_actions = release_proposals(
@@ -1516,8 +1717,9 @@ pub async fn post_rag(
     let run_id = Some(run.run_id);
     let agent_id = Some(agent.agent_id);
 
-    let mut sources: Vec<RagSource> = live_snapshots_to_rag_sources(&live_snapshots);
+    let mut sources: Vec<RagSource> = Vec::new();
     if passages_disclosed {
+        sources.extend(live_snapshots_to_rag_sources(&live_snapshots));
         sources.extend(ranked.into_iter().map(|s| s.rag_source));
         sources.extend(saved_imports.iter().map(AuthorizedImportTask::source));
         sources.extend(selected_spreadsheet.iter().map(AuthorizedSelection::source));
@@ -1537,8 +1739,11 @@ pub async fn post_rag(
         org_hit_count,
         live_snapshot_count,
         source_count = sources.len(),
+        run_id = run.run_id,
+        run_status,
+        verification_outcome = ?verification.as_ref().map(|verdict| &verdict.outcome),
         duration_ms = started.elapsed().as_millis() as u64,
-        "RAG query answered"
+        "RAG query finished"
     );
 
     Ok(Json(RagResponse {
@@ -1614,11 +1819,77 @@ mod tests {
     use super::*;
 
     #[test]
+    fn unindexed_company_gets_a_distinct_actionable_reply() {
+        let response =
+            no_relevant_information_with_coverage(false, Vec::new(), false, IndexCoverage::Empty)
+                .unwrap();
+        assert!(response
+            .answer
+            .starts_with("This company's records haven't been indexed yet"));
+        assert!(response.answer.contains("AI settings"));
+        assert!(!response.retrieval_degraded);
+        assert!(response.sources.is_empty());
+        assert!(response.verification.is_none());
+    }
+
+    #[test]
+    fn populated_or_unmeasured_coverage_keeps_the_nothing_relevant_reply() {
+        let baseline = no_relevant_information_response(false, Vec::new(), false)
+            .unwrap()
+            .answer;
+        for coverage in [IndexCoverage::Populated, IndexCoverage::Unknown] {
+            let response =
+                no_relevant_information_with_coverage(false, Vec::new(), false, coverage).unwrap();
+            assert_eq!(response.answer, baseline);
+            assert!(!response.answer.contains("haven't been indexed"));
+        }
+    }
+
+    #[test]
+    fn degraded_search_stays_unavailable_even_when_the_company_looks_unindexed() {
+        for coverage in [
+            IndexCoverage::Empty,
+            IndexCoverage::Populated,
+            IndexCoverage::Unknown,
+        ] {
+            assert!(matches!(
+                no_relevant_information_with_coverage(true, Vec::new(), false, coverage),
+                Err(AppError::RetrievalUnavailable)
+            ));
+            assert!(matches!(
+                no_relevant_information_with_coverage(false, Vec::new(), true, coverage),
+                Err(AppError::RetrievalUnavailable)
+            ));
+        }
+    }
+
+    #[test]
+    fn saved_guides_take_precedence_over_the_not_indexed_reply() {
+        let guide = RelatedGuide {
+            guide_id: "guide-1".into(),
+            revision: 1,
+            title: "Saved instructions".into(),
+            module: "sales".into(),
+            workflow: None,
+            language: "en".into(),
+            review_state: "draft".into(),
+            company_id: "4097".into(),
+            updated_at: None,
+            content_hash: "hash".into(),
+            product_version: None,
+        };
+        let response =
+            no_relevant_information_with_coverage(false, vec![guide], false, IndexCoverage::Empty)
+                .unwrap();
+        assert!(response.answer.starts_with("Saved guides are available"));
+    }
+
+    #[test]
     fn healthy_empty_retrieval_returns_no_unverified_sources() {
         let response = no_relevant_information_response(false, Vec::new(), false).unwrap();
         assert_eq!(
             response.answer,
-            "No relevant information found for your query."
+            "No authorized data is available for this question. Open a permitted record, select spreadsheet cells, or select a saved import before asking again. For a financial summary, also specify the reporting period and report or records to review. Page labels and earlier conversation are not current ERP evidence."
         );
         assert!(!response.retrieval_degraded);
         assert!(response.sources.is_empty());
@@ -1774,6 +2045,30 @@ mod tests {
         assert_eq!(sources[0].trust, "authoritative");
         assert_eq!(sources[0].label.as_deref(), Some("Sale order #42"));
         assert_eq!(sources[0].instruction_trust, "untrusted");
+    }
+
+    #[test]
+    fn deterministic_record_reply_exposes_verified_facts_and_the_exact_source() {
+        let snapshot = LiveSnapshot {
+            entity_type: "contact".into(),
+            entity_id: 42,
+            label: "Contact #42".into(),
+            snapshot_at: "2026-11-17T20:00:00Z".into(),
+            row: json!({"name": "Sample customer", "companyId": 7}),
+            relations: Vec::new(),
+        };
+        let reply = exact_record_reply(&snapshot);
+        assert!(reply.answer.contains("Name: Sample customer"));
+        assert!(reply.provider.is_none());
+        assert!(reply.run_id.is_none());
+        assert_eq!(reply.sources[0].entity_id.as_deref(), Some("42"));
+        assert_eq!(reply.sources[0].trust, "authoritative");
+        let metadata = rag_stream_metadata(&reply);
+        assert_eq!(metadata["verification"]["outcome"], "admitted");
+        assert_eq!(
+            metadata["provenance"]["claims"][0]["supportRefs"][0]["id"],
+            "contact:42"
+        );
     }
 
     #[test]
@@ -2159,6 +2454,33 @@ mod tests {
         assert!(release.provenance.claims.is_empty());
         assert!(!release.provenance.persisted);
         assert!(release.provenance.claim_ids.is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_initial_claimless_rejection_is_a_failed_run_not_completed_prose() {
+        let access = FakeAccess::new(5, 4096).with_passage(7, BODY);
+        let evidence = authorized_evidence(&access).await;
+        let sink = MemorySink::ok();
+        let released = release(
+            &json!({"content": "Unverified answer", "claims": [], "calculations": []}).to_string(),
+            &evidence,
+            &[],
+            None,
+            &sink,
+            &access,
+        )
+        .await;
+        assert_eq!(released.verification.outcome, TextAnswerOutcome::Blocked);
+        assert_eq!(
+            released.run_failure,
+            Some("answer was withheld by the evidence gate")
+        );
+        assert_eq!(sink.calls.load(Ordering::SeqCst), 0);
+        assert_withheld(
+            &released,
+            &response_of(&released, &evidence),
+            &["Unverified answer", BODY],
+        );
     }
 
     #[tokio::test]

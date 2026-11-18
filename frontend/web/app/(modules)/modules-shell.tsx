@@ -77,10 +77,12 @@ import { isAssistantErrorQuestion } from "@/lib/assistant-error-help"
 import { AI_WORKSPACE_SCOPES, aiWorkspaceScopesForProfile, resolveAiWorkspaceScope } from "@/lib/ai-workspace-scope"
 import { useFarmOperationsEnabled } from "@/lib/use-farm-operations-enabled"
 import { parseFarmComparisonRequest, readAssistantFarmMetrics } from "@/lib/assistant-farm-metrics"
+import { parseAssistantDomainRead, readAssistantDomainRead } from "@/lib/assistant-domain-reads"
+import { parseAssistantSupportRecord, readAssistantSupportRecord } from "@/lib/assistant-support-records"
 import { useErpAiSelectionReporter } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { performSignOut } from "@/lib/auth-sign-out"
 import {
-  assistantAnswer, assistantAnswerMetadata, assistantSetupFailure, coordinateAssistantTurn,
+  assistantAnswer, assistantAnswerMetadata, assistantHistoryResult, assistantSetupFailure, coordinateAssistantTurn,
   parseStoredAssistantRecovery, readAssistantStream, withAssistantRecoveryMetadata, type AssistantTurnFailure,
 } from "@/lib/assistant-turn"
 import { i18n } from "@lumiere/i18n"
@@ -295,6 +297,9 @@ function ErpAiChatPanel({
     readonly: history.archived || !availableHistory,
   })
   const [selectedScope, setSelectedScope] = useState("current")
+  useEffect(() => {
+    if (selection?.explicit) setSelectedScope("current")
+  }, [selection])
   const [openGuide, setOpenGuide] = useState<{ scope: string; request: OpenGuideRequest } | null>(null)
   const guideConversation = useAssistantGuideConversation()
   const errorQuestion = useErpAiErrorQuestion()
@@ -433,6 +438,7 @@ function ErpAiChatPanel({
       guides?: GuideReference[]
       importTaskIds?: string[]
       recoveryPath?: ChatMessage["recoveryPath"]
+      verification?: ReturnType<typeof assistantAnswer>["verification"]
     }) => {
       if (!sessionKey || !orgReady || operatingCompanyId == null || operatingCompanyId <= 0) return
       const { actorRequest } = args
@@ -455,7 +461,7 @@ function ErpAiChatPanel({
           ui_context_json: JSON.stringify(args.uiContext ?? null),
           model: args.model ?? null,
           duration_ms: args.durationMs ?? null,
-          metadata: withStoredTurnMetadata(args.turnId, args.earlierContextUnavailable, withAssistantRecoveryMetadata(
+          ...assistantHistoryResult(args.verification, withStoredTurnMetadata(args.turnId, args.earlierContextUnavailable, withAssistantRecoveryMetadata(
             withGuideReferencesMetadata(
               withNativeActionsMetadata(
                 args.actions?.length || args.runId != null
@@ -472,7 +478,7 @@ function ErpAiChatPanel({
               args.guides,
             ),
             args.recoveryPath,
-          ), args.importTaskIds),
+          ), args.importTaskIds)),
         }) },
       })
       if (result === "failed") setFailedHistoryScope(historyScope)
@@ -717,7 +723,7 @@ function ErpAiChatPanel({
         }
         try {
           setProgress("answering", Boolean(onDelta))
-          const answer = await rag.mutateAsync({
+          const answer = assistantAnswer(await rag.mutateAsync({
             query: selectedDocument.action === "explain"
               ? "Explain the selected spreadsheet cells."
               : "Check the selected spreadsheet cells for issues.",
@@ -726,12 +732,12 @@ function ErpAiChatPanel({
             signal,
             spreadsheet_selection: documentSelectionAnalysisReference(selectedDocument.selection),
             ...(requestedAgentId ? { agent_id: requestedAgentId } : {}),
-          })
+          }))
           if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
           const sources = answer.sources.map(mapRagSourceToChatSource)
-          await saveReply({ userText, assistantText: answer.answer, sources, uiContext: null, runId: answer.run_id })
+          await saveReply({ userText, assistantText: answer.answer, sources, uiContext: null, runId: answer.run_id, verification: answer.verification })
           if (selectedReferences?.length && isCurrent()) clearReferences(sessionKey)
-          return { content: answer.answer, sources, runId: answer.run_id, earlierContextUnavailable: answer.earlier_context_unavailable }
+          return { content: answer.answer, sources, runId: answer.run_id, earlierContextUnavailable: answer.earlierContextUnavailable }
         } catch (error) {
           if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
           const setup = assistantSetupFailure(error)
@@ -748,7 +754,31 @@ function ErpAiChatPanel({
         ? [{ taskId: focusedImport.requestId, companyId: focusedImport.companyId }]
         : undefined
       const importTaskIds = importTaskRefs?.map(reference => reference.taskId)
-      const farmComparison = !attachments.length && !questionGuide && !selectedReferences?.length
+      const useDirectReads = !attachments.length && !questionGuide && !selectedReferences?.length
+      const supportRecord = useDirectReads && identity
+        ? parseAssistantSupportRecord(userText)
+        : undefined
+      if (supportRecord && identity) {
+        const result = await readAssistantSupportRecord(supportRecord, {
+          organizationId: orgId, companyId: operatingCompanyId, actorIdentity: identity,
+          locale: i18n.resolvedLanguage ?? "en", signal,
+        })
+        if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
+        await saveReply({ userText, assistantText: result.content, sources: result.sources, uiContext })
+        return result
+      }
+      const domainRead = useDirectReads
+        ? parseAssistantDomainRead(userText, { farmEnabled: farmOperationsEnabled })
+        : undefined
+      if (domainRead) {
+        const result = await readAssistantDomainRead(domainRead, {
+          companyId: operatingCompanyId, locale: i18n.resolvedLanguage ?? "en", signal,
+        })
+        if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
+        await saveReply({ userText, assistantText: result.content, sources: result.sources, uiContext })
+        return result
+      }
+      const farmComparison = useDirectReads
         ? parseFarmComparisonRequest(userText)
         : undefined
       if (farmComparison && farmOperationsEnabled) {
@@ -880,11 +910,12 @@ function ErpAiChatPanel({
         earlierContextUnavailable: out?.earlierContextUnavailable,
         durationMs: Math.round(performance.now() - started), model: out?.model ?? null,
         actions: actions.length ? actions : undefined, runId: out?.run_id, recoveryPath,
+        verification: out?.verification,
       })
       if (out && selectedReferences?.length && isCurrent()) clearReferences(sessionKey)
       return { content, attachmentsConsumed: turn.answer.kind === "ready", runId: out?.run_id, sources, guides, recoveryPath, importTaskIds, importTasks: taskStatuses, actions: actions.length ? actions : undefined, earlierContextUnavailable: out?.earlierContextUnavailable }
     },
-    [orgId, orgReady, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, sessionKey, actorHistoryScope, history.archived, availableHistory, historyRefs, clearReferences, ensureSession, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft, farmOperationsEnabled],
+    [orgId, orgReady, identity, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, sessionKey, actorHistoryScope, history.archived, availableHistory, historyRefs, clearReferences, ensureSession, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft, farmOperationsEnabled],
   )
   const sendTurn = useCallback(async (text: string, onDelta?: (delta: string) => void, turnId?: string, guideRefs?: GuideReference[], guide?: GuideDraft, hasUnsavedGuideEdits = false, files: readonly File[] = []) => {
     if (inFlight.current.has(historyScope) || inFlight.current.size >= 2) {

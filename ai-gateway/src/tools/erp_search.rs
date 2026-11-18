@@ -2,7 +2,9 @@ use serde_json::{json, Value};
 
 use crate::{
     harness::{
-        fetch_authorized_live_snapshots, resolve_snapshot_candidates, HARNESS_MAX_LIVE_SNAPSHOTS,
+        fetch_authorized_live_snapshots,
+        record_lookup::{lookup_record_candidates, RecordLookup},
+        resolve_snapshot_candidates, HARNESS_MAX_LIVE_SNAPSHOTS,
     },
     retrieval_policy::optional_retrieval,
     tools::types::{live_snapshot_citation, ToolContext, ToolOutput, ToolResult},
@@ -52,6 +54,32 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .ok_or_else(|| anyhow::anyhow!("query is required"))?;
+
+    match lookup_record_candidates(&ctx.state, actor, ctx.org_id, ctx.company_id, query, None)
+        .await?
+    {
+        RecordLookup::NotRequested => {}
+        RecordLookup::Match(candidate) => {
+            let snapshots = fetch_authorized_live_snapshots(
+                &ctx.state,
+                actor,
+                ctx.org_id,
+                ctx.company_id,
+                &[candidate],
+            )
+            .await?;
+            return Ok(build_authorized_output(snapshots, false));
+        }
+        result @ (RecordLookup::NotFound | RecordLookup::Ambiguous) => {
+            let mut output = build_authorized_output(Vec::new(), false);
+            output.summary = if matches!(result, RecordLookup::Ambiguous) {
+                "More than one record matches. Use the exact record reference.".into()
+            } else {
+                "No matching record was available in this company.".into()
+            };
+            return Ok(output);
+        }
+    }
 
     let limit = input
         .get("limit")
@@ -105,30 +133,17 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
 
     let org_result = match query_vector {
         Ok(vector) => {
-            ctx.rig()
-                .search_scope_with_vector(
-                    ctx.org_id,
-                    ctx.company_id,
-                    &actor.identity_hex,
-                    vector,
-                    limit as usize,
-                )
-                .await
-        }
-        Err(_) => Err(anyhow::anyhow!("admitted activity query unavailable")),
-    };
-    let org_result = match org_result {
-        Ok(hits) => {
-            crate::routes::context::reauthorize_activity_hits(
+            crate::routes::context::search_authorized_activity(
                 &ctx.state,
                 actor,
                 ctx.org_id,
                 ctx.company_id,
-                hits,
+                vector,
+                limit as usize,
             )
             .await
         }
-        Err(error) => Err(error),
+        Err(_) => Err(anyhow::anyhow!("admitted activity query unavailable")),
     };
     if let Err(error) = &org_result {
         tracing::warn!(error = %error, "ERP activity retrieval unavailable");

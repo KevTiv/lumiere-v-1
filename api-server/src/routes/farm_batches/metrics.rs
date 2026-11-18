@@ -45,8 +45,8 @@ pub(super) enum MissingInput {
 #[serde(rename_all = "camelCase")]
 pub(super) struct Metrics {
     as_of: String,
-    live_headcount: Metric<u64>,
-    recorded_deaths: u64,
+    pub(super) live_headcount: Metric<u64>,
+    pub(super) recorded_deaths: u64,
     mortality_rate: Metric<f64>,
     average_daily_gain_kg: Metric<f64>,
     growth_window: Option<GrowthWindow>,

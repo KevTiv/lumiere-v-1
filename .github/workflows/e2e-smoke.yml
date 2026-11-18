@@ -517,12 +517,8 @@ jobs:
           key: ${{ steps.playwright-browsers.outputs.key }}
 
       - name: Install Playwright Chromium
-        working-directory: frontend/web
-        timeout-minutes: 5
-        run: |
-          # Use Ubuntu's HTTPS archive when the runner's Azure HTTP mirror stalls.
-          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
-          pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 12
+        uses: ./.github/actions/install-playwright-chromium
 
       - name: Start the quotation PDF renderer
         env:
@@ -765,7 +761,7 @@ jobs:
           --health-timeout=5s
           --health-retries=5
       qdrant:
-        image: qdrant/qdrant:v1.12.6
+        image: qdrant/qdrant:v1.17.0
         ports:
           - 6334:6334
     env:

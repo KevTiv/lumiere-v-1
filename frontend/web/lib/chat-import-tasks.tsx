@@ -10,14 +10,14 @@ import { FileIdentity } from "@lumiere/ui/components/file-identity"
 import { Button } from "@lumiere/ui/components/button"
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
 import { apiFetch } from "./api-fetch"
-import { ChatImportReceipt, chatImportReceiptKey } from "./chat-import-receipt"
+import { ChatImportReceipt } from "./chat-import-receipt"
 import { ChatReconciliationPreview } from "./chat-reconciliation-preview"
 import { DataImportWorkspace } from "./data-import-workspace"
 import { SavedImportTaskPicker, useSavedImportTaskList } from "./saved-import-task-picker"
 import { importTaskHref, type ImportTaskView } from "./import-task-navigation"
 import type { ImportPreparation } from "./import-preparation"
 import {
-  canPrepareInspectedImport, chatImportScopeKey, listChatImportTasks, parseChatImportTask,
+  canPrepareInspectedImport, chatImportReceiptKey, chatImportScopeKey, listChatImportTasks, parseChatImportTask,
   readChatImportTask, recoverChatImportPointer, recoverChatImportDecision,
   retryChatImportDecision, submitChatImportDecision, submitChatImportFiles,
   type ChatImportDecisionAnswer, type ChatImportDecisionPointer, type ChatImportPointer, type ChatImportScope, type ChatImportTask,
@@ -75,7 +75,7 @@ export function useChatImportTasks(args: {
     decisionPointers: Record<string, ChatImportDecisionPointer>;
     available: boolean; busy: boolean; error: string | null;
   }>({ key: null, epoch, tasks: [], pointer: null, decisionPointers: {}, available: false, busy: false, error: null })
-  const [review, setReview] = useState<{ key: string; epoch: number; taskId: string | null; id?: string; view: ImportTaskView } | null>(null)
+  const [review, setReview] = useState<{ key: string; epoch: number; taskId: string | null; id?: string; view?: ImportTaskView } | null>(null)
   const [focus, setFocus] = useState<{ key: string; epoch: number; taskId: string | null; task?: ChatImportTask } | null>(null)
   const isCurrent = useCallback(() => mounted.current && currentScope.current.key === key && currentScope.current.epoch === epoch, [key, epoch])
 
@@ -232,17 +232,17 @@ export function useChatImportTasks(args: {
   }, [key, epoch, isCurrent])
   const focusedTask = visible?.available
     ? focus?.key === key && focus.epoch === epoch
-      ? focus.task ?? visible.tasks.find(task => task.requestId === focus.taskId)
+      ? visible.tasks.find(task => task.requestId === focus.taskId) ?? focus.task
       : visible.tasks.length === 1 ? visible.tasks[0] : undefined
     : undefined
   const selectedImport = focusedTask?.requestId === selectedReview?.taskId
     ? focusedTask
     : visible?.tasks.find(task => task.requestId === selectedReview?.taskId)
   const inspecting = selectedImport?.decision.selectedOptionId === "inspect_only"
-  const openSavedTask = (taskId: string | null, view: ImportTaskView = "sources", id?: string) => {
+  const openSavedTask = (taskId: string | null, view?: ImportTaskView, id?: string) => {
     if (key && visible?.available) setReview({ key, epoch, taskId, id, view })
   }
-  const openTask = (task: ChatImportTask, view: ImportTaskView, id?: string) => {
+  const openTask = (task: ChatImportTask, view?: ImportTaskView, id?: string) => {
     focusTask(task)
     openSavedTask(task.requestId, view, id)
   }
@@ -290,7 +290,7 @@ export function useChatImportTasks(args: {
         : task.status === "failed" ? t("aiChat.import.preparationFailed", { defaultValue: "Files saved · preparation needs attention" })
           : task.decision.selectedOptionId === "inspect_only" ? t("aiChat.import.inspectionSaved", { defaultValue: "Files saved · inspection can be resumed" })
             : t("aiChat.import.saved", { defaultValue: "Files saved · preparation can be resumed" })}</p>
-      <p className="text-xs text-muted-foreground">{t("aiChat.import.noRecords", { defaultValue: "Preparation creates no business records. Review the source before importing." })}</p>
+      {task.status !== "needs_review" ? <p className="text-xs text-muted-foreground">{t("aiChat.import.noRecords", { defaultValue: "Preparation creates no business records. Review the source before importing." })}</p> : null}
       <ul className="space-y-2">{task.files.map(file => <li key={file.ordinal} className="min-w-0 [overflow-wrap:anywhere]">
         <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
           <FileIdentity fileName={file.fileName} size={file.size} className="flex-1 basis-36" />
@@ -347,7 +347,9 @@ export function useChatImportTasks(args: {
         }).catch(() => undefined)}
       >{t("aiChat.import.approvePreparation", { defaultValue: "Approve preparation" })}</Button> : null}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" size="sm" disabled={visible.busy} onClick={() => openTask(task, "sources")}>{t("settings.importTask.openTask", { defaultValue: "Open saved task" })}</Button>
+        {focusedTask?.requestId !== task.requestId || task.status !== "needs_review" ? (
+          <Button type="button" variant="outline" size="sm" disabled={visible.busy} onClick={() => openTask(task)}>{t("settings.importTask.openTask", { defaultValue: "Open saved task" })}</Button>
+        ) : null}
         <a className="text-sm underline underline-offset-4" href={importTaskHref({
           companyId: scope.companyId, taskId: task.requestId, view: task.reviews.length ? "decisions" : "sources",
         })}>{t("settings.importTask.permalink", { defaultValue: "Open this task in Data import" })}</a>
@@ -363,6 +365,10 @@ export function useChatImportTasks(args: {
         <Button type="button" variant="outline" size="sm" onClick={() => openTask(task, "decisions", batch.id)}>{task.status === "inspection_ready" ? t("aiChat.import.viewInspection", { defaultValue: "View inspection {{title}}", title: batch.title }) : t("aiChat.import.review", { defaultValue: "Review {{title}}", title: batch.title })}</Button>
       </div>)}
     </article>)}
+    {!selectedReview && focusedTask?.status === "needs_review" &&
+      !visible.tasks.some(task => task.requestId === focusedTask.requestId)
+      ? renderReceipt(focusedTask.requestId)
+      : null}
     {selectedReview ? <Dialog open onOpenChange={open => { if (!open) { setReview(null); void reload() } }}>
       <DialogContent size="document" layout="bounded">
         <DialogHeader>
@@ -381,7 +387,7 @@ export function useChatImportTasks(args: {
         </DialogHeader>
         <DialogBody>
           {selectedReview.taskId
-            ? <DataImportWorkspace organizationId={scope.organizationId} taskId={selectedReview.taskId} initialReviewId={selectedReview.id} initialView={selectedReview.view} syncUrl={false} onTaskFocus={focusTask} />
+            ? <DataImportWorkspace organizationId={scope.organizationId} taskId={selectedReview.taskId} initialReviewId={selectedReview.id} initialView={selectedReview.view} resumeAtNextStep={!selectedReview.view} syncUrl={false} onTaskFocus={focusTask} />
             : <ChatSavedImportPicker scope={scope} onSelect={openSavedTask} />}
         </DialogBody>
       </DialogContent>

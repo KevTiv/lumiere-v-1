@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "@lumiere/i18n"
 import { ChatDecisionCard } from "@lumiere/ui"
+import { importTaskNextView } from "@lumiere/ui/ai-chat/import-task-status-card"
 import { FileIdentity } from "@lumiere/ui/components/file-identity"
 import { Button } from "@lumiere/ui/components/button"
 import {
@@ -34,7 +35,11 @@ import {
   type SavedImportScope,
 } from "./use-saved-import-task"
 import type { ReviewedImportSource } from "./import-review-model"
-import { canPrepareInspectedImport, type ChatImportTask } from "./chat-import-task"
+import {
+  canPrepareInspectedImport,
+  chatImportReceiptKey,
+  type ChatImportTask,
+} from "./chat-import-task"
 import { DocumentViewerDialog } from "../components/document-viewer-dialog"
 import { ImportPreparationPanel } from "./import-preparation-panel"
 import type { ImportPreparationSection } from "./import-preparation"
@@ -44,6 +49,7 @@ export function SavedImportWorkspace({
   taskId,
   view,
   initialReviewId,
+  resumeAtNextStep = false,
   preparationTarget,
   inspectionOnly = false,
   onNavigate,
@@ -55,6 +61,7 @@ export function SavedImportWorkspace({
   taskId: string
   view: ImportTaskView
   initialReviewId?: string
+  resumeAtNextStep?: boolean
   preparationTarget?: ImportPreparationSection["targetEntity"]
   inspectionOnly?: boolean
   onNavigate: (view: ImportTaskView, reviewId?: string) => void
@@ -125,7 +132,10 @@ export function SavedImportWorkspace({
   const selectedReviewId =
     reviewId && allowedReviewIds.includes(reviewId)
       ? reviewId
-      : allowedReviewIds[0]
+      : ((view === "preview"
+          ? reviews?.find((review) => review.confirmed > 0)?.id
+          : reviews?.find((review) => review.pending > 0)?.id) ??
+        allowedReviewIds[0])
   const counts = useMemo(
     () =>
       (reviews ?? []).reduce(
@@ -143,6 +153,56 @@ export function SavedImportWorkspace({
     !inspectionOnly &&
     task?.decision.status === "approved" &&
     task.decision.selectedOptionId === "prepare_import"
+  const nextView = importTaskNextView({
+    preparationStatus:
+      inspectionOnly && task?.status === "needs_review"
+        ? "inspection_ready"
+        : (task?.status ?? "saved"),
+    sourceRows: {
+      total: counts.total,
+      ready: counts.confirmed,
+      held: counts.pending,
+      excluded: counts.excluded,
+    },
+    hasPreparedProposal: !!workflowData?.proposals.some(
+      (proposal) => proposal.status === "prepared",
+    ),
+    hasResults: !!(
+      workflowData?.proposals.some(
+        (proposal) => proposal.approvedAt !== null,
+      ) ||
+      workflowData?.nativeResults.length ||
+      workflowData?.backfilledRecords?.some((result) => result.count > 0) ||
+      workflowData?.farmResults?.some((result) => result.count > 0)
+    ),
+  })
+  const nextReviewId =
+    (nextView === "preview"
+      ? reviews?.find((item) => item.confirmed > 0)?.id
+      : reviews?.find((item) => item.pending > 0)?.id) ?? selectedReviewId
+  useEffect(() => {
+    if (
+      !resumeAtNextStep ||
+      !task ||
+      saved.busy ||
+      workflow.isPending ||
+      workflow.isFetching
+    )
+      return
+    if (!allowImport && (nextView === "preview" || nextView === "results"))
+      return
+    onNavigate(nextView, nextReviewId)
+  }, [
+    resumeAtNextStep,
+    task,
+    saved.busy,
+    workflow.isPending,
+    workflow.isFetching,
+    allowImport,
+    nextView,
+    nextReviewId,
+    onNavigate,
+  ])
   useEffect(() => {
     if (view === "preview" || view === "results") setExecutionView(view)
   }, [view])
@@ -164,6 +224,12 @@ export function SavedImportWorkspace({
       setNativePreview(true)
       navigate("preview", selectedReviewId, true)
     }
+  }
+  const refreshTask = () => {
+    void saved.reload()
+    void queryClient.invalidateQueries({
+      queryKey: chatImportReceiptKey(scope, taskId),
+    })
   }
 
   if (!task)
@@ -198,19 +264,8 @@ export function SavedImportWorkspace({
       </section>
     )
 
-  const hasSavedExecution = !!(
-    workflowData?.proposals.some((proposal) => proposal.approvedAt !== null) ||
-    workflowData?.nativeResults.length
-  )
-  const nextView: ImportTaskView =
-    task.status === "awaiting_decision" || !reviews?.length
-      ? "sources"
-      : counts.pending > 0 || !allowImport
-        ? "decisions"
-        : hasSavedExecution
-          ? "results"
-          : "preview"
-  const canPrepare = !inspectionOnly && !saved.pointer && canPrepareInspectedImport(task)
+  const canPrepare =
+    !inspectionOnly && !saved.pointer && canPrepareInspectedImport(task)
   const nextLabel =
     nextView === "sources"
       ? t("settings.importTask.nextSources", {
@@ -280,7 +335,7 @@ export function SavedImportWorkspace({
             variant="outline"
             disabled={saved.busy}
             onClick={() => {
-              void saved.reload()
+              refreshTask()
               void workflow.refetch()
             }}
           >
@@ -291,11 +346,13 @@ export function SavedImportWorkspace({
               type="button"
               disabled={saved.busy}
               onClick={() => {
-                void saved.answer({
-                  requestId: task.decision.id,
-                  expectedRevision: task.decision.revision,
-                  optionId: "prepare_import",
-                }).catch(() => undefined)
+                void saved
+                  .answer({
+                    requestId: task.decision.id,
+                    expectedRevision: task.decision.revision,
+                    optionId: "prepare_import",
+                  })
+                  .catch(() => undefined)
               }}
             >
               {t("aiChat.import.approvePreparation", {
@@ -306,7 +363,7 @@ export function SavedImportWorkspace({
             <Button
               type="button"
               disabled={saved.busy}
-              onClick={() => navigate(nextView, selectedReviewId, true)}
+              onClick={() => navigate(nextView, nextReviewId, true)}
             >
               {nextLabel}
             </Button>
@@ -601,7 +658,11 @@ export function SavedImportWorkspace({
               organizationId={scope.organizationId}
               selectedId={selectedReviewId}
               allowedReviewIds={allowedReviewIds}
-              historySource={task ? { taskId: task.requestId, sessionKey: task.conversationKey } : undefined}
+              historySource={
+                task
+                  ? { taskId: task.requestId, sessionKey: task.conversationKey }
+                  : undefined
+              }
               allowUpload={false}
               syncUrl={false}
               allowImport={allowImport}
@@ -617,7 +678,7 @@ export function SavedImportWorkspace({
                 void queryClient.invalidateQueries({
                   queryKey: ["import-workflow-source"],
                 })
-                void saved.reload()
+                refreshTask()
               }}
             />
           ) : (
@@ -632,6 +693,32 @@ export function SavedImportWorkspace({
         <TabsContent value={executionView} keepMounted className="space-y-4">
           {allowImport ? (
             <>
+              {executionView === "preview" && reviews && reviews.length > 1 ? (
+                <label className="grid max-w-lg gap-1 text-sm">
+                  {t("settings.importTask.previewReviewGroup", {
+                    defaultValue: "Source group to preview",
+                  })}
+                  <select
+                    className="rounded-md border bg-background px-2 py-2"
+                    value={selectedReviewId}
+                    onChange={(event) =>
+                      navigate("preview", event.currentTarget.value)
+                    }
+                  >
+                    {reviews.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {t("settings.importTask.previewReviewOption", {
+                          defaultValue:
+                            "{{title}} · {{confirmed}} confirmed · {{pending}} need review",
+                          title: item.title,
+                          confirmed: item.confirmed,
+                          pending: item.pending,
+                        })}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               <ImportTaskExecutionPanel
                 organizationId={scope.organizationId}
                 companyId={scope.companyId}
@@ -642,9 +729,7 @@ export function SavedImportWorkspace({
                   if (allowedReviewIds.includes(id))
                     navigate("decisions", id, true)
                 }}
-                onChanged={() => {
-                  void saved.reload()
-                }}
+                onChanged={refreshTask}
               />
               <div
                 hidden={!nativePreview && continuationBlock !== "unresolved"}

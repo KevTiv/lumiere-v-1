@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { useTranslation } from "@lumiere/i18n"
+import { formatImportAmount } from "@lumiere/ui/ai-chat/import-task-status-card"
 import {
   isModuleBackfillRecordId,
   moduleBackfillTabs,
@@ -11,6 +12,8 @@ import {
   type BackfillModule,
 } from "./module-backfill-navigation"
 import { apiFetch } from "./api-fetch"
+import { chatImportReceiptKey } from "./chat-import-task"
+import { importAmountUnits } from "./import-workflow"
 import type {
   ReviewDetail,
   ReviewedRecordOperation,
@@ -34,6 +37,47 @@ type Contact = {
   name: string
   isCustomer?: boolean
   is_customer?: boolean
+}
+
+function previewShopSales(rows: Receipt["results"]) {
+  const currencies = new Map<
+    string,
+    { newAmount: bigint; existingAmount: bigint }
+  >()
+  let alreadyPresent = 0
+  for (const row of rows) {
+    const { amount, currency } = row.facts ?? {}
+    if (
+      typeof amount !== "string" ||
+      !/^\d{1,12}(?:\.\d{1,6})?$/.test(amount) ||
+      typeof currency !== "string" ||
+      !/^[A-Z]{3}$/.test(currency) ||
+      (row.recordId != null && !isModuleBackfillRecordId(row.recordId))
+    )
+      return null
+    const totals = currencies.get(currency) ?? {
+      newAmount: 0n,
+      existingAmount: 0n,
+    }
+    const units = importAmountUnits(amount)
+    if (row.recordId) {
+      alreadyPresent += 1
+      totals.existingAmount += units
+    } else {
+      totals.newAmount += units
+    }
+    currencies.set(currency, totals)
+  }
+  return { alreadyPresent, currencies }
+}
+
+function formatPreviewUnits(units: bigint, locale?: string) {
+  const decimals = (units % 1_000_000n)
+    .toString()
+    .padStart(6, "0")
+    .replace(/0+$/, "")
+  const whole = String(units / 1_000_000n)
+  return formatImportAmount(decimals ? `${whole}.${decimals}` : whole, locale)
 }
 
 function destinationHref(
@@ -104,7 +148,7 @@ function BackfillAction({
   operation: ReviewedRecordOperation
   disabled: boolean
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const cache = useQueryClient()
   const [overrides, setOverrides] = useState<Record<string, string>>({})
   const [showMatches, setShowMatches] = useState(false)
@@ -183,6 +227,16 @@ function BackfillAction({
               queryKey[2] === organizationId &&
               queryKey[3] === companyId,
           }),
+          ...(taskId && actor
+            ? [
+                cache.invalidateQueries({
+                  queryKey: chatImportReceiptKey(
+                    { identity: actor, organizationId, companyId },
+                    taskId,
+                  ),
+                }),
+              ]
+            : []),
         ])
     },
   })
@@ -201,10 +255,16 @@ function BackfillAction({
     )?.results.filter(
       (row) => row.status === "held" || row.status === "conflict",
     ) ?? []
-  const results = write.variables === false ? write.data?.results ?? [] : []
+  const results = write.variables === false ? (write.data?.results ?? []) : []
   const matched = results.filter((row) => row.status === "matched").length
   const saved = results.filter((row) => row.status === "saved").length
   const dispatch = operation.reviewedRecord.dispatch
+  const showPreview =
+    ready.length > 0 && (!write.isSuccess || write.variables === true)
+  const salesPreview =
+    dispatch === "shop_sales" && showPreview
+      ? previewShopSales(ready)
+      : undefined
   const recordLinks = results.flatMap((row) => {
     if (
       (row.status !== "saved" && row.status !== "matched") ||
@@ -235,9 +295,9 @@ function BackfillAction({
         >
           Preview {operation.label.toLowerCase()}
         </Button>
-        {ready.length > 0 ? (
+        {showPreview ? (
           <Button
-            disabled={disabled || write.isPending}
+            disabled={disabled || write.isPending || salesPreview === null}
             onClick={() => write.mutate(false)}
           >
             {write.isPending
@@ -261,6 +321,45 @@ function BackfillAction({
           Open {operation.label.toLowerCase()}
         </a>
       </div>
+      {salesPreview === null ? (
+        <p role="alert">
+          {t("settings.importTask.shopSalesPreviewUnavailable", {
+            defaultValue:
+              "Shop Sales totals could not be verified. Refresh the preview before saving.",
+          })}
+        </p>
+      ) : salesPreview ? (
+        <div className="space-y-1 rounded-md bg-muted/40 p-2 tabular-nums">
+          <p className="font-medium">
+            {t("settings.importTask.shopSalesPreviewCounts", {
+              defaultValue:
+                "Preview · {{newCount}} new · {{existingCount}} already present · {{heldCount}} held",
+              newCount: ready.length - salesPreview.alreadyPresent,
+              existingCount: salesPreview.alreadyPresent,
+              heldCount: held.length,
+            })}
+          </p>
+          {[...salesPreview.currencies]
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([currency, totals]) => (
+              <p key={currency}>
+                {t("settings.importTask.shopSalesPreviewAmounts", {
+                  defaultValue:
+                    "{{currency}} {{newAmount}} to create · {{currency}} {{existingAmount}} already present",
+                  currency,
+                  newAmount: formatPreviewUnits(
+                    totals.newAmount,
+                    i18n?.language,
+                  ),
+                  existingAmount: formatPreviewUnits(
+                    totals.existingAmount,
+                    i18n?.language,
+                  ),
+                })}
+              </p>
+            ))}
+        </div>
+      ) : null}
       {showMatches && canMatchCustomer ? (
         contacts.isPending ? (
           <p>Loading customers…</p>
@@ -292,7 +391,7 @@ function BackfillAction({
           </div>
         )
       ) : null}
-      {ready.length ? (
+      {showPreview ? (
         <ul className="max-h-60 list-disc space-y-1 overflow-y-auto pl-5">
           {ready.map(({ itemId, periodStart, periodEnd, facts, recordId }) => (
             <li key={itemId}>
