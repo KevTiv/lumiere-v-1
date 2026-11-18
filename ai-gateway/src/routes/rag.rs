@@ -20,11 +20,12 @@ use crate::{
     error::{AppError, AppResult},
     harness::{
         fetch_authorized_live_snapshots, filter_entity_refs_by_allowed_types,
+        follow_up_reference::{anchors_apply, NamedRecord},
         format_live_context_block,
         record_lookup::{lookup_record_candidates, RecordLookup},
-        resolve_snapshot_candidates,
+        resolve_snapshot_candidates, resolve_snapshot_candidates_with_anchors,
         snapshot::recheck_live_snapshots,
-        ActorCredentials, LiveSnapshot, SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
+        ActorCredentials, EntityRef, LiveSnapshot, SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
     orchestrator::skill_access::ActorSkillAccess,
     orchestrator::{
@@ -135,6 +136,10 @@ pub struct RagRequest {
     pub chat_session_key: Option<String>,
     #[serde(default)]
     pub history_refs: Vec<HistoryReference>,
+    /// The user dismissed "Using: ..." for this turn: do not carry the previous
+    /// answer's records forward. Only ever narrows what the gateway reads.
+    #[serde(default)]
+    pub clear_anchors: bool,
     spreadsheet_selection: Option<SpreadsheetSelection>,
     /// BFF-owned native presentation catalog, never caller-provided authority.
     #[serde(default)]
@@ -692,9 +697,48 @@ fn live_snapshots_to_rag_sources(snapshots: &[LiveSnapshot]) -> Vec<RagSource> {
                 source_version: None,
                 passage_key: None,
                 content_hash: None,
+                from_anchor: false,
             }
         })
         .collect()
+}
+
+/// Label live sources that were reached only through follow-up anchors. Only
+/// records that were freshly read this turn exist as sources, so a revoked or
+/// unreadable anchor can never appear here.
+fn mark_anchor_sources(
+    sources: &mut [RagSource],
+    anchors: &[EntityRef],
+    ui: Option<&SnapshotUiContext>,
+) {
+    let ui_entity = ui.and_then(|ctx| {
+        Some((
+            ctx.entity_type
+                .as_deref()?
+                .trim()
+                .to_ascii_lowercase()
+                .replace('-', "_"),
+            ctx.entity_id.as_deref()?.parse::<u64>().ok()?,
+        ))
+    });
+    for source in sources.iter_mut().filter(|source| source.kind == "live") {
+        let (Some(entity_type), Some(entity_id)) = (
+            source.entity_type.as_deref(),
+            source
+                .entity_id
+                .as_deref()
+                .and_then(|id| id.parse::<u64>().ok()),
+        ) else {
+            continue;
+        };
+        let is_ui = ui_entity
+            .as_ref()
+            .is_some_and(|(kind, id)| kind == entity_type && *id == entity_id);
+        source.from_anchor = !is_ui
+            && anchors
+                .iter()
+                .any(|anchor| anchor.entity_type == entity_type && anchor.entity_id == entity_id);
+    }
 }
 
 fn source_snippet(text: &str) -> String {
@@ -925,6 +969,16 @@ pub async fn post_rag(
         || !req.guide_refs.is_empty()
         || !req.history_refs.is_empty();
     let mut exact_candidate = None;
+    // The previous answer's record identities, never content. They narrow to
+    // allowed types here and are re-read through the authorized resolver below.
+    let ui_record = !resolve_snapshot_candidates(snapshot_ui.as_ref(), &[], &[], 1).is_empty();
+    let anchor_pool =
+        if req.clear_anchors || has_other_selected_evidence || !agent_allows_live_read(&agent) {
+            Vec::new()
+        } else {
+            filter_entity_refs_by_allowed_types(conversation.anchors, allowed_types)
+        };
+    let mut named_record = NamedRecord::None;
     if !has_other_selected_evidence && agent_allows_live_read(&agent) {
         if req
             .ui_context
@@ -953,12 +1007,28 @@ pub async fn post_rag(
             let notice = match lookup {
                 Ok(RecordLookup::NotRequested) => None,
                 Ok(RecordLookup::Match(candidate)) => {
+                    named_record = NamedRecord::Resolved;
                     exact_candidate = filter_entity_refs_by_allowed_types(vec![candidate], allowed_types).pop();
                     None
                 }
-                Ok(RecordLookup::NotFound) => Some(
-                    "No matching record was available in this company. Check the reference or open the record and choose Ask AI.",
-                ),
+                Ok(RecordLookup::NotFound) => {
+                    // A missing named record falls back to the previous answer's
+                    // records only when the question also refers back to them.
+                    if anchors_apply(
+                        req.clear_anchors,
+                        &anchor_pool,
+                        ui_record,
+                        NamedRecord::NotFound,
+                        &req.query,
+                    ) {
+                        named_record = NamedRecord::NotFound;
+                        None
+                    } else {
+                        Some(
+                            "No matching record was available in this company. Check the reference or open the record and choose Ask AI.",
+                        )
+                    }
+                }
                 Ok(RecordLookup::Ambiguous) => Some(
                     "More than one record matches. Use the exact reference or open the record and choose Ask AI.",
                 ),
@@ -1098,9 +1168,21 @@ pub async fn post_rag(
     let company_hit_count = company_hits.len();
     let org_hit_count = org_hits.len();
 
+    let applied_anchors: Vec<EntityRef> = if anchors_apply(
+        req.clear_anchors,
+        &anchor_pool,
+        ui_record,
+        named_record,
+        &req.query,
+    ) {
+        anchor_pool
+    } else {
+        Vec::new()
+    };
     let snapshot_candidates = filter_entity_refs_by_allowed_types(
-        resolve_snapshot_candidates(
+        resolve_snapshot_candidates_with_anchors(
             snapshot_ui.as_ref(),
+            &applied_anchors,
             &company_hits,
             &org_hits,
             RAG_MAX_LIVE_SNAPSHOTS,
@@ -1654,7 +1736,9 @@ pub async fn post_rag(
 
     let mut sources: Vec<RagSource> = Vec::new();
     if passages_disclosed {
-        sources.extend(live_snapshots_to_rag_sources(&live_snapshots));
+        let mut live_sources = live_snapshots_to_rag_sources(&live_snapshots);
+        mark_anchor_sources(&mut live_sources, &applied_anchors, snapshot_ui.as_ref());
+        sources.extend(live_sources);
         sources.extend(ranked.into_iter().map(|s| s.rag_source));
         sources.extend(saved_imports.iter().map(AuthorizedImportTask::source));
         sources.extend(selected_spreadsheet.iter().map(AuthorizedSelection::source));
@@ -1914,6 +1998,52 @@ mod tests {
         assert_eq!(sources[0].trust, "authoritative");
         assert_eq!(sources[0].label.as_deref(), Some("Sale order #42"));
         assert_eq!(sources[0].instruction_trust, "untrusted");
+    }
+
+    #[test]
+    fn only_freshly_read_anchor_records_are_labelled_and_the_ui_record_never_is() {
+        let snapshot = |entity_type: &str, id: u64| LiveSnapshot {
+            entity_type: entity_type.into(),
+            entity_id: id,
+            label: format!("{entity_type} #{id}"),
+            snapshot_at: "2026-11-18T10:00:00Z".into(),
+            row: json!({}),
+            relations: vec![],
+        };
+        // The anchored contact 9 was revoked, so it was never read.
+        let mut sources = live_snapshots_to_rag_sources(&[
+            snapshot("sale_order", 42),
+            snapshot("account_move", 123),
+            snapshot("product", 7),
+        ]);
+        let anchors = vec![
+            EntityRef {
+                entity_type: "sale_order".into(),
+                entity_id: 42,
+                priority: 0.99,
+            },
+            EntityRef {
+                entity_type: "account_move".into(),
+                entity_id: 123,
+                priority: 0.98,
+            },
+            EntityRef {
+                entity_type: "contact".into(),
+                entity_id: 9,
+                priority: 0.97,
+            },
+        ];
+        let ui = SnapshotUiContext {
+            entity_type: Some("sale_order".into()),
+            entity_id: Some("42".into()),
+            ..Default::default()
+        };
+        mark_anchor_sources(&mut sources, &anchors, Some(&ui));
+        let flags = sources.iter().map(|s| s.from_anchor).collect::<Vec<_>>();
+        assert_eq!(flags, vec![false, true, false]);
+        let wire = serde_json::to_value(&sources).unwrap();
+        assert!(wire[0].get("from_anchor").is_none());
+        assert_eq!(wire[1]["from_anchor"], true);
     }
 
     #[test]

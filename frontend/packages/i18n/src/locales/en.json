@@ -13889,6 +13889,13 @@
     }
   },
   "aiChat": {
+    "followUp": {
+      "using": "Using: {{label}} from your last question",
+      "usingMore": "Using: {{label}} and {{more}} more from your last question",
+      "clear": "Stop using",
+      "clearLabel": "Stop using earlier records for my next question",
+      "cleared": "Won't be used next"
+    },
     "workspace": {
       "context": "Workspace context",
       "modules": "Modules",

@@ -99,6 +99,20 @@ pub fn resolve_snapshot_candidates(
     org_hits: &[ContextHit],
     max: usize,
 ) -> Vec<EntityRef> {
+    resolve_snapshot_candidates_with_anchors(ui_context, &[], company_hits, org_hits, max)
+}
+
+/// Candidate order: explicit UI record, then follow-up anchors (the previous
+/// answer's records, in their own order), then ANN hits by score. Anchors are
+/// hints only: callers must still read each through
+/// `fetch_authorized_live_snapshots`, which drops what the actor cannot see.
+pub fn resolve_snapshot_candidates_with_anchors(
+    ui_context: Option<&SnapshotUiContext>,
+    anchors: &[EntityRef],
+    company_hits: &[SearchResult],
+    org_hits: &[ContextHit],
+    max: usize,
+) -> Vec<EntityRef> {
     let mut candidates: Vec<EntityRef> = Vec::new();
 
     if let Some(ctx) = ui_context {
@@ -117,6 +131,17 @@ pub fn resolve_snapshot_candidates(
             }
         }
     }
+
+    // Pinned ahead of every ANN hit regardless of score; only hits are sorted.
+    for anchor in anchors {
+        if lookup_entity_spec(&anchor.entity_type).is_some() {
+            candidates.push(EntityRef {
+                priority: anchor.priority.min(1.0),
+                ..anchor.clone()
+            });
+        }
+    }
+    let pinned = candidates.len();
 
     for hit in org_hits {
         let entity_type = &hit.record.semantic.resource_kind;
@@ -160,7 +185,7 @@ pub fn resolve_snapshot_candidates(
         });
     }
 
-    candidates.sort_by(|a, b| {
+    candidates[pinned..].sort_by(|a, b| {
         b.priority
             .partial_cmp(&a.priority)
             .unwrap_or(std::cmp::Ordering::Equal)
@@ -834,6 +859,96 @@ mod tests {
         let refs = resolve_snapshot_candidates(Some(&ui), &[], &org, 3);
         assert_eq!(refs[0].entity_type, "sale_order");
         assert_eq!(refs[0].entity_id, 42);
+    }
+
+    #[test]
+    fn anchors_rank_after_the_ui_record_and_before_ann_hits() {
+        let ui = SnapshotUiContext {
+            entity_type: Some("sale_order".into()),
+            entity_id: Some("42".into()),
+            ..Default::default()
+        };
+        let anchors = vec![
+            EntityRef {
+                entity_type: "account_move".into(),
+                entity_id: 123,
+                priority: 0.99,
+            },
+            EntityRef {
+                entity_type: "contact".into(),
+                entity_id: 9,
+                priority: 0.98,
+            },
+            EntityRef {
+                entity_type: "not_a_table".into(),
+                entity_id: 1,
+                priority: 0.97,
+            },
+        ];
+        // An ANN hit scoring above every anchor must still rank after them.
+        let org = vec![
+            context_hit("product", "7", 0.999),
+            context_hit("contact", "9", 0.9),
+        ];
+        let refs = resolve_snapshot_candidates_with_anchors(Some(&ui), &anchors, &[], &org, 8);
+        let order = refs
+            .iter()
+            .map(|r| (r.entity_type.as_str(), r.entity_id))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            order,
+            vec![
+                ("sale_order", 42),
+                ("account_move", 123),
+                ("contact", 9),
+                ("product", 7)
+            ]
+        );
+        // Without anchors the legacy resolver is unchanged.
+        let plain = resolve_snapshot_candidates(Some(&ui), &[], &org, 8);
+        assert_eq!(plain[1].entity_id, 7);
+    }
+
+    #[tokio::test]
+    async fn revoked_anchor_is_silently_dropped_by_the_authorized_read() {
+        use axum::{extract::Path, http::StatusCode, routing::get, Json, Router};
+        let router = Router::new().route(
+            "/v1/authoritative/sale-orders/:id",
+            get(|Path(id): Path<u64>| async move {
+                if id == 6 {
+                    return Err(StatusCode::FORBIDDEN);
+                }
+                Ok(Json(serde_json::json!({"data": {
+                    "id": id, "organization_id": 7, "company_id": 9, "state": "paid"
+                }})))
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, router).await;
+        });
+        let mut config = crate::routes::harness_descriptor::test_support::config();
+        config.api_server_url = Some(format!("http://{address}"));
+        let state = crate::routes::harness_descriptor::test_support::state(config).await;
+        let actor = ActorCredentials::new("token", "abc123").unwrap();
+        let anchors = vec![
+            EntityRef {
+                entity_type: "sale_order".into(),
+                entity_id: 6,
+                priority: 0.99,
+            },
+            EntityRef {
+                entity_type: "sale_order".into(),
+                entity_id: 5,
+                priority: 0.98,
+            },
+        ];
+        let snapshots = fetch_authorized_live_snapshots(&state, &actor, 7, 9, &anchors)
+            .await
+            .expect("a revoked anchor is not an error");
+        assert_eq!(snapshots.len(), 1);
+        assert_eq!(snapshots[0].entity_id, 5);
     }
 
     #[test]

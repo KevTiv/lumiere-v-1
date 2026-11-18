@@ -36,6 +36,8 @@ export type AiRagSource = {
   instruction_trust?: "untrusted"
   entity_type?: string
   entity_id?: string
+  /** Set by the gateway for records read through the previous answer. */
+  from_anchor?: boolean
   source_kind?: string
   source_key?: string
   source_version?: string
@@ -439,6 +441,7 @@ export function useAiMemoryRag() {
       guide_refs?: AiGuideReference[]
       chat_session_key?: string
       history_refs?: AiChatHistoryReference[]
+      clear_anchors?: boolean
       signal?: AbortSignal
       import_task_refs?: AiImportTaskReference[]
       spreadsheet_selection?: AiSpreadsheetSelectionReference
@@ -457,6 +460,7 @@ export function useAiMemoryRag() {
           ...(args.guide_refs?.length ? { guide_refs: args.guide_refs } : {}),
           ...(args.chat_session_key ? { chat_session_key: args.chat_session_key } : {}),
           ...(args.history_refs?.length ? { history_refs: args.history_refs } : {}),
+          ...(args.clear_anchors ? { clear_anchors: true } : {}),
           ...(args.import_task_refs?.length ? { import_task_refs: args.import_task_refs } : {}),
           ...(args.spreadsheet_selection ? { spreadsheet_selection: args.spreadsheet_selection } : {}),
         }),

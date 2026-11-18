@@ -288,3 +288,9 @@ test("invalid optional UI proposals cannot hide a verified answer or grant execu
     assert.deepEqual(reply.ui_actions, [])
   }
 })
+
+test("follow-up anchor flag survives stream metadata and rejects non-boolean values", () => {
+  const source = { kind: "live", trust: "authoritative", text_snippet: "x", entity_type: "account_move", entity_id: "123", from_anchor: true }
+  assert.equal(assistantAnswerMetadata({ sources: [source] }).sources[0].from_anchor, true)
+  assert.throws(() => assistantAnswerMetadata({ sources: [{ ...source, from_anchor: "yes" }] }), /anchor flag/)
+})

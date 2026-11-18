@@ -30,6 +30,8 @@ export interface ChatMessageSourceRef {
   label?: string
 
   score?: number
+  /** Read this turn through the previous answer's records, not the question itself. */
+  from_anchor?: boolean
   excerpt?: string
   /** In-app route when content/entity type maps to an ERP screen */
   href?: string
@@ -152,6 +154,8 @@ export interface AIChatConfig {
   /** Opens a prepared preview or reauthorizes a saved guide in the host workspace. */
   onOpenGuide?: (request: OpenGuideRequest) => void | Promise<void>
   guideLibraryHref?: string
+  /** Stop carrying the previous answer's records into the next question. */
+  onClearFollowUpAnchors?: () => void
 }
 
 export interface ChatSkill {

@@ -56,6 +56,7 @@ import { extractGuideHtmlDerivative, safeGuideHref } from "../lib/assistant-guid
 import type { GuideReference, OpenGuideRequest } from "../lib/assistant-guide-types"
 import { aiChatCategoryPillClass } from "@/lib/theme-colors"
 import { useTranslation } from "@lumiere/i18n"
+import { followUpAnchorLabels } from "../lib/follow-up-anchors"
 import { chatImportInstructionMode, validateChatImportFiles, type ChatImportInitialMode } from "../lib/chat-import-files"
 import { assistantStarterIds, assistantStarters } from "./assistant-starters"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "../components/select"
@@ -291,6 +292,7 @@ function AIChatConversation({
   onStreamMessage,
 }: AIChatPanelProps) {
   const { t } = useTranslation()
+  const [dismissedAnchorMessages, setDismissedAnchorMessages] = useState<ReadonlySet<string>>(() => new Set())
   const docked = requestedDocked && !modal
   const managedPlacement = workspaceHost !== undefined && !modal
   const [localMessages, setMessages] = useState<LocalChatMessage[]>([])
@@ -1189,6 +1191,37 @@ function AIChatConversation({
                           runId: message.metadata?.runId != null ? String(message.metadata.runId) : undefined,
                         } })} /> : null}
                       </> : null}
+                      {message.role === "assistant" && !provisional && (() => {
+                        const { labels, more } = followUpAnchorLabels(message.sources)
+                        if (labels.length === 0) return null
+                        const dismissed = dismissedAnchorMessages.has(message.id)
+                        const label = labels.join(", ")
+                        return (
+                          <div className="flex w-full max-w-full flex-wrap items-center gap-2 text-xs leading-5 text-muted-foreground" data-testid="follow-up-anchor-note">
+                            <span>
+                              {more > 0
+                                ? t("aiChat.followUp.usingMore", { label, more })
+                                : t("aiChat.followUp.using", { label })}
+                            </span>
+                            {config?.onClearFollowUpAnchors ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="min-h-9 px-2 text-xs"
+                                disabled={dismissed}
+                                aria-label={t("aiChat.followUp.clearLabel")}
+                                onClick={() => {
+                                  config.onClearFollowUpAnchors?.()
+                                  setDismissedAnchorMessages(prev => new Set(prev).add(message.id))
+                                }}
+                              >
+                                {dismissed ? t("aiChat.followUp.cleared") : t("aiChat.followUp.clear")}
+                              </Button>
+                            ) : null}
+                          </div>
+                        )
+                      })()}
                       {message.role === "assistant" && !provisional && message.sources != null && message.sources.length > 0 && (
                         <details className="group w-full max-w-full text-xs leading-5 text-muted-foreground">
                           <summary className="inline-flex min-h-9 cursor-pointer list-none items-center gap-1.5 rounded-md px-1 font-medium text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">

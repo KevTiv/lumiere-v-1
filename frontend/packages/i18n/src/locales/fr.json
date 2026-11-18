@@ -1,5 +1,12 @@
 {
   "aiChat": {
+    "followUp": {
+      "using": "Utilise : {{label}} de votre dernière question",
+      "usingMore": "Utilise : {{label}} et {{more}} autre(s) de votre dernière question",
+      "clear": "Ne plus utiliser",
+      "clearLabel": "Ne plus utiliser les enregistrements précédents pour ma prochaine question",
+      "cleared": "Ne sera pas utilisé ensuite"
+    },
     "draft": {
       "applied": "Appliqué",
       "proposedValue": "Valeur proposée",

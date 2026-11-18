@@ -37,6 +37,10 @@ pub struct RagSource {
     pub passage_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content_hash: Option<String>,
+    /// The record came from the previous answer's anchors, not this question.
+    /// Set only after a fresh authorized read; lets the UI label and clear it.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub from_anchor: bool,
 }
 
 #[cfg(test)]
@@ -109,6 +113,7 @@ pub(super) fn passage_to_ranked(passage: ResolvedPassage) -> RankedSource {
             source_version: Some(passage.source_version),
             passage_key: Some(passage.passage_key),
             content_hash: Some(passage.content_hash),
+            from_anchor: false,
         },
     }
 }

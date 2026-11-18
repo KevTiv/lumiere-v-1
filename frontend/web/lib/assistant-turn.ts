@@ -210,6 +210,7 @@ export function assistantAnswerMetadata(value: unknown): { sources: AiRagSource[
     for (const key of ["entity_type", "entity_id", "source_kind", "source_key", "source_version", "passage_key", "content_hash", "label", "field", "snapshot_at", "url", "fetched_at"] as const) {
       if (source[key] != null && typeof source[key] !== "string") throw new Error("Invalid assistant source field")
     }
+    if (source.from_anchor != null && typeof source.from_anchor !== "boolean") throw new Error("Invalid assistant source anchor flag")
     if (source.score != null && (typeof source.score !== "number" || !Number.isFinite(source.score))) throw new Error("Invalid source score")
     if (source.passage_id != null && (!Number.isSafeInteger(source.passage_id) || source.passage_id <= 0)) throw new Error("Invalid passage identity")
   }
