@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use axum::{
     extract::{Path, Query, State},
+    response::{IntoResponse, Response},
     Json,
 };
 use chrono::NaiveDate;
@@ -20,7 +21,7 @@ pub(super) use reconciliation::exercise_persistence;
 use super::{
     history_period::calendar_date,
     model::{decimal, ReviewItem},
-    scope,
+    rollout_guard, scope,
 };
 use crate::{
     cold_tier::pg_pool,
@@ -521,11 +522,28 @@ fn backfill_customers(rows: Vec<Value>) -> Vec<Value> {
         .collect()
 }
 
+/// Route entry for previews and saves. A paused deployment, or a writer whose
+/// migration catalog differs from the database, answers 503 before any query
+/// that depends on the worksheet-aware schema.
 pub(super) async fn write(
     State(state): State<Arc<AppState>>,
-    OrgSession { session, .. }: OrgSession,
+    session: OrgSession,
     Path(batch): Path<i64>,
     Json(body): Json<WriteBody>,
+) -> Response {
+    if let Some(refusal) = rollout_guard::refusal().await {
+        return refusal.into_response();
+    }
+    write_reviewed(state, session, batch, body)
+        .await
+        .into_response()
+}
+
+async fn write_reviewed(
+    state: Arc<AppState>,
+    OrgSession { session, .. }: OrgSession,
+    batch: i64,
+    body: WriteBody,
 ) -> Result<Json<Value>, ApiError> {
     let ctx = scope(&state, &session, body.company_id).await?;
     let org = ctx.organization_id();

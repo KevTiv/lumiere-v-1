@@ -16735,6 +16735,8 @@
       "shopSalesPreviewUnavailable": "Shop Sales totals could not be verified. Refresh the preview before saving.",
       "shopSalesPreviewCounts": "Preview · {{newCount}} new · {{existingCount}} already present · {{heldCount}} held",
       "shopSalesPreviewAmounts": "{{currency}} {{newAmount}} to create · {{currency}} {{existingAmount}} already present",
+      "importsPaused": "Imports are paused for an update",
+      "importsPausedResume": "Your saved import is kept. Try again when imports resume; rows already saved are matched, not repeated.",
       "cardBoundary": "Source confirmation does not create ERP records. The receipts below describe verified ERP drafts.",
       "cardVerified": "{{records}} verified draft journal entries · {{lines}} lines",
       "cardTotals": "Debit {{debit}} · credit {{credit}} · currency #{{currency}}",
