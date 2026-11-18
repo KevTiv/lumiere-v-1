@@ -11,6 +11,7 @@ mod native_requests;
 #[cfg(test)]
 mod postgres_tests;
 mod recipes;
+pub(crate) mod rollout_guard;
 mod tasks;
 mod workflow;
 

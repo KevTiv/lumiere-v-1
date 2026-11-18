@@ -14,6 +14,7 @@ import {
 import { apiFetch } from "./api-fetch"
 import { chatImportReceiptKey } from "./chat-import-task"
 import { importAmountUnits } from "./import-workflow"
+import { ImportsPausedError, importsPausedFrom } from "./import-write-pause"
 import type {
   ReviewDetail,
   ReviewedRecordOperation,
@@ -203,6 +204,10 @@ function BackfillAction({
             }),
           },
         )
+        if (!response.ok) {
+          const paused = await importsPausedFrom(response)
+          if (paused) throw paused
+        }
         if (!response.ok)
           throw new Error(
             "Could not verify the backfill. Retry to reconcile saved records.",
@@ -412,7 +417,23 @@ function BackfillAction({
           ))}
         </ul>
       ) : null}
-      {write.isError ? <p role="alert">{write.error.message}</p> : null}
+      {write.error instanceof ImportsPausedError ? (
+        <div role="alert" className="space-y-1">
+          <p className="font-medium">
+            {t("settings.importTask.importsPaused", {
+              defaultValue: "Imports are paused for an update",
+            })}
+          </p>
+          <p>
+            {t("settings.importTask.importsPausedResume", {
+              defaultValue:
+                "Your saved import is kept. Try again when imports resume; rows already saved are matched, not repeated.",
+            })}
+          </p>
+        </div>
+      ) : write.isError ? (
+        <p role="alert">{write.error.message}</p>
+      ) : null}
       {write.data && write.variables === false ? (
         <p role="status">
           {saved} saved · {matched} matched existing records · {held.length}{" "}

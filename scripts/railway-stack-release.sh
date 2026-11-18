@@ -25,6 +25,10 @@ Commands:
   publish-stdb SERVICE  Deploy the one-shot publisher and verify its completion marker.
   migrate-storage SERVICE
                          Deploy the one-shot migrator and verify its completion marker.
+  set-import-pause SERVICE on|off
+                         Set LUMIERE_IMPORTS_PAUSED on the API service and wait for its redeploy.
+  verify-catalog NAME=URL VERSION
+                         Require the served readiness report to show migration catalog VERSION.
 
 Required environment:
   RAILWAY_PROJECT_ID, RAILWAY_ENVIRONMENT
@@ -610,6 +614,96 @@ redeploy_storage() {
     "$deployment_id"
 }
 
+# The API server refuses Sales and Warehouse backfill writes with a 503 while
+# LUMIERE_IMPORTS_PAUSED is true. Reuse the environment-scoped patch the source
+# promotion already depends on; a variable change redeploys the service.
+set_import_pause_one() {
+  local service="$1"
+  local state="$2"
+  local value
+  case "$state" in
+    on) value=true ;;
+    off) value=false ;;
+    *) die "set-import-pause requires on or off" ;;
+  esac
+  local service_id snapshot environment_id before_ids edit_result
+  if ! service_id="$(resolve_service_id "$service")" ||
+      ! snapshot="$(existing_service_snapshot "$service_id")" ||
+      ! environment_id="$(jq -er '.environmentId | select(type == "string" and length > 0)' <<<"$snapshot")"; then
+    echo "[railway-release] $service: could not validate the target environment before changing import pause" >&2
+    dump_diagnostics "$service"
+    return 1
+  fi
+  before_ids="$(deployment_list "$service" | jq -c 'map(.id)')"
+  local patch
+  patch="$(jq -cn --arg service_id "$service_id" --arg value "$value" \
+    '{services: {($service_id): {variables: {LUMIERE_IMPORTS_PAUSED: {value: $value}}}}}')"
+
+  echo "[railway-release] $service: setting import pause $state"
+  if ! edit_result="$(printf '%s\n' "$patch" | timeout "$UPLOAD_TIMEOUT_SECONDS" \
+    railway environment edit \
+      --project "$RAILWAY_PROJECT_ID" \
+      --environment "$RAILWAY_ENVIRONMENT" \
+      --message "set import pause $state ($service)" \
+      --json)"; then
+    dump_diagnostics "$service"
+    return 1
+  fi
+  if ! jq -e --arg environment "$environment_id" \
+    '(.committed == true and .staged == true and .environmentId == $environment) or
+     (.committed == false and .staged == false)' \
+    >/dev/null <<<"$edit_result"; then
+    echo "[railway-release] $service: import pause edit returned an invalid result" >&2
+    dump_diagnostics "$service"
+    return 1
+  fi
+  if [[ "$(jq -r '.committed' <<<"$edit_result")" != true ]]; then
+    echo "[railway-release] $service: import pause already $state"
+    return 0
+  fi
+
+  local deployment_id
+  if ! deployment_id="$(wait_for_new_deployment "$service" "$before_ids")"; then
+    echo "[railway-release] $service: import pause edit committed but no new deployment appeared" >&2
+    dump_diagnostics "$service"
+    return 1
+  fi
+  wait_for_terminal_success "$service" "$deployment_id"
+}
+
+# The served readiness report names the migration catalog the running binary
+# was built with. Pause may only be lifted once it is the expected version.
+verify_catalog_one() {
+  local specification="$1"
+  local expected="$2"
+  local name="${specification%%=*}"
+  local url="${specification#*=}"
+  [[ "$name" =~ ^[A-Za-z0-9_-]+$ && "$url" != "$specification" && "$url" =~ ^https?:// ]] || {
+    echo "[railway-release] invalid catalog probe $specification; expected NAME=URL" >&2
+    return 2
+  }
+  [[ "$expected" =~ ^[0-9]+$ ]] || {
+    echo "[railway-release] expected catalog version must be a number" >&2
+    return 2
+  }
+
+  local deadline=$((SECONDS + PROBE_TIMEOUT_SECONDS))
+  local report=""
+  while (( SECONDS < deadline )); do
+    if report="$(curl --silent --connect-timeout "$HTTP_TIMEOUT_SECONDS" \
+        --max-time "$HTTP_TIMEOUT_SECONDS" "$url")" &&
+        jq -e --argjson expected "$expected" '
+          .migrationVersion == $expected and .expectedMigrationVersion == $expected
+        ' >/dev/null <<<"$report"; then
+      echo "[railway-release] $name: serving migration catalog $expected"
+      return 0
+    fi
+    sleep "$POLL_SECONDS"
+  done
+  echo "[railway-release] $name: did not serve migration catalog $expected within ${PROBE_TIMEOUT_SECONDS}s" >&2
+  return 1
+}
+
 promote_publisher() {
   local service="$1"
   : "${STDB_PUBLISHER_IMAGE:?STDB_PUBLISHER_IMAGE is required}"
@@ -665,6 +759,15 @@ main() {
       [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || die "RELEASE_SHA must be a lowercase full commit SHA"
       [[ $# -eq 1 ]] || die "migrate-storage requires exactly one migration service"
       migrate_storage "$1"
+      ;;
+    set-import-pause)
+      [[ $# -eq 2 ]] || die "set-import-pause requires one service and on or off"
+      set_import_pause_one "$1" "$2"
+      ;;
+    verify-catalog)
+      require_command curl
+      [[ $# -eq 2 ]] || die "verify-catalog requires NAME=URL and the expected version"
+      verify_catalog_one "$1" "$2"
       ;;
     redeploy-storage)
       [[ $# -eq 1 ]] || die "redeploy-storage requires exactly one migration service"

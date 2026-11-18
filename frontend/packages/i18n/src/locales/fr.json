@@ -4474,7 +4474,9 @@
       "reviewedInventoryCounts": "Comptages enregistrés",
       "shopSalesPreviewUnavailable": "Les totaux des ventes en boutique n’ont pas pu être vérifiés. Actualisez l’aperçu avant d’enregistrer.",
       "shopSalesPreviewCounts": "Aperçu · {{newCount}} nouvelles · {{existingCount}} déjà présentes · {{heldCount}} en attente",
-      "shopSalesPreviewAmounts": "{{currency}} {{newAmount}} à créer · {{currency}} {{existingAmount}} déjà présents"
+      "shopSalesPreviewAmounts": "{{currency}} {{newAmount}} à créer · {{currency}} {{existingAmount}} déjà présents",
+      "importsPaused": "Les imports sont suspendus pour une mise à jour",
+      "importsPausedResume": "Votre import enregistré est conservé. Réessayez lorsque les imports reprendront ; les lignes déjà enregistrées sont reconnues, pas dupliquées."
     },
     "importWorkflow": {
       "operationExplanation": "Vérifiez les lignes source et les changements proposés avant l’enregistrement. Retrouvez les enregistrements dans Résultats.",

@@ -474,6 +474,13 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: include_str!("module_backfill_provenance_expand.sql"),
     },
+    Migration {
+        version: 52,
+        name: "module_backfill_provenance_contract",
+        change_set: 40,
+        phase: MigrationPhase::Contract,
+        sql: include_str!("module_backfill_provenance_contract.sql"),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
@@ -1799,6 +1806,29 @@ mod tests {
             first_pending_migration(&history, MIGRATIONS).expect("additive future schema is safe"),
             MIGRATIONS.len()
         );
+    }
+
+    #[test]
+    fn module_backfill_provenance_is_split_into_expand_and_contract() {
+        let expand = MIGRATIONS[50];
+        let contract = MIGRATIONS[51];
+        assert_eq!(
+            (expand.version, expand.name),
+            (51, "module_backfill_provenance")
+        );
+        assert_eq!(expand.phase, MigrationPhase::Expand);
+        // The expand step must leave the original constraint for earlier writers.
+        assert!(expand
+            .sql
+            .contains("module_backfill_source_coordinate_unique"));
+        assert!(!expand.sql.contains("drop constraint"));
+        assert_eq!(
+            (contract.version, contract.name),
+            (52, "module_backfill_provenance_contract")
+        );
+        assert_eq!(contract.phase, MigrationPhase::Contract);
+        assert_eq!(contract.change_set, expand.change_set);
+        assert!(contract.sql.contains("drop constraint"));
     }
 
     #[test]

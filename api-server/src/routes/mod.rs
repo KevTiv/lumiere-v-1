@@ -22,6 +22,7 @@ mod history;
 mod import;
 mod import_inspection;
 mod import_reviews;
+pub(crate) use import_reviews::rollout_guard::verify_at_startup as verify_import_writer_schema;
 mod inventory;
 mod knowledge_guides;
 mod mail;

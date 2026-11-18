@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use axum::{
     extract::{Path, Query, State},
+    response::{IntoResponse, Response},
     Json,
 };
 use chrono::NaiveDate;
@@ -20,7 +21,7 @@ pub(super) use reconciliation::exercise_persistence;
 use super::{
     history_period::calendar_date,
     model::{decimal, ReviewItem},
-    scope,
+    rollout_guard, scope,
 };
 use crate::{
     cold_tier::pg_pool,
@@ -521,11 +522,28 @@ fn backfill_customers(rows: Vec<Value>) -> Vec<Value> {
         .collect()
 }
 
+/// Route entry for previews and saves. A paused deployment, or a writer whose
+/// migration catalog differs from the database, answers 503 before any query
+/// that depends on the worksheet-aware schema.
 pub(super) async fn write(
     State(state): State<Arc<AppState>>,
-    OrgSession { session, .. }: OrgSession,
+    session: OrgSession,
     Path(batch): Path<i64>,
     Json(body): Json<WriteBody>,
+) -> Response {
+    if let Some(refusal) = rollout_guard::refusal().await {
+        return refusal.into_response();
+    }
+    write_reviewed(state, session, batch, body)
+        .await
+        .into_response()
+}
+
+async fn write_reviewed(
+    state: Arc<AppState>,
+    OrgSession { session, .. }: OrgSession,
+    batch: i64,
+    body: WriteBody,
 ) -> Result<Json<Value>, ApiError> {
     let ctx = scope(&state, &session, body.company_id).await?;
     let org = ctx.organization_id();
@@ -660,14 +678,14 @@ pub(super) async fn write(
             continue;
         }
         let key = row.business_key()?;
-        let mut existing = row.existing(&tx, &key).await?;
+        let mut existing = row.settled(&tx, &key).await?;
         let mut saved_id = None;
         if !body.preview && matches!(existing, Existing::None) {
             saved_id = row
                 .save(&tx, batch, id, revision, ctx.actor_identity(), &key)
                 .await?;
             if saved_id.is_none() {
-                existing = row.existing(&tx, &key).await?;
+                existing = row.settled(&tx, &key).await?;
             }
         }
         let saved = match existing {
@@ -675,6 +693,12 @@ pub(super) async fn write(
             Existing::Matched(saved) => Some(saved),
             Existing::Held(reason) => {
                 results.push(json!({"itemId":id.to_string(),"status":"held","reason":reason}));
+                continue;
+            }
+            Existing::PendingContract => {
+                results.push(json!({"itemId":id.to_string(),"status":"held",
+                    "reason":reconciliation::PENDING_CONTRACT_REASON,
+                    "code":reconciliation::PENDING_CONTRACT_CODE}));
                 continue;
             }
             Existing::Conflict(reason) => {
