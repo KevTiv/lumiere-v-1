@@ -45,13 +45,19 @@ are recorded here.
 - `pnpm --dir web exec tsx --test lib/assistant-history.test.ts lib/assistant-turn.test.ts`
   (Node 22.23.5): 33 passed.
 - `node --test scripts/withheld-run-candidates.test.mjs`: passed.
-- Not compiled locally: `spacetimedb` module, `ai-gateway` (lumiere-contracts OOMs
-  in this environment). CI is the first compile. Reducer tests (eligibility, ID
-  bounds, operator-check ordering) are written but not run.
+- Cloud Runner: the changed-file SpacetimeDB rustfmt check passed, and all three
+  `withheld_run_correction` module tests passed (eligibility, ID bounds, and
+  authorization before mutation).
+- The CI-built WASM was loaded into a disposable loopback instance with
+  SpacetimeDB 2.8.2. Its schema includes the correction reducer; the authored
+  operation ID and classification checks passed, and both history inventory
+  verifiers passed. The reducer remains unavailable to sessions.
 - Not run: the operator call itself and the dry run against any live database.
 
 ## Rollout
 
-New reducer: contracts regenerate/release and pin required. Hand edit:
-`lumiere-codegen/reducer-exposure.json` (`denied`). Run the dry run, review with
-Kevin, then call the reducer per company as the operator.
+New reducer: contracts regenerate/release and pin required. The authored
+contract registers `erp.correct_withheld_ai_agent_runs` as internal,
+non-client-facing, and `denied` to sessions. No generated bindings were
+hand-edited. Run the dry run, review with Kevin, then call the reducer per
+company as the operator.

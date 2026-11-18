@@ -249,6 +249,7 @@
     "convert_proposal_to_sale_order": "erp.convert_proposal_to_sale_order",
     "convert_purchase_requisition_to_po": "erp.convert_purchase_requisition_to_po",
     "correct_ai_decision_case": "erp.correct_ai_decision_case",
+    "correct_withheld_ai_agent_runs": "erp.correct_withheld_ai_agent_runs",
     "create_account_account": "erp.create_account_account",
     "create_account_account_type": "erp.create_account_account_type",
     "create_account_asset": "erp.create_account_asset",
