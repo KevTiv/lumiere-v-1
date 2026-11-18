@@ -320,10 +320,9 @@ impl GatedTextAnswer {
 
     /// What to show in place of a withheld candidate.
     pub fn withheld_notice(&self) -> String {
-        match &self.verification.reason {
-            Some(reason) => format!("This answer could not be verified and was withheld: {reason}"),
-            None => "This answer could not be verified and was withheld.".to_string(),
-        }
+        lumiere_policy_core::withheld_answer::withheld_answer_notice(
+            self.verification.reason.as_deref(),
+        )
     }
 }
 

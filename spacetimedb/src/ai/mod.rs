@@ -46,6 +46,7 @@ pub mod spend;
 pub mod spend_reads;
 pub mod work_program_learning;
 pub mod work_programs;
+pub mod withheld_run_correction;
 pub mod workflow_provenance;
 
 pub use action_drafts::*;

@@ -455,7 +455,7 @@ pub(crate) struct RagRelease {
 
 impl RagRelease {
     fn withhold(&mut self, reason: &'static str) {
-        self.answer = format!("This answer could not be verified and was withheld: {reason}");
+        self.answer = lumiere_policy_core::withheld_answer::withheld_answer_notice(Some(reason));
         self.verification.outcome =
             crate::orchestrator::text_answer_gate::TextAnswerOutcome::RequiresReview;
         self.verification.reason = Some(reason.to_string());

@@ -4,6 +4,7 @@ pub mod additional_tenant;
 pub mod ai_skills;
 pub mod expense_allocations;
 pub mod skill_projection;
+pub mod withheld_answer;
 
 /// Reserved non-interactive operator namespace, including future versions.
 pub const PERSISTENT_PLATFORM_OPERATOR_METADATA_PREFIX: &str = "persistent_platform_operator_";
