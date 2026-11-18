@@ -10,7 +10,7 @@ import {
   useAiChatSessions,
   type AiChatReadScope,
 } from "@lumiere/query-hooks/hooks/ai-memory"
-import { assistantHistoryScope, rememberAssistantSession, scopedAssistantSession } from "./assistant-history"
+import { assistantHistoryScope, reclassifyWithheldHistoryRow, rememberAssistantSession, scopedAssistantSession } from "./assistant-history"
 
 const THREAD_PARAM = "assistantThread"
 const MESSAGE_PARAM = "assistantMessage"
@@ -145,9 +145,9 @@ export function useAssistantChatHistory(
 
   const messageRows = useMemo(() => {
     if (unavailable) return []
-    const rows = messages.data?.pages.slice().reverse().flatMap(page => page.data) ?? []
+    const rows = (messages.data?.pages.slice().reverse().flatMap(page => page.data) ?? []).map(reclassifyWithheldHistoryRow)
     return !anchor.isError && anchor.data && !rows.some(row => String(row.id) === String(anchor.data?.id))
-      ? [anchor.data, ...rows]
+      ? [reclassifyWithheldHistoryRow(anchor.data), ...rows]
       : rows
   }, [messages.data, anchor.data, anchor.isError, unavailable])
 

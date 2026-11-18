@@ -10,6 +10,7 @@ mod orchestrator;
 mod providers;
 mod qdrant_client;
 mod rate_limit;
+mod reindex;
 mod retrieval_policy;
 mod rig_agent;
 mod routes;
@@ -104,6 +105,10 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
     let _ = dotenvy::dotenv();
+
+    if std::env::args().nth(1).as_deref() == Some("reindex-company") {
+        return reindex::run_from_env(std::env::args().skip(2)).await;
+    }
 
     #[cfg(feature = "phase4-acceptance")]
     if std::env::args().nth(1).as_deref() == Some("phase4-restart-probe") {
@@ -280,6 +285,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/import/preview", post(routes::import::post_preview))
         .route("/v1/context/search", post(routes::context::post_search))
         .route("/v1/context/ingest", post(routes::context::post_ingest))
+        .route(
+            "/v1/context/index-jobs/drain",
+            post(context_worker::post_drain),
+        )
+        .route("/v1/context/coverage", post(routes::context::post_coverage))
         .route(
             "/v1/documents/ocr",
             post(routes::ocr::post_ocr).layer(DefaultBodyLimit::max(14 * 1024 * 1024)),

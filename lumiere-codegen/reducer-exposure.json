@@ -521,6 +521,11 @@
       "reason": "AI Skills UI action guarded by reducer-side write permission and organization/company ownership checks"
     },
     {
+      "name": "correct_withheld_ai_agent_runs",
+      "exposure": "denied",
+      "reason": "Platform-operator-only maintenance (AIH-35); reclassifies completed runs whose recorded summary is a withheld notice, with a per-run audit event; not callable by sessions"
+    },
+    {
       "name": "cancel_ai_embedding_job",
       "exposure": "denied",
       "reason": "Private embedding-runtime recovery; exact active AI writer and current worker/token/revision proof, no generic queue grant or financial settlement"

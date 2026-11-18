@@ -5,6 +5,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
 import { sanitizeRagUiContext } from "@lumiere/erp-shared/ai-ui-context"
+import { parseChatAttachments, type AiChatAttachment } from "@lumiere/erp-shared/ai-chat-attachments"
 import type { ApiSession } from "@/lib/api-session"
 import { serverFarmOperationsEnabled } from "@/lib/server-farm-operations"
 
@@ -137,6 +138,7 @@ export interface RagPayload extends RagAgentSelection {
   ui_context?: unknown
   guide_refs?: RagGuideReference[]
   import_task_refs?: RagImportTaskReference[]
+  attachments?: AiChatAttachment[]
   chat_session_key?: string
   history_refs?: AssistantHistoryReference[]
   /** Narrowing only: skip the previous answer's records for this question. */
@@ -180,10 +182,12 @@ export async function prepareRagPayload(params: {
   const companyId = positiveInteger(body.companyId ?? body.company_id)
   let guideRefs: RagGuideReference[] | undefined
   let importTaskRefs: RagImportTaskReference[] | undefined
+  let attachments: AiChatAttachment[]
   let historyRefs: AssistantHistoryReference[] | undefined
   let sessionKey: string | undefined
   let agentSelection: RagAgentSelection
   try {
+    attachments = parseChatAttachments(body.attachments)
     guideRefs = parseRagGuideReferences(body.guide_refs)
     importTaskRefs = parseRagImportTaskReferences(
       body.import_task_refs,
@@ -211,6 +215,7 @@ export async function prepareRagPayload(params: {
   if (body.spreadsheet_selection !== undefined) {
     const selection = spreadsheetSelection.safeParse(body.spreadsheet_selection)
     if (
+      attachments.length > 0 ||
       !selection.success || sessionKey !== undefined || historyRefs !== undefined ||
       ![
         "Explain the selected spreadsheet cells.",
@@ -263,6 +268,7 @@ export async function prepareRagPayload(params: {
   if (ui_context) payload.ui_context = ui_context
   if (guideRefs) payload.guide_refs = guideRefs
   if (importTaskRefs) payload.import_task_refs = importTaskRefs
+  if (attachments.length) payload.attachments = attachments
   if (sessionKey) payload.chat_session_key = sessionKey
   if (historyRefs) payload.history_refs = historyRefs
   if (sessionKey && body.clear_anchors === true) payload.clear_anchors = true

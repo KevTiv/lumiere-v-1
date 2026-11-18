@@ -63,10 +63,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGr
 import { ActionSkillList } from "./action-skill-list"
 import { matchingChatSkills, slashSkillToken } from "../lib/chat-skill-search"
 import { WorkspaceToolSurface } from "../pages/workspace-tool-surface"
+import { CHAT_FILE_ACCEPT, CHAT_FILE_LIMIT, isChatAttachmentFile } from "@lumiere/erp-shared/ai-chat-attachments"
 import { ChatAnswerMarkdown } from "./chat-answer-markdown"
 
 interface ChatReply {
   content: string
+  attachmentsConsumed?: boolean
   stopped?: boolean
   recoveryPath?: ChatMessage["recoveryPath"]
   runId?: number
@@ -168,7 +170,9 @@ interface AIChatPanelProps {
   /** History persistence is separate from obtaining an answer or executing an action. */
   historySaveFailed?: boolean
   /** When set, user messages are answered via this hook (e.g. BFF → ai-gateway RAG). */
-  onSendMessage?: (userText: string, turnId?: string) => Promise<ChatReply>
+  onSendMessage?: (userText: string, turnId?: string, files?: readonly File[]) => Promise<ChatReply>
+  /** Opt in only when the host sends text-file contents to the answer route. */
+  enableChatAttachments?: boolean
   /** File intake can use an explicit draft instruction without sending or replacing it. */
   onImportFiles?: (files: File[], initialMode?: ChatImportInitialMode) => Promise<void>
   /** Server-backed task cards are owned by the host, separately from text replies. */
@@ -189,6 +193,7 @@ interface AIChatPanelProps {
       onSources: (sources: ChatMessageSourceRef[]) => void
       onActions?: (actions: ChatAction[]) => void
     },
+    files?: readonly File[],
   ) => Promise<ChatReply>
 }
 
@@ -280,6 +285,7 @@ function AIChatConversation({
   modal = false,
   historySaveFailed,
   onSendMessage,
+  enableChatAttachments = false,
   onImportFiles,
   importTaskContent,
   renderImportTask,
@@ -329,13 +335,14 @@ function AIChatConversation({
   const [activeSkillId, setActiveSkillId] = useState("draft")
   const pendingCaret = useRef<number | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const sendAttempt = useRef<object | null>(null)
   const [streamingTurnId, setStreamingTurnId] = useState<string | null>(null)
   const [stopping, setStopping] = useState(false)
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [guideError, setGuideError] = useState<string | null>(null)
   const fileImportEnabled = config?.enableFileUpload === true && onImportFiles != null && !readOnly
-  const fileScope = JSON.stringify([importScopeKey, context?.currentUser, context?.companyId, fileImportEnabled])
+  const fileScope = JSON.stringify([importScopeKey, context?.currentUser, context?.companyId, fileImportEnabled, enableChatAttachments])
   const currentFileScope = useRef(fileScope)
   currentFileScope.current = fileScope
   const [fileImport, setFileImport] = useState<{ scope: string; busy: boolean; error?: string }>({ scope: fileScope, busy: false })
@@ -344,12 +351,19 @@ function AIChatConversation({
   const fileDragDepth = useRef(0)
   const fileImportBusy = fileImport.scope === fileScope && fileImport.busy
   const fileImportError = fileImport.scope === fileScope ? fileImport.error : undefined
+  const [attachmentDraft, setAttachmentDraft] = useState<{ scope: string; files: File[] }>({ scope: fileScope, files: [] })
+  const attachmentFiles = attachmentDraft.scope === fileScope && enableChatAttachments ? attachmentDraft.files : []
+  const [attachmentError, setAttachmentError] = useState<string | null>(null)
   useEffect(() => {
     fileDragDepth.current = 0
     fileImportAttempt.current = null
     setDraggingFiles(false)
     setFileImport({ scope: fileScope, busy: false })
-  }, [fileScope])
+    setAttachmentDraft({ scope: fileScope, files: [] })
+    setAttachmentError(null)
+    sendAttempt.current = null
+    setIsLoading(false)
+  }, [fileScope, enableChatAttachments])
   const active = useRef(true)
   useEffect(() => {
     active.current = true
@@ -638,15 +652,29 @@ function AIChatConversation({
   }
 
   const handleSend = async () => {
-    if (readOnly || history?.loading || (!input.trim() && selectedSkills.length === 0) || isLoading || sendPending || slash) return
+    if (readOnly || history?.loading || (!input.trim() && selectedSkills.length === 0) || isLoading || sendPending || sendAttempt.current || slash) return
     const submittedInput = input
     const turnId = crypto.randomUUID()
+    const submittedFiles = attachmentFiles
+    const submittedScope = fileScope
+    const attempt = {}
+    sendAttempt.current = attempt
+    const isCurrentSubmission = () => active.current && currentFileScope.current === submittedScope && sendAttempt.current === attempt
+    const finishAttachments = (reply: ChatReply) => {
+      if (!isCurrentSubmission()) return
+      if (reply.attachmentsConsumed === false || reply.stopped) {
+        setInput(current => current === "" ? submittedInput : current)
+      } else {
+        setAttachmentDraft({ scope: submittedScope, files: [] })
+      }
+    }
 
     const userMessage: ChatMessage = {
       id: `${turnId}:user`,
       metadata: { turnId },
       role: "user",
       content: [input.trim(), ...selectedSkills.map(skill => skill.prompt)].filter(Boolean).join("\n\n"),
+      attachmentNames: submittedFiles.length ? submittedFiles.map(file => file.name) : undefined,
       timestamp: new Date(),
     }
 
@@ -681,10 +709,10 @@ function AIChatConversation({
           },
         ])
 
-        const reply = await onStreamMessage(userMessage.content, {
+        const handlers = {
           turnId,
-          onDelta: (delta) => {
-            if (!active.current) return
+          onDelta: (delta: string) => {
+            if (!isCurrentSubmission()) return
             streamedContent += delta
             if (streamFrame !== undefined) return
             streamFrame = requestAnimationFrame(() => {
@@ -696,13 +724,20 @@ function AIChatConversation({
               ))
             })
           },
-          onSources: (sources) => {
+          onSources: (sources: ChatMessageSourceRef[]) => {
+            if (!isCurrentSubmission()) return
             streamedSources = sources
           },
-          onActions: (actions) => {
+          onActions: (actions: ChatAction[]) => {
+            if (!isCurrentSubmission()) return
             streamedActions = actions
           },
-        })
+        }
+        const reply = submittedFiles.length
+          ? await onStreamMessage(userMessage.content, handlers, submittedFiles)
+          : await onStreamMessage(userMessage.content, handlers)
+        if (!isCurrentSubmission()) return
+        finishAttachments(reply)
         if (reply.stopped) {
           if (active.current || draft) setInput((current) => current === "" ? submittedInput : current)
           if (active.current) {
@@ -712,7 +747,6 @@ function AIChatConversation({
           }
           return
         }
-        if (!active.current) return
         setEarlierContextUnavailable(Boolean(reply.earlierContextUnavailable))
         const t1 = typeof performance !== "undefined" ? performance.now() : Date.now()
         assistantMessage = {
@@ -748,10 +782,13 @@ function AIChatConversation({
         )
         return
       } else if (onSendMessage) {
-        const reply = await (conversationKey
-          ? onSendMessage(userMessage.content, turnId)
-          : onSendMessage(userMessage.content))
-        if (!active.current) return
+        const reply = submittedFiles.length
+          ? await onSendMessage(userMessage.content, turnId, submittedFiles)
+          : await (conversationKey
+            ? onSendMessage(userMessage.content, turnId)
+            : onSendMessage(userMessage.content))
+        if (!isCurrentSubmission()) return
+        finishAttachments(reply)
         setEarlierContextUnavailable(Boolean(reply.earlierContextUnavailable))
         const t1 = typeof performance !== "undefined" ? performance.now() : Date.now()
         assistantMessage = {
@@ -781,11 +818,11 @@ function AIChatConversation({
         }
       }
 
-      if (!active.current) return
+      if (!isCurrentSubmission()) return
       setMessages((prev) => [...prev, assistantMessage])
     } catch (err) {
       if (active.current || draft) setInput((current) => current === "" ? submittedInput : current)
-      if (!active.current) return
+      if (!isCurrentSubmission()) return
       const msg = err instanceof Error ? err.message : String(err)
       setSendError(msg)
       setMessages((prev) => [...prev.filter(message => message.metadata?.turnId !== turnId), {
@@ -797,11 +834,12 @@ function AIChatConversation({
       }])
     } finally {
       if (streamFrame !== undefined) cancelAnimationFrame(streamFrame)
-      if (active.current) {
+      if (isCurrentSubmission()) {
         setIsLoading(false)
         setStreamingTurnId(null)
         setStopping(false)
       }
+      if (sendAttempt.current === attempt) sendAttempt.current = null
     }
   }
 
@@ -1149,6 +1187,7 @@ function AIChatConversation({
                             ? <ChatAnswerMarkdown content={message.content} />
                             : <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.content}</p>
                         ) : null}
+                        {message.attachmentNames?.length ? <ChatFileNames names={message.attachmentNames} /> : null}
                         {message.stopped ? (
                           <p role="status" className="mt-2 text-xs font-medium text-muted-foreground">
                             {message.content
@@ -1491,19 +1530,51 @@ function AIChatConversation({
               </a>
             ) : null}
           </div>
-          {config?.enableFileUpload ? (
+          {config?.enableFileUpload || enableChatAttachments ? (
             <div id={filesId} hidden={!showFiles} className="mb-3 max-h-[30dvh] space-y-2 overflow-y-auto rounded-lg border bg-card p-3">
-              <ChatFileNames names={importFileNames} />
-              <FileUploadField
-                multiple
-                accept=".csv,.xlsx"
-                data-testid="erp-ai-chat-file-input"
-                chooseTestId="erp-ai-chat-attach"
-                disabled={!fileImportEnabled || fileImportBusy}
-                aria-label={t("aiChat.import.chooseFiles", { defaultValue: "Choose import files" })}
-                chooseLabel={t("aiChat.workspace.addFiles")}
-                onSelect={(files) => void handleImportFiles(files)}
-              />
+              {enableChatAttachments ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-muted-foreground">{t("aiChat.attachments.help")}</p>
+                  <FileUploadField multiple accept={CHAT_FILE_ACCEPT}
+                    data-testid="erp-ai-chat-context-file-input"
+                    chooseTestId="erp-ai-chat-attach-context"
+                    disabled={isLoading}
+                    aria-label={t("aiChat.attachments.choose")}
+                    chooseLabel={t("aiChat.attachments.choose")}
+                    files={attachmentFiles.map((file, index) => ({ id: String(index), name: file.name, size: file.size }))}
+                    onRemove={(id) => {
+                      setAttachmentError(null)
+                      setAttachmentDraft({ scope: fileScope, files: attachmentFiles.filter((_, index) => String(index) !== id) })
+                    }}
+                    removeLabel={(name) => t("aiChat.attachments.remove", { name })}
+                    error={attachmentError ?? undefined}
+                    onSelect={(files) => {
+                      const next = [...attachmentFiles, ...files]
+                      if (next.length > CHAT_FILE_LIMIT || next.some(file => !isChatAttachmentFile(file.name, file.size))) {
+                        setAttachmentError(t("aiChat.attachments.invalid"))
+                        return
+                      }
+                      setAttachmentError(null)
+                      setAttachmentDraft({ scope: fileScope, files: next })
+                    }}
+                  />
+                </div>
+              ) : null}
+              {config?.enableFileUpload ? (
+                <>
+                  <ChatFileNames names={importFileNames} />
+                  <FileUploadField
+                    multiple
+                    accept=".csv,.xlsx"
+                    data-testid="erp-ai-chat-file-input"
+                    chooseTestId="erp-ai-chat-attach"
+                    disabled={!fileImportEnabled || fileImportBusy}
+                    aria-label={t("aiChat.import.chooseFiles", { defaultValue: "Choose import files" })}
+                    chooseLabel={t("aiChat.workspace.addFiles")}
+                    onSelect={(files) => void handleImportFiles(files)}
+                  />
+                </>
+              ) : null}
             </div>
           ) : null}
           {fileImportError ? <p role="alert" className="mx-auto mb-2 max-w-[790px] break-words text-sm text-destructive">{fileImportError}</p> : null}
@@ -1638,7 +1709,7 @@ function AIChatConversation({
               </Select>
             </div>
           ) : null}
-            {config?.enableFileUpload ? (
+            {config?.enableFileUpload || enableChatAttachments ? (
               <Button variant="ghost" size="sm" className="h-9 gap-1.5 px-2 text-xs"
                 aria-controls={filesId} aria-expanded={showFiles}
                 onClick={() => {
@@ -1647,7 +1718,7 @@ function AIChatConversation({
                 }}>
                 <Files className="size-4 text-muted-foreground" aria-hidden="true" />
                 {t("aiChat.workspace.files")}
-                {importFileNames?.length ? <span>{importFileNames.length}</span> : null}
+                {(importFileNames?.length ?? 0) + attachmentFiles.length > 0 ? <span>{(importFileNames?.length ?? 0) + attachmentFiles.length}</span> : null}
               </Button>
             ) : null}
             <Button variant="ghost" size="sm" className="h-9 gap-1.5 px-2 text-xs"

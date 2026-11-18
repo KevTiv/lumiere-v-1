@@ -1,3 +1,5 @@
+> Superseded for repository-owned skills by [skill ownership and lifecycle](../plan/skill-ownership-and-lifecycle.md) (2026-11-17). Historical record only for those steps.
+
 # SME ERP Feature Gap Plan
 
 ## Scope

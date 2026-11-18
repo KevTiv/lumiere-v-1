@@ -56,6 +56,8 @@ export interface ChatMessage {
   guides?: GuideReference[]
   /** Fresh, deterministic server status cards; never restored as current from chat text. */
   importTasks?: ChatImportTaskStatus[]
+  /** Display names only; attachment contents are scoped to the submitted turn. */
+  attachmentNames?: string[]
   /** Saved selectors whose current status must be checked by the import workspace. */
   importTaskIds?: string[]
   metadata?: {

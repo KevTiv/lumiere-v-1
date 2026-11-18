@@ -759,3 +759,10 @@ spacetime logs <module-name>
 12. **DO NOT edit generated bindings** — regenerate with `spacetime generate`
 13. **Identity to String needs `.to_string()`** — `identity.to_hex().to_string()`
 14. **Client SDK is blocking** — use `spawn_blocking` or dedicated thread if mixing with async runtimes
+
+# Skills and certification
+
+- Repository-owned skills (`erp-skills/`) ship with the application. See `docs/plan/skill-ownership-and-lifecycle.md`.
+- Do not certify, activate, or promote them, and do not refresh manifests or bump built-in skill versions.
+- `scripts/finance-skill-manifests.py` and built-in proposed manifests were removed; older plans that require them are superseded.
+- Only user-created skills (`json_projection_v1`) use the certification and activation lifecycle.

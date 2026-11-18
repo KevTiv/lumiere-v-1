@@ -40,6 +40,9 @@ Priority: UI record, record named in the question, anchors, ANN hits.
   version 1. Its assertion now requires version 2 and verifies that ungrounded
   and fresh threads have no anchors. CI and E2E use the shared HTTPS Chromium
   installer to avoid the regional Ubuntu archive that stalled smoke setup.
+- Reconciled with `main` at #448: the chat request keeps both text attachments
+  and `clear_anchors`, and English retains both sets of labels. The catalog and
+  i18n checks passed; 34 web chat tests and three anchor UI tests passed.
 
 ## Not validated
 

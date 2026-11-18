@@ -6,6 +6,7 @@ description = "SpacetimeDB HTTP client (SQL + reducers) with SATS-JSON row parsi
 
 [dependencies]
 anyhow.workspace = true
+lumiere-policy-core.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -86,6 +86,7 @@ import {
   parseStoredAssistantRecovery, readAssistantStream, withAssistantRecoveryMetadata, type AssistantTurnFailure,
 } from "@/lib/assistant-turn"
 import { i18n } from "@lumiere/i18n"
+import { readChatAttachments, readStoredChatAttachmentNames } from "@/lib/ai-chat-attachments"
 import { assistantHistoryScope, saveAssistantHistory } from "@/lib/assistant-history"
 import { assistantHistoryLink, useAssistantChatHistory } from "@/lib/use-assistant-chat-history"
 import { useAssistantHistoryReferences } from "@/lib/use-assistant-history-references"
@@ -377,6 +378,7 @@ function ErpAiChatPanel({
               ? row.role
               : "assistant",
           content: row.content,
+          attachmentNames: readStoredChatAttachmentNames(row.metadata),
           timestamp: dateFromStored(row.createDate ?? row.create_date),
           sources,
           actions: [...(parseStoredChatActions(row.metadata) ?? []), ...parseNativeChatActions(row.metadata, actionScope)] as ChatAction[],
@@ -424,6 +426,7 @@ function ErpAiChatPanel({
   const persistExchange = useCallback(
     async (args: {
       userText: string
+      attachmentNames?: string[]
       assistantText: string
       turnId: string
       historyRefs?: readonly AiChatHistoryReference[]
@@ -451,7 +454,7 @@ function ErpAiChatPanel({
           role: "user",
           content: args.userText,
           ui_context_json: JSON.stringify(args.uiContext ?? null),
-          metadata: JSON.stringify({ turnId: args.turnId, ...(args.historyRefs?.length ? { historyRefs: args.historyRefs } : {}) }),
+          metadata: JSON.stringify({ turnId: args.turnId, ...(args.attachmentNames?.length ? { attachmentNames: args.attachmentNames } : {}), ...(args.historyRefs?.length ? { historyRefs: args.historyRefs } : {}) }),
         }) },
         appendAssistant: async () => { await appendMessage.mutateAsync({
           session_key: sessionKey,
@@ -681,6 +684,7 @@ function ErpAiChatPanel({
       questionGuide?: GuideDraft,
       hasUnsavedGuideEdits = false,
       turnId: string = crypto.randomUUID(),
+      files: readonly File[] = [],
     ) => {
       if (!orgReady || operatingCompanyId == null || operatingCompanyId <= 0) {
         return {
@@ -688,6 +692,7 @@ function ErpAiChatPanel({
             ? i18n.t("aiChat.turn.loadingCompany")
             : i18n.t("aiChat.turn.companyRequired"),
           sources: [] as ChatMessageSourceRef[],
+          attachmentsConsumed: false,
         }
       }
       if (!sessionKey || !actorHistoryScope || history.archived || !availableHistory) throw new Error("Open an active conversation before sending.")
@@ -703,6 +708,9 @@ function ErpAiChatPanel({
         return persistExchange({ ...turnMeta, ...args })
       }
       const started = performance.now()
+      const attachments = await readChatAttachments(files)
+      if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[], attachmentsConsumed: false }
+      const attachmentNames = attachments.length ? attachments.map(file => file.name) : undefined
       const continuity = {
         chat_session_key: sessionKey,
         history_refs: selectedReferences?.length ? [...selectedReferences] : undefined,
@@ -714,6 +722,7 @@ function ErpAiChatPanel({
         ? scopedSelectionDraft
         : null
       if (selectedDocument) {
+        if (attachments.length) throw new Error("Ask about text attachments separately from a managed spreadsheet selection.")
         if (!documentSelectionMatchesScope(selectedDocument.selection, orgId, operatingCompanyId)) {
           throw new Error("The company changed. Reopen the file before asking.")
         }
@@ -753,7 +762,8 @@ function ErpAiChatPanel({
         ? [{ taskId: focusedImport.requestId, companyId: focusedImport.companyId }]
         : undefined
       const importTaskIds = importTaskRefs?.map(reference => reference.taskId)
-      const supportRecord = !questionGuide && !selectedReferences?.length && identity
+      const useDirectReads = !attachments.length && !questionGuide && !selectedReferences?.length
+      const supportRecord = useDirectReads && identity
         ? parseAssistantSupportRecord(userText)
         : undefined
       if (supportRecord && identity) {
@@ -765,7 +775,7 @@ function ErpAiChatPanel({
         await saveReply({ userText, assistantText: result.content, sources: result.sources, uiContext })
         return result
       }
-      const domainRead = !questionGuide && !selectedReferences?.length
+      const domainRead = useDirectReads
         ? parseAssistantDomainRead(userText, { farmEnabled: farmOperationsEnabled })
         : undefined
       if (domainRead) {
@@ -776,7 +786,7 @@ function ErpAiChatPanel({
         await saveReply({ userText, assistantText: result.content, sources: result.sources, uiContext })
         return result
       }
-      const farmComparison = !questionGuide && !selectedReferences?.length
+      const farmComparison = useDirectReads
         ? parseFarmComparisonRequest(userText)
         : undefined
       if (farmComparison && farmOperationsEnabled) {
@@ -793,7 +803,7 @@ function ErpAiChatPanel({
         await saveReply({ userText, assistantText: content, sources: [], uiContext })
         return { content, sources: [] as ChatMessageSourceRef[] }
       }
-      let presentationResolution = !questionGuide && !selectedReferences?.length && !isAssistantErrorQuestion(userText) && actionScope
+      let presentationResolution = !attachments.length && !questionGuide && !selectedReferences?.length && !isAssistantErrorQuestion(userText) && actionScope
         ? resolveAssistantActionRequest(userText, {
           scope: actionScope,
           module: workspaceScope.usesCurrentPage ? module : workspaceScope.pathname.split("/")[1],
@@ -823,7 +833,8 @@ function ErpAiChatPanel({
         await saveReply({ userText, assistantText: presentation.content, sources: presentation.sources, uiContext, actions: presentation.actions })
         return presentation
       }
-      const prepareDrafts = !questionGuide && !selectedReferences?.length && !isAssistantErrorQuestion(userText) && looksLikeActionDraftRequest(userText)
+      // File contents are answer context, not a source for the separate draft writer.
+      const prepareDrafts = !attachments.length && !questionGuide && !selectedReferences?.length && !isAssistantErrorQuestion(userText) && looksLikeActionDraftRequest(userText)
       let answerFinished = false
       const turn = await coordinateAssistantTurn({
         isCurrent,
@@ -839,6 +850,7 @@ function ErpAiChatPanel({
               ...continuity,
               signal,
               include_types: includeTypes, ui_context: uiContext, guide_refs: guideRefs, import_task_refs: importTaskRefs,
+              attachments,
               ...(requestedAgentId ? { agent_id: requestedAgentId } : {}),
             }))
             const response = await fetch("/api/ai/rag/stream", {
@@ -853,6 +865,7 @@ function ErpAiChatPanel({
                 ...(uiContext ? { ui_context: uiContext } : {}),
                 ...(guideRefs?.length ? { guide_refs: guideRefs } : {}),
                 ...(importTaskRefs?.length ? { import_task_refs: importTaskRefs } : {}),
+                ...(attachments.length ? { attachments } : {}),
               }),
             })
             // A missing reply does not establish the gateway outcome, so do not redispatch.
@@ -873,7 +886,7 @@ function ErpAiChatPanel({
           }
         } : undefined,
       })
-      if ("kind" in turn) return { content: "", sources: [] as ChatMessageSourceRef[] }
+      if ("kind" in turn) return { content: "", sources: [] as ChatMessageSourceRef[], attachmentsConsumed: false }
       const out = turn.answer.kind === "ready" ? turn.answer.value : undefined
       const sources = (out?.sources ?? []).map(mapRagSourceToChatSource)
       if (sources.length > 0) clearFollowUpAnchors.current = null
@@ -902,18 +915,18 @@ function ErpAiChatPanel({
       const recoveryPath = answerRecovery?.recoveryPath ?? draftRecovery?.recoveryPath
       const content = parts.join("\n\n")
       await saveReply({
-        userText, assistantText: content, sources, uiContext, guides, importTaskIds,
+        userText, attachmentNames, assistantText: content, sources, uiContext, guides, importTaskIds,
         earlierContextUnavailable: out?.earlierContextUnavailable,
         durationMs: Math.round(performance.now() - started), model: out?.model ?? null,
         actions: actions.length ? actions : undefined, runId: out?.run_id, recoveryPath,
         verification: out?.verification,
       })
       if (out && selectedReferences?.length && isCurrent()) clearReferences(sessionKey)
-      return { content, runId: out?.run_id, sources, guides, recoveryPath, importTaskIds, importTasks: taskStatuses, actions: actions.length ? actions : undefined, earlierContextUnavailable: out?.earlierContextUnavailable }
+      return { content, attachmentsConsumed: turn.answer.kind === "ready", runId: out?.run_id, sources, guides, recoveryPath, importTaskIds, importTasks: taskStatuses, actions: actions.length ? actions : undefined, earlierContextUnavailable: out?.earlierContextUnavailable }
     },
     [orgId, orgReady, identity, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, sessionKey, actorHistoryScope, history.archived, availableHistory, historyRefs, clearReferences, ensureSession, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft, farmOperationsEnabled],
   )
-  const sendTurn = useCallback(async (text: string, onDelta?: (delta: string) => void, turnId?: string, guideRefs?: GuideReference[], guide?: GuideDraft, hasUnsavedGuideEdits = false) => {
+  const sendTurn = useCallback(async (text: string, onDelta?: (delta: string) => void, turnId?: string, guideRefs?: GuideReference[], guide?: GuideDraft, hasUnsavedGuideEdits = false, files: readonly File[] = []) => {
     if (inFlight.current.has(historyScope) || inFlight.current.size >= 2) {
       throw new Error(i18n.t("aiChat.history.waitForReply", { defaultValue: "Wait for an Assistant response to finish before sending another message." }))
     }
@@ -953,7 +966,7 @@ function ErpAiChatPanel({
     inFlight.current.set(historyScope, request)
     refreshSending(version => version + 1)
     try {
-      const result = await runTurn(text, request.controller.signal, setProgress, deliverDelta, guideRefs, guide, hasUnsavedGuideEdits, turnId)
+      const result = await runTurn(text, request.controller.signal, setProgress, deliverDelta, guideRefs, guide, hasUnsavedGuideEdits, turnId, files)
       const reply = request.stopped ? { content: "", sources: [], stopped: true } : result
       rememberTurn({ reply })
       return reply
@@ -979,9 +992,9 @@ function ErpAiChatPanel({
     refreshSending(version => version + 1)
   }, [historyScope])
   const pendingTurn = inFlight.current.get(historyScope)
-  const onSendMessage = useCallback((text: string, turnId?: string) => sendTurn(text, undefined, turnId), [sendTurn])
+  const onSendMessage = useCallback((text: string, turnId?: string, files?: readonly File[]) => sendTurn(text, undefined, turnId, undefined, undefined, false, files), [sendTurn])
   const onStreamMessage = useCallback<NonNullable<ComponentProps<typeof AIChatPanel>["onStreamMessage"]>>(
-    (text, handlers) => sendTurn(text, handlers.onDelta, handlers.turnId), [sendTurn],
+    (text, handlers, files) => sendTurn(text, handlers.onDelta, handlers.turnId, undefined, undefined, false, files), [sendTurn],
   )
 
   const onGuideSaved = useCallback(async (guide: GuideDocument) => {
@@ -1168,6 +1181,7 @@ function ErpAiChatPanel({
       onAgentChange={setSelectedAgent}
       onSendMessage={onSendMessage}
       onStreamMessage={onStreamMessage}
+      enableChatAttachments
       onImportFiles={importTasks.onImportFiles}
       importFileNames={importTasks.fileNames}
       importFocusedFileNames={importTasks.focusedFileNames}
