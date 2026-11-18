@@ -52,6 +52,9 @@ are recorded here.
   SpacetimeDB 2.8.2. Its schema includes the correction reducer; the authored
   operation ID and classification checks passed, and both history inventory
   verifiers passed. The reducer remains unavailable to sessions.
+- The Rust and TypeScript SDK generators, `lumiere-codegen`, and standalone IR
+  verification passed against that WASM (1,533 operations). This checked a
+  local candidate, not publication or drift against a newly released pin.
 - Not run: the operator call itself and the dry run against any live database.
 
 ## Rollout
