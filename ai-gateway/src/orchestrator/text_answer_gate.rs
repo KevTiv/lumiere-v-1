@@ -58,6 +58,9 @@ pub struct TextEvidence {
     pub refs: Vec<EvidenceRef>,
     /// Every number in that evidence.
     pub figures: Vec<f64>,
+    /// Exact request-scoped text available to the semantic reviewer. These have
+    /// no persisted passage row id and cannot become persisted-passage citations.
+    pub(crate) request_sources: Vec<SourcePassage>,
 }
 
 impl TextEvidence {
@@ -676,12 +679,13 @@ async fn gate_candidate(
         calculations: structured.calculations.clone(),
     };
     let (report, durable_provenance) = gate
-        .evaluate(
+        .evaluate_with_request_sources(
             &draft,
             &AdmissionEvidence {
                 known: &known,
                 data_figures: &evidence.figures,
             },
+            &evidence.request_sources,
         )
         .await?;
 
