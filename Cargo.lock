@@ -80,6 +80,7 @@ dependencies = [
  "lumiere-contracts",
  "lumiere-file-inspection",
  "lumiere-finance-review-core",
+ "lumiere-policy-core",
  "qdrant-client",
  "reqwest",
  "serde",

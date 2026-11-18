@@ -12,22 +12,40 @@ Date: 2026-11-18. Branch `claude/aih-30-index-on-write`, base `main` fcde3069.
   `RigContext::count_company_points`; third empty-reply case in `rag.rs`.
 - BFF: after a successful operation write, `after()` triggers the drain with the actor's
   own session.
+- Step 6: `gateway reindex-company --check|--apply` is a private operator command
+  with an explicit `embedding_reindex` grant, an exact organization/company and
+  ID interval, hard row/byte ceilings, and a per-invocation monetary cap enforced
+  against the native reservation before dispatch. It reuses the existing spend
+  reducers and operator enrollment probe; no schema change or contracts release
+  was added for this step.
+- Bulk vectors share a company namespace, separate from actor-owned write points.
+  They index only the allowlisted display field. The gateway uses separate ANN
+  candidate lanes and requires the asking actor's live authorized display field
+  to match the indexed fingerprint before accepting a shared hit. Reader denials
+  do not delete shared points. Daily briefing remains actor-activity only.
 - Runbook `docs/guides/qdrant-1.17-cutover-runbook.md`.
 
 ## Validated
 
 - `pnpm --dir web exec tsx --test lib/ai-index-drain-path.test.ts` passed (1 suite, Node 22).
+- Cloud Runner: verified the vendored Rust contracts, then passed
+  `cargo check --locked -p api-server -p ai-gateway --tests` on the #447 base.
+- `cargo test --locked -p ai-gateway --bin gateway`: 1,063 passed, 13 ignored.
+  New tests cover exact operator scope, per-run cap refusal before dispatch,
+  fingerprint scoping, and a loopback record owner that hides the indexed display
+  field for one reader and then revokes the other reader's record access.
 - `rustfmt --edition 2021` applied to changed Rust files.
 
 ## Not validated
 
-- Rust was NOT compiled or tested locally (the contracts crate exceeds this host's memory).
-  CI is the first compile of the gateway and api-server changes.
 - `release-compatibility-manifest.json` catalog checksum must be regenerated with
-  `cargo run -p api-server --example migration_catalog_checksum`.
-- No Postgres integration test for the queue SQL; no live Qdrant or provider calls.
+  `cargo run -p api-server --example migration_catalog_checksum` when rebasing
+  after AIH-37 and moving the queue migration to 53.
+- No Postgres integration test for the queue SQL. No live SpacetimeDB operator
+  grant, Qdrant backfill, paid provider call, or cutover was attempted. The runbook
+  includes the staging acceptance steps.
 
 ## Not done
 
-Imported-history indexing (module_backfill_record), the operator bulk reindex and its
-`embedding_reindex` grant. See the PR for the reasons.
+Imported-history indexing (`module_backfill_record`), create-ID readback, and the
+coverage/status UI are separate remaining AIH-30 work.

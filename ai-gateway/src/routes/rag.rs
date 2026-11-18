@@ -1092,26 +1092,18 @@ pub async fn post_rag(
     let org_top_k = req.limit.clamp(1, RAG_ORG_ACTIVITY_TOP_K as u64) as usize;
     let org_result = match query_vector {
         Some(Ok(vector)) => {
-            state
-                .rig
-                .search_scope_with_vector(
-                    org_id,
-                    req.company_id,
-                    &actor.identity_hex,
-                    vector,
-                    org_top_k,
-                )
-                .await
+            super::context::search_authorized_activity(
+                &state,
+                &actor,
+                org_id,
+                req.company_id,
+                vector,
+                org_top_k,
+            )
+            .await
         }
         Some(Err(_)) => Err(anyhow::anyhow!("admitted activity query unavailable")),
         None => Ok(Vec::new()),
-    };
-    let org_result = match org_result {
-        Ok(hits) => {
-            super::context::reauthorize_activity_hits(&state, &actor, org_id, req.company_id, hits)
-                .await
-        }
-        Err(error) => Err(error),
     };
     if let Err(error) = &org_result {
         tracing::warn!(

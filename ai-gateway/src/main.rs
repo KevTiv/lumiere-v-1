@@ -10,6 +10,7 @@ mod orchestrator;
 mod providers;
 mod qdrant_client;
 mod rate_limit;
+mod reindex;
 mod retrieval_policy;
 mod rig_agent;
 mod routes;
@@ -104,6 +105,10 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
     let _ = dotenvy::dotenv();
+
+    if std::env::args().nth(1).as_deref() == Some("reindex-company") {
+        return reindex::run_from_env(std::env::args().skip(2)).await;
+    }
 
     #[cfg(feature = "phase4-acceptance")]
     if std::env::args().nth(1).as_deref() == Some("phase4-restart-probe") {

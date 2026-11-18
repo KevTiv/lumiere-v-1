@@ -7,11 +7,14 @@ use crate::{
         resolve_snapshot_candidates, ActorCredentials, EntityRef,
     },
     non_llm_spend::{execute_metered, MeteredResult, MeteredScope, MeteredUnit},
-    rig_agent::{activity_fingerprint, activity_for_snapshot, ContextHit},
+    rig_agent::{
+        activity_fingerprint, activity_for_snapshot, company_reindex_activity, ContextHit,
+    },
     state::AppState,
 };
 use anyhow::{Context, Result};
 use axum::{extract::State, Json};
+use lumiere_auth_context::CapabilityGrantBounds;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -71,7 +74,7 @@ pub struct ContextIngestResponse {
 fn unavailable(message: &str) -> AppError {
     AppError::Unavailable(message.into())
 }
-fn request_digest(
+pub(crate) fn request_digest(
     label: &str,
     org: u64,
     company: u64,
@@ -308,21 +311,10 @@ pub async fn post_search(
             "activity retrieval not permitted".into(),
         ));
     }
-    let candidates = state
-        .rig
-        .search_scope_with_vector(
-            req.org_id,
-            req.company_id,
-            &actor.identity_hex,
-            vector,
-            top_k,
-        )
-        .await
-        .map_err(|_| unavailable("activity retrieval unavailable"))?;
     let mut hits =
-        reauthorize_activity_hits(&state, &actor, req.org_id, req.company_id, candidates)
+        search_authorized_activity(&state, &actor, req.org_id, req.company_id, vector, top_k)
             .await
-            .map_err(|_| unavailable("authoritative resolver unavailable"))?;
+            .map_err(|_| unavailable("authorized activity retrieval unavailable"))?;
     while serde_json::to_vec(&hits)
         .map_err(|_| unavailable("activity encoding failed"))?
         .len() as u64
@@ -333,6 +325,103 @@ pub async fn post_search(
         }
     }
     Ok(Json(ContextSearchResponse { hits }))
+}
+
+/// Search distinct company and actor lanes so unapproved shared candidates
+/// cannot consume the actor's private candidate slots. Only authorized hits
+/// can participate in the final ranking.
+pub(crate) async fn search_authorized_activity(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org: u64,
+    company: u64,
+    vector: Vec<f32>,
+    top_k: usize,
+) -> Result<Vec<ContextHit>> {
+    let (private, shared) = tokio::try_join!(
+        state.rig.search_scope_with_vector(
+            org,
+            company,
+            &actor.identity_hex,
+            vector.clone(),
+            top_k
+        ),
+        state
+            .rig
+            .search_company_reindex_with_vector(org, company, vector, top_k),
+    )?;
+    if private.is_empty() && shared.is_empty() {
+        return Ok(Vec::new());
+    }
+    let bounds = activity_read_bounds(state, actor, org, company).await?;
+    let private_count = (bounds.max_rows.min(50) as usize).min(private.len());
+    let shared_count = bounds.max_rows.min(50) as usize - private_count;
+    let (mut private, shared) = tokio::try_join!(
+        resolve_private_activity_hits(state, actor, org, company, private, private_count),
+        reauthorize_company_hits(state, actor, org, company, shared, shared_count),
+    )?;
+    private.extend(shared);
+    private.sort_by(|a, b| b.score.total_cmp(&a.score));
+    let mut seen = HashSet::new();
+    private.retain(|hit| {
+        seen.insert((
+            hit.record.semantic.resource_kind.clone(),
+            hit.record.semantic.resource_id.clone(),
+        ))
+    });
+    private.truncate(top_k);
+    truncate_activity_bytes(&mut private, bounds.max_bytes)?;
+    Ok(private)
+}
+
+async fn reauthorize_company_hits(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org: u64,
+    company: u64,
+    mut hits: Vec<ContextHit>,
+    limit: usize,
+) -> Result<Vec<ContextHit>> {
+    let model = state.config.embedding_model_name();
+    hits.retain(|hit| {
+        hit.record.is_company_reindex()
+            && hit.record.semantic.organization_id == org
+            && hit.record.semantic.company_id == company
+            && hit.record.semantic.embedding_model == model
+    });
+    hits.truncate(limit);
+    if hits.is_empty() {
+        return Ok(hits);
+    }
+    let refs = resolve_snapshot_candidates(None, &[], &hits, hits.len());
+    let snapshots = fetch_authorized_live_snapshots(state, actor, org, company, &refs).await?;
+    // A reader has no authority to remove or repair another principal's
+    // shared point. Missing, redacted, and stale candidates simply disappear.
+    hits.retain(|hit| {
+        snapshots
+            .iter()
+            .any(|snapshot| shared_hit_matches_snapshot(hit, org, company, snapshot))
+    });
+    Ok(hits)
+}
+
+fn shared_hit_matches_snapshot(
+    hit: &ContextHit,
+    org: u64,
+    company: u64,
+    snapshot: &crate::harness::LiveSnapshot,
+) -> bool {
+    let record = &hit.record.semantic;
+    record.resource_kind == snapshot.entity_type
+        && record.resource_id == snapshot.entity_id.to_string()
+        && company_reindex_activity(
+            org,
+            company,
+            &snapshot.entity_type,
+            snapshot.entity_id,
+            &snapshot.row,
+        )
+        .is_some_and(|activity| activity_fingerprint(&activity) == record.source_fingerprint)
 }
 
 /// Resolve current owner data and require the exact actor-filtered source fingerprint.
@@ -347,10 +436,20 @@ pub(crate) async fn reauthorize_activity_hits(
     if hits.is_empty() {
         return Ok(Vec::new());
     }
-    if hits.len() > 50 {
-        anyhow::bail!("activity candidate bound exceeded");
-    }
-    let bounds = super::evidence::require_scoped_capability_grant(
+    let bounds = activity_read_bounds(state, actor, org, company).await?;
+    let limit = (bounds.max_rows.min(50) as usize).min(hits.len());
+    let mut hits = resolve_private_activity_hits(state, actor, org, company, hits, limit).await?;
+    truncate_activity_bytes(&mut hits, bounds.max_bytes)?;
+    Ok(hits)
+}
+
+async fn activity_read_bounds(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org: u64,
+    company: u64,
+) -> AppResult<CapabilityGrantBounds> {
+    super::evidence::require_scoped_capability_grant(
         state,
         &actor.identity_hex,
         &actor.stdb_token,
@@ -358,10 +457,37 @@ pub(crate) async fn reauthorize_activity_hits(
         company,
         RETRIEVE_CAPABILITY,
     )
-    .await?;
-    let limit = usize::try_from(bounds.max_rows)
-        .unwrap_or(usize::MAX)
-        .min(hits.len());
+    .await
+}
+
+fn truncate_activity_bytes(hits: &mut Vec<ContextHit>, max_bytes: u64) -> Result<()> {
+    while !hits.is_empty() && serde_json::to_vec(&hits)?.len() as u64 > max_bytes {
+        hits.pop();
+    }
+    Ok(())
+}
+
+async fn resolve_private_activity_hits(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org: u64,
+    company: u64,
+    mut hits: Vec<ContextHit>,
+    limit: usize,
+) -> Result<Vec<ContextHit>> {
+    anyhow::ensure!(hits.len() <= 50, "activity candidate bound exceeded");
+    let model = state.config.embedding_model_name();
+    hits.retain(|hit| {
+        hit.record.actor_identity == actor.identity_hex
+            && !hit.record.is_company_reindex()
+            && hit.record.semantic.organization_id == org
+            && hit.record.semantic.company_id == company
+            && hit.record.semantic.embedding_model == model
+    });
+    hits.truncate(limit);
+    if hits.is_empty() {
+        return Ok(hits);
+    }
     let refs = resolve_snapshot_candidates(None, &[], &hits, limit);
     let snapshots = fetch_authorized_live_snapshots(state, actor, org, company, &refs).await?;
     let allowed: HashSet<_> = snapshots
@@ -377,18 +503,13 @@ pub(crate) async fn reauthorize_activity_hits(
         })
         .collect();
     let mut accepted = Vec::with_capacity(hits.len());
-    for hit in hits.into_iter().take(limit) {
+    for hit in hits {
         let record = &hit.record.semantic;
-        if record.organization_id == org
-            && record.company_id == company
-            && hit.record.actor_identity == actor.identity_hex
-            && record.embedding_model == state.config.embedding_model_name()
-            && allowed.contains(&(
-                record.resource_kind.clone(),
-                record.resource_id.clone(),
-                record.source_fingerprint.clone(),
-            ))
-        {
+        if allowed.contains(&(
+            record.resource_kind.clone(),
+            record.resource_id.clone(),
+            record.source_fingerprint.clone(),
+        )) {
             accepted.push(hit);
         } else {
             state
@@ -401,12 +522,6 @@ pub(crate) async fn reauthorize_activity_hits(
                     &record.resource_id,
                 )
                 .await?;
-        }
-    }
-    accepted.truncate(limit);
-    while serde_json::to_vec(&accepted)?.len() as u64 > bounds.max_bytes {
-        if accepted.pop().is_none() {
-            break;
         }
     }
     Ok(accepted)
@@ -683,6 +798,172 @@ pub(crate) async fn ingest_references(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shared_candidate_requires_the_readers_current_exact_projection() {
+        use crate::{
+            harness::LiveSnapshot,
+            qdrant_client::SemanticIndexRecord,
+            rig_agent::{ActivityIndexRecord, COMPANY_REINDEX_SCOPE},
+        };
+        let activity = company_reindex_activity(
+            7, 11, "sale_order", 42,
+            &serde_json::json!({"reference":"SO-42","amountTotal":900,"privateNote":"do not embed"}),
+        ).unwrap();
+        assert!(!activity.text.contains("900"));
+        assert!(!activity.text.contains("do not embed"));
+        assert_eq!(activity.timestamp, 0);
+        let hit = ContextHit {
+            score: 0.9,
+            record: ActivityIndexRecord {
+                actor_identity: COMPANY_REINDEX_SCOPE.into(),
+                activity_timestamp: 0,
+                semantic: SemanticIndexRecord {
+                    organization_id: 7,
+                    company_id: 11,
+                    resource_kind: "sale_order".into(),
+                    resource_id: "42".into(),
+                    source_fingerprint: activity_fingerprint(&activity),
+                    resource_version: activity_fingerprint(&activity),
+                    embedding_model: "mistral-embed".into(),
+                    indexed_at: "t".into(),
+                    tags: vec![COMPANY_REINDEX_SCOPE.into()],
+                },
+            },
+        };
+        let mut snapshot = LiveSnapshot {
+            entity_type: "sale_order".into(),
+            entity_id: 42,
+            label: "Sale order #42".into(),
+            snapshot_at: "now".into(),
+            relations: Vec::new(),
+            row: serde_json::json!({"reference":"SO-42"}),
+        };
+        assert!(shared_hit_matches_snapshot(&hit, 7, 11, &snapshot));
+        assert!(!shared_hit_matches_snapshot(&hit, 7, 12, &snapshot));
+        assert!(!shared_hit_matches_snapshot(&hit, 8, 11, &snapshot));
+        snapshot.row = serde_json::json!({"id":42,"amountTotal":900});
+        assert!(!shared_hit_matches_snapshot(&hit, 7, 11, &snapshot));
+        snapshot.row = serde_json::json!({"reference":"renamed"});
+        assert!(!shared_hit_matches_snapshot(&hit, 7, 11, &snapshot));
+    }
+
+    #[tokio::test]
+    async fn shared_lookup_drops_hidden_fields_and_revoked_readers() {
+        use crate::{
+            providers,
+            qdrant_client::VectorStore,
+            rate_limit::AgentRateLimiter,
+            rig_agent::{ActivityIndexRecord, RigContext, COMPANY_REINDEX_SCOPE},
+        };
+        use axum::{
+            http::{HeaderMap, StatusCode},
+            response::IntoResponse,
+            routing::get,
+            Router,
+        };
+        use serde_json::json;
+        use std::sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        };
+
+        let revoked = Arc::new(AtomicBool::new(false));
+        let revoke = revoked.clone();
+        let app = Router::new().route(
+            "/v1/authoritative/sale-orders/42",
+            get(move |headers: HeaderMap| {
+                let revoke = revoke.clone();
+                async move {
+                    let token = headers.get("authorization").and_then(|v| v.to_str().ok());
+                    let identity = headers.get("x-stdb-identity").and_then(|v| v.to_str().ok());
+                    let data = match (token, identity) {
+                        (Some("Bearer fixture-a"), Some("reader-a"))
+                            if !revoke.load(Ordering::Relaxed) =>
+                        {
+                            json!({"id":42,"organizationId":7,"companyId":11,"reference":"SO-42"})
+                        }
+                        (Some("Bearer fixture-b"), Some("reader-b")) => {
+                            json!({"id":42,"organizationId":7,"companyId":11})
+                        }
+                        _ => return StatusCode::FORBIDDEN.into_response(),
+                    };
+                    Json(json!({"data":data})).into_response()
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut config = providers::readiness_tests::test_config();
+        config.api_server_url = Some(format!("http://{}", listener.local_addr().unwrap()));
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let http = reqwest::Client::new();
+        let providers = providers::build(&config, http.clone()).unwrap();
+        let rig = RigContext::new(&config, providers.clone()).await.unwrap();
+        let vectors = VectorStore::new(&config.qdrant_url, None, config.qdrant_collection.clone())
+            .await
+            .unwrap();
+        let activity =
+            company_reindex_activity(7, 11, "sale_order", 42, &json!({"reference":"SO-42"}))
+                .unwrap();
+        let hit = ContextHit {
+            score: 0.9,
+            record: ActivityIndexRecord {
+                actor_identity: COMPANY_REINDEX_SCOPE.into(),
+                activity_timestamp: 0,
+                semantic: crate::qdrant_client::SemanticIndexRecord {
+                    organization_id: 7,
+                    company_id: 11,
+                    resource_kind: "sale_order".into(),
+                    resource_id: "42".into(),
+                    source_fingerprint: activity_fingerprint(&activity),
+                    resource_version: activity_fingerprint(&activity),
+                    embedding_model: config.embedding_model_name(),
+                    indexed_at: "t".into(),
+                    tags: vec![COMPANY_REINDEX_SCOPE.into()],
+                },
+            },
+        };
+        let state = AppState {
+            stdb: Arc::new(stdb_client::StdbClient::new(
+                config.stdb_host.clone(),
+                config.stdb_module.clone(),
+                config.stdb_token.clone(),
+            )),
+            config: Arc::new(config),
+            providers,
+            vector_store: Arc::new(vectors),
+            rig: Arc::new(rig),
+            spend_read_stdb: None,
+            http: Arc::new(http),
+            activity_watermarks: Default::default(),
+            download_jobs: Default::default(),
+            kaggle_search_cache: Default::default(),
+            agent_rate_limiter: Arc::new(AgentRateLimiter::new()),
+        };
+        let alice = ActorCredentials::new("fixture-a", "reader-a").unwrap();
+        let bob = ActorCredentials::new("fixture-b", "reader-b").unwrap();
+        assert_eq!(
+            reauthorize_company_hits(&state, &alice, 7, 11, vec![hit.clone()], 1)
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            reauthorize_company_hits(&state, &bob, 7, 11, vec![hit.clone()], 1)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        revoked.store(true, Ordering::Relaxed);
+        assert!(
+            reauthorize_company_hits(&state, &alice, 7, 11, vec![hit], 1)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        server.abort();
+    }
 
     #[tokio::test]
     async fn disabled_rag_skill_blocks_embedding_before_spend_or_io() {

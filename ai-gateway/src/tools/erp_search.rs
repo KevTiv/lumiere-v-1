@@ -133,30 +133,17 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
 
     let org_result = match query_vector {
         Ok(vector) => {
-            ctx.rig()
-                .search_scope_with_vector(
-                    ctx.org_id,
-                    ctx.company_id,
-                    &actor.identity_hex,
-                    vector,
-                    limit as usize,
-                )
-                .await
-        }
-        Err(_) => Err(anyhow::anyhow!("admitted activity query unavailable")),
-    };
-    let org_result = match org_result {
-        Ok(hits) => {
-            crate::routes::context::reauthorize_activity_hits(
+            crate::routes::context::search_authorized_activity(
                 &ctx.state,
                 actor,
                 ctx.org_id,
                 ctx.company_id,
-                hits,
+                vector,
+                limit as usize,
             )
             .await
         }
-        Err(error) => Err(error),
+        Err(_) => Err(anyhow::anyhow!("admitted activity query unavailable")),
     };
     if let Err(error) = &org_result {
         tracing::warn!(error = %error, "ERP activity retrieval unavailable");
