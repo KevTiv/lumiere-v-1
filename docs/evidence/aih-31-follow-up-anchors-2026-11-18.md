@@ -41,3 +41,10 @@ Priority: UI record, record named in the question, anchors, ANN hits.
 - Full-workspace TypeScript typecheck was not run (tsc ran out of memory on the host).
 - Import-card `reviewedRecords` ids are module backfill record ids (sales / shop_sales / warehouse), not ERP
   entity ids with an authorized live-read resource, so they are not anchored.
+
+## Remaining work
+
+- [ ] Watch CI on the draft PR: first compile of the api-server and ai-gateway changes and tests; fix failures.
+- [ ] Run `cargo test -p ai-gateway --bin gateway` and `cargo test -p api-server --lib` where the contracts crate can build.
+- [ ] Run a full web/ui TypeScript typecheck.
+- [ ] Decide whether to narrow `anchors_apply` for unrelated questions asked right after a record answer.
