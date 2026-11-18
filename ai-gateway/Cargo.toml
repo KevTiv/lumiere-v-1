@@ -35,6 +35,7 @@ base64.workspace = true
 stdb-client.workspace = true
 stdb-auth.workspace = true
 lumiere-contracts.workspace = true
+lumiere-policy-core.workspace = true
 sha2.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 urlencoding = "2"
