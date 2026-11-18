@@ -281,6 +281,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/context/search", post(routes::context::post_search))
         .route("/v1/context/ingest", post(routes::context::post_ingest))
         .route(
+            "/v1/context/index-jobs/drain",
+            post(context_worker::post_drain),
+        )
+        .route("/v1/context/coverage", post(routes::context::post_coverage))
+        .route(
             "/v1/documents/ocr",
             post(routes::ocr::post_ocr).layer(DefaultBodyLimit::max(14 * 1024 * 1024)),
         )

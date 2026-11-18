@@ -180,17 +180,47 @@ pub struct RagResponse {
     pub ui_actions: Vec<UiActionProposal>,
 }
 
+/// Whether the company has any indexed activity references. It only changes
+/// the wording of an empty reply; it never admits evidence.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum IndexCoverage {
+    /// Not measured (embeddings off, guides present, or retrieval degraded).
+    Unknown,
+    /// Zero indexed points for this company: nothing has been indexed yet.
+    Empty,
+    /// Points exist, so an empty result means nothing relevant was found.
+    Populated,
+}
+
 fn no_relevant_information_response(
     retrieval_degraded: bool,
     related_guides: Vec<RelatedGuide>,
     guide_retrieval_degraded: bool,
+) -> AppResult<RagResponse> {
+    no_relevant_information_with_coverage(
+        retrieval_degraded,
+        related_guides,
+        guide_retrieval_degraded,
+        IndexCoverage::Unknown,
+    )
+}
+
+const NOT_INDEXED_REPLY: &str = "This company's records haven't been indexed yet, so there is nothing to search. Open a permitted record, select spreadsheet cells, or select a saved import to ask about it now. An organization administrator can check indexing status in AI settings.";
+
+fn no_relevant_information_with_coverage(
+    retrieval_degraded: bool,
+    related_guides: Vec<RelatedGuide>,
+    guide_retrieval_degraded: bool,
+    coverage: IndexCoverage,
 ) -> AppResult<RagResponse> {
     // Saved guides are independently authorized readback cards, not grounding
     // for a generated answer. Keep them useful without claiming a healthy search.
     if (retrieval_degraded || guide_retrieval_degraded) && related_guides.is_empty() {
         return Err(AppError::RetrievalUnavailable);
     }
-    let answer = if related_guides.is_empty() {
+    let answer = if related_guides.is_empty() && coverage == IndexCoverage::Empty {
+        NOT_INDEXED_REPLY
+    } else if related_guides.is_empty() {
         "No authorized data is available for this question. Open a permitted record, select spreadsheet cells, or select a saved import before asking again. For a financial summary, also specify the reporting period and report or records to review. Page labels and earlier conversation are not current ERP evidence."
     } else if retrieval_degraded {
         "Semantic retrieval is unavailable. Saved guides are available for this question. Open a guide to review its saved instructions. Draft guides have not been independently verified."
@@ -1237,10 +1267,29 @@ pub async fn post_rag(
             recheck_related_guides(&state, &actor, org_id, req.company_id, &related_guides).await;
         related_guides = fresh_guides.references;
         guide_retrieval_degraded |= fresh_guides.degraded;
-        let mut response = no_relevant_information_response(
+        // A healthy search that found nothing reads differently when the
+        // company has never been indexed. A failed count is a degraded index.
+        let coverage = if related_guides.is_empty()
+            && !retrieval_degraded
+            && !guide_retrieval_degraded
+            && state.config.embedding_enabled()
+        {
+            match state.rig.count_company_points(org_id, req.company_id).await {
+                Ok(0) => IndexCoverage::Empty,
+                Ok(_) => IndexCoverage::Populated,
+                Err(_) => {
+                    retrieval_degraded = true;
+                    IndexCoverage::Unknown
+                }
+            }
+        } else {
+            IndexCoverage::Unknown
+        };
+        let mut response = no_relevant_information_with_coverage(
             retrieval_degraded,
             related_guides,
             guide_retrieval_degraded,
+            coverage,
         )?;
         response.earlier_context_unavailable = earlier_context_unavailable;
         return Ok(Json(response));
@@ -1752,6 +1801,72 @@ fn rag_stream_metadata(response: &RagResponse) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unindexed_company_gets_a_distinct_actionable_reply() {
+        let response =
+            no_relevant_information_with_coverage(false, Vec::new(), false, IndexCoverage::Empty)
+                .unwrap();
+        assert!(response
+            .answer
+            .starts_with("This company's records haven't been indexed yet"));
+        assert!(response.answer.contains("AI settings"));
+        assert!(!response.retrieval_degraded);
+        assert!(response.sources.is_empty());
+        assert!(response.verification.is_none());
+    }
+
+    #[test]
+    fn populated_or_unmeasured_coverage_keeps_the_nothing_relevant_reply() {
+        let baseline = no_relevant_information_response(false, Vec::new(), false)
+            .unwrap()
+            .answer;
+        for coverage in [IndexCoverage::Populated, IndexCoverage::Unknown] {
+            let response =
+                no_relevant_information_with_coverage(false, Vec::new(), false, coverage).unwrap();
+            assert_eq!(response.answer, baseline);
+            assert!(!response.answer.contains("haven't been indexed"));
+        }
+    }
+
+    #[test]
+    fn degraded_search_stays_unavailable_even_when_the_company_looks_unindexed() {
+        for coverage in [
+            IndexCoverage::Empty,
+            IndexCoverage::Populated,
+            IndexCoverage::Unknown,
+        ] {
+            assert!(matches!(
+                no_relevant_information_with_coverage(true, Vec::new(), false, coverage),
+                Err(AppError::RetrievalUnavailable)
+            ));
+            assert!(matches!(
+                no_relevant_information_with_coverage(false, Vec::new(), true, coverage),
+                Err(AppError::RetrievalUnavailable)
+            ));
+        }
+    }
+
+    #[test]
+    fn saved_guides_take_precedence_over_the_not_indexed_reply() {
+        let guide = RelatedGuide {
+            guide_id: "guide-1".into(),
+            revision: 1,
+            title: "Saved instructions".into(),
+            module: "sales".into(),
+            workflow: None,
+            language: "en".into(),
+            review_state: "draft".into(),
+            company_id: "4097".into(),
+            updated_at: None,
+            content_hash: "hash".into(),
+            product_version: None,
+        };
+        let response =
+            no_relevant_information_with_coverage(false, vec![guide], false, IndexCoverage::Empty)
+                .unwrap();
+        assert!(response.answer.starts_with("Saved guides are available"));
+    }
 
     #[test]
     fn healthy_empty_retrieval_returns_no_unverified_sources() {

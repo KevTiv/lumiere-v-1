@@ -30,6 +30,18 @@ pub struct ContextSearchRequest {
     pub stdb_token: String,
     pub identity_hex: String,
 }
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ContextCoverageRequest {
+    pub org_id: u64,
+    pub company_id: u64,
+    pub stdb_token: String,
+    pub identity_hex: String,
+}
+#[derive(Debug, Serialize)]
+pub struct ContextCoverageResponse {
+    pub indexed_points: u64,
+}
 #[derive(Debug, Serialize)]
 pub struct ContextSearchResponse {
     pub hits: Vec<ContextHit>,
@@ -400,40 +412,116 @@ pub(crate) async fn reauthorize_activity_hits(
     Ok(accepted)
 }
 
-pub async fn post_ingest(
-    State(state): State<AppState>,
-    Json(req): Json<ContextIngestRequest>,
-) -> AppResult<Json<ContextIngestResponse>> {
-    let refs = references(&req.resources).map_err(|e| AppError::BadRequest(e.to_string()))?;
-    if !state.config.embedding_enabled() {
-        return Err(unavailable("embeddings disabled"));
+/// Per-reference result of one ingest pass.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum IngestOutcome {
+    Indexed,
+    Unchanged,
+    Withheld,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct IngestReport {
+    pub indexed: usize,
+    pub unchanged: usize,
+    pub withheld: usize,
+    /// `(resource kind, resource id, outcome)` for every requested reference.
+    pub outcomes: Vec<(String, u64, IngestOutcome)>,
+}
+
+impl IngestReport {
+    fn record(&mut self, kind: &str, id: u64, outcome: IngestOutcome) {
+        match outcome {
+            IngestOutcome::Indexed => self.indexed += 1,
+            IngestOutcome::Unchanged => self.unchanged += 1,
+            IngestOutcome::Withheld => self.withheld += 1,
+        }
+        self.outcomes.push((kind.to_owned(), id, outcome));
     }
+}
+
+/// Per-company indexed point count. The actor must hold the retrieval grant;
+/// the number is a coverage signal and never an authorization.
+pub async fn post_coverage(
+    State(state): State<AppState>,
+    Json(req): Json<ContextCoverageRequest>,
+) -> AppResult<Json<ContextCoverageResponse>> {
     let actor = ActorCredentials::new(req.stdb_token, req.identity_hex)
         .map_err(|_| AppError::Forbidden("authenticated actor required".into()))?;
-    let bounds = super::evidence::require_scoped_capability_grant(
+    super::evidence::require_scoped_capability_grant(
         &state,
         &actor.identity_hex,
         &actor.stdb_token,
         req.org_id,
         req.company_id,
+        RETRIEVE_CAPABILITY,
+    )
+    .await?;
+    let indexed_points = state
+        .rig
+        .count_company_points(req.org_id, req.company_id)
+        .await
+        .map_err(|_| unavailable("activity index unavailable"))?;
+    Ok(Json(ContextCoverageResponse { indexed_points }))
+}
+
+pub async fn post_ingest(
+    State(state): State<AppState>,
+    Json(req): Json<ContextIngestRequest>,
+) -> AppResult<Json<ContextIngestResponse>> {
+    let refs = references(&req.resources).map_err(|e| AppError::BadRequest(e.to_string()))?;
+    let actor = ActorCredentials::new(req.stdb_token, req.identity_hex)
+        .map_err(|_| AppError::Forbidden("authenticated actor required".into()))?;
+    let report = ingest_references(&state, &actor, req.org_id, req.company_id, &refs).await?;
+    Ok(Json(ContextIngestResponse {
+        indexed: report.indexed,
+        unchanged: report.unchanged,
+        withheld: report.withheld,
+        automatic_backfill: false,
+    }))
+}
+
+/// The one indexing path, shared by the explicit endpoint and the queue drain:
+/// `embedding_index` agent action, the actor's `ai.context.index` grant,
+/// field-filtered projection, spend admission and settlement, publication
+/// revalidation, then the Qdrant upsert. Callers bound `refs` to eight.
+pub(crate) async fn ingest_references(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org_id: u64,
+    company_id: u64,
+    refs: &[EntityRef],
+) -> AppResult<IngestReport> {
+    if refs.is_empty() || refs.len() > MAX_REFERENCES {
+        return Err(AppError::BadRequest(
+            "activity indexing requires one to eight references".into(),
+        ));
+    }
+    if !state.config.embedding_enabled() {
+        return Err(unavailable("embeddings disabled"));
+    }
+    let bounds = super::evidence::require_scoped_capability_grant(
+        state,
+        &actor.identity_hex,
+        &actor.stdb_token,
+        org_id,
+        company_id,
         INDEX_CAPABILITY,
     )
     .await?;
     if refs.len() as u64 > bounds.max_rows {
         return Err(AppError::Forbidden("activity row grant exceeded".into()));
     }
-    let snapshots =
-        fetch_authorized_live_snapshots(&state, &actor, req.org_id, req.company_id, &refs)
-            .await
-            .map_err(|_| unavailable("authorized indexing projection unavailable"))?;
+    let snapshots = fetch_authorized_live_snapshots(state, actor, org_id, company_id, refs)
+        .await
+        .map_err(|_| unavailable("authorized indexing projection unavailable"))?;
     let mut activities = Vec::new();
     let mut bytes = 0usize;
     for snapshot in &snapshots {
-        let activity =
-            activity_for_snapshot(req.org_id, req.company_id, &actor.identity_hex, snapshot)
-                .map_err(|_| {
-                    AppError::BadRequest("activity projection outside its input bound".into())
-                })?;
+        let activity = activity_for_snapshot(org_id, company_id, &actor.identity_hex, snapshot)
+            .map_err(|_| {
+                AppError::BadRequest("activity projection outside its input bound".into())
+            })?;
         bytes = bytes.saturating_add(activity.text.len());
         activities.push(activity);
     }
@@ -445,33 +533,33 @@ pub async fn post_ingest(
         .check_ready()
         .await
         .map_err(|_| unavailable("activity index unavailable"))?;
-    let mut response = ContextIngestResponse {
-        indexed: 0,
-        unchanged: 0,
-        withheld: refs.len() - activities.len(),
-        automatic_backfill: false,
-    };
-    for reference in &refs {
+    let mut report = IngestReport::default();
+    for reference in refs {
         if !activities.iter().any(|a| {
             a.entity_type == reference.entity_type && a.entity_id == reference.entity_id.to_string()
         }) {
             state
                 .rig
                 .delete_reference(
-                    req.org_id,
-                    req.company_id,
+                    org_id,
+                    company_id,
                     &actor.identity_hex,
                     &reference.entity_type,
                     &reference.entity_id.to_string(),
                 )
                 .await
                 .map_err(|_| unavailable("activity index removal unavailable"))?;
+            report.record(
+                &reference.entity_type,
+                reference.entity_id,
+                IngestOutcome::Withheld,
+            );
         }
     }
     let agent = resolve_surface_agent(
         state.stdb.as_ref(),
-        req.org_id,
-        req.company_id,
+        org_id,
+        company_id,
         "activity_indexing",
         None,
         None,
@@ -486,26 +574,30 @@ pub async fn post_ingest(
         .as_deref()
         .ok_or_else(|| unavailable("embedding spend reader unavailable"))?;
     for activity in activities {
+        let entity_id: u64 = activity
+            .entity_id
+            .parse()
+            .map_err(|_| unavailable("invalid projection identity"))?;
         if state
             .rig
             .activity_is_current(&activity)
             .await
             .map_err(|_| unavailable("activity index read unavailable"))?
         {
-            response.unchanged += 1;
+            report.record(&activity.entity_type, entity_id, IngestOutcome::Unchanged);
             continue;
         }
         let model = state.config.embedding_model_name();
         let scope = MeteredScope {
-            organization_id: req.org_id,
-            company_id: req.company_id,
+            organization_id: org_id,
+            company_id,
             agent_id: agent.agent_id,
             run_id: 0,
             actor_identity: actor.identity_hex.clone(),
             request_key: request_digest(
                 "index",
-                req.org_id,
-                req.company_id,
+                org_id,
+                company_id,
                 &actor.identity_hex,
                 &model,
                 activity_fingerprint(&activity).as_bytes(),
@@ -536,25 +628,22 @@ pub async fn post_ingest(
         .await
         .map_err(|_| unavailable("activity embedding admission or settlement unavailable"))?;
         super::evidence::require_scoped_capability_grant(
-            &state,
+            state,
             &actor.identity_hex,
             &actor.stdb_token,
-            req.org_id,
-            req.company_id,
+            org_id,
+            company_id,
             INDEX_CAPABILITY,
         )
         .await?;
         let current = fetch_authorized_live_snapshots(
-            &state,
-            &actor,
-            req.org_id,
-            req.company_id,
+            state,
+            actor,
+            org_id,
+            company_id,
             &[EntityRef {
                 entity_type: activity.entity_type.clone(),
-                entity_id: activity
-                    .entity_id
-                    .parse()
-                    .map_err(|_| unavailable("invalid projection identity"))?,
+                entity_id,
                 priority: 1.0,
             }],
         )
@@ -563,33 +652,33 @@ pub async fn post_ingest(
         let unchanged = current
             .first()
             .and_then(|snapshot| {
-                activity_for_snapshot(req.org_id, req.company_id, &actor.identity_hex, snapshot)
-                    .ok()
+                activity_for_snapshot(org_id, company_id, &actor.identity_hex, snapshot).ok()
             })
             .is_some_and(|fresh| activity_fingerprint(&fresh) == activity_fingerprint(&activity));
         if !unchanged {
             state
                 .rig
                 .delete_reference(
-                    req.org_id,
-                    req.company_id,
+                    org_id,
+                    company_id,
                     &actor.identity_hex,
                     &activity.entity_type,
                     &activity.entity_id,
                 )
                 .await
                 .map_err(|_| unavailable("activity index removal unavailable"))?;
-            response.withheld += 1;
+            report.record(&activity.entity_type, entity_id, IngestOutcome::Withheld);
             continue;
         }
+        let kind = activity.entity_type.clone();
         state
             .rig
             .upsert_activities_with_vectors(&[activity], vec![vector])
             .await
             .map_err(|_| unavailable("activity publication unavailable"))?;
-        response.indexed += 1;
+        report.record(&kind, entity_id, IngestOutcome::Indexed);
     }
-    Ok(Json(response))
+    Ok(report)
 }
 #[cfg(test)]
 mod tests {

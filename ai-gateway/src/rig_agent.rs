@@ -10,9 +10,9 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::Result;
 use qdrant_client::{
     qdrant::{
-        r#match::MatchValue, Condition, CreateFieldIndexCollectionBuilder, DeletePointsBuilder,
-        Distance, FieldCondition, FieldType, Filter, GetPointsBuilder, Match, PointStruct,
-        PointsIdsList, SearchPointsBuilder, UpsertPointsBuilder, VectorParamsBuilder,
+        r#match::MatchValue, Condition, CountPointsBuilder, CreateFieldIndexCollectionBuilder,
+        DeletePointsBuilder, Distance, FieldCondition, FieldType, Filter, GetPointsBuilder, Match,
+        PointStruct, PointsIdsList, SearchPointsBuilder, UpsertPointsBuilder, VectorParamsBuilder,
         VectorsConfigBuilder,
     },
     Payload, Qdrant,
@@ -263,6 +263,23 @@ impl RigContext {
             )
             .await?;
         Ok(())
+    }
+
+    /// Number of indexed activity references for one company. This is a
+    /// coverage signal only (any actor, any model); it never authorizes a read.
+    pub async fn count_company_points(&self, org_id: u64, company_id: u64) -> Result<u64> {
+        if org_id == 0 || company_id == 0 {
+            anyhow::bail!("organization and company are required");
+        }
+        let response = self
+            .qdrant
+            .count(
+                CountPointsBuilder::new(&self.collection)
+                    .filter(activity_scope_filter(org_id, company_id))
+                    .exact(true),
+            )
+            .await?;
+        Ok(response.result.map_or(0, |result| result.count))
     }
 
     /// Exact reference read prevents a status refresh from paying to embed
