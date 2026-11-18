@@ -15,6 +15,9 @@ case "${1:-}" in
     if [[ -n "${TEST_RAILWAY_DEPLOYMENTS_AFTER_REDEPLOY_FILE:-}" && -f "${TEST_REDEPLOY_ARGS_FILE:-}" ]]; then
       deployments_file="$TEST_RAILWAY_DEPLOYMENTS_AFTER_REDEPLOY_FILE"
     fi
+    if [[ -n "${TEST_RAILWAY_DEPLOYMENTS_AFTER_EDIT_FILE:-}" && -f "${TEST_SOURCE_PATCH_FILE:-}" ]]; then
+      deployments_file="$TEST_RAILWAY_DEPLOYMENTS_AFTER_EDIT_FILE"
+    fi
     if [[ -n "$deployments_file" ]]; then
       limit=20
       args=("$@")
@@ -98,6 +101,10 @@ chmod +x "$TMP/railway"
 
 cat >"$TMP/curl" <<'EOF'
 #!/usr/bin/env bash
+if [[ -n "${TEST_CURL_BODY:-}" ]]; then
+  [[ " $* " == *" --fail "* ]] || exit 90
+  printf '%s\n' "$TEST_CURL_BODY"
+fi
 exit "${TEST_CURL_EXIT:-0}"
 EOF
 chmod +x "$TMP/curl"
@@ -128,6 +135,27 @@ common_env=(
 
 env "${common_env[@]}" bash "$ROOT/scripts/railway-stack-release.sh" gate Postgres kong-postgres
 env "${common_env[@]}" bash "$ROOT/scripts/railway-stack-release.sh" probe api=https://api.example.test/ready ai=https://ai.example.test/ready
+
+ready_catalog='{"status":"ready","migrationVersion":52,"expectedMigrationVersion":52}'
+env "${common_env[@]}" TEST_CURL_BODY="$ready_catalog" \
+  bash "$ROOT/scripts/railway-stack-release.sh" verify-catalog api=https://api.example.test/ready 52
+for report in \
+  '{"status":"unready","migrationVersion":52,"expectedMigrationVersion":52}' \
+  '{"status":"ready","migrationVersion":51,"expectedMigrationVersion":52}' \
+  '{"status":"ready","migrationVersion":52,"expectedMigrationVersion":51}' \
+  '{"status":"ready","migrationVersion":null,"expectedMigrationVersion":52}' \
+  'not JSON'; do
+  if env "${common_env[@]}" RAILWAY_PROBE_TIMEOUT_SECONDS=1 TEST_CURL_BODY="$report" \
+    bash "$ROOT/scripts/railway-stack-release.sh" verify-catalog api=https://api.example.test/ready 52 >/dev/null 2>&1; then
+    echo 'catalog gate accepted an invalid readiness report' >&2
+    exit 1
+  fi
+done
+if env "${common_env[@]}" RAILWAY_PROBE_TIMEOUT_SECONDS=1 TEST_CURL_EXIT=22 TEST_CURL_BODY="$ready_catalog" \
+  bash "$ROOT/scripts/railway-stack-release.sh" verify-catalog api=https://api.example.test/ready 52 >/dev/null 2>&1; then
+  echo 'catalog gate accepted a failed HTTP request' >&2
+  exit 1
+fi
 
 # Exercise the real CLI status shape, with a newer skipped watch-path record
 # that has not replaced the successful, running active deployment.
@@ -283,6 +311,82 @@ jq -n --arg image "$runtime_digest" '{services: {"service-api-id": {
 }}}' >"$TMP/runtime-config.json"
 source_env=("${common_env[@]}" "TEST_RAILWAY_STATUS_FILE=$TMP/runtime-source.json"
   "TEST_RAILWAY_CONFIG_FILE=$TMP/runtime-config.json" "TEST_CONFIG_ARGS_FILE=$TMP/config-args.txt")
+
+# Exercise the import pause command with the pinned CLI's config and edit
+# response shapes. Both pause values are strings, not JSON booleans.
+pause_patch="$TMP/pause-patch.json"
+pause_config="$TMP/pause-config.json"
+pause_retry="$TMP/pause-retry.txt"
+pause_config_count="$TMP/pause-config-count.txt"
+printf '[{"id":"dep-pause","status":"SUCCESS"},{"id":"dep-1","status":"SUCCESS"}]\n' \
+  >"$TMP/pause-deployment.json"
+pause_env=("${source_env[@]}"
+  "TEST_SOURCE_PATCH_FILE=$pause_patch"
+  "TEST_SOURCE_ARGS_FILE=$TMP/pause-args.txt"
+  "TEST_RAILWAY_CONFIG_FILE=$pause_config"
+  "TEST_CONFIG_INITIAL_FILE=$TMP/runtime-config.json"
+  "TEST_CONFIG_READ_COUNT_FILE=$pause_config_count"
+  "TEST_RAILWAY_DEPLOYMENTS_AFTER_EDIT_FILE=$TMP/pause-deployment.json"
+  "TEST_RAILWAY_DEPLOYMENTS_AFTER_REDEPLOY_FILE=$TMP/pause-deployment.json"
+  "TEST_REDEPLOY_ARGS_FILE=$pause_retry")
+for state in on off; do
+  value=false
+  [[ "$state" != on ]] || value=true
+  jq --arg value "$value" '.services["service-api-id"].variables.LUMIERE_IMPORTS_PAUSED = {value: $value}' \
+    "$TMP/runtime-config.json" >"$pause_config"
+  rm -f "$pause_patch" "$pause_config_count"
+  env "${pause_env[@]}" bash "$ROOT/scripts/railway-stack-release.sh" set-import-pause api-server "$state" \
+    >"$TMP/pause-output.log"
+  jq -e --arg value "$value" '
+    . == {services: {"service-api-id": {variables: {LUMIERE_IMPORTS_PAUSED: {value: $value}}}}}
+  ' "$pause_patch" >/dev/null
+  grep -Fq -- '--project project-test --environment environment-test' "$TMP/pause-args.txt"
+  grep -Fq 'dep-pause: SUCCESS' "$TMP/pause-output.log"
+  test ! -e "$pause_retry"
+done
+
+rm "$pause_patch" "$pause_config_count"
+if env "${pause_env[@]}" TEST_CONFIG_DENIED=true \
+  bash "$ROOT/scripts/railway-stack-release.sh" set-import-pause api-server on >"$TMP/pause-output.log" 2>&1; then
+  echo 'pause command mutated an unreadable environment' >&2
+  exit 1
+fi
+test ! -e "$pause_patch"
+if grep -Fq 'untrusted-config-error-must-not-be-logged' "$TMP/pause-output.log"; then
+  echo 'pause command leaked a Railway config error' >&2
+  exit 1
+fi
+
+if env "${pause_env[@]}" TEST_ENV_EDIT_COMMITTED=false \
+  bash "$ROOT/scripts/railway-stack-release.sh" set-import-pause api-server on >"$TMP/pause-output.log" 2>&1; then
+  echo 'pause command accepted a no-op edit with the wrong applied value' >&2
+  exit 1
+fi
+test ! -e "$pause_retry"
+rm "$pause_patch" "$pause_config_count"
+env "${pause_env[@]}" TEST_CONFIG_INITIAL_FILE= \
+  bash "$ROOT/scripts/railway-stack-release.sh" set-import-pause api-server off >/dev/null
+grep -Fq -- '--service service-api-id --from-source' "$pause_retry"
+test ! -e "$pause_patch"
+
+rm "$pause_retry" "$pause_config_count"
+if env "${pause_env[@]}" \
+  bash "$ROOT/scripts/railway-stack-release.sh" set-import-pause api-server on >"$TMP/pause-output.log" 2>&1; then
+  echo 'pause command accepted a successful deployment with the wrong applied value' >&2
+  exit 1
+fi
+if grep -Fq 'config-private-sentinel' "$TMP/pause-output.log"; then
+  echo 'pause command leaked an unrelated service variable' >&2
+  exit 1
+fi
+
+jq '.[0].status = "FAILED"' "$TMP/pause-deployment.json" >"$TMP/failed-pause-deployment.json"
+rm "$pause_patch" "$pause_config_count"
+if env "${pause_env[@]}" TEST_RAILWAY_DEPLOYMENTS_AFTER_EDIT_FILE="$TMP/failed-pause-deployment.json" \
+  bash "$ROOT/scripts/railway-stack-release.sh" set-import-pause api-server off >/dev/null 2>&1; then
+  echo 'pause command accepted a failed deployment' >&2
+  exit 1
+fi
 env "${source_env[@]}" \
   RUST_RUNTIME_IMAGE="$runtime_digest" \
   TEST_SOURCE_PATCH_FILE="$source_patch_file" \

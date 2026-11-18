@@ -614,6 +614,18 @@ redeploy_storage() {
     "$deployment_id"
 }
 
+applied_import_pause_value() {
+  local service_id="$1" environment_id="$2"
+  # The config also contains unrelated decrypted variables; never log it.
+  timeout 45 railway environment config \
+    --environment "$environment_id" --json 2>/dev/null | jq -er \
+      --arg service "$service_id" '
+        .services[$service]
+        | select(type == "object" and .isDeleted != true)
+        | (.variables.LUMIERE_IMPORTS_PAUSED.value // "") | select(type == "string")
+      ' 2>/dev/null
+}
+
 # The API server refuses Sales and Warehouse backfill writes with a 503 while
 # LUMIERE_IMPORTS_PAUSED is true. Reuse the environment-scoped patch the source
 # promotion already depends on; a variable change redeploys the service.
@@ -626,7 +638,7 @@ set_import_pause_one() {
     off) value=false ;;
     *) die "set-import-pause requires on or off" ;;
   esac
-  local service_id snapshot environment_id before_ids edit_result
+  local service_id snapshot environment_id before_ids current
   if ! service_id="$(resolve_service_id "$service")" ||
       ! snapshot="$(existing_service_snapshot "$service_id")" ||
       ! environment_id="$(jq -er '.environmentId | select(type == "string" and length > 0)' <<<"$snapshot")"; then
@@ -634,41 +646,55 @@ set_import_pause_one() {
     dump_diagnostics "$service"
     return 1
   fi
-  before_ids="$(deployment_list "$service" | jq -c 'map(.id)')"
-  local patch
-  patch="$(jq -cn --arg service_id "$service_id" --arg value "$value" \
-    '{services: {($service_id): {variables: {LUMIERE_IMPORTS_PAUSED: {value: $value}}}}}')"
+  if ! current="$(applied_import_pause_value "$service_id" "$environment_id")"; then
+    echo "[railway-release] $service: could not read applied import pause state" >&2
+    return 1
+  fi
+  before_ids="$(deployment_list "$service_id" | jq -c 'map(.id)')"
 
-  echo "[railway-release] $service: setting import pause $state"
-  if ! edit_result="$(printf '%s\n' "$patch" | timeout "$UPLOAD_TIMEOUT_SECONDS" \
-    railway environment edit \
+  if [[ "$current" == "$value" ]]; then
+    # A retry may find the correct value configured even if its last deployment
+    # failed. Deploy from source to make the requested state effective.
+    echo "[railway-release] $service: import pause already configured; deploying it again"
+    if ! timeout "$UPLOAD_TIMEOUT_SECONDS" railway redeploy \
       --project "$RAILWAY_PROJECT_ID" \
-      --environment "$RAILWAY_ENVIRONMENT" \
-      --message "set import pause $state ($service)" \
-      --json)"; then
-    dump_diagnostics "$service"
-    return 1
-  fi
-  if ! jq -e --arg environment "$environment_id" \
-    '(.committed == true and .staged == true and .environmentId == $environment) or
-     (.committed == false and .staged == false)' \
-    >/dev/null <<<"$edit_result"; then
-    echo "[railway-release] $service: import pause edit returned an invalid result" >&2
-    dump_diagnostics "$service"
-    return 1
-  fi
-  if [[ "$(jq -r '.committed' <<<"$edit_result")" != true ]]; then
-    echo "[railway-release] $service: import pause already $state"
-    return 0
+      --environment "$environment_id" \
+      --service "$service_id" \
+      --from-source --yes --json >/dev/null; then
+      dump_diagnostics "$service"
+      return 1
+    fi
+  else
+    local patch edit_result
+    patch="$(jq -cn --arg service_id "$service_id" --arg value "$value" \
+      '{services: {($service_id): {variables: {LUMIERE_IMPORTS_PAUSED: {value: $value}}}}}')"
+    echo "[railway-release] $service: setting import pause $state"
+    if ! edit_result="$(printf '%s\n' "$patch" | timeout "$UPLOAD_TIMEOUT_SECONDS" \
+      railway environment edit \
+        --project "$RAILWAY_PROJECT_ID" \
+        --environment "$environment_id" \
+        --message "set import pause $state ($service)" \
+        --json)" || ! jq -e --arg environment "$environment_id" '
+          .committed == true and .staged == true and .environmentId == $environment
+        ' >/dev/null 2>&1 <<<"$edit_result"; then
+      echo "[railway-release] $service: import pause edit did not confirm a scoped commit" >&2
+      dump_diagnostics "$service"
+      return 1
+    fi
   fi
 
   local deployment_id
-  if ! deployment_id="$(wait_for_new_deployment "$service" "$before_ids")"; then
-    echo "[railway-release] $service: import pause edit committed but no new deployment appeared" >&2
+  if ! deployment_id="$(wait_for_new_deployment "$service_id" "$before_ids")"; then
+    echo "[railway-release] $service: no new deployment for the requested import pause state" >&2
     dump_diagnostics "$service"
     return 1
   fi
-  wait_for_terminal_success "$service" "$deployment_id"
+  wait_for_terminal_success "$service_id" "$deployment_id" || return 1
+  if ! current="$(applied_import_pause_value "$service_id" "$environment_id")" ||
+      [[ "$current" != "$value" ]]; then
+    echo "[railway-release] $service: could not verify applied import pause state" >&2
+    return 1
+  fi
 }
 
 # The served readiness report names the migration catalog the running binary
@@ -682,19 +708,20 @@ verify_catalog_one() {
     echo "[railway-release] invalid catalog probe $specification; expected NAME=URL" >&2
     return 2
   }
-  [[ "$expected" =~ ^[0-9]+$ ]] || {
-    echo "[railway-release] expected catalog version must be a number" >&2
+  [[ "$expected" =~ ^(0|[1-9][0-9]*)$ ]] || {
+    echo "[railway-release] expected catalog version must be a non-negative integer" >&2
     return 2
   }
 
   local deadline=$((SECONDS + PROBE_TIMEOUT_SECONDS))
   local report=""
   while (( SECONDS < deadline )); do
-    if report="$(curl --silent --connect-timeout "$HTTP_TIMEOUT_SECONDS" \
+    if report="$(curl --fail --silent --connect-timeout "$HTTP_TIMEOUT_SECONDS" \
         --max-time "$HTTP_TIMEOUT_SECONDS" "$url")" &&
         jq -e --argjson expected "$expected" '
-          .migrationVersion == $expected and .expectedMigrationVersion == $expected
-        ' >/dev/null <<<"$report"; then
+          .status == "ready"
+          and .migrationVersion == $expected and .expectedMigrationVersion == $expected
+        ' >/dev/null 2>&1 <<<"$report"; then
       echo "[railway-release] $name: serving migration catalog $expected"
       return 0
     fi

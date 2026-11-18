@@ -134,6 +134,7 @@ jobs:
             exit 1
           }
           : "${RAILWAY_TOKEN:?Configure RAILWAY_TOKEN on the selected GitHub Environment}"
+          : "${API_READINESS_URL:?Configure RAILWAY_API_READINESS_URL on the selected GitHub Environment}"
           if [[ "$RAILWAY_ENVIRONMENT" == production && -z "$EDGE_READINESS_URL" ]]; then
             echo "Production releases require edge_readiness_url" >&2
             exit 1
@@ -231,7 +232,6 @@ jobs:
       # API server serves the expected catalog. A failure in any step between
       # these two leaves the pause on; it is only lifted by the step below.
       - name: Phase 2b — pause Sales and Warehouse import writes
-        if: env.API_READINESS_URL != ''
         shell: bash
         run: bash scripts/railway-stack-release.sh set-import-pause api-server on
 
@@ -253,12 +253,10 @@ jobs:
         run: bash scripts/railway-stack-release.sh redeploy-source api-server
 
       - name: Phase 5 gate — API readiness
-        if: env.API_READINESS_URL != ''
         shell: bash
         run: bash scripts/railway-stack-release.sh probe "api-server=$API_READINESS_URL"
 
       - name: Phase 5 gate — served migration catalog version
-        if: env.API_READINESS_URL != ''
         shell: bash
         run: |
           set -euo pipefail
@@ -266,7 +264,6 @@ jobs:
           bash scripts/railway-stack-release.sh verify-catalog "api-server=$API_READINESS_URL" "$expected"
 
       - name: Phase 5 resume — lift import pause
-        if: env.API_READINESS_URL != ''
         shell: bash
         run: bash scripts/railway-stack-release.sh set-import-pause api-server off
 
