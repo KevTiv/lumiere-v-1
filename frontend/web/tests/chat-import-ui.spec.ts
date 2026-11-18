@@ -455,8 +455,9 @@ test("saved import stages sit above their panels in the narrow Settings workspac
 
   const workspace = page.getByTestId("saved-import-workspace")
   const tabs = workspace.getByRole("tablist", { name: "Import task stages" })
-  await expectPanelBelowImportTabs(workspace, "Sources")
-  for (const stage of ["Decisions", "ERP preview", "ERP results"]) {
+  await expect(tabs.getByRole("tab", { name: "Decisions", exact: true })).toHaveAttribute("aria-selected", "true")
+  await expectPanelBelowImportTabs(workspace, "Decisions")
+  for (const stage of ["Sources", "ERP preview", "ERP results"]) {
     await tabs.getByRole("tab", { name: stage, exact: true }).click()
     await expectPanelBelowImportTabs(workspace, stage)
   }
