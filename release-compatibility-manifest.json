@@ -36,7 +36,7 @@
     "checksum": "sha256:5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab",
     "application_catalog_path": "api-server/src/cold_tier/migrate.rs",
     "application_catalog_version": 52,
-    "application_catalog_checksum": "sha256:d19ed9736f62b53efdf2edcb5c2d6ab21d61c220d3103aef5245d050a92c4ab6"
+    "application_catalog_checksum": "sha256:c9b304d54a12cccf5c297f74764e98e491a952805b85a5ba416a3969077bcff3"
   },
   "services": {
     "api_server": {
