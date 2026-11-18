@@ -80,6 +80,7 @@ dependencies = [
  "lumiere-contracts",
  "lumiere-file-inspection",
  "lumiere-finance-review-core",
+ "lumiere-policy-core",
  "qdrant-client",
  "reqwest",
  "serde",
@@ -2158,7 +2159,7 @@ dependencies = [
 
 [[package]]
 name = "lumiere-contracts"
-version = "0.3.184"
+version = "0.3.185"
 dependencies = [
  "serde_json",
  "sha2 0.10.9",
@@ -4145,6 +4146,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "lumiere-policy-core",
  "reqwest",
  "serde",
  "serde_json",

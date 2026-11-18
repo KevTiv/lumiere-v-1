@@ -474,6 +474,13 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: include_str!("module_backfill_provenance_expand.sql"),
     },
+    Migration {
+        version: 52,
+        name: "ai_index_job",
+        change_set: 41,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("ai_index_job_expand.sql"),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

@@ -14,6 +14,9 @@ Status: draft. The gateway suite passed in the Cloud Runner after preparing the 
 - On `a8e4768`, hosted E2E smoke, Rust, frontend typecheck, and Chromium installation passed. The accounting browser job then caught four inspector assertions that did not account for the new `rag-outcomes` read. The fixture now verifies the company-scoped read and renders a synthetic report, while still asserting the exact inspection requests and rejecting unexpected calls.
 - All six inspector browser tests passed locally on Node 26 with pinned Chromium at both viewport widths. The two outcomes parser tests passed. The full hosted CI rerun is still needed.
 - `cargo test --locked -p ai-gateway --bin gateway`: 1,060 passed, 13 ignored.
+- Reconciled the branch with `main` at #448: the initial gate and any shape repair
+  share the same attachment evidence, the browser sends both attachments and the
+  locale, and typed withhold reasons still use the shared history notice.
 
 ## Remaining
 - Confirm the full hosted CI run on the updated draft.

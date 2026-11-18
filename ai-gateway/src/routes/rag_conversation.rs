@@ -225,11 +225,26 @@ mod tests {
             json!({"messageId": "25", "role": "assistant", "text": "Three rows need review."}),
         ];
         let conversation = assemble(checkpoint, 7, 9, "thread");
-        let mut prompt = super::super::build_user_prompt_value("[]", None, None, "Resume", &[]);
+        let attachment = super::super::attachments::ChatAttachment {
+            name: "notes.txt".into(),
+            text: "User-supplied observations".into(),
+        };
+        let mut prompt = super::super::build_user_prompt_value(
+            "[]",
+            None,
+            None,
+            "Resume",
+            &[attachment.support_ref()],
+            &[attachment],
+        );
         prompt["untrusted_context"]["earlier_conversation"] = conversation.prompt.unwrap();
 
         let sent = route_chat_prompt_through_provider_switch(prompt.to_string()).await;
         assert_eq!(sent, prompt);
+        assert_eq!(
+            sent["untrusted_context"]["user_attachments"][0]["text"],
+            "User-supplied observations"
+        );
         let history = &sent["untrusted_context"]["earlier_conversation"];
         assert_eq!(history["instruction_trust"], "untrusted");
         assert_eq!(history["checkpoint_revision"], 2);

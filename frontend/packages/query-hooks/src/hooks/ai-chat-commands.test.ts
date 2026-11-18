@@ -9,6 +9,7 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type {
   useAppendAiChatMessage,
   useCreateAiChatSession,
+  useAiMemoryRag,
   useUpdateAiChatSession,
 } from "./ai-memory"
 
@@ -45,7 +46,7 @@ function fixture() {
     "../http": {
       apiFetch: async (path: string, init: RequestInit) => {
         requests.push({ path, body: JSON.parse(String(init.body)) })
-        return new Response(null, { status: 200 })
+        return Response.json({ answer: "According to the supplied file: notes.", sources: [] })
       },
     },
   }
@@ -68,6 +69,7 @@ function fixture() {
         organizationId: number,
         companyId: number | null,
       ): Mutation<AppendMessageInput>
+      useAiMemoryRag(): Mutation<Parameters<ReturnType<typeof useAiMemoryRag>["mutateAsync"]>[0]>
       useUpdateAiChatSession(
         scope: Parameters<typeof useUpdateAiChatSession>[0],
       ): Mutation<UpdateSessionInput>
@@ -89,6 +91,7 @@ function fixture() {
     updates,
     create: module.exports.useCreateAiChatSession(7, 42).mutationFn,
     append: module.exports.useAppendAiChatMessage(7, 42).mutationFn,
+    rag: module.exports.useAiMemoryRag().mutationFn,
     update: module.exports.useUpdateAiChatSession({
       organizationId: 7,
       companyId: 42,
@@ -96,6 +99,16 @@ function fixture() {
     }).mutationFn,
   }
 }
+
+test("JSON chat forwards text attachments separately from the question and ERP scope", async () => {
+  const f = fixture()
+  const attachments = [{ name: "notes.txt", text: "notes" }]
+  await f.rag({ query: "Summarize the file", companyId: 42, attachments })
+  assert.deepEqual(f.requests, [{
+    path: "/api/ai/rag",
+    body: { query: "Summarize the file", companyId: 42, attachments },
+  }])
+})
 
 test("chat history updates use the company-scoped operation dispatcher", async () => {
   const f = fixture()
