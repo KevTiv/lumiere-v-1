@@ -37,6 +37,8 @@ export const MAX_INCLUDE_TYPES = 8
 const MAX_RAG_REQUEST_BYTES = 32 * 1024
 const MAX_RAG_QUERY_BYTES = 8 * 1024
 const chatSessionKey = z.string().regex(/^[A-Za-z0-9_-]{1,150}$/).optional()
+/** BCP-47-shaped UI language tag (e.g. en, fr, rw, sw, pt-BR). Metadata only. */
+const requestLocale = z.string().regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$/).max(35).optional()
 
 export async function parseRagRequest(request: NextRequest): Promise<
   | { ok: true; body: JsonObject }
@@ -138,6 +140,7 @@ export interface RagPayload extends RagAgentSelection {
   guide_refs?: RagGuideReference[]
   import_task_refs?: RagImportTaskReference[]
   chat_session_key?: string
+  locale?: string
   history_refs?: AssistantHistoryReference[]
   spreadsheet_selection?: z.infer<typeof spreadsheetSelection>
   ui_action_offers: RagUiActionOffer[]
@@ -180,6 +183,7 @@ export async function prepareRagPayload(params: {
   let importTaskRefs: RagImportTaskReference[] | undefined
   let historyRefs: AssistantHistoryReference[] | undefined
   let sessionKey: string | undefined
+  let locale: string | undefined
   let agentSelection: RagAgentSelection
   try {
     guideRefs = parseRagGuideReferences(body.guide_refs)
@@ -190,6 +194,8 @@ export async function prepareRagPayload(params: {
     agentSelection = parseRagAgentSelection(body)
     historyRefs = parseHistoryReferences(body.history_refs)
     sessionKey = chatSessionKey.parse(body.chat_session_key)
+    // A malformed locale is dropped rather than failing the turn.
+    locale = requestLocale.safeParse(body.locale).data
   } catch (error) {
     return {
       ok: false,
@@ -262,6 +268,7 @@ export async function prepareRagPayload(params: {
   if (guideRefs) payload.guide_refs = guideRefs
   if (importTaskRefs) payload.import_task_refs = importTaskRefs
   if (sessionKey) payload.chat_session_key = sessionKey
+  if (locale) payload.locale = locale
   if (historyRefs) payload.history_refs = historyRefs
 
   return { ok: true, payload }

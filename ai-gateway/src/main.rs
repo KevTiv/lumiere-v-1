@@ -271,6 +271,10 @@ async fn main() -> anyhow::Result<()> {
             post(routes::evidence::post_review_queue),
         )
         .route(
+            "/v1/evidence/rag-outcomes",
+            post(routes::rag_outcome::post_rag_outcomes),
+        )
+        .route(
             "/v1/knowledge/retrieve",
             post(routes::evidence::post_knowledge_retrieve),
         )

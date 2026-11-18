@@ -20,6 +20,7 @@ import { Textarea } from "@lumiere/ui/components/textarea"
 import { companyRowsToSelectOptions } from "@/lib/form-lookup"
 import { evidenceInspectionMatchesTarget, mapEvidenceInspection, type EvidenceInspectionView, type EvidenceTargetKind } from "./evidence-inspection"
 import { EvidenceReviewQueuePanel } from "./evidence-review-queue-panel"
+import { RagOutcomesPanel } from "./rag-outcomes-panel"
 import { HarnessInspector } from "./harness-inspector"
 import { availabilityLabel, claimKindLabel, evidenceMethodLabel, evidenceOutcomeLabel, evidenceStatusLabel, linkStateLabel, reviewTargetLabel } from "./enum-labels"
 
@@ -342,6 +343,8 @@ export function EvidenceReviewerPanel({ companies }: EvidenceReviewerPanelProps)
               </Field>
         </CardContent>
       </Card>
+
+      <RagOutcomesPanel key={`rag-outcomes-${companyId}`} companyId={companyId} />
 
       <EvidenceReviewQueuePanel
         key={companyId}

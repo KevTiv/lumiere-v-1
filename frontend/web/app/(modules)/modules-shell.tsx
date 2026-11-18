@@ -699,7 +699,7 @@ function ErpAiChatPanel({
         return persistExchange({ ...turnMeta, ...args })
       }
       const started = performance.now()
-      const continuity = { chat_session_key: sessionKey, history_refs: selectedReferences?.length ? [...selectedReferences] : undefined }
+      const continuity = { chat_session_key: sessionKey, locale: i18n.resolvedLanguage ?? "en", history_refs: selectedReferences?.length ? [...selectedReferences] : undefined }
       await ensureSession(userText)
       if (!isCurrent()) throw new Error("The conversation company changed.")
       const selectedDocument = !questionGuide && scopedSelectionDraft && userText.includes(scopedSelectionDraft.text)

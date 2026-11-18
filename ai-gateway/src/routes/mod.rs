@@ -16,6 +16,7 @@ pub mod ocr;
 pub(crate) mod passage_retrieval;
 pub mod policy;
 pub mod rag;
+pub(crate) mod rag_outcome;
 pub(crate) mod rag_ui_actions;
 pub mod report;
 pub mod run_lifecycle;

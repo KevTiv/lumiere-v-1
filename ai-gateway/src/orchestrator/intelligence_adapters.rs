@@ -312,8 +312,12 @@ impl GenerationProvider for LlmGenerationAdapter<'_> {
             let call = single_call(&response.tool_calls, TOOL_SUBMIT_RAG_ANSWER)?;
             object_arguments(call)?;
             let candidate = serde_json::to_string(&call.arguments)?;
-            super::text_answer_gate::validate_rag_generation(&candidate)
-                .map_err(anyhow::Error::msg)?;
+            super::text_answer_gate::validate_rag_generation(&candidate).map_err(|mut error| {
+                // The rejected attempt was already paid for; keep its usage.
+                error.input_tokens = response.input_tokens;
+                error.output_tokens = response.output_tokens;
+                anyhow::Error::new(error)
+            })?;
             candidate
         } else if structured {
             let call = single_call(&response.tool_calls, TOOL_SUBMIT_FINAL_DRAFT)?;
