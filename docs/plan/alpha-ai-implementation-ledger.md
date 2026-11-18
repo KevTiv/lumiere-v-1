@@ -1,3 +1,5 @@
+> Superseded for repository-owned skills by [skill ownership and lifecycle](skill-ownership-and-lifecycle.md) (2026-11-17). Historical record only for those steps.
+
 # AI-assisted ERP Alpha implementation ledger
 
 Updated 2026-10-30. Coordinator: Codex. This ledger coordinates AA-00–08;

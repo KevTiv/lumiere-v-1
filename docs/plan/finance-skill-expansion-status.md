@@ -1,3 +1,5 @@
+> Superseded for repository-owned skills by [skill ownership and lifecycle](skill-ownership-and-lifecycle.md) (2026-11-17). Historical record only for those steps.
+
 # Finance skill implementation — 2026-10-26
 
 Branch: `codex/finance-skill-expansion`, following the evidence foundation at

@@ -1,3 +1,5 @@
+> Superseded for repository-owned skills by [skill ownership and lifecycle](../skill-ownership-and-lifecycle.md) (2026-11-17). Historical record only for those steps.
+
 # AA-02 first-task activation slice
 
 Baseline: `3d6f32c23ba4a569f83d752ac0b2257e43799397` (main refreshed on

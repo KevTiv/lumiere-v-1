@@ -36,6 +36,8 @@ jobs:
         run: python3 -B scripts/generate-alpha-history-inventory.py --check
       - name: Validate repository-owned ERP skill contracts
         run: python3 -B scripts/erp_skill_catalog.py --check
+      - name: Verify retired skill certification steps are marked superseded
+        run: python3 -B scripts/check-retired-skill-steps.py
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc

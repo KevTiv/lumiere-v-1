@@ -1,3 +1,5 @@
+> Superseded for repository-owned skills by [skill ownership and lifecycle](../plan/skill-ownership-and-lifecycle.md) (2026-11-17). Historical record only for those steps.
+
 # AI Harness Completion — Tracked Issues
 
 Derived from
@@ -865,41 +867,53 @@ database rather than this tree.
 
 ---
 
-### AIH-19 — Harness setup, certification, and admission matrix
+### AIH-19 — Harness setup, user-skill certification, and admission matrix
 
 **Plan ref:** §7.5, §8, M0–M6. **Depends on:** AIH-1–5 plus the evidence,
 inspection and recovery issues required by the pilot's declared capability/path
 matrix. **Size:** L
 
 Configure versioned evidence requirements, source capability admission, reviewer
-roles, applicability, retention, budgets and failure behavior. Bind runs to the
-effective configuration. Extend certification with the plan's ERP/policy and
-intellectual-source-to-workflow and interactive-recovery scenarios on flagged
-pilot skills. Implement versioned Investigate/Design/Draft/Review mode profiles
-and transitions within server authorization; delegation remains disabled until M8.
-Record per-path capabilities, passed gates, evidence and explicit deferrals.
-This issue admits one flagged pilot only; reuse its matrix for AIH-6 rather than
-making pilot admission depend on wider migration.
+roles, applicability, retention, budgets and failure behavior, and bind runs to
+the effective configuration. Scope of this issue is **user-created skills**
+(`json_projection_v1`, the only user-authored executor) and the admission matrix:
+saved immutable versions, examples, certification/draft tests, review and
+activation, running the exact published version, and governed rollback, all under
+the current actor/company permissions. Extend that certification with the plan's
+ERP/policy and intellectual-source-to-workflow and interactive-recovery scenarios
+on a flagged pilot, implement versioned Investigate/Design/Draft/Review mode
+profiles and transitions within server authorization (delegation stays disabled
+until M8), and record per-path capabilities, passed gates, evidence and explicit
+deferrals. This issue admits one flagged pilot only; reuse its matrix for AIH-6
+rather than making pilot admission depend on wider migration.
 
-**Acceptance:** all three scenarios pass using persisted records and normal authorized
-API/UI reads, including compaction, adaptation, source changes, injected content,
-fallback and revocation. Adapter fixtures cover provider variations; each
-production provider/capability has its own smoke evidence before admission.
-Mode escalation attempts deny; user steering cannot silently change approved
-scope. The pilot passes every M0–M5 gate applicable to its declared paths and
+**Acceptance:** all three scenarios pass using persisted records and normal
+authorized API/UI reads, including compaction, adaptation, source changes,
+injected content, fallback and revocation. Adapter fixtures cover provider
+variations; each production provider/capability has its own smoke evidence before
+admission. Mode escalation attempts deny; user steering cannot silently change
+approved scope. A user-created `json_projection_v1` skill cannot run until an
+active reviewed version exists and cannot gain tools, model access or business
+data. The pilot passes every M0–M5 gate applicable to its declared paths and
 records non-applicable/deferred paths explicitly. AIH-6 owns bounded wider
 migration and the full M6 matrix; M7 remains the usage/evidence-quality gate.
-Disabled specialists/extensions do not block the base, but cannot be
-advertised as admitted until their M8/M9 gates pass.
+Disabled specialists/extensions do not block the base, but cannot be advertised
+as admitted until their M8/M9 gates pass.
 
-**Status — partial; not complete.** Certification reads now return persisted
+**Superseded scope:** earlier text required certifying, activating, manifest-
+refreshing or version-bumping repository-owned (built-in) skills. That is
+retired by [skill ownership and lifecycle](../plan/skill-ownership-and-lifecycle.md)
+(2026-11-17): built-ins ship with the application and need no certificate,
+activation, manifest refresh or per-change skill-version bump.
+
+**Status — partial; not complete.** Certification reads return persisted
 terminal evidence and a server-computed readiness reason. The API/BFF and skill
 registry UI expose loading, retry, empty, evidence and readiness states; release
-promotion is gated by that persisted readiness rather than client-side hash
-inference. Knowledge-promotion propose/list/review routes are company-scoped and
-feed accepted, unreleased skill versions into the same certification flow.
-Generated reducer descriptors, authenticated browser-to-STDB E2E and the full
-three-scenario admission matrix remain open.
+promotion for user-created skills is gated by that persisted readiness rather
+than client-side hash inference. Knowledge-promotion propose/list/review routes
+are company-scoped and feed accepted, unreleased user-skill versions into the
+same certification flow. Generated reducer descriptors, authenticated
+browser-to-STDB E2E and the full three-scenario admission matrix remain open.
 
 ---
 
@@ -1249,6 +1263,183 @@ financial execution authority and does not close existing pilot gates.
 
 ---
 
+### AIH-30 — Index ERP records so chat can retrieve them
+
+**Plan ref:** [chat remediation plan](./ai-harness-chat-remediation-plan.md) §AIH-30. **Depends on:** AIH-13, AIH-37 (rollout guard). **Size:** L
+
+Chat retrieval returns nothing for ordinary ERP records because only documents
+and activity are embedded; edits and approved imports never reach Qdrant. Add an
+`ai_index_job` queue table, enqueue on every relevant write with the writer as
+actor, and a gateway worker that drains at most 8 jobs per tick through the
+existing ingest path (spend admission, `embedding_index` permission and field
+projection unchanged). Add an operator bulk reindex that requires the
+`embedding_reindex` grant and a per-run spend cap, index `module_backfill_record`
+rows, and expose a per-company coverage signal so a company with no indexed
+points gets a "not indexed yet" reply instead of an empty answer. Write a Qdrant
+1.12.6 → 1.17 cutover runbook (fresh cluster + reindex versus staged
+one-minor-at-a-time upgrade); the infrastructure change itself stays an open ops
+decision and is not made here.
+
+**Acceptance:** an edited record is retrievable within 60 s; an approved Shop
+Sales import is retrievable by product and month; a company with zero points gets
+"not indexed yet"; degraded Qdrant still yields `RetrievalUnavailable`; no hit is
+returned to a user without access (every hit re-authorized for the asker); the
+bulk reindex stops at its spend cap; the live Qdrant is 1.17.x once cut over.
+
+**Status:** planned — 2026-11-18
+
+---
+
+### AIH-31 — Follow-up anchors for chat turns
+
+**Plan ref:** [chat remediation plan](./ai-harness-chat-remediation-plan.md) §AIH-31. **Depends on:** AIH-37. **Size:** M
+
+Follow-up questions ("what about the previous month?") lose the records the last
+answer was about. Carry typed anchors forward: add envelope v2 `anchor_refs`
+(`entity_type`, `entity_id`) built from the last grounded turn plus the #444
+`reviewedRecords`, capped at 8 and never containing prose. Anchors are
+re-authorized through `fetch_authorized_live_snapshots` on every turn. Resolution
+priority is UI record > named record > anchors > ANN search. Recognise reference
+words, show a "Using:" label for the active anchors with a clear control. Deploy
+the gateway before the api-server.
+
+**Acceptance:** a follow-up resolves to the prior record without a name; revoked
+access drops the anchor; prose is never persisted as an anchor; the cap of 8
+holds; the "Using:" label appears and clearing it removes the anchors; an old
+gateway ignores v2 fields safely.
+
+**Status:** planned — 2026-11-18
+
+---
+
+### AIH-32 — Multilingual read planner (lexicon-only)
+
+**Plan ref:** [chat remediation plan](./ai-harness-chat-remediation-plan.md) §AIH-32. **Depends on:** AIH-30, AIH-31. **Size:** L
+
+Move sales/farm/support read routing out of web-side parsers into the gateway.
+Add a `ReadPlan` enum in `harness/read_plan.rs` and lexicons at
+`erp-skills/rag_generation/lexicon/{en,fr,rw,sw,pt-BR}.json` with Unicode
+case-folding. Resolve labels via `authoritative_search` with Clarify choices when
+ambiguous. The gateway executes sales, farm and support reads behind a per-company
+flag; add `module_backfill_record` and `farm_batch` entities. Decision: lexicon
+only, no router model; leave a clearly named trait/hook for a future router. The
+web routers are removed only after parity is proven.
+
+**Acceptance:** a parity test against the TypeScript parsers passes; at least 40
+eval questions per language, with proposed thresholds 95% for en/fr and 90% for
+rw/sw; ambiguous labels return Clarify choices; every read is re-authorized for
+the actor; flag off preserves current behavior.
+
+**Status:** planned — 2026-11-18
+
+---
+
+### AIH-33 — Gate withhold reasons and one repair
+
+**Plan ref:** [chat remediation plan](./ai-harness-chat-remediation-plan.md) §AIH-33. **Depends on:** AIH-15. **Size:** M
+
+Withheld answers are indistinguishable. Add a `WithholdReason` enum and record
+reason, provider, model, language and spend per withheld turn; report 7-day counts
+by reason × model. Add one shape-only repair attempt for `Malformed`, `NoClaims`
+and `CoverageGap`. Authorization and source failures are never repaired. Build an
+eval corpus covering each reason.
+
+**Acceptance:** each withhold records one reason; counts by reason × model are
+queryable; at most one repair per turn and only for the three shape reasons; an
+auth/source failure is never repaired; the repair cannot add facts the evidence
+does not support.
+
+**Status:** planned — 2026-11-18
+
+---
+
+### AIH-34 — Chat to skill handoff
+
+**Plan ref:** [chat remediation plan](./ai-harness-chat-remediation-plan.md) §AIH-34. **Depends on:** AIH-32. **Size:** M
+
+When a question needs a governed skill run (for example a period report), offer it
+from the thread. Add a `Handoff` plan and a `start_skill_run` action in the BFF
+`ui_action_offers`, gated by the run permission, with a confirm card showing the
+spend estimate and an editable period. The run is a normal governed run; its
+result card returns to the thread as a decision history reference. A partial
+answer is shown first.
+
+**Acceptance:** the offer is absent without run permission; nothing starts without
+confirmation; the spend estimate and period shown match the run; the result card
+is linked in the thread; the partial answer precedes the offer.
+
+**Status:** planned — 2026-11-18
+
+---
+
+### AIH-35 — Withheld history reclassification
+
+**Plan ref:** [chat remediation plan](./ai-harness-chat-remediation-plan.md) §AIH-35. **Depends on:** AIH-33. **Size:** S
+
+Old runs that were really "not indexed" or retrieval failures are displayed as
+withheld. Reclassify on read, add an operator-only run-status correction with an
+audit record, a dry-run listing and usage counts.
+
+**Acceptance:** the dry run lists candidates without writing; correction needs the
+operator role and writes an audit row; usage counts reflect reclassification;
+stored evidence is unchanged.
+
+**Status:** planned — 2026-11-18
+
+---
+
+### AIH-36 — Release chat checks
+
+**Plan ref:** [chat remediation plan](./ai-harness-chat-remediation-plan.md) §AIH-36. **Depends on:** AIH-33. **Size:** M
+
+Extend release verification with one scenario per known gap, with known-gap
+support, for web releases. On by default with a recorded skip, using fresh
+sessions, run nightly, and gate on a withhold-rate threshold.
+
+**Acceptance:** each gap has a scenario; a known gap is reported, not hidden; a
+skip is recorded with reason; fresh sessions per scenario; nightly runs publish
+results; the withhold-rate gate fails the run when exceeded.
+
+**Status:** planned — 2026-11-18
+
+---
+
+### AIH-37 — #444 rollout guard
+
+**Plan ref:** [chat remediation plan](./ai-harness-chat-remediation-plan.md) §AIH-37. **Depends on:** #444. **Size:** S (P0 for the next deploy)
+
+Make the #444 rollout safe: a pause switch, a documented release order, a catalog
+version check, and migration 51 **split into expand and contract** so rollback
+stays safe. Verify on the signed-in pilot with RWF 71,406,345.45.
+
+**Acceptance:** pausing stops imports without data loss; release order is
+enforced or checked; a catalog version mismatch fails closed; expand ships first
+and contract only after verification; the pilot figure is reproduced.
+
+**Status:** planned — 2026-11-18
+
+---
+
+### AIH-38 — Retire certification steps from plans; record the AIH-30..38 plan
+
+**Plan ref:** [chat remediation plan](./ai-harness-chat-remediation-plan.md) §AIH-38. **Depends on:** none. **Size:** S
+
+Mark plans and guides that still require certifying, activating, manifest-
+refreshing or version-bumping repository-owned skills as superseded by
+[skill ownership and lifecycle](../plan/skill-ownership-and-lifecycle.md), rewrite
+AIH-19 to user-created skills and admission, commit this plan, add a short
+CLAUDE.md pointer, and add a CI check so the removed helper is not reintroduced
+as a required step.
+
+**Acceptance:** every doc outside `docs/evidence/` that names
+`finance-skill-manifests.py` or `certification-bundles` carries the banner;
+`scripts/check-retired-skill-steps.py` passes in CI; AIH-19 no longer reads as an
+open built-in certification requirement.
+
+**Status:** planned — 2026-11-18
+
+---
+
 ## Explicitly deferred (not in this issue list)
 
 - Promoting `tools/scoped_sql.rs` / `tools/tenant_files.rs` from
@@ -1272,3 +1463,12 @@ financial execution authority and does not close existing pilot gates.
 10. AIH-10 → AIH-11 → optional AIH-12
 11. AIH-25 and AIH-26 as separately admitted later capabilities after full M6
 12. AIH-27 after the H6 pilot is admitted; AIH-28 only after P1
+13. Chat remediation (see the [plan](./ai-harness-chat-remediation-plan.md); one PR per workstream):
+    - Batch A: AIH-37 rollout guard (next deploy; migration 51 expand first)
+    - Batch B: AIH-36 baseline checks, AIH-33 reasons, AIH-35 (wave 0 gate: pilot verified)
+    - Batch C: AIH-30 and AIH-31 (wave 1 gate: fixture hits; gateway before api-server)
+    - Batch D: AIH-32 en/fr lexicons and planner behind the per-company flag
+    - Batch E: AIH-32 rw/sw/pt-BR (wave 2 gate: parity passes)
+    - Batch F: AIH-33 repair, then AIH-34 stacked on AIH-32
+    - Batch G: AIH-32 web router removal, AIH-36 withhold-rate gate (wave 3 gate: 7 nights green)
+    - Batch H: AIH-38 docs cleanup (independent; may land any time)
