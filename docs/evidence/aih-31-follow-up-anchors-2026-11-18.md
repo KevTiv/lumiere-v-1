@@ -33,18 +33,21 @@ Priority: UI record, record named in the question, anchors, ANN hits.
   `pnpm exec tsx --test lib/assistant-turn.test.ts` (web, 27 passed); `pnpm i18n:check` scripts
   (duplicate keys, keys, locales, loanwords) pass. Node 22.23.5.
 - `rustfmt --edition 2021 --check` on all changed Rust files.
+- Cloud Runner: the gateway suite passed (1,054 passed, 13 ignored), all five API
+  chat-context tests passed, and the 30 focused frontend tests passed on Node 26.
+  GitHub's Rust and frontend typecheck jobs also passed on `1e9fe7e`.
+- The hosted long-thread fixture reached the API but still expected envelope
+  version 1. Its assertion now requires version 2 and verifies that ungrounded
+  and fresh threads have no anchors. CI and E2E use the shared HTTPS Chromium
+  installer to avoid the regional Ubuntu archive that stalled smoke setup.
 
 ## Not validated
 
-- Rust was NOT compiled or tested locally: `lumiere-contracts` OOMs the shared build host. The new
-  api-server and ai-gateway tests were written but not run; CI is the first compile.
-- Full-workspace TypeScript typecheck was not run (tsc ran out of memory on the host).
+- The full hosted long-thread run and browser smoke checks have not been revalidated with these fixes.
 - Import-card `reviewedRecords` ids are module backfill record ids (sales / shop_sales / warehouse), not ERP
   entity ids with an authorized live-read resource, so they are not anchored.
 
 ## Remaining work
 
-- [ ] Watch CI on the draft PR: first compile of the api-server and ai-gateway changes and tests; fix failures.
-- [ ] Run `cargo test -p ai-gateway --bin gateway` and `cargo test -p api-server --lib` where the contracts crate can build.
-- [ ] Run a full web/ui TypeScript typecheck.
+- [ ] Confirm the hosted long-thread and browser smoke runs pass on the updated draft.
 - [ ] Decide whether to narrow `anchors_apply` for unrelated questions asked right after a record answer.

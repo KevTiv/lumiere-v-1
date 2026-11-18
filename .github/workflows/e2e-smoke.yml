@@ -804,11 +804,12 @@ jobs:
           make contracts-staging-from-pinned
           cargo build --locked -p ai-gateway --bin gateway
           python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --bin gateway routes::rag::conversation::tests
-      - name: Install frontend and Playwright
+      - name: Install frontend dependencies
         working-directory: frontend
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm --dir web exec playwright install --with-deps chromium
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        timeout-minutes: 12
+        uses: ./.github/actions/install-playwright-chromium
       - uses: actions/download-artifact@v4
         with:
           name: e2e-build-${{ github.sha }}
