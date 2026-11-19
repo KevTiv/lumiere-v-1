@@ -245,11 +245,5 @@ export function useUpdateBudgetPost(organizationId: number) {
 }
 
 export function invalidateBudgetQueries(qc: ReturnType<typeof useQueryClient>, organizationId: number) {
-  // `stdbQueryKey` (hooks/stdb.ts) stringifies the organization id, so the invalidation key
-  // must match that shape or React Query will not match the cached query and the new row never
-  // refetches (this was the root cause of the budget-create E2E failure).
-  const k = String(organizationId)
-  void qc.invalidateQueries({ queryKey: ["stdb", "budgets", k] })
-  void qc.invalidateQueries({ queryKey: ["stdb", "budget-lines", k] })
-  void qc.invalidateQueries({ queryKey: ["stdb", "budget-posts", k] })
+  invalidateStdbQueryResources(qc, organizationId, ["budgets", "budget-lines", "budget-posts"])
 }
