@@ -58,6 +58,30 @@ services:
           content_type: application/json
           body: '{"status":"ok","service":"api-gateway"}'
 
+  # The release workflow runs on GitHub's runners and cannot reach Railway's
+  # private network, while api-server stays unexposed. Admit exactly one GET
+  # path to its readiness report, which serves the migration catalog version
+  # that Phase 5 must verify before lifting the import pause. The report holds
+  # only fixed component details. Each call checks PostgreSQL and SpacetimeDB,
+  # so it keeps its own limit; a release polls about six times a minute.
+  - name: api-server-readiness
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/health/ready
+    routes:
+      - name: api-server-readiness
+        paths:
+          - '~/health/api$'
+        methods: [GET]
+        regex_priority: 10
+        strip_path: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 60
+          hour: 600
+          limit_by: ip
+          fault_tolerant: false
+          policy: cluster
+
   - name: web
     url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__
     routes:

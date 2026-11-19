@@ -71,7 +71,8 @@ def start_gateway(suffix, template):
            '-e', 'LUMIERE_ENV=production',
            '-e', 'LUMIERE_GATEWAY_RATE_LIMIT_SCOPE=service',
            '-e', 'KONG_TRUSTED_IPS=0.0.0.0/0',
-           '-e', 'WEB_UPSTREAM_PORT=8080', '-e', 'KONG_ADMIN_LISTEN=0.0.0.0:8001',
+           '-e', 'WEB_UPSTREAM_PORT=8080', '-e', f'API_SERVER_UPSTREAM_HOST={UPSTREAM}',
+           '-e', 'API_SERVER_UPSTREAM_PORT=8080', '-e', 'KONG_ADMIN_LISTEN=0.0.0.0:8001',
            IMAGE)
     ports = json.loads(docker('inspect', '--format', '{{json .NetworkSettings.Ports}}', name))
     proxy = int(ports['8000/tcp'][0]['HostPort'])
@@ -98,7 +99,8 @@ def main():
                'from http.server import BaseHTTPRequestHandler, HTTPServer\n'
                'class Handler(BaseHTTPRequestHandler):\n'
                ' def do_GET(self):\n'
-               '  self.send_response(200); self.end_headers(); self.wfile.write(b"ok")\n'
+               '  self.send_response(200); self.send_header("X-Upstream-Path", self.path)\n'
+               '  self.end_headers(); self.wfile.write(b"ok")\n'
                ' do_POST = do_GET\n'
                ' do_PUT = do_GET\n'
                'HTTPServer(("0.0.0.0",8080),Handler).serve_forever()')
@@ -144,6 +146,18 @@ def main():
             ]:
                 assert request(port, path, method=method)[0] == 503, (method, path)
             print('Exact Alpha workbench route admission verified', flush=True)
+            status, headers = request(port, '/health/api?probe=1')
+            assert status == 200, status
+            assert headers.get('X-Upstream-Path') == '/health/ready?probe=1', dict(headers)
+            assert headers.get('RateLimit-Limit') == '60', dict(headers)
+            # Anything else under /health stays with the gateway-owned answer.
+            for method, path in [('POST', '/health/api'), ('GET', '/health/api/'),
+                                 ('GET', '/health/api/extra'), ('GET', '/health/apix'),
+                                 ('GET', '/health/ready')]:
+                status, headers = request(port, path, method=method)
+                assert status == 200, (method, path, status)
+                assert headers.get('X-Upstream-Path') is None, (method, path, dict(headers))
+            print('API server readiness route admission verified', flush=True)
             for i in range(10):
                 status, _ = request(port, '/api/auth/signin', {
                     'X-Forwarded-For': f'198.51.100.{i + 1}',

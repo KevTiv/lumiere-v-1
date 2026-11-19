@@ -119,6 +119,22 @@ class PrivateReleaseTests(unittest.TestCase):
             self.assertNotIn('redis', limiter)
             self.assertGreater(limiter['hour'], limiter['minute'])
 
+    def test_api_server_readiness_admits_one_get_path_only(self):
+        config = yaml.safe_load((ROOT / 'infra/kong/kong.yml').read_text())
+        service = next(s for s in config['services'] if s['name'] == 'api-server-readiness')
+        self.assertEqual(
+            service['url'],
+            'http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/health/ready')
+        [route] = service['routes']
+        self.assertEqual(route['paths'], ['~/health/api$'])
+        self.assertEqual(route['methods'], ['GET'])
+        self.assertTrue(route['strip_path'])
+        pattern = route['paths'][0][1:]
+        self.assertTrue(re.match(pattern, '/health/api'))
+        for path in ['/health/api/', '/health/api/extra', '/health/apix', '/prefix/health/api',
+                     '/health/ready', '/health']:
+            self.assertFalse(re.match(pattern, path), path)
+
     def test_robots_never_reaches_web(self):
         config = yaml.safe_load((ROOT / 'infra/kong/kong.yml').read_text())
         robots = next(service for service in config['services'] if service['name'] == 'robots')
