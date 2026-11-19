@@ -342,6 +342,16 @@ add explicit HTTP readiness probes after each service deployment. Railway
 terminal deployment success remains mandatory even when no external probe URL
 is configured.
 
+`RAILWAY_API_READINESS_URL` is required: phase 5 reads the served migration
+catalog version from it before lifting the import pause. The probes run on
+GitHub's runners, and `api-server` has no public domain, so point it at the
+gateway's single admitted readiness path, `https://<api-gateway domain>/health/api`.
+Kong forwards only `GET /health/api` to `api-server` `/health/ready`. The
+gateway's own `/health` and `/health/ready` never reach `api-server`, so they
+cannot satisfy the catalog check. The gateway deploys last, so the first
+release that relies on this route needs an `api-gateway` image that already
+contains it.
+
 Every upload, deployment wait, schema check, and HTTP probe has a timeout.
 Terminal failures print recent deployment metadata and logs. A failed phase
 prevents every downstream phase; successfully started deployments are not
