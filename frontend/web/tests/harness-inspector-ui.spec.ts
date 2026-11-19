@@ -1,7 +1,25 @@
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Page, type Route } from "@playwright/test"
 
 const checkpointHash = "a".repeat(64)
 const run = { runId: 42, status: "parked", skillId: 3, agentId: 4, stepCount: 2, tokensUsed: 120, startedAt: "2026-11-03T10:00:00Z" }
+const reviewQueuePath = "/api/ai/evidence/review-queue"
+const inspectPath = "/api/ai/evidence/inspect"
+const outcomesPath = "/api/ai/evidence/rag-outcomes"
+const reviewerBackgroundReads = [reviewQueuePath, outcomesPath]
+
+function fulfillOutcomes(route: Route) {
+  expect(route.request().method()).toBe("POST")
+  expect(route.request().postDataJSON()).toEqual({ companyId: 7 })
+  return route.fulfill({ json: {
+    windowDays: 7,
+    turns: 4,
+    withheld: 1,
+    withholdRate: 0.25,
+    models: [{ provider: "fixture", model: "Synthetic model", turns: 4, withheld: 1, repaired: 0, withholdRate: 0.25 }],
+    byReasonAndModel: [{ provider: "fixture", model: "Synthetic model", reason: "coverage_gap", withheld: 1, rate: 0.25 }],
+    truncated: false,
+  } })
+}
 
 async function noPageOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
@@ -63,11 +81,12 @@ for (const width of [320, 390]) {
       await page.route("**/api/ai/**", async (route) => {
         const path = new URL(route.request().url()).pathname
         requests.push(path)
-        if (path.endsWith("/review-queue")) return route.fulfill({ json: { claims: [
+        if (path === outcomesPath) return fulfillOutcomes(route)
+        if (path === reviewQueuePath) return route.fulfill({ json: { claims: [
           { id: 8, statement: "Synthetic claim A", reviewableByViewer: false },
           { id: 9, statement: "Synthetic claim B", reviewableByViewer: false },
         ], decisions: [], components: [] } })
-        if (path === "/api/ai/evidence/inspect") {
+        if (path === inspectPath) {
           const body = route.request().postDataJSON() as { id: number }
           inspected.push(body.id)
           if (body.id === 8) await firstGate
@@ -80,6 +99,7 @@ for (const width of [320, 390]) {
       await page.goto("/harness-inspector", { waitUntil: "domcontentloaded" })
       await expect(page.getByTestId("harness-inspector-fixture")).toHaveAttribute("data-ready", "true", { timeout: 30_000 })
       await page.getByRole("button", { name: "Review evidence", exact: true }).click()
+      await expect(page.getByText("1 of 4 answers withheld (25.0%)", { exact: true })).toBeVisible()
       await page.getByTestId("queue-claim-8").getByRole("button", { name: "Inspect", exact: true }).click()
       await expect.poll(() => inspected).toContain(8)
       await page.getByTestId("queue-claim-9").getByRole("button", { name: "Inspect", exact: true }).click()
@@ -91,7 +111,8 @@ for (const width of [320, 390]) {
       await page.getByRole("button", { name: "Use this claim in a proposed decision", exact: true }).click()
       await expect(page.locator("#adopted-claims")).toHaveValue("9")
       await expect(page.locator("#decision-title")).toBeFocused()
-      expect(requests.every((path) => path.endsWith("/review-queue") || path.endsWith("/evidence/inspect"))).toBe(true)
+      expect(requests.filter((path) => !reviewerBackgroundReads.includes(path))).toEqual([inspectPath, inspectPath])
+      expect(inspected).toEqual([8, 9])
       await noPageOverflow(page)
     })
 
@@ -100,8 +121,10 @@ for (const width of [320, 390]) {
       await page.route("**/api/ai/**", async (route) => {
         const path = new URL(route.request().url()).pathname
         paths.push(path)
-        if (path.endsWith("/review-queue")) return route.fulfill({ json: { claims: [], decisions: [], components: [] } })
-        return route.fulfill({ status: 403, json: { error: "Synthetic reviewer access denied" } })
+        if (path === outcomesPath) return fulfillOutcomes(route)
+        if (path === reviewQueuePath) return route.fulfill({ json: { claims: [], decisions: [], components: [] } })
+        if (path === inspectPath) return route.fulfill({ status: 403, json: { error: "Synthetic reviewer access denied" } })
+        return route.fulfill({ status: 403, json: { error: "No synthetic mutations are allowed" } })
       })
       await page.goto("/harness-inspector", { waitUntil: "domcontentloaded" })
       await expect(page.getByTestId("harness-inspector-fixture")).toHaveAttribute("data-ready", "true", { timeout: 30_000 })
@@ -116,9 +139,10 @@ for (const width of [320, 390]) {
       await expect(page.locator("#evidence-target-id")).toBeHidden()
       await page.keyboard.press("Enter")
       await expect(page.locator("#evidence-target-id")).toHaveValue("91")
+      expect(paths.filter((path) => !reviewerBackgroundReads.includes(path))).toEqual([])
       await page.getByRole("button", { name: "Inspect lineage", exact: true }).click()
       await expect(page.getByRole("alert").filter({ hasText: "Synthetic reviewer access denied" })).toBeVisible()
-      expect(paths.filter((path) => path !== "/api/ai/evidence/review-queue")).toEqual(["/api/ai/evidence/inspect"])
+      expect(paths.filter((path) => !reviewerBackgroundReads.includes(path))).toEqual([inspectPath])
       await noPageOverflow(page)
       await page.screenshot({ path: testInfo.outputPath(`evidence-inspector-${width}.png`) })
     })

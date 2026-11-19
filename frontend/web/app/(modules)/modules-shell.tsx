@@ -713,6 +713,7 @@ function ErpAiChatPanel({
       const attachmentNames = attachments.length ? attachments.map(file => file.name) : undefined
       const continuity = {
         chat_session_key: sessionKey,
+        locale: i18n.resolvedLanguage ?? "en",
         history_refs: selectedReferences?.length ? [...selectedReferences] : undefined,
         ...(clearFollowUpAnchors.current !== null && clearFollowUpAnchors.current === sessionKey ? { clear_anchors: true } : {}),
       }

@@ -38,6 +38,8 @@ export const MAX_INCLUDE_TYPES = 8
 const MAX_RAG_REQUEST_BYTES = 32 * 1024
 const MAX_RAG_QUERY_BYTES = 8 * 1024
 const chatSessionKey = z.string().regex(/^[A-Za-z0-9_-]{1,150}$/).optional()
+/** BCP-47-shaped UI language tag (e.g. en, fr, rw, sw, pt-BR). Metadata only. */
+const requestLocale = z.string().regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$/).max(35).optional()
 
 export async function parseRagRequest(request: NextRequest): Promise<
   | { ok: true; body: JsonObject }
@@ -140,6 +142,7 @@ export interface RagPayload extends RagAgentSelection {
   import_task_refs?: RagImportTaskReference[]
   attachments?: AiChatAttachment[]
   chat_session_key?: string
+  locale?: string
   history_refs?: AssistantHistoryReference[]
   /** Narrowing only: skip the previous answer's records for this question. */
   clear_anchors?: true
@@ -185,6 +188,7 @@ export async function prepareRagPayload(params: {
   let attachments: AiChatAttachment[]
   let historyRefs: AssistantHistoryReference[] | undefined
   let sessionKey: string | undefined
+  let locale: string | undefined
   let agentSelection: RagAgentSelection
   try {
     attachments = parseChatAttachments(body.attachments)
@@ -196,6 +200,8 @@ export async function prepareRagPayload(params: {
     agentSelection = parseRagAgentSelection(body)
     historyRefs = parseHistoryReferences(body.history_refs)
     sessionKey = chatSessionKey.parse(body.chat_session_key)
+    // A malformed locale is dropped rather than failing the turn.
+    locale = requestLocale.safeParse(body.locale).data
   } catch (error) {
     return {
       ok: false,
@@ -270,6 +276,7 @@ export async function prepareRagPayload(params: {
   if (importTaskRefs) payload.import_task_refs = importTaskRefs
   if (attachments.length) payload.attachments = attachments
   if (sessionKey) payload.chat_session_key = sessionKey
+  if (locale) payload.locale = locale
   if (historyRefs) payload.history_refs = historyRefs
   if (sessionKey && body.clear_anchors === true) payload.clear_anchors = true
 

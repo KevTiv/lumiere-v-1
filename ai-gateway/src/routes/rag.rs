@@ -31,7 +31,7 @@ use crate::{
     orchestrator::{
         intelligence::EvidenceRef,
         intelligence_router::{
-            gate_rag_answer_with_review, generation_prompt_budget_bytes,
+            gate_rag_answer_with_review, generation_prompt_budget_bytes, repair_rag_generation,
             run_catalogued_generation_surface,
         },
         model_configuration::StdbModelConfigurationStore,
@@ -39,8 +39,9 @@ use crate::{
         skill_loader::{complete_run, create_generation_surface_run, GovernedRunRef},
         spend_admission::StdbSpendLedger,
         text_answer_gate::{
-            GatedTextAnswer, PassageStatus, SourcePassage, TextAnswerOutcome, TextAnswerProvenance,
-            TextAnswerVerification, TextClaimProvenance, TextEvidence,
+            notice, GatedTextAnswer, PassageStatus, RagSubmissionRejected, SourcePassage,
+            TextAnswerOutcome, TextAnswerProvenance, TextAnswerVerification, TextClaimProvenance,
+            TextEvidence, WithholdReason,
         },
     },
     retrieval_policy::optional_retrieval,
@@ -52,6 +53,7 @@ use crate::{
         authorize_and_resolve, recheck_before_release, AuthorizedEvidence, EvidenceAccess,
         EvidenceScope, LiveEvidenceAccess, ReleaseCheck, ResolvedPassage, RAG_MAX_EVIDENCE_ROWS,
     },
+    routes::rag_outcome::{self, RagOutcome, Spend},
     state::AppState,
     stdb_embed::company_belongs_to_organization,
 };
@@ -140,6 +142,10 @@ pub struct RagRequest {
     #[serde(default)]
     attachments: Vec<ChatAttachment>,
     pub chat_session_key: Option<String>,
+    /// UI language tag, recorded with the run for outcome counts only. It
+    /// never selects evidence, a model or any authority.
+    #[serde(default)]
+    pub locale: Option<String>,
     #[serde(default)]
     pub history_refs: Vec<HistoryReference>,
     /// The user dismissed "Using: ..." for this turn: do not carry the previous
@@ -494,10 +500,13 @@ pub(crate) struct RagRelease {
     pub(crate) run_failure: Option<&'static str>,
     /// True only after answer admission, provenance and release checks succeeded.
     pub(crate) answer_released: bool,
+    /// Why the candidate was withheld; `None` when it was released.
+    pub(crate) withhold_reason: Option<WithholdReason>,
 }
 
 impl RagRelease {
-    fn withhold(&mut self, reason: &'static str) {
+    fn withhold(&mut self, kind: WithholdReason, reason: &'static str) {
+        self.withhold_reason = Some(kind);
         self.answer = lumiere_policy_core::withheld_answer::withheld_answer_notice(Some(reason));
         self.verification.outcome =
             crate::orchestrator::text_answer_gate::TextAnswerOutcome::RequiresReview;
@@ -549,16 +558,20 @@ pub(crate) async fn release_rag_answer(
         .await?;
     // A parser/coverage rejection is a withheld result too, not a successfully
     // completed run. Later rechecks may replace this with a more specific cause.
-    let mut run_failure =
-        (!gated.is_released()).then_some("answer was withheld by the evidence gate");
+    let mut run_failure = (!gated.is_released()).then_some(notice::EVIDENCE_GATE);
+    let mut withhold_reason = gated.withhold_reason;
     // Any answer generated with passages in its prompt depends on the actor's
     // continuing access to them, whether or not it cites one.
     let depends_on_passages = !passages.is_empty();
 
-    let recheck = |gated: &mut GatedTextAnswer, run_failure: &mut Option<&'static str>, check| {
+    let recheck = |gated: &mut GatedTextAnswer,
+                   run_failure: &mut Option<&'static str>,
+                   withhold_reason: &mut Option<WithholdReason>,
+                   check| {
         if let ReleaseCheck::Withdrawn(reason) = check {
-            gated.withhold(reason);
+            gated.withhold(WithholdReason::AccessChanged, reason);
             *run_failure = Some(reason);
+            *withhold_reason = Some(WithholdReason::AccessChanged);
         }
     };
 
@@ -566,15 +579,15 @@ pub(crate) async fn release_rag_answer(
         let check =
             recheck_before_release(access, inputs.scope, inputs.evidence, inputs.requested_rows)
                 .await;
-        recheck(&mut gated, &mut run_failure, check);
+        recheck(&mut gated, &mut run_failure, &mut withhold_reason, check);
     }
 
     if gated.released.is_some()
         && !import_tasks::recheck(inputs.import_access, inputs.import_tasks).await
     {
-        const REASON: &str = "the saved import changed or its current access could not be checked";
-        gated.withhold(REASON);
-        run_failure = Some(REASON);
+        gated.withhold(WithholdReason::AccessChanged, notice::IMPORT_CHANGED);
+        run_failure = Some(notice::IMPORT_CHANGED);
+        withhold_reason = Some(WithholdReason::AccessChanged);
     }
 
     if gated.released.is_some() {
@@ -584,17 +597,23 @@ pub(crate) async fn release_rag_answer(
                     gated.provenance.mark_persisted(contribution_id, claim_ids)
                 }
                 Ok(_) => {
-                    const REASON: &str = "answer provenance produced no durable claims";
-                    gated.withhold(REASON);
-                    run_failure = Some(REASON);
+                    gated.withhold(
+                        WithholdReason::ProvenanceNotRecorded,
+                        notice::PROVENANCE_EMPTY,
+                    );
+                    run_failure = Some(notice::PROVENANCE_EMPTY);
+                    withhold_reason = Some(WithholdReason::ProvenanceNotRecorded);
                 }
                 Err(error) => {
                     // The error names reducers and ids, never passage text;
                     // the user-facing reason stays generic regardless.
                     tracing::warn!(error = %format!("{error:#}"), "RAG answer provenance was not recorded");
-                    const REASON: &str = "answer provenance could not be recorded";
-                    gated.withhold(REASON);
-                    run_failure = Some(REASON);
+                    gated.withhold(
+                        WithholdReason::ProvenanceNotRecorded,
+                        notice::PROVENANCE_FAILED,
+                    );
+                    run_failure = Some(notice::PROVENANCE_FAILED);
+                    withhold_reason = Some(WithholdReason::ProvenanceNotRecorded);
                 }
             }
         } else {
@@ -610,15 +629,15 @@ pub(crate) async fn release_rag_answer(
         let check =
             recheck_before_release(access, inputs.scope, inputs.evidence, inputs.requested_rows)
                 .await;
-        recheck(&mut gated, &mut run_failure, check);
+        recheck(&mut gated, &mut run_failure, &mut withhold_reason, check);
     }
 
     if gated.released.is_some()
         && !import_tasks::recheck(inputs.import_access, inputs.import_tasks).await
     {
-        const REASON: &str = "the saved import changed or its current access could not be checked";
-        gated.withhold(REASON);
-        run_failure = Some(REASON);
+        gated.withhold(WithholdReason::AccessChanged, notice::IMPORT_CHANGED);
+        run_failure = Some(notice::IMPORT_CHANGED);
+        withhold_reason = Some(WithholdReason::AccessChanged);
     }
 
     let passages_disclosed = gated.released.is_some() && run_failure.is_none();
@@ -634,6 +653,7 @@ pub(crate) async fn release_rag_answer(
         passages_disclosed,
         run_failure,
         answer_released,
+        withhold_reason: withhold_reason.filter(|_| !answer_released),
     })
 }
 
@@ -809,6 +829,130 @@ fn normalized_include_types(include_types: Option<&[String]>) -> Vec<String> {
     }
 
     out
+}
+
+/// Performs the one shape repair; a trait so the repair paths are testable
+/// without a provider.
+#[async_trait]
+trait ShapeRepairer: Send + Sync {
+    /// `None` when no repair may be attempted. An attempt is counted on `spend`.
+    async fn attempt(
+        &self,
+        reason: WithholdReason,
+        spend: &mut Spend,
+    ) -> Option<anyhow::Result<crate::orchestrator::intelligence::GenerationResponse>>;
+}
+
+/// A turn's release, plus the revised submission when one repair was used.
+struct RepairedRelease {
+    release: RagRelease,
+    repaired: Option<crate::orchestrator::intelligence::GenerationResponse>,
+}
+
+/// Release a candidate; if it was withheld for a repairable shape reason
+/// (malformed, no claims, coverage gap) resend it once and send the revision
+/// through the full gate again. Every other reason fails closed with no repair.
+/// A repair that itself fails leaves the first withheld release in place, with
+/// the attempt and its spend recorded on `spend`.
+async fn release_with_one_repair(
+    inputs: &ReleaseInputs<'_>,
+    candidate: &str,
+    admission: &dyn RagAnswerAdmission,
+    provenance_sink: &dyn RagProvenanceSink,
+    access: &dyn EvidenceAccess,
+    repairer: &dyn ShapeRepairer,
+    spend: &mut Spend,
+) -> anyhow::Result<RepairedRelease> {
+    let first = release_rag_answer(inputs, candidate, admission, provenance_sink, access).await?;
+    let repairable = Some(&first)
+        .filter(|first| !first.answer_released && spend.repair_attempts == 0)
+        .and_then(|first| first.withhold_reason)
+        .filter(|reason| reason.is_repairable());
+    let Some(reason) = repairable else {
+        return Ok(RepairedRelease {
+            release: first,
+            repaired: None,
+        });
+    };
+    match repairer.attempt(reason, spend).await {
+        Some(Ok(response)) => {
+            let (revised, _) = split_candidate(&response.content);
+            let release =
+                release_rag_answer(inputs, &revised, admission, provenance_sink, access).await?;
+            Ok(RepairedRelease {
+                release,
+                repaired: Some(response),
+            })
+        }
+        _ => Ok(RepairedRelease {
+            release: first,
+            repaired: None,
+        }),
+    }
+}
+
+/// The single shape repair of a RAG submission, bound to the same run, agent,
+/// evidence and spend admission as the first generation.
+struct ShapeRepair<'a> {
+    state: &'a AppState,
+    store: &'a StdbModelConfigurationStore<'a>,
+    ledger: &'a StdbSpendLedger<'a>,
+    org_id: u64,
+    company_id: u64,
+    run: &'a GovernedRunRef,
+    agent: &'a crate::ai_agent::ResolvedAgentConfig,
+    skill_access: &'a ActorSkillAccess<'a>,
+    /// The first generation's exact prompt: the evidence is not re-gathered.
+    objective: String,
+    instructions: String,
+}
+
+#[async_trait]
+impl ShapeRepairer for ShapeRepair<'_> {
+    /// `None` when the reason is not repairable or the chargeable limits refuse
+    /// another call (the first failure then stands). Otherwise one attempt,
+    /// counted and charged to `spend` whether or not it succeeds.
+    async fn attempt(
+        &self,
+        reason: WithholdReason,
+        spend: &mut Spend,
+    ) -> Option<anyhow::Result<crate::orchestrator::intelligence::GenerationResponse>> {
+        let diagnostic = reason.repair_diagnostic()?;
+        if enforce_chargeable_limits(
+            self.state.agent_rate_limiter.as_ref(),
+            self.org_id,
+            self.agent,
+        )
+        .is_err()
+        {
+            return None;
+        }
+        spend.repair_attempts += 1;
+        let result = repair_rag_generation(
+            self.store,
+            self.ledger,
+            self.org_id,
+            self.company_id,
+            self.run,
+            self.agent,
+            self.state.providers.llm.as_ref(),
+            self.objective.clone(),
+            &self.instructions,
+            self.agent.max_tokens,
+            diagnostic,
+            self.skill_access,
+        )
+        .await;
+        match &result {
+            Ok(response) => spend.add_repair(response.input_tokens, response.output_tokens),
+            Err(error) => {
+                if let Some(rejected) = error.downcast_ref::<RagSubmissionRejected>() {
+                    spend.add_repair(rejected.input_tokens, rejected.output_tokens);
+                }
+            }
+        }
+        Some(result)
+    }
 }
 
 pub async fn post_rag(
@@ -1585,6 +1729,20 @@ pub async fn post_rag(
         writer: state.stdb.as_ref(),
         reader: spend_reader,
     };
+    let mut spend = Spend::default();
+    let language = rag_outcome::normalize_language(req.locale.as_deref());
+    let repair = ShapeRepair {
+        state: &state,
+        store: &model_store,
+        ledger: &ledger,
+        org_id,
+        company_id: req.company_id,
+        run: &run,
+        agent: &agent,
+        skill_access: &skill_access,
+        objective: user_prompt.clone(),
+        instructions: system_prompt.clone(),
+    };
     let program = run_catalogued_generation_surface(
         &model_store,
         &ledger,
@@ -1603,33 +1761,81 @@ pub async fn post_rag(
         &skill_access,
     )
     .await;
-    let program = match program {
-        Ok(outcome) => outcome,
-        Err(error) => {
-            let _ = complete_run(
-                state.stdb.as_ref(),
-                org_id,
-                req.company_id,
-                run.run_id,
-                "failed",
-                None,
-                None,
-                None,
-                0,
-                0,
-                Some(error.to_string()),
+    let (generated, trace_len, mut provider, mut model) = match program {
+        Ok(outcome) => {
+            spend.add_first(
+                outcome.generation_input_tokens,
+                outcome.generation_output_tokens,
+            );
+            let generated = outcome.final_content.clone().ok_or_else(|| {
+                AppError::Internal("governed RAG generation produced no final content".into())
+            })?;
+            (
+                generated,
+                outcome.trace.len() as u32,
+                outcome.generation_provider.clone(),
+                outcome.generation_model.clone(),
             )
-            .await;
-            return Err(AppError::from_generation(error));
+        }
+        Err(error) => {
+            // A submission that broke the answer contract may be repaired once
+            // for its shape. Any other generation failure fails closed as before.
+            let rejected = error
+                .downcast_ref::<RagSubmissionRejected>()
+                .filter(|rejected| rejected.reason.is_repairable())
+                .cloned();
+            let repaired = match &rejected {
+                Some(rejected) => {
+                    spend.add_first(rejected.input_tokens, rejected.output_tokens);
+                    repair.attempt(rejected.reason, &mut spend).await
+                }
+                None => None,
+            };
+            match repaired {
+                Some(Ok(response)) => (
+                    response.content,
+                    0,
+                    Some(response.provider),
+                    Some(response.model),
+                ),
+                _ => {
+                    if let Some(rejected) = &rejected {
+                        rag_outcome::record_outcome(
+                            state.stdb.as_ref(),
+                            org_id,
+                            run.run_id,
+                            &RagOutcome::new(
+                                req.company_id,
+                                false,
+                                Some(rejected.reason),
+                                None,
+                                None,
+                                language.clone(),
+                                spend,
+                            ),
+                        )
+                        .await;
+                    }
+                    let _ = complete_run(
+                        state.stdb.as_ref(),
+                        org_id,
+                        req.company_id,
+                        run.run_id,
+                        "failed",
+                        None,
+                        None,
+                        None,
+                        0,
+                        spend.total_tokens(),
+                        Some(error.to_string()),
+                    )
+                    .await;
+                    return Err(AppError::from_generation(error));
+                }
+            }
         }
     };
-    let total_tokens = program
-        .generation_input_tokens
-        .saturating_add(program.generation_output_tokens);
-    let generated = program.final_content.clone().ok_or_else(|| {
-        AppError::Internal("governed RAG generation produced no final content".into())
-    })?;
-    let (answer_candidate, candidate_actions) = split_candidate(&generated);
+    let (mut answer_candidate, mut candidate_actions) = split_candidate(&generated);
 
     let review_admission = RoutedRagAdmission {
         store: &model_store,
@@ -1647,26 +1853,37 @@ pub async fn post_rag(
         scope,
         run_id: run.run_id,
     };
-    let mut release = match release_rag_answer(
-        &ReleaseInputs {
-            scope,
-            requested_rows: req.limit,
-            query: &req.query,
-            snapshots: &live_snapshots,
-            evidence: &authorized,
-            import_tasks: &saved_imports,
-            import_access: Some(&import_access),
-            spreadsheet: selected_spreadsheet.as_ref(),
-            attachments: &req.attachments,
-            history_references: &history_references,
-        },
+    let release_inputs = ReleaseInputs {
+        scope,
+        requested_rows: req.limit,
+        query: &req.query,
+        snapshots: &live_snapshots,
+        evidence: &authorized,
+        import_tasks: &saved_imports,
+        import_access: Some(&import_access),
+        spreadsheet: selected_spreadsheet.as_ref(),
+        attachments: &req.attachments,
+        history_references: &history_references,
+    };
+    let released = release_with_one_repair(
+        &release_inputs,
         &answer_candidate,
         &review_admission,
         &provenance_sink,
         &evidence_access,
+        &repair,
+        &mut spend,
     )
     .await
-    {
+    .map(|turn| {
+        if let Some(response) = turn.repaired {
+            provider = Some(response.provider);
+            model = Some(response.model);
+            (answer_candidate, candidate_actions) = split_candidate(&response.content);
+        }
+        turn.release
+    });
+    let mut release = match released {
         Ok(release) => release,
         Err(error) => {
             let _ = complete_run(
@@ -1679,13 +1896,14 @@ pub async fn post_rag(
                 None,
                 None,
                 1,
-                total_tokens,
+                spend.total_tokens(),
                 Some(format!("answer gate failed: {error}")),
             )
             .await;
             return Err(AppError::Internal(format!("answer gate failed: {error}")));
         }
     };
+    let total_tokens = spend.total_tokens();
     // A readback card may accompany withheld prose. Changed or revoked task
     // authority suppresses the card and every answer made with its old context.
     let fresh_guides =
@@ -1699,7 +1917,7 @@ pub async fn post_rag(
             .map(AuthorizedImportTask::status_card)
             .collect()
     } else {
-        release.withhold("the saved import changed or its current access could not be checked");
+        release.withhold(WithholdReason::AccessChanged, notice::IMPORT_CHANGED);
         Vec::new()
     };
 
@@ -1709,9 +1927,7 @@ pub async fn post_rag(
             .await
             .is_ok_and(|fresh| fresh.digest == original.digest)
         {
-            release.withhold(
-                "the spreadsheet selection changed or its current access could not be checked",
-            );
+            release.withhold(WithholdReason::AccessChanged, notice::SPREADSHEET_CHANGED);
         }
     }
     if !history_references.is_empty()
@@ -1719,9 +1935,7 @@ pub async fn post_rag(
             .await
             .is_ok_and(|fresh| fresh == history_references)
     {
-        release.withhold(
-            "saved conversation evidence changed or its current access could not be checked",
-        );
+        release.withhold(WithholdReason::AccessChanged, notice::HISTORY_CHANGED);
     }
     if let Some(key) = req
         .chat_session_key
@@ -1729,7 +1943,7 @@ pub async fn post_rag(
         .filter(|_| used_conversation)
     {
         if !conversation::recheck_scope(&state, &actor, req.company_id, key).await {
-            release.withhold("the earlier conversation is no longer available");
+            release.withhold(WithholdReason::AccessChanged, notice::CONVERSATION_GONE);
         }
     }
 
@@ -1743,7 +1957,7 @@ pub async fn post_rag(
             None,
             None,
             None,
-            program.trace.len() as u32,
+            trace_len,
             total_tokens,
             Some(error.to_string()),
         )
@@ -1754,7 +1968,7 @@ pub async fn post_rag(
     if release.answer_released
         && !recheck_live_snapshots(&state, &actor, org_id, req.company_id, &live_snapshots).await
     {
-        release.withhold("the ERP record changed or its current access could not be checked");
+        release.withhold(WithholdReason::AccessChanged, notice::RECORD_CHANGED);
     }
 
     // The durable run completes only after admission and provenance
@@ -1770,6 +1984,26 @@ pub async fn post_rag(
         None => ("completed", Some(release.answer.clone()), None),
         Some(reason) => ("failed", None, Some(reason.to_string())),
     };
+    let turn_released = release.answer_released && release.run_failure.is_none();
+    let withhold_label = release
+        .withhold_reason
+        .filter(|_| !turn_released)
+        .map(WithholdReason::label);
+    rag_outcome::record_outcome(
+        state.stdb.as_ref(),
+        org_id,
+        run.run_id,
+        &RagOutcome::new(
+            req.company_id,
+            turn_released,
+            release.withhold_reason,
+            provider.clone(),
+            model.clone(),
+            language.clone(),
+            spend,
+        ),
+    )
+    .await;
     complete_run(
         state.stdb.as_ref(),
         org_id,
@@ -1779,7 +2013,7 @@ pub async fn post_rag(
         run_summary,
         None,
         None,
-        program.trace.len() as u32,
+        trace_len,
         total_tokens,
         run_error,
     )
@@ -1794,8 +2028,6 @@ pub async fn post_rag(
     } = release;
     let verification = Some(verification);
     let provenance = Some(provenance);
-    let provider = program.generation_provider.clone();
-    let model = program.generation_model.clone();
     let run_id = Some(run.run_id);
     let agent_id = Some(agent.agent_id);
 
@@ -1826,6 +2058,17 @@ pub async fn post_rag(
         run_id = run.run_id,
         run_status,
         verification_outcome = ?verification.as_ref().map(|verdict| &verdict.outcome),
+        withhold_reason = ?withhold_label,
+        provider = ?provider.as_deref(),
+        model = ?model.as_deref(),
+        language = ?language.as_deref(),
+        plan_kind = ?Option::<&str>::None,
+        input_tokens = spend.input_tokens,
+        output_tokens = spend.output_tokens,
+        repair_attempts = spend.repair_attempts,
+        repair_tokens = spend
+            .repair_input_tokens
+            .saturating_add(spend.repair_output_tokens),
         duration_ms = started.elapsed().as_millis() as u64,
         "RAG query finished"
     );
@@ -3279,5 +3522,361 @@ mod tests {
         ] {
             assert_eq!(answer_chunks(answer).concat(), answer);
         }
+    }
+
+    // ── AIH-33: withhold reasons and the single shape repair ─────────────────
+
+    async fn reason_of(
+        candidate: &str,
+        checker: Option<&dyn ClaimCoverageChecker>,
+        sink: &MemorySink,
+    ) -> (RagRelease, Option<WithholdReason>) {
+        let access = FakeAccess::new(5, 4096).with_passage(7, BODY);
+        let evidence = authorized_evidence(&access).await;
+        let released = release(candidate, &evidence, &[], checker, sink, &access).await;
+        let reason = released.withhold_reason;
+        (released, reason)
+    }
+
+    #[tokio::test]
+    async fn every_gate_rejection_maps_to_one_reason_with_unchanged_user_text() {
+        let supported_checker = ScriptedChecker::new(Ok(ClaimSupport::Supported));
+        let unsupported_checker = ScriptedChecker::new(Ok(ClaimSupport::Unsupported));
+        let broken_checker = ScriptedChecker::new(Err("provider said secret-detail"));
+        let supported: &dyn ClaimCoverageChecker = &supported_checker;
+        let unsupported: &dyn ClaimCoverageChecker = &unsupported_checker;
+        let broken: &dyn ClaimCoverageChecker = &broken_checker;
+        let sink = MemorySink::ok();
+        let cases: Vec<(String, Option<&dyn ClaimCoverageChecker>, WithholdReason, &str)> = vec![
+            (
+                "{not json".into(),
+                Some(supported),
+                WithholdReason::MalformedSubmission,
+                notice::MALFORMED,
+            ),
+            (
+                json!({"content": "Some answer", "claims": [], "calculations": []}).to_string(),
+                Some(supported),
+                WithholdReason::NoClaims,
+                notice::NO_CLAIMS,
+            ),
+            (
+                json!({"content": "One. Two.", "calculations": [], "claims": [
+                    {"text": "One.", "supportRefs": [{"kind": "passage", "id": "7"}], "passageSupport": []}
+                ]})
+                .to_string(),
+                Some(supported),
+                WithholdReason::CoverageGap,
+                notice::COVERAGE,
+            ),
+            (
+                cited(BODY, json!([{"kind": "passage", "id": "99"}])),
+                Some(supported),
+                WithholdReason::UnauthorizedCitation,
+                notice::CITATION_UNAUTHORIZED,
+            ),
+            (
+                cited(BODY, json!([{"kind": "live_snapshot", "id": "sale_order:1"}])),
+                Some(supported),
+                WithholdReason::UnauthorizedCitation,
+                notice::SUPPORT_UNKNOWN,
+            ),
+            (
+                passage_candidate(BODY),
+                Some(unsupported),
+                WithholdReason::UnsupportedClaim,
+                "claim not supported by its cited passages",
+            ),
+            (
+                passage_candidate(BODY),
+                Some(broken),
+                WithholdReason::CheckerUnavailable,
+                notice::CHECKER_UNAVAILABLE,
+            ),
+        ];
+        for (candidate, checker, expected, text) in cases {
+            let (released, reason) = reason_of(&candidate, checker, &sink).await;
+            assert_eq!(reason, Some(expected), "{text}");
+            assert!(!released.answer_released);
+            assert!(
+                released
+                    .answer
+                    .starts_with("This answer could not be verified and was withheld: "),
+                "{}",
+                released.answer
+            );
+            assert!(released.answer.contains(text), "{}", released.answer);
+            assert!(!released.answer.contains("secret-detail"));
+        }
+        assert_eq!(sink.calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn provenance_and_access_failures_have_their_own_reasons() {
+        let access = FakeAccess::new(5, 4096).with_passage(7, BODY);
+        let evidence = authorized_evidence(&access).await;
+        let checker = ScriptedChecker::new(Ok(ClaimSupport::Supported));
+        let sink = MemorySink::failing("write failed");
+        let released = release(
+            &passage_candidate(BODY),
+            &evidence,
+            &[],
+            Some(&checker),
+            &sink,
+            &access,
+        )
+        .await;
+        assert_eq!(
+            released.withhold_reason,
+            Some(WithholdReason::ProvenanceNotRecorded)
+        );
+        assert!(released.answer.ends_with(notice::PROVENANCE_FAILED));
+
+        *access.grant.lock().unwrap() = Err("revoked");
+        let sink = MemorySink::ok();
+        let released = release(
+            &passage_candidate(BODY),
+            &evidence,
+            &[],
+            Some(&checker),
+            &sink,
+            &access,
+        )
+        .await;
+        assert_eq!(
+            released.withhold_reason,
+            Some(WithholdReason::AccessChanged)
+        );
+        assert!(!released.answer_released);
+    }
+
+    #[test]
+    fn only_shape_reasons_are_repairable() {
+        use WithholdReason::*;
+        for reason in [MalformedSubmission, NoClaims, CoverageGap] {
+            assert!(reason.is_repairable() && reason.repair_diagnostic().is_some());
+        }
+        for reason in [
+            UnauthorizedCitation,
+            UnsupportedClaim,
+            CheckerUnavailable,
+            AccessChanged,
+            ProvenanceNotRecorded,
+            EvidencePolicy,
+        ] {
+            assert!(!reason.is_repairable() && reason.repair_diagnostic().is_none());
+        }
+        assert_eq!(
+            WithholdReason::from_label(WithholdReason::CoverageGap.label()),
+            Some(CoverageGap)
+        );
+    }
+
+    struct ScriptedRepairer {
+        responses: Mutex<
+            Vec<Option<anyhow::Result<crate::orchestrator::intelligence::GenerationResponse>>>,
+        >,
+        calls: AtomicUsize,
+    }
+
+    impl ScriptedRepairer {
+        fn new(
+            responses: Vec<
+                Option<anyhow::Result<crate::orchestrator::intelligence::GenerationResponse>>,
+            >,
+        ) -> Self {
+            Self {
+                responses: Mutex::new(responses),
+                calls: AtomicUsize::new(0),
+            }
+        }
+
+        fn ok(
+            content: String,
+        ) -> Option<anyhow::Result<crate::orchestrator::intelligence::GenerationResponse>> {
+            Some(Ok(crate::orchestrator::intelligence::GenerationResponse {
+                content,
+                model: "m".into(),
+                provider: "p".into(),
+                input_tokens: 10,
+                output_tokens: 5,
+            }))
+        }
+    }
+
+    #[async_trait]
+    impl ShapeRepairer for ScriptedRepairer {
+        async fn attempt(
+            &self,
+            reason: WithholdReason,
+            spend: &mut Spend,
+        ) -> Option<anyhow::Result<crate::orchestrator::intelligence::GenerationResponse>> {
+            reason.repair_diagnostic()?;
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            spend.repair_attempts += 1;
+            let next = self.responses.lock().unwrap().remove(0);
+            match &next {
+                Some(Ok(response)) => {
+                    spend.add_repair(response.input_tokens, response.output_tokens)
+                }
+                Some(Err(error)) => {
+                    if let Some(rejected) = error.downcast_ref::<RagSubmissionRejected>() {
+                        spend.add_repair(rejected.input_tokens, rejected.output_tokens);
+                    }
+                }
+                None => {}
+            }
+            next
+        }
+    }
+
+    fn gap_candidate() -> String {
+        json!({"content": "Returns need approval. Extra.", "calculations": [], "claims": [
+            {"text": "Returns need approval.", "supportRefs": [{"kind": "passage", "id": "7"}], "passageSupport": []}
+        ]})
+        .to_string()
+    }
+
+    async fn run_with_repair(
+        candidate: &str,
+        checker: Option<&dyn ClaimCoverageChecker>,
+        sink: &MemorySink,
+        repairer: &ScriptedRepairer,
+    ) -> (RepairedRelease, Spend) {
+        let access = FakeAccess::new(5, 4096).with_passage(7, BODY);
+        let evidence = authorized_evidence(&access).await;
+        let mut spend = Spend::default();
+        let turn = release_with_one_repair(
+            &ReleaseInputs {
+                scope: SCOPE,
+                requested_rows: 20,
+                query: QUERY,
+                snapshots: &[],
+                evidence: &evidence,
+                import_tasks: &[],
+                import_access: None,
+                spreadsheet: None,
+                attachments: &[],
+                history_references: &[],
+            },
+            candidate,
+            &TestAdmission { checker },
+            sink,
+            &access,
+            repairer,
+            &mut spend,
+        )
+        .await
+        .expect("release decision");
+        (turn, spend)
+    }
+
+    #[tokio::test]
+    async fn a_coverage_gap_is_repaired_once_and_released_through_the_full_gate() {
+        let checker = ScriptedChecker::new(Ok(ClaimSupport::Supported));
+        let sink = MemorySink::ok();
+        let repairer = ScriptedRepairer::new(vec![ScriptedRepairer::ok(passage_candidate(BODY))]);
+        let (turn, spend) =
+            run_with_repair(&gap_candidate(), Some(&checker), &sink, &repairer).await;
+        assert!(turn.release.answer_released);
+        assert!(turn.release.run_failure.is_none());
+        assert!(turn.repaired.is_some());
+        assert_eq!(repairer.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(spend.repair_attempts, 1);
+        assert_eq!(
+            (spend.repair_input_tokens, spend.repair_output_tokens),
+            (10, 5)
+        );
+        // Provenance was recorded for the revision only; the full gate ran.
+        assert_eq!(sink.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(checker.calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn non_shape_reasons_get_no_repair() {
+        let supported = ScriptedChecker::new(Ok(ClaimSupport::Supported));
+        let unsupported = ScriptedChecker::new(Ok(ClaimSupport::Unsupported));
+        let broken = ScriptedChecker::new(Err("down"));
+        let cases: [(String, &ScriptedChecker, WithholdReason); 3] = [
+            (
+                cited(BODY, json!([{"kind": "passage", "id": "99"}])),
+                &supported,
+                WithholdReason::UnauthorizedCitation,
+            ),
+            (
+                passage_candidate(BODY),
+                &unsupported,
+                WithholdReason::UnsupportedClaim,
+            ),
+            (
+                passage_candidate(BODY),
+                &broken,
+                WithholdReason::CheckerUnavailable,
+            ),
+        ];
+        for (candidate, checker, expected) in cases {
+            let sink = MemorySink::ok();
+            let repairer =
+                ScriptedRepairer::new(vec![ScriptedRepairer::ok(passage_candidate(BODY))]);
+            let (turn, spend) = run_with_repair(&candidate, Some(checker), &sink, &repairer).await;
+            assert_eq!(turn.release.withhold_reason, Some(expected));
+            assert!(!turn.release.answer_released && turn.repaired.is_none());
+            assert_eq!(repairer.calls.load(Ordering::SeqCst), 0);
+            assert_eq!(spend, Spend::default());
+        }
+    }
+
+    #[tokio::test]
+    async fn a_failing_repair_leaves_a_failed_run_with_both_attempts_recorded() {
+        let checker = ScriptedChecker::new(Ok(ClaimSupport::Supported));
+
+        // The repair submission is itself rejected by the provider contract.
+        let sink = MemorySink::ok();
+        let rejected = RagSubmissionRejected {
+            reason: WithholdReason::MalformedSubmission,
+            message: "RAG answer contract is malformed",
+            input_tokens: 4,
+            output_tokens: 3,
+        };
+        let repairer = ScriptedRepairer::new(vec![Some(Err(anyhow::Error::new(rejected)))]);
+        let (turn, spend) =
+            run_with_repair(&gap_candidate(), Some(&checker), &sink, &repairer).await;
+        assert!(!turn.release.answer_released && turn.repaired.is_none());
+        assert_eq!(
+            turn.release.withhold_reason,
+            Some(WithholdReason::CoverageGap)
+        );
+        assert!(turn.release.run_failure.is_some());
+        assert_eq!(spend.repair_attempts, 1);
+        assert_eq!(
+            (spend.repair_input_tokens, spend.repair_output_tokens),
+            (4, 3)
+        );
+
+        // The revision is well-formed but still fails the gate: no third try.
+        let sink = MemorySink::ok();
+        let repairer = ScriptedRepairer::new(vec![ScriptedRepairer::ok(gap_candidate())]);
+        let (turn, spend) =
+            run_with_repair(&gap_candidate(), Some(&checker), &sink, &repairer).await;
+        assert!(!turn.release.answer_released);
+        assert!(turn.release.run_failure.is_some());
+        assert_eq!(repairer.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(spend.repair_attempts, 1);
+        assert_eq!(sink.calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn a_rejected_submission_is_typed_and_content_free() {
+        let rejected = crate::orchestrator::text_answer_gate::RagSubmissionRejected {
+            reason: WithholdReason::NoClaims,
+            message: "RAG answer must contain content and one to six material claims",
+            input_tokens: 1,
+            output_tokens: 2,
+        };
+        let error = anyhow::Error::new(rejected.clone()).context("wrapped");
+        assert_eq!(
+            error.downcast_ref::<RagSubmissionRejected>(),
+            Some(&rejected)
+        );
     }
 }

@@ -317,6 +317,62 @@ pub(crate) async fn run_catalogued_generation_surface(
     .await
 }
 
+/// First call scope of the single RAG shape repair. The run's first generation
+/// counts up from 1, so these never collide with it.
+const RAG_REPAIR_SCOPE_BASE: u32 = 500;
+
+/// The one shape repair of a RAG submission: the same routed provider path,
+/// spend admission, skill gates and evidence (the objective is unchanged) as
+/// the first generation, plus one trusted, content-free diagnostic. The result
+/// is still only a candidate; the caller sends it through the full answer gate.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn repair_rag_generation(
+    store: &super::model_configuration::StdbModelConfigurationStore<'_>,
+    ledger: &dyn SpendLedger,
+    organization_id: u64,
+    company_id: u64,
+    run: &GovernedRunRef,
+    agent: &ResolvedAgentConfig,
+    transport: &dyn LlmCompletion,
+    objective: String,
+    system_prompt: &str,
+    max_tokens: u32,
+    diagnostic: &str,
+    skill_access: &ActorSkillAccess<'_>,
+) -> Result<GenerationResponse> {
+    let resolver = IntelligenceRouteResolver::new(
+        store,
+        organization_id,
+        agent,
+        run.intelligence_policy_ref.as_deref(),
+    )?;
+    let router = ConfiguredIntelligenceRouter::new(resolver);
+    let generation = RoutedGenerationProvider::new(
+        &router,
+        transport,
+        ledger,
+        agent,
+        organization_id,
+        company_id,
+        run.run_id,
+    )
+    .with_skill_gate(store.reader, "rag_generation")
+    .with_actor_skill_access(skill_access, "rag_generation")
+    .with_scope_base(RAG_REPAIR_SCOPE_BASE);
+    generation
+        .generate(GenerationRequest {
+            objective,
+            context: json!({"surface":"rag_generation"}),
+            format: super::governed_programs::RAG_GENERATION_FORMAT.to_string(),
+            response_format: super::intelligence::GenerationResponseFormat::RagAnswer,
+            instructions: Some(format!(
+                "{system_prompt}\n\nShape repair (one attempt): {diagnostic} Use exactly the same evidence and supportRefs as before; add no new sources."
+            )),
+            max_tokens: Some(max_tokens),
+        })
+        .await
+}
+
 /// Judge one RAG candidate against the passages its actor is authorized to
 /// see. Passage-backed claims are checked for semantic support by a
 /// review-role model routed and spend-admitted like every other model call in
@@ -733,6 +789,13 @@ impl<'a> RoutedGenerationProvider<'a> {
         skill_key: &'a str,
     ) -> Self {
         self.actor_skill_access = Some((access, skill_key));
+        self
+    }
+
+    /// Start call scopes above those of the run's first generation so a second
+    /// provider on the same run never reuses a spend reservation key.
+    fn with_scope_base(mut self, base: u32) -> Self {
+        self.next_scope = AtomicU32::new(base);
         self
     }
 }

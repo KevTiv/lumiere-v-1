@@ -107,6 +107,149 @@ pub struct TextAnswerVerification {
     pub reason: Option<String>,
 }
 
+/// Fixed, content-free notices shown to the user when a candidate is withheld.
+/// None of them may ever carry model, evidence or provider text.
+pub(crate) mod notice {
+    pub const MALFORMED: &str = "structured answer is malformed";
+    pub const NO_CLAIMS: &str = "structured answer must identify at least one material claim";
+    pub const COVERAGE: &str = "structured claims must cover the complete answer content in order";
+    pub const CLAIM_NOT_IN_CONTENT: &str =
+        "each structured claim must be nonempty and appear in answer content";
+    pub const CITATION_SUPPLIED: &str =
+        "passage citations are bound by the server and cannot be supplied by the answer";
+    pub const CITATION_UNAUTHORIZED: &str =
+        "claim cites a passage that is not authorized for this answer";
+    pub const SUPPORT_UNKNOWN: &str = "claim support was not produced by this run";
+    pub const CHECKER_UNAVAILABLE: &str = "claim coverage check unavailable";
+    pub const PROVENANCE_EMPTY: &str = "answer provenance produced no durable claims";
+    pub const PROVENANCE_FAILED: &str = "answer provenance could not be recorded";
+    pub const EVIDENCE_GATE: &str = "answer was withheld by the evidence gate";
+    pub const IMPORT_CHANGED: &str =
+        "the saved import changed or its current access could not be checked";
+    pub const SPREADSHEET_CHANGED: &str =
+        "the spreadsheet selection changed or its current access could not be checked";
+    pub const HISTORY_CHANGED: &str =
+        "saved conversation evidence changed or its current access could not be checked";
+    pub const CONVERSATION_GONE: &str = "the earlier conversation is no longer available";
+    pub const RECORD_CHANGED: &str =
+        "the ERP record changed or its current access could not be checked";
+}
+
+/// Why an answer candidate was withheld, as a closed vocabulary. The user-facing
+/// notice stays a fixed sentence (see [`notice`]); this enum is what the run
+/// record, the completion log and the admin counts use, and what decides whether
+/// one shape repair is allowed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WithholdReason {
+    /// The submission did not parse as the answer contract.
+    MalformedSubmission,
+    /// The answer identified no material claim.
+    NoClaims,
+    /// The claims do not cover the answer content (or are not part of it).
+    CoverageGap,
+    /// A claim cites a passage or support the server did not authorize or produce.
+    UnauthorizedCitation,
+    /// A claim was judged unsupported by its cited evidence.
+    UnsupportedClaim,
+    /// The semantic claim check could not run.
+    CheckerUnavailable,
+    /// The actor's access or the evidence changed before release.
+    AccessChanged,
+    /// Answer provenance could not be durably recorded.
+    ProvenanceNotRecorded,
+    /// Any other deterministic gate finding (calculations, source validity,
+    /// verification budget, policy).
+    EvidencePolicy,
+}
+
+impl WithholdReason {
+    /// Stable snake_case label for records, logs and counts.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::MalformedSubmission => "malformed_submission",
+            Self::NoClaims => "no_claims",
+            Self::CoverageGap => "coverage_gap",
+            Self::UnauthorizedCitation => "unauthorized_citation",
+            Self::UnsupportedClaim => "unsupported_claim",
+            Self::CheckerUnavailable => "checker_unavailable",
+            Self::AccessChanged => "access_changed",
+            Self::ProvenanceNotRecorded => "provenance_not_recorded",
+            Self::EvidencePolicy => "evidence_policy",
+        }
+    }
+
+    pub fn from_label(label: &str) -> Option<Self> {
+        [
+            Self::MalformedSubmission,
+            Self::NoClaims,
+            Self::CoverageGap,
+            Self::UnauthorizedCitation,
+            Self::UnsupportedClaim,
+            Self::CheckerUnavailable,
+            Self::AccessChanged,
+            Self::ProvenanceNotRecorded,
+            Self::EvidencePolicy,
+        ]
+        .into_iter()
+        .find(|reason| reason.label() == label)
+    }
+
+    /// Only the answer's shape may be repaired. Authorization, source validity,
+    /// support, checker and provenance failures fail closed with no second try.
+    pub fn is_repairable(self) -> bool {
+        matches!(
+            self,
+            Self::MalformedSubmission | Self::NoClaims | Self::CoverageGap
+        )
+    }
+
+    /// Trusted, content-free instruction sent with the one repair attempt.
+    /// `None` for a reason that must not be repaired.
+    pub fn repair_diagnostic(self) -> Option<&'static str> {
+        match self {
+            Self::MalformedSubmission => Some(
+                "malformed_submission: the previous submission did not match the answer contract. Submit content plus one to six claims, each with explicit supportRefs and an empty passageSupport.",
+            ),
+            Self::NoClaims => Some(
+                "no_claims: the previous submission identified no material claim. Submit one to six claims that together state the whole answer.",
+            ),
+            Self::CoverageGap => Some(
+                "coverage_gap: the previous claims did not cover the whole answer content in order. Make content exactly the claim texts joined by single spaces, and keep every claim as written in content.",
+            ),
+            _ => None,
+        }
+    }
+
+    /// Classify the free-text finding of the evidence gate. Order matters: the
+    /// stricter category wins when a joined finding names several.
+    pub fn from_gate_finding(finding: &str) -> Self {
+        let finding = finding.to_ascii_lowercase();
+        if finding.contains("does not resolve to a recorded passage")
+            || finding.contains("does not correspond to evidence")
+            || finding.contains("claim selects evidence not produced")
+        {
+            Self::UnauthorizedCitation
+        } else if finding.contains("claim coverage check unavailable") {
+            Self::CheckerUnavailable
+        } else if finding.contains("has been withdrawn")
+            || finding.contains("has been superseded")
+            || finding.contains("is not effective as of")
+        {
+            Self::AccessChanged
+        } else if finding.contains("unsupported claim")
+            || finding.contains("not supported by its cited passages")
+            || finding.contains("judged this exact claim unsupported")
+        {
+            Self::UnsupportedClaim
+        } else if finding.contains("does not identify its material claims") {
+            Self::NoClaims
+        } else {
+            Self::EvidencePolicy
+        }
+    }
+}
+
 /// One claim in a free-text answer and the server-known evidence the claim
 /// relies on. Support references are never copied from display snippets.
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -199,6 +342,8 @@ pub struct GatedTextAnswer {
     pub verification: TextAnswerVerification,
     pub provenance: TextAnswerProvenance,
     pub(super) durable_provenance: AnswerProvenance,
+    /// Set whenever `released` is `None`.
+    pub withhold_reason: Option<WithholdReason>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -220,14 +365,45 @@ struct StructuredTextClaim {
     passage_support: Vec<PassageCitation>,
 }
 
+/// A provider submission that violated the `submit_rag_answer` contract before
+/// the answer gate ran. Typed so the route can offer the one shape repair and
+/// count the spend of the rejected attempt; the message is content-free.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{message}")]
+pub(crate) struct RagSubmissionRejected {
+    pub reason: WithholdReason,
+    pub message: &'static str,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+}
+
 /// Provider contract validation only. The ordinary answer gate still binds
 /// every support, verifies claim coverage and controls publication.
-pub(super) fn validate_rag_generation(candidate: &str) -> Result<(), &'static str> {
+pub(super) fn validate_rag_generation(candidate: &str) -> Result<(), RagSubmissionRejected> {
+    let rejected = |reason, message| RagSubmissionRejected {
+        reason,
+        message,
+        input_tokens: 0,
+        output_tokens: 0,
+    };
     let (answer, _) = crate::routes::rag_ui_actions::split_candidate(candidate);
-    let draft: StructuredTextDraft =
-        serde_json::from_str(&answer).map_err(|_| "RAG answer contract is malformed")?;
-    if draft.content.trim().is_empty() || !(1..=6).contains(&draft.claims.len()) {
-        return Err("RAG answer must contain content and one to six material claims");
+    let draft: StructuredTextDraft = serde_json::from_str(&answer).map_err(|_| {
+        rejected(
+            WithholdReason::MalformedSubmission,
+            "RAG answer contract is malformed",
+        )
+    })?;
+    if draft.claims.is_empty() {
+        return Err(rejected(
+            WithholdReason::NoClaims,
+            "RAG answer must contain content and one to six material claims",
+        ));
+    }
+    if draft.content.trim().is_empty() || draft.claims.len() > 6 {
+        return Err(rejected(
+            WithholdReason::MalformedSubmission,
+            "RAG answer must contain content and one to six material claims",
+        ));
     }
     if draft.claims.iter().any(|claim| {
         claim.text.trim().is_empty()
@@ -238,7 +414,10 @@ pub(super) fn validate_rag_generation(candidate: &str) -> Result<(), &'static st
                 .iter()
                 .any(|reference| reference.validate().is_err())
     }) {
-        return Err("RAG claims require explicit support references");
+        return Err(rejected(
+            WithholdReason::MalformedSubmission,
+            "RAG claims require explicit support references",
+        ));
     }
     Ok(())
 }
@@ -247,8 +426,8 @@ fn empty_provenance(reason: &str) -> TextAnswerProvenance {
     TextAnswerProvenance::withheld(reason)
 }
 
-fn blocked_text_answer(reason: impl Into<String>) -> GatedTextAnswer {
-    let reason = reason.into();
+fn blocked_text_answer(kind: WithholdReason, reason: &str) -> GatedTextAnswer {
+    let reason = reason.to_string();
     GatedTextAnswer {
         released: None,
         verification: TextAnswerVerification {
@@ -259,19 +438,19 @@ fn blocked_text_answer(reason: impl Into<String>) -> GatedTextAnswer {
         },
         provenance: empty_provenance(&reason),
         durable_provenance: AnswerProvenance::default(),
+        withhold_reason: Some(kind),
     }
 }
 
 fn parse_candidate(
     candidate: &str,
     _evidence: &TextEvidence,
-) -> Result<StructuredTextDraft, String> {
+) -> Result<StructuredTextDraft, &'static str> {
     let trimmed = candidate.trim();
     if trimmed.starts_with('{') {
         // serde's diagnostic can echo a model-authored field name or value.
         // A withheld verdict is public, so keep parser detail server-side.
-        return serde_json::from_str(trimmed)
-            .map_err(|_| "structured answer is malformed".to_string());
+        return serde_json::from_str(trimmed).map_err(|_| notice::MALFORMED);
     }
     Ok(StructuredTextDraft {
         content: candidate.to_string(),
@@ -309,8 +488,9 @@ impl GatedTextAnswer {
 
     /// Replace a released answer with a withheld verdict. The reason must be
     /// generic: it is shown to the user and must never carry evidence content.
-    pub fn withhold(&mut self, reason: &str) {
+    pub fn withhold(&mut self, kind: WithholdReason, reason: &str) {
         self.released = None;
+        self.withhold_reason = Some(kind);
         self.verification = TextAnswerVerification {
             outcome: TextAnswerOutcome::RequiresReview,
             methods: self.verification.methods.clone(),
@@ -567,7 +747,12 @@ async fn gate_candidate(
 ) -> Result<GatedTextAnswer> {
     let structured = match parse_candidate(candidate, evidence) {
         Ok(structured) => structured,
-        Err(reason) => return Ok(blocked_text_answer(reason)),
+        Err(reason) => {
+            return Ok(blocked_text_answer(
+                WithholdReason::MalformedSubmission,
+                reason,
+            ))
+        }
     };
     let mut known: HashSet<EvidenceRef> = evidence.refs.iter().cloned().collect();
     if bind_passages {
@@ -575,7 +760,8 @@ async fn gate_candidate(
     }
     if structured.claims.is_empty() && !structured.content.trim().is_empty() {
         return Ok(blocked_text_answer(
-            "structured answer must identify at least one material claim",
+            WithholdReason::NoClaims,
+            notice::NO_CLAIMS,
         ));
     }
     let normalized_content = structured
@@ -591,7 +777,8 @@ async fn gate_candidate(
         .join(" ");
     if normalized_content != normalized_claims {
         return Ok(blocked_text_answer(
-            "structured claims must cover the complete answer content in order",
+            WithholdReason::CoverageGap,
+            notice::COVERAGE,
         ));
     }
 
@@ -603,12 +790,14 @@ async fn gate_candidate(
     for claim in &structured.claims {
         if claim.text.trim().is_empty() || !structured.content.contains(claim.text.trim()) {
             return Ok(blocked_text_answer(
-                "each structured claim must be nonempty and appear in answer content",
+                WithholdReason::CoverageGap,
+                notice::CLAIM_NOT_IN_CONTENT,
             ));
         }
         if bind_passages && !claim.passage_support.is_empty() {
             return Ok(blocked_text_answer(
-                "passage citations are bound by the server and cannot be supplied by the answer",
+                WithholdReason::UnauthorizedCitation,
+                notice::CITATION_SUPPLIED,
             ));
         }
         let mut run = Vec::new();
@@ -620,7 +809,8 @@ async fn gate_candidate(
                     .find(|passage| passage.id != 0 && passage_ref(passage) == *support)
                 else {
                     return Ok(blocked_text_answer(
-                        "claim cites a passage that is not authorized for this answer",
+                        WithholdReason::UnauthorizedCitation,
+                        notice::CITATION_UNAUTHORIZED,
                     ));
                 };
                 let citation = bound_citation(passage);
@@ -631,7 +821,8 @@ async fn gate_candidate(
                 run.push(support.clone());
             } else {
                 return Ok(blocked_text_answer(
-                    "claim support was not produced by this run",
+                    WithholdReason::UnauthorizedCitation,
+                    notice::SUPPORT_UNKNOWN,
                 ));
             }
             if !citations.contains(support) {
@@ -785,6 +976,7 @@ async fn gate_candidate(
             },
             provenance,
             durable_provenance,
+            withhold_reason: None,
         },
         AnswerAdmissionOutcome::Qualified { limitations } => GatedTextAnswer {
             released: Some(qualified_content(&structured.content, &limitations)),
@@ -796,8 +988,10 @@ async fn gate_candidate(
             },
             provenance,
             durable_provenance,
+            withhold_reason: None,
         },
         AnswerAdmissionOutcome::RequiresReview { reason } => {
+            let withhold_reason = WithholdReason::from_gate_finding(&reason);
             let reason = redact_withheld_reason(&reason, &structured);
             let mut provenance = provenance;
             provenance.redact_for_withholding("candidate withheld pending review");
@@ -811,9 +1005,11 @@ async fn gate_candidate(
                 },
                 provenance,
                 durable_provenance: AnswerProvenance::default(),
+                withhold_reason: Some(withhold_reason),
             }
         }
         AnswerAdmissionOutcome::Blocked { reason } => {
+            let withhold_reason = WithholdReason::from_gate_finding(&reason);
             let reason = redact_withheld_reason(&reason, &structured);
             let mut provenance = provenance;
             provenance.redact_for_withholding("candidate blocked by answer gate");
@@ -827,6 +1023,7 @@ async fn gate_candidate(
                 },
                 provenance,
                 durable_provenance: AnswerProvenance::default(),
+                withhold_reason: Some(withhold_reason),
             }
         }
     })
@@ -1411,8 +1608,13 @@ mod tests {
                 claim_ids: vec![4],
             },
             durable_provenance: AnswerProvenance::default(),
+            withhold_reason: None,
         };
-        gated.withhold("evidence changed before release");
+        gated.withhold(
+            WithholdReason::AccessChanged,
+            "evidence changed before release",
+        );
+        assert_eq!(gated.withhold_reason, Some(WithholdReason::AccessChanged));
         assert!(gated.released.is_none());
         assert_eq!(
             gated.verification.outcome,
@@ -1444,5 +1646,103 @@ mod tests {
         assert_eq!(value["outcome"], "requires_review");
         assert!(value.get("limitations").is_none());
         assert_eq!(value["reason"], "no evidence");
+    }
+
+    #[tokio::test]
+    async fn plain_gate_rejections_carry_their_reason_and_exact_notice() {
+        let evidence = evidence(json!({ "state": "sale" }));
+        let ok_ref = json!([{"kind": "live_snapshot", "id": "sale_order:42"}]);
+        let cases = [
+            ("{oops".to_string(), WithholdReason::MalformedSubmission, notice::MALFORMED),
+            (
+                json!({"content": "Answer.", "claims": [], "calculations": []}).to_string(),
+                WithholdReason::NoClaims,
+                notice::NO_CLAIMS,
+            ),
+            (
+                json!({"content": "A. B.", "calculations": [], "claims": [
+                    {"text": "A.", "supportRefs": ok_ref, "passageSupport": []}]})
+                .to_string(),
+                WithholdReason::CoverageGap,
+                notice::COVERAGE,
+            ),
+            (
+                json!({"content": "A.", "calculations": [], "claims": [
+                    {"text": "A.", "supportRefs": [{"kind": "live_snapshot", "id": "sale_order:9"}], "passageSupport": []}]})
+                .to_string(),
+                WithholdReason::UnauthorizedCitation,
+                notice::SUPPORT_UNKNOWN,
+            ),
+        ];
+        for (candidate, reason, text) in cases {
+            let gated = gate_text_answer(1, 2, &candidate, &evidence).await.unwrap();
+            assert!(gated.released.is_none(), "{text}");
+            assert_eq!(gated.withhold_reason, Some(reason), "{text}");
+            assert!(
+                gated.verification.reason.as_deref().unwrap().contains(text),
+                "{:?}",
+                gated.verification.reason
+            );
+        }
+    }
+
+    #[test]
+    fn gate_findings_classify_into_the_closed_vocabulary() {
+        for (finding, expected) in [
+            (
+                "citation 'passage:1@v#k' does not resolve to a recorded passage",
+                WithholdReason::UnauthorizedCitation,
+            ),
+            (
+                "claim coverage check unavailable (x): text",
+                WithholdReason::CheckerUnavailable,
+            ),
+            ("'doc' has been withdrawn", WithholdReason::AccessChanged),
+            (
+                "claim not supported by its cited passages: text",
+                WithholdReason::UnsupportedClaim,
+            ),
+            (
+                "final draft does not identify its material claims",
+                WithholdReason::NoClaims,
+            ),
+            (
+                "calculation 'x' divides by zero",
+                WithholdReason::EvidencePolicy,
+            ),
+        ] {
+            assert_eq!(
+                WithholdReason::from_gate_finding(finding),
+                expected,
+                "{finding}"
+            );
+        }
+    }
+
+    #[test]
+    fn rag_submission_validation_is_typed_by_reason() {
+        let ok_claim = json!({"text": "A.", "supportRefs": [{"kind": "live_snapshot", "id": "x:1"}], "passageSupport": []});
+        let reason = |value: Value| {
+            validate_rag_generation(&value.to_string())
+                .unwrap_err()
+                .reason
+        };
+        assert_eq!(
+            validate_rag_generation("not json").unwrap_err().reason,
+            WithholdReason::MalformedSubmission
+        );
+        assert_eq!(
+            reason(json!({"content": "A.", "claims": [], "calculations": []})),
+            WithholdReason::NoClaims
+        );
+        assert_eq!(
+            reason(json!({"content": "A.", "calculations": [], "claims": [
+                {"text": "A.", "supportRefs": [], "passageSupport": []}]})),
+            WithholdReason::MalformedSubmission
+        );
+        assert!(validate_rag_generation(
+            &json!({"content": "A.", "claims": [ok_claim], "calculations": []}).to_string()
+        )
+        .is_ok());
     }
 }

@@ -321,10 +321,11 @@ pub(super) fn consequential_mutation_reference_graph() -> DecisionGraph {
     }
 }
 
+pub(super) const RAG_GENERATION_FORMAT: &str =
+    "schema-constrained grounded JSON answer from authorized retrieval and live ERP evidence";
+
 pub(super) fn rag_generation_graph() -> DecisionGraph {
-    generation_surface_graph(
-        "schema-constrained grounded JSON answer from authorized retrieval and live ERP evidence",
-    )
+    generation_surface_graph(RAG_GENERATION_FORMAT)
 }
 
 pub(super) fn form_suggestion_graph() -> DecisionGraph {

@@ -440,6 +440,8 @@ export function useAiMemoryRag() {
       ui_context?: AiUiContext
       guide_refs?: AiGuideReference[]
       chat_session_key?: string
+      /** BCP-47 UI language; recorded with the run, never used for authority. */
+      locale?: string
       history_refs?: AiChatHistoryReference[]
       clear_anchors?: boolean
       signal?: AbortSignal
@@ -460,6 +462,7 @@ export function useAiMemoryRag() {
           ...(args.ui_context ? { ui_context: args.ui_context } : {}),
           ...(args.guide_refs?.length ? { guide_refs: args.guide_refs } : {}),
           ...(args.chat_session_key ? { chat_session_key: args.chat_session_key } : {}),
+          ...(args.locale ? { locale: args.locale } : {}),
           ...(args.history_refs?.length ? { history_refs: args.history_refs } : {}),
           ...(args.clear_anchors ? { clear_anchors: true } : {}),
           ...(args.import_task_refs?.length ? { import_task_refs: args.import_task_refs } : {}),

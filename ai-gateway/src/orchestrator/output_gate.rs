@@ -15,7 +15,7 @@ use super::{
         AnswerEvidenceRecorder, PublicationEvidenceScope, RunEvidenceScope, StdbEvidenceRecorder,
     },
     intelligence::{ClaimedCalculation, EvidenceRef, PassageCitation},
-    text_answer_gate::{gate_text_answer, GatedTextAnswer, TextEvidence},
+    text_answer_gate::{gate_text_answer, GatedTextAnswer, TextEvidence, WithholdReason},
 };
 
 #[derive(Debug, Clone)]
@@ -161,7 +161,7 @@ pub(crate) async fn record_run_answer_provenance(
 }
 
 fn withhold_for_persistence(gated: &mut GatedTextAnswer, reason: &str) {
-    gated.withhold(reason);
+    gated.withhold(WithholdReason::ProvenanceNotRecorded, reason);
 }
 
 #[cfg(test)]
@@ -244,6 +244,7 @@ mod tests {
                 claim_ids: Vec::new(),
             },
             durable_provenance: Default::default(),
+            withhold_reason: None,
         };
 
         withhold_for_persistence(&mut result, "recording unavailable");

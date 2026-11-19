@@ -14907,6 +14907,36 @@
       "supplier_payables_v1": "Supplier payables",
       "failed": "The review could not be confirmed. Check the selected skill’s active release and your source access; inspect saved runs before starting again."
     },
+    "ragOutcomes": {
+      "title": "Chat answer outcomes",
+      "description": "Answers withheld by the evidence gate in the last {{days}} days, by reason and model. Counts only; no question or answer text is stored here.",
+      "summary": "{{withheld}} of {{turns}} answers withheld ({{rate}})",
+      "empty": "No chat answers were recorded in this period.",
+      "truncated": "More outcomes exist than could be read; counts may be low.",
+      "model": "Model",
+      "reason": "Reason",
+      "withheld": "Withheld",
+      "rate": "Rate",
+      "repaired": "Repaired",
+      "unknownModel": "Unknown model",
+      "refresh": "Refresh",
+      "errors": {
+        "denied": "Reviewer access is required to see answer outcomes.",
+        "loadFailed": "Answer outcomes could not be loaded.",
+        "unavailable": "Answer outcomes are unavailable right now."
+      },
+      "reasons": {
+        "malformed_submission": "Malformed submission",
+        "no_claims": "No claims",
+        "coverage_gap": "Claims do not cover answer",
+        "unauthorized_citation": "Unauthorized citation",
+        "unsupported_claim": "Unsupported claim",
+        "checker_unavailable": "Claim check unavailable",
+        "access_changed": "Access or evidence changed",
+        "provenance_not_recorded": "Provenance not recorded",
+        "evidence_policy": "Other gate finding"
+      }
+    },
     "runHistory": {
       "title": "Recent AI runs",
       "description": "View recent runs for the selected company.",

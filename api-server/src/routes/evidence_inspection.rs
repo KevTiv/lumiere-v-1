@@ -323,6 +323,34 @@ async fn review_queue(
     .await
 }
 
+/// Seven-day answer withhold counts by reason and model for the caller's
+/// company (AIH-33). Same session, company and `ai.evidence.inspect` boundary
+/// as the review queue; the body carries only the company intent.
+async fn rag_outcomes(
+    State(state): State<Arc<AppState>>,
+    org: OrgSession,
+    headers: HeaderMap,
+    cookies: tower_cookies::Cookies,
+    Json(body): Json<ReviewQueueBody>,
+) -> Result<Response, ApiError> {
+    let api_token = presented_api_token(&headers, &cookies)?;
+    if body.company_id == 0 {
+        return Err(ApiError::BadRequest(
+            "companyId must be a positive integer".into(),
+        ));
+    }
+    forward_evidence_read(
+        &state,
+        org,
+        body.company_id,
+        &api_token,
+        "/v1/evidence/rag-outcomes",
+        json!({}),
+        "Answer outcome counts",
+    )
+    .await
+}
+
 /// Shared boundary for the read routes: the session supplies organization,
 /// actor and token, the company must be the caller's membership company, and
 /// the exact `ai.evidence.inspect` grant must be active before the trusted
@@ -406,6 +434,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/ai/evidence/runs/export", post(export_run_evidence))
         .route("/ai/evidence/runs/history", post(run_history))
         .route("/ai/evidence/review-queue", post(review_queue))
+        .route("/ai/evidence/rag-outcomes", post(rag_outcomes))
         .route_layer(middleware::from_fn(no_store))
 }
 
