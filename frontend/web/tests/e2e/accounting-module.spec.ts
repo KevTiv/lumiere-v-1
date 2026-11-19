@@ -16,6 +16,7 @@ import {
   openEntityCreate,
   smokeName,
   submitForm,
+  waitForToastsToClear,
 } from "./helpers"
 
 const ACCOUNTING_TAB_IDS = [
@@ -247,6 +248,7 @@ test.describe("Accounting module e2e", () => {
     await fillField(page, "name", termName)
     await submitForm(page, "new-payment-term")
     await expectSeededText(page, termName, "/api/query/account-payment-terms")
+    await waitForToastsToClear(page)
 
     await openAccountingTab(page, "payment-term-lines")
     await page.getByTestId("module-create-accounting-payment-term-lines").click()

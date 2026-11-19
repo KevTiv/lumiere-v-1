@@ -247,7 +247,8 @@ test("read-only action/tab changes preserve access to the remaining content", as
   await page.getByRole("button", { name: "Open record sheet", exact: true }).click()
   await expect(page.getByRole("tab", { name: "Privileged", exact: true })).toHaveCount(0)
   await page.getByRole("tab", { name: "Offboarding", exact: true }).click()
-  await expect(page.getByRole("tabpanel")).toHaveText("Offboarding content")
+  // The previous panel stays mounted (inert) while its exit transition runs.
+  await expect(page.getByRole("tabpanel", { name: "Offboarding", exact: true })).toHaveText("Offboarding content")
 })
 
 for (const mode of ["floating", "docked"] as const) {
