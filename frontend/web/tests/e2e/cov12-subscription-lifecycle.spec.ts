@@ -40,7 +40,8 @@ function tagged(value: unknown): string {
 }
 
 async function rows(page: Page, resource: string): Promise<Row[]> {
-  const response = await page.request.get(`/api/query/${resource}`)
+  // Playwright retries only connection resets; HTTP failures still fail the read.
+  const response = await page.request.get(`/api/query/${resource}`, { maxRetries: 2 })
   if (!response.ok()) {
     throw new Error(`${resource} query failed: ${response.status()}`)
   }

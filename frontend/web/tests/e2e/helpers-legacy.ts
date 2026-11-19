@@ -908,17 +908,6 @@ export async function submitForm(page: Page, formId: string) {
   await expectNoAppError(page)
 }
 
-/**
- * Wait for Sonner toasts to close before acting near the bottom-right corner,
- * where a toast can cover a dialog's submit button. Sonner pauses dismissal
- * while the pointer is over a toast, and a submit click leaves the pointer
- * where the next toast appears, so move it away first.
- */
-export async function waitForToastsToClear(page: Page) {
-  await page.mouse.move(0, 0)
-  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 15_000 })
-}
-
 /** `YYYY-MM-DD` for date fields (DatePicker accepts it typed or filled). */
 export function isoDate(daysFromNow = 0) {
   const d = new Date()

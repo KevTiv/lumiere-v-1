@@ -16,7 +16,6 @@ import {
   openEntityCreate,
   smokeName,
   submitForm,
-  waitForToastsToClear,
 } from "./helpers"
 
 const ACCOUNTING_TAB_IDS = [
@@ -240,24 +239,23 @@ test.describe("Accounting module e2e", () => {
     await fillField(page, "dateFrom", isoDate(0))
     await fillField(page, "dateTo", isoDate(365))
     await submitForm(page, "new-budget")
-    await expectSeededText(page, budgetName, "/api/query/budgets")
+    // Keep the current workspace mounted: reloading would hide a stale budget query.
+    await expect(page.getByRole("cell", { name: budgetName, exact: true })).toBeVisible()
 
     const termName = smokeName("term")
     await openAccountingTab(page, "payment-terms")
-    await openEntityCreate(page, "/accounting", "accounting", "payment-terms", "new-payment-term")
+    await page.getByTestId("module-create-accounting-payment-terms").click()
+    await expect(page.getByTestId("form-modal-new-payment-term")).toBeVisible()
     await fillField(page, "name", termName)
     await submitForm(page, "new-payment-term")
     await expectSeededText(page, termName, "/api/query/account-payment-terms")
-    await waitForToastsToClear(page)
 
-    await openAccountingTab(page, "payment-term-lines")
+    // Open the line workspace in a fresh document rather than depending on toast expiry.
+    await gotoModule(page, "/accounting?tab=payment-term-lines", "accounting")
     await page.getByTestId("module-create-accounting-payment-term-lines").click()
     await expect(page.getByTestId("form-modal-new-payment-term-line")).toBeVisible()
-    await page.getByTestId("form-field-paymentTermId").click()
-    await page.getByRole("option", { disabled: false }).first().click()
-    await page.getByTestId("form-submit-new-payment-term-line").click()
-    await expect(page.getByTestId("form-modal-new-payment-term-line")).toBeHidden()
-    await expectNoAppError(page)
+    await chooseSelectOptionByLabel(page, "paymentTermId", termName)
+    await submitForm(page, "new-payment-term-line")
   })
 
   test("creates fiscal year then accounting period", async ({ page }) => {
