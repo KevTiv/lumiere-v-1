@@ -45,6 +45,12 @@ function render(tree: ReactNode) {
   return renderComponent(tree, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> })
 }
 
+async function editGuide() {
+  const edit = await screen.findByRole("button", { name: "Edit guide" })
+  await waitFor(() => expect(edit).toHaveProperty("disabled", false))
+  fireEvent.click(edit)
+}
+
 it("replaces the loading skeleton inside the same guide dialog", async () => {
   let resolveGuide!: (guide: GuideDocument) => void
   controls.read.mockReturnValueOnce(new Promise<GuideDocument>((resolve) => { resolveGuide = resolve }))
@@ -76,9 +82,7 @@ for (const owner of ["modal", "page"] as const) describe(`${owner} guide revalid
 
   it("retains title, Markdown and question after transient failure, then retries the exact revision", async () => {
     await act(async () => { render(tree()) })
-    const edit = screen.getByRole("button", { name: "Edit guide" })
-    expect(edit).toHaveProperty("disabled", false)
-    fireEvent.click(edit)
+    await editGuide()
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Retain my title" } })
     fireEvent.change(screen.getByLabelText("Guide content (Markdown)"), { target: { value: "Retain my edits" } })
     fireEvent.change(screen.getByLabelText("Ask about this document"), { target: { value: "Retain my question" } })
@@ -100,7 +104,7 @@ for (const owner of ["modal", "page"] as const) describe(`${owner} guide revalid
 
   it("ignores an older denied result after a newer access check succeeds", async () => {
     render(tree())
-    fireEvent.click(await screen.findByRole("button", { name: "Edit guide" }))
+    await editGuide()
     fireEvent.change(screen.getByLabelText("Guide content (Markdown)"), { target: { value: "Keep this working draft" } })
     let rejectOld!: (cause: Error) => void
     controls.read.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectOld = reject }))
@@ -116,7 +120,7 @@ for (const owner of ["modal", "page"] as const) describe(`${owner} guide revalid
 
   it("does not replace an acknowledged save with an older background read", async () => {
     render(tree())
-    fireEvent.click(await screen.findByRole("button", { name: "Edit guide" }))
+    await editGuide()
     fireEvent.change(screen.getByLabelText("Guide content (Markdown)"), { target: { value: "Acknowledged new instructions" } })
     let resolveOld!: (value: GuideDocument) => void
     controls.read.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve }))
@@ -142,9 +146,7 @@ for (const owner of ["modal", "page"] as const) describe(`${owner} guide revalid
 
   if (owner === "modal") it("retains a dirty editor when display translations change", async () => {
     const view = render(tree())
-    const edit = await screen.findByRole("button", { name: "Edit guide" })
-    await waitFor(() => expect(edit).toHaveProperty("disabled", false))
-    fireEvent.click(edit)
+    await editGuide()
 
     const draft = "Keep edits while changing preferences"
     fireEvent.change(screen.getByLabelText("Guide content (Markdown)"), { target: { value: draft } })
