@@ -127,23 +127,23 @@ audits; counts reflect reclassification; stored evidence unchanged.
 
 ## AIH-36 — Release chat checks (P1, M)
 
-**Changes.** One scenario per gap with known-gap support; web releases; on by
-default with a recorded skip; fresh sessions; nightly; withhold-rate gate.
+**Changes.** One scenario per gap with known-gap support, fresh sessions, and a
+withhold-rate threshold. Verify the served release on demand and nightly.
 
-**Acceptance.** Each gap has a scenario; known gaps reported; skips recorded;
-nightly results published; the gate fails when the withhold rate is exceeded.
+**Acceptance.** Each gap has a scenario. Acceptance reports known gaps and
+fails when the withhold rate exceeds the threshold. Nightly results are published.
 
 **Follow-up — release fixture registry.** SpaceTimeDB stores private versioned
 scenario definitions and evidence references. The broker checks GitHub's
 repository, workflow and environment claims before issuing short-lived WorkOS
 sessions for separate company-bound test actors.
 
-Preflight validates the upgraded fixture. Once the candidate is served, the
-release prints a signed cutover receipt and waits for the operator to provision,
-index, and register a fresh fixture. The broker checks that the company and
-document were created after cutover. Stack, web, and nightly runs retain their
-public streaming, citation, persisted claim, and withhold checks. The
-[activation guide](../guides/mistral-alpha-activation.md#verify-a-railway-release-through-authenticated-chat)
+The standalone acceptance workflow runs after Railway serves the candidate.
+On demand it prints a signed cutover receipt and waits for the operator to
+provision, index, and register a fresh fixture. The broker checks that the
+company and document were created after the receipt. On-demand and nightly
+checks verify public streaming, citations, persisted claims, and withholding.
+The [activation guide](../guides/mistral-alpha-activation.md#verify-a-railway-release-through-authenticated-chat)
 documents the migration from `AI_CHAT_ACCEPTANCE_JSON`.
 
 ## AIH-37 — #444 rollout guard (P0 for the next deploy, S)

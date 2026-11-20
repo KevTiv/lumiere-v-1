@@ -358,27 +358,20 @@ fn authorized_job(claims: &JobClaims, config: &BrokerConfig, stage: Stage) -> bo
     {
         return false;
     }
-    let workflow = |name: &str| {
-        format!(
-            "{}/.github/workflows/{name}.yml@{MAIN_REF}",
-            claims.repository
-        )
-    };
+    let workflow = format!(
+        "{}/.github/workflows/grounded-chat-nightly.yml@{MAIN_REF}",
+        claims.repository
+    );
     let caller = claims.workflow_ref.as_str();
     let job = claims.job_workflow_ref.as_deref().unwrap_or(caller);
-    let manual = claims.event_name == "workflow_dispatch";
-    if stage == Stage::Nightly {
-        return caller == workflow("grounded-chat-nightly")
-            && caller == job
-            && (manual || claims.event_name == "schedule");
-    }
-    (manual
+    let event = claims.event_name.as_str();
+    caller == workflow.as_str()
         && caller == job
-        && (caller == workflow("release-railway-stack")
-            || caller == workflow("release-railway-web")))
-        || (caller == workflow("release-main")
-            && job == workflow("release-railway-stack")
-            && (manual || matches!(claims.event_name.as_str(), "push" | "workflow_run")))
+        && match stage {
+            Stage::Nightly => matches!(event, "workflow_dispatch" | "schedule"),
+            Stage::Verify => event == "workflow_dispatch",
+            Stage::Preflight => false,
+        }
 }
 
 fn company_ids(fixtures: &Value) -> Result<BTreeSet<u64>, ApiError> {
@@ -574,17 +567,22 @@ mod tests {
         serde_json::from_value(json!({
             "repository":"owner/repo","repository_id":"42","environment":"production",
             "ref":"refs/heads/main",
-            "workflow_ref":"owner/repo/.github/workflows/release-main.yml@refs/heads/main",
-            "job_workflow_ref":"owner/repo/.github/workflows/release-railway-stack.yml@refs/heads/main",
-            "event_name":"workflow_run","iat":1,"exp":2,
-        })).unwrap()
+            "workflow_ref":"owner/repo/.github/workflows/grounded-chat-nightly.yml@refs/heads/main",
+            "event_name":"workflow_dispatch","iat":1,"exp":2,
+        }))
+        .unwrap()
     }
 
     #[test]
     fn job_must_match_the_repository_environment_and_both_workflows() {
         let config = settings();
         assert!(authorized_job(&job(), &config, Stage::Verify));
-        assert!(!authorized_job(&job(), &config, Stage::Nightly));
+        assert!(authorized_job(&job(), &config, Stage::Nightly));
+        assert!(!authorized_job(&job(), &config, Stage::Preflight));
+        let mut scheduled = job();
+        scheduled.event_name = "schedule".into();
+        assert!(authorized_job(&scheduled, &config, Stage::Nightly));
+        assert!(!authorized_job(&scheduled, &config, Stage::Verify));
         let mut wrong = job();
         wrong.repository_id = "43".into();
         assert!(!authorized_job(&wrong, &config, Stage::Verify));
@@ -599,6 +597,10 @@ mod tests {
         assert!(!authorized_job(&wrong, &config, Stage::Verify));
         let mut wrong = job();
         wrong.workflow_ref = "owner/repo/.github/workflows/untrusted.yml@refs/heads/main".into();
+        assert!(!authorized_job(&wrong, &config, Stage::Verify));
+        let mut wrong = job();
+        wrong.job_workflow_ref =
+            Some("owner/repo/.github/workflows/release-railway-stack.yml@refs/heads/main".into());
         assert!(!authorized_job(&wrong, &config, Stage::Verify));
     }
 

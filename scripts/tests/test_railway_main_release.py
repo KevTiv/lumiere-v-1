@@ -117,6 +117,26 @@ class MainReleaseWorkflowTests(unittest.TestCase):
         self.assertFalse(owner["required"])
         self.assertEqual(owner["featureGate"], "RAILWAY_ENABLE_OWNER_REPORTS")
 
+    def test_grounded_chat_acceptance_runs_independently_with_registry_fixtures(self):
+        workflows = ROOT / ".github/workflows"
+        for name in ("release-main", "release-railway-stack", "release-railway-web"):
+            with self.subTest(workflow=name):
+                release = (workflows / f"{name}.yml").read_text()
+                self.assertNotIn("verify-grounded-chat", release)
+                self.assertNotIn("AI_CHAT_ACCEPTANCE", release)
+                self.assertNotIn("skip_grounded_chat", release)
+                self.assertNotIn("grounded-chat-nightly.yml", release)
+
+        acceptance = (workflows / "grounded-chat-nightly.yml").read_text()
+        for setting in ("workflow_dispatch:", "schedule:", "release_sha:",
+                        "id-token: write", "name: production", "AI_CHAT_ACCEPTANCE_SOURCE: registry",
+                        "if: github.ref == 'refs/heads/main'", "if: '!inputs.release_sha'",
+                        "if: inputs.release_sha", "RELEASE_SHA: ${{ inputs.release_sha }}",
+                        "node scripts/verify-grounded-chat.mjs\n", "node scripts/verify-grounded-chat.mjs --nightly"):
+            self.assertIn(setting, acceptance)
+        self.assertNotIn("AI_CHAT_ACCEPTANCE_JSON", acceptance)
+        self.assertNotIn("continue-on-error", acceptance)
+
 
 if __name__ == "__main__":
     unittest.main()

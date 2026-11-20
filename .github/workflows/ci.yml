@@ -179,6 +179,7 @@ jobs:
         run: |
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib session::workos::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib session::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::ai_chat_acceptance::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::bootstrap::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib tenant_services::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib integration_worker::tests
