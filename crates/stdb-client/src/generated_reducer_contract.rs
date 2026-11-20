@@ -4105,6 +4105,12 @@ const PARAMS_REGISTER_AI_CALIBRATION_PROFILE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("RegisterAiCalibrationProfileParams") },
 ];
+const PARAMS_REGISTER_AI_CHAT_ACCEPTANCE_FIXTURE: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "environment", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "release_sha", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "fixture_json", kind: ScalarKind::String, ref_target: None },
+];
 const PARAMS_REGISTER_AI_DECISION_TYPE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("RegisterAiDecisionTypeParams") },
@@ -7557,6 +7563,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "refuse_expense_sheet", contract_operation_id: "erp.refuse_expense_sheet", params: PARAMS_REFUSE_EXPENSE_SHEET, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "refuse_leave", contract_operation_id: "erp.refuse_leave", params: PARAMS_REFUSE_LEAVE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "register_ai_calibration_profile", contract_operation_id: "erp.register_ai_calibration_profile", params: PARAMS_REGISTER_AI_CALIBRATION_PROFILE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "register_ai_chat_acceptance_fixture", contract_operation_id: "erp.register_ai_chat_acceptance_fixture", params: PARAMS_REGISTER_AI_CHAT_ACCEPTANCE_FIXTURE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "register_ai_decision_type", contract_operation_id: "erp.register_ai_decision_type", params: PARAMS_REGISTER_AI_DECISION_TYPE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "register_ai_intelligence_policy", contract_operation_id: "erp.register_ai_intelligence_policy", params: PARAMS_REGISTER_AI_INTELLIGENCE_POLICY, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "register_ai_model_profile", contract_operation_id: "erp.register_ai_model_profile", params: PARAMS_REGISTER_AI_MODEL_PROFILE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -9079,6 +9086,7 @@ pub mod reducer_names {
     pub const REFUSE_EXPENSE_SHEET: ReducerName = ReducerName::new("refuse_expense_sheet");
     pub const REFUSE_LEAVE: ReducerName = ReducerName::new("refuse_leave");
     pub const REGISTER_AI_CALIBRATION_PROFILE: ReducerName = ReducerName::new("register_ai_calibration_profile");
+    pub const REGISTER_AI_CHAT_ACCEPTANCE_FIXTURE: ReducerName = ReducerName::new("register_ai_chat_acceptance_fixture");
     pub const REGISTER_AI_DECISION_TYPE: ReducerName = ReducerName::new("register_ai_decision_type");
     pub const REGISTER_AI_INTELLIGENCE_POLICY: ReducerName = ReducerName::new("register_ai_intelligence_policy");
     pub const REGISTER_AI_MODEL_PROFILE: ReducerName = ReducerName::new("register_ai_model_profile");
@@ -10586,6 +10594,7 @@ macro_rules! reducer_call {
     ("refuse_expense_sheet", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REFUSE_EXPENSE_SHEET, $args) };
     ("refuse_leave", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REFUSE_LEAVE, $args) };
     ("register_ai_calibration_profile", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REGISTER_AI_CALIBRATION_PROFILE, $args) };
+    ("register_ai_chat_acceptance_fixture", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REGISTER_AI_CHAT_ACCEPTANCE_FIXTURE, $args) };
     ("register_ai_decision_type", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REGISTER_AI_DECISION_TYPE, $args) };
     ("register_ai_intelligence_policy", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REGISTER_AI_INTELLIGENCE_POLICY, $args) };
     ("register_ai_model_profile", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REGISTER_AI_MODEL_PROFILE, $args) };
