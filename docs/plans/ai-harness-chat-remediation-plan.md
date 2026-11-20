@@ -133,6 +133,19 @@ default with a recorded skip; fresh sessions; nightly; withhold-rate gate.
 **Acceptance.** Each gap has a scenario; known gaps reported; skips recorded;
 nightly results published; the gate fails when the withhold rate is exceeded.
 
+**Follow-up — release fixture registry.** SpaceTimeDB stores private versioned
+scenario definitions and evidence references. The broker checks GitHub's
+repository, workflow and environment claims before issuing short-lived WorkOS
+sessions for separate company-bound test actors.
+
+Preflight validates the upgraded fixture. Once the candidate is served, the
+release prints a signed cutover receipt and waits for the operator to provision,
+index, and register a fresh fixture. The broker checks that the company and
+document were created after cutover. Stack, web, and nightly runs retain their
+public streaming, citation, persisted claim, and withhold checks. The
+[activation guide](../guides/mistral-alpha-activation.md#verify-a-railway-release-through-authenticated-chat)
+documents the migration from `AI_CHAT_ACCEPTANCE_JSON`.
+
 ## AIH-37 — #444 rollout guard (P0 for the next deploy, S)
 
 **Changes.** Pause switch; documented release order; catalog version check;

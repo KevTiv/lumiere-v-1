@@ -51,6 +51,12 @@ RUN server="$(find /app/web/.next/standalone -type f -path '*/web/server.js' -pr
     && mkdir /app/standalone \
     && cp -a "$root/." /app/standalone/
 
+ARG LUMIERE_WEB_RELEASE_SHA=""
+RUN if [ -n "$LUMIERE_WEB_RELEASE_SHA" ]; then \
+      node web/scripts/write-release-acceptance-manifest.mjs \
+        /app/standalone/web/release-acceptance.json "$LUMIERE_WEB_RELEASE_SHA"; \
+    fi
+
 # --- runner ---
 FROM node:26-bookworm-slim AS runner
 WORKDIR /app

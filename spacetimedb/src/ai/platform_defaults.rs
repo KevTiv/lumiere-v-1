@@ -93,7 +93,7 @@ pub struct AiManagedEnrollment {
     pub created_at: Timestamp,
 }
 
-fn require_platform(ctx: &ReducerContext) -> Result<(), String> {
+pub(super) fn require_platform(ctx: &ReducerContext) -> Result<(), String> {
     let caller = find_user_profile_for_identity(ctx, ctx.sender()).ok_or("user not found")?;
     if !caller.is_active || !caller.is_superuser {
         return Err("active platform superuser is required".into());

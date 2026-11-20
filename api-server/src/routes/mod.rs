@@ -3,6 +3,7 @@
 mod accounting;
 mod admin;
 mod ai_capabilities;
+mod ai_chat_acceptance;
 mod ai_certifications;
 mod ai_evidence;
 mod ai_index_jobs;
@@ -51,6 +52,7 @@ use crate::state::AppState;
 pub fn domain_router() -> Router<Arc<AppState>> {
     Router::new()
         .merge(ai_capabilities::router())
+        .merge(ai_chat_acceptance::router())
         .merge(ai_certifications::router())
         .merge(ai_evidence::router())
         .merge(ai_index_jobs::router())

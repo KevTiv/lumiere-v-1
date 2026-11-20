@@ -293,7 +293,7 @@ mod tests {
         company_writes: Vec<Value>,
         managed_profile_available: bool,
         chat_agent_unavailable: bool,
-        managed_enrolled: bool,
+        chat_binding_written: bool,
         enrollment_writes: Vec<Value>,
         report_catalog: Option<Vec<Value>>,
         system_catalog_reads: usize,
@@ -373,16 +373,7 @@ mod tests {
         let mut database = database.lock().unwrap();
         database.reads += 1;
         if statement.contains("FROM ai_managed_enrollment ") {
-            assert!(statement.contains("organization_id = 9"));
-            let rows = if database.managed_enrolled {
-                vec![vec![json!(42), json!(true)]]
-            } else {
-                vec![]
-            };
-            return Json(
-                json!([{"schema":{"elements":[{"name":{"some":"agent_id"}},{"name":{"some":"is_enabled"}}]},"rows":rows}]),
-            )
-            .into_response();
+            return (StatusCode::BAD_REQUEST, "private enrollment table").into_response();
         }
         if statement.contains("FROM company ") {
             assert!(statement.contains("organization_id = 9 AND id = 7"));
@@ -424,10 +415,12 @@ mod tests {
             assert!(statement.contains("organization_id = 9"));
             assert!(!statement.contains("company_id ="));
             let config = if statement.contains("skill_id = 66") {
-                Some(json!({
-                    "is_enabled": true,
-                    "config_json": r#"{"defaultAgentId":42,"intelligencePolicyRef":"pilot@1"}"#,
-                }))
+                database.chat_binding_written.then(|| {
+                    json!({
+                        "is_enabled": true,
+                        "config_json": r#"{"defaultAgentId":42,"intelligencePolicyRef":"pilot@1"}"#,
+                    })
+                })
             } else {
                 assert!(statement.contains("skill_id = 55"));
                 database.company_config.clone()
@@ -723,7 +716,9 @@ mod tests {
             payload,
             json!({"companyId":7,"agentId":42,"intelligencePolicyRef":"pilot@1"})
         );
-        database.lock().unwrap().company_writes.push(payload);
+        let mut db = database.lock().unwrap();
+        db.company_writes.push(payload);
+        db.chat_binding_written = true;
         Json(json!({"ok":true,"operationId":"erp.provision_ai_company_defaults","correlationId":"setup-1"})).into_response()
     }
 
@@ -737,7 +732,7 @@ mod tests {
         assert_eq!(payload, json!({"companyId":7}));
         let mut db = database.lock().unwrap();
         db.enrollment_writes.push(payload);
-        db.managed_enrolled = db.managed_profile_available;
+        db.chat_binding_written |= db.managed_profile_available;
         Json(json!({"ok":true,"operationId":"erp.enroll_ai_company_defaults","correlationId":"enroll-1"})).into_response()
     }
 

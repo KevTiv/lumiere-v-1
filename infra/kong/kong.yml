@@ -369,6 +369,12 @@ services:
   - name: web-ai-alpha-pilot
     url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__
     routes:
+      - name: web-ai-alpha-acceptance-session
+        paths:
+          - '~/api/ai/acceptance/session$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
       - name: web-ai-alpha-contextual-chat
         paths:
           - '~/api/ai/rag(?:/stream)?$'

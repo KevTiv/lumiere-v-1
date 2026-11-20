@@ -16,6 +16,7 @@ SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 # These private platform authorities (including historical sponsorship grants)
 # must never enter tenant projection or restore, even when they carry org IDs.
 PLATFORM_CONTROL_TABLES = frozenset({
+    "ai_chat_acceptance_fixture",
     "ai_platform_default",
     "ai_platform_template",
     "ai_managed_enrollment",

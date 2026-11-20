@@ -90,9 +90,12 @@ jobs:
           IMAGE_SHA: ${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
+          revision="$(git rev-parse HEAD)"
+          test "$revision" = "$IMAGE_SHA"
           repository="ghcr.io/${GITHUB_REPOSITORY,,}-$SERVICE"
           echo "repository=$repository" >> "$GITHUB_OUTPUT"
           echo "tag=$repository:$IMAGE_SHA" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
       - name: Preserve existing commit image
         id: existing
         if: github.event_name != 'pull_request'
@@ -119,6 +122,7 @@ jobs:
             NEXT_PUBLIC_STDB_MODULE=lumiere-v1
             NEXT_PUBLIC_API_GATEWAY_URL=
             NEXT_PUBLIC_REALTIME_WS_URL=wss://api-gateway-production-d680.up.railway.app/v1/realtime/ws
+            LUMIERE_WEB_RELEASE_SHA=${{ matrix.service == 'web' && steps.image.outputs.revision || '' }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ inputs.release_sha || github.event.pull_request.head.sha || github.sha }}

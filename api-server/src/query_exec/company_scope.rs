@@ -303,7 +303,7 @@ fn company_scope_timestamp_micros(value: &Value) -> Option<i64> {
         .or_else(|| value.get("some").and_then(company_scope_timestamp_micros))
 }
 
-async fn membership_company_id(
+pub(crate) async fn membership_company_id(
     client: &StdbClient,
     organization_id: u64,
     identity_hex: &str,
