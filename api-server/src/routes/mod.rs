@@ -3,8 +3,8 @@
 mod accounting;
 mod admin;
 mod ai_capabilities;
-mod ai_chat_acceptance;
 mod ai_certifications;
+mod ai_chat_acceptance;
 mod ai_evidence;
 mod ai_index_jobs;
 mod ai_skill_user_access;
