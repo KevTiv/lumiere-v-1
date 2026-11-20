@@ -569,7 +569,8 @@ mod tests {
             "ref":"refs/heads/main",
             "workflow_ref":"owner/repo/.github/workflows/grounded-chat-nightly.yml@refs/heads/main",
             "event_name":"workflow_dispatch","iat":1,"exp":2,
-        })).unwrap()
+        }))
+        .unwrap()
     }
 
     #[test]
