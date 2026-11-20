@@ -24,7 +24,7 @@ use crate::{
         format_live_context_block,
         record_lookup::{lookup_record_candidates, RecordLookup},
         resolve_snapshot_candidates, resolve_snapshot_candidates_with_anchors,
-        snapshot::recheck_live_snapshots,
+        snapshot::{fetch_authorized_contact_notes, recheck_live_snapshots},
         ActorCredentials, EntityRef, LiveSnapshot, SnapshotUiContext, RAG_MAX_LIVE_SNAPSHOTS,
     },
     orchestrator::skill_access::ActorSkillAccess,
@@ -277,7 +277,13 @@ fn ungenerated_reply(
 }
 
 fn exact_record_reply(snapshot: &LiveSnapshot) -> RagResponse {
-    let record = record_reply::record_facts(snapshot);
+    exact_record_reply_with_facts(snapshot, record_reply::record_facts(snapshot))
+}
+
+fn exact_record_reply_with_facts(
+    snapshot: &LiveSnapshot,
+    record: record_reply::RecordFacts,
+) -> RagResponse {
     let mut reply = ungenerated_reply("", false, Vec::new(), false);
     reply.answer = format!("**{}**", snapshot.label);
     for fact in &record.facts {
@@ -1169,12 +1175,40 @@ pub async fn post_rag(
         };
     let mut named_record = NamedRecord::None;
     if !has_other_selected_evidence && agent_allows_live_read(&agent) {
-        if req
+        let explicit_record = req
             .ui_context
             .as_ref()
-            .is_some_and(|ctx| ctx.explicit_record == Some(true))
-            && record_reply::is_single_record_question(&req.query)
-        {
+            .is_some_and(|ctx| ctx.explicit_record == Some(true));
+        if record_reply::asks_for_contact_notes(&req.query, explicit_record) {
+            let candidate = filter_entity_refs_by_allowed_types(
+                resolve_snapshot_candidates(snapshot_ui.as_ref(), &[], &[], 1),
+                allowed_types,
+            )
+            .pop()
+            .filter(|candidate| candidate.entity_type == "contact");
+            if let Some(contact) = candidate {
+                skill_access.require("rag_generation").await?;
+                let snapshots =
+                    fetch_authorized_contact_notes(&state, &actor, org_id, req.company_id, &contact)
+                        .await
+                        .map_err(|_| AppError::RetrievalUnavailable)?;
+                let mut response = match snapshots.as_slice() {
+                    [snapshot] => exact_record_reply_with_facts(
+                        snapshot,
+                        record_reply::contact_note_facts(snapshot),
+                    ),
+                    _ => ungenerated_reply(
+                        "The selected contact is unavailable in this company.",
+                        false,
+                        Vec::new(),
+                        false,
+                    ),
+                };
+                response.earlier_context_unavailable = earlier_context_unavailable;
+                return Ok(Json(response));
+            }
+        }
+        if explicit_record && record_reply::is_single_record_question(&req.query) {
             exact_candidate = filter_entity_refs_by_allowed_types(
                 resolve_snapshot_candidates(snapshot_ui.as_ref(), &[], &[], 1),
                 allowed_types,

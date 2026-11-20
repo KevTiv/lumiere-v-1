@@ -11,6 +11,7 @@ import {
   decodeAssistantAction,
   getAssistantCapability,
   parseAssistantWidgetKey,
+  productNamePrefill,
   resolveAssistantActionRequest,
   type AssistantAction,
   type AssistantActionScope,
@@ -32,6 +33,22 @@ function action(text: string, module?: string): AssistantAction {
   if (result.kind !== "action") throw new Error("Expected action")
   return result.action
 }
+
+test("opens an unsaved product form and preserves the requested name", () => {
+  const prompt = "Open the new product form. Prefill the product name as Harness smoke test. Leave it unsaved."
+  const result = action(prompt, "products")
+  assert.equal(result.kind, "open_form")
+  assert.equal(result.capabilityKey, "products.product.create")
+  assert.equal(result.prompt, prompt)
+  assert.equal(productNamePrefill(result.prompt!), "Harness smoke test")
+  assert.equal(productNamePrefill('Prefill the name with "Farm Co. Feed".'), "Farm Co. Feed")
+  assert.equal(productNamePrefill("Do not prefill the name as Test."), undefined)
+  assert.equal(productNamePrefill("Prefill the price as 100."), undefined)
+  assert.equal(
+    resolveAssistantActionRequest(prompt, { scope, allowedModules: ["crm"] }).kind,
+    "clarify",
+  )
+})
 
 test("explicit navigation never prepares a mutation draft", () => {
   for (const text of [
@@ -341,7 +358,7 @@ test("runtime decoding rejects arbitrary parameters, mismatched kinds and malfor
   )
 })
 
-test("prompts are bounded plain instructions, never automatically applied values", () => {
+test("native cards accept bounded prompts and reject arbitrary field payloads", () => {
   const result = action("Create an invoice")
   assert.equal(
     decodeAssistantAction({ ...result, values: { amount: 9000 } }, scope),

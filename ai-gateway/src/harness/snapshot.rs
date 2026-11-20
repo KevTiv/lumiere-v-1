@@ -213,6 +213,36 @@ pub async fn fetch_authorized_live_snapshots(
     company_id: u64,
     candidates: &[EntityRef],
 ) -> Result<Vec<LiveSnapshot>> {
+    fetch_live_snapshots(state, actor, org_id, company_id, candidates, false).await
+}
+
+pub(crate) async fn fetch_authorized_contact_notes(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org_id: u64,
+    company_id: u64,
+    contact: &EntityRef,
+) -> Result<Vec<LiveSnapshot>> {
+    anyhow::ensure!(contact.entity_type == "contact", "contact notes require a contact");
+    fetch_live_snapshots(
+        state,
+        actor,
+        org_id,
+        company_id,
+        std::slice::from_ref(contact),
+        true,
+    )
+    .await
+}
+
+async fn fetch_live_snapshots(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org_id: u64,
+    company_id: u64,
+    candidates: &[EntityRef],
+    contact_notes_only: bool,
+) -> Result<Vec<LiveSnapshot>> {
     if candidates.is_empty() {
         return Ok(Vec::new());
     }
@@ -312,10 +342,14 @@ pub async fn fetch_authorized_live_snapshots(
             entity_id: candidate.entity_id,
             label: format_snapshot_label(spec.label_template, candidate.entity_id),
             snapshot_at: snapshot_at.clone(),
-            row: filter_prompt_fields(
-                row,
-                spec.prompt_fields.iter().chain(spec.derived_prompt_fields),
-            ),
+            row: if contact_notes_only {
+                filter_prompt_fields(row, &["description"])
+            } else {
+                filter_prompt_fields(
+                    row,
+                    spec.prompt_fields.iter().chain(spec.derived_prompt_fields),
+                )
+            },
             relations: project_authorized_relations(
                 spec,
                 envelope.get("relations"),

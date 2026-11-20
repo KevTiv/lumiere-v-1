@@ -29,6 +29,19 @@ pub(super) fn is_single_record_question(query: &str) -> bool {
     .any(|phrase| query.contains(phrase))
 }
 
+pub(super) fn asks_for_contact_notes(query: &str, explicit_record: bool) -> bool {
+    let query = query.trim().to_ascii_lowercase();
+    let asks = ["summarize ", "show ", "what ", "read ", "quote ", "cite "]
+        .iter()
+        .any(|verb| query.starts_with(verb));
+    let mentions_notes = query
+        .split(|character: char| !character.is_alphanumeric())
+        .any(|word| matches!(word, "notes" | "description"));
+    asks && mentions_notes
+        && (explicit_record || query.contains("selected contact"))
+        && is_single_record_question(&query)
+}
+
 fn markdown_value(value: &str) -> String {
     let compact = value.split_whitespace().collect::<Vec<_>>().join(" ");
     let mut characters = compact.chars();
@@ -325,11 +338,54 @@ pub(super) fn record_facts(snapshot: &LiveSnapshot) -> RecordFacts {
     output
 }
 
+pub(super) fn contact_note_facts(snapshot: &LiveSnapshot) -> RecordFacts {
+    match scalar(&snapshot.row["description"]) {
+        Some(note) => RecordFacts {
+            facts: vec![format!("Saved notes: {note}")],
+            limitations: Vec::new(),
+        },
+        None => RecordFacts {
+            facts: Vec::new(),
+            limitations: vec!["No saved notes are available for this contact.".into()],
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::harness::snapshot::RelationSnapshot;
     use serde_json::json;
+
+    #[test]
+    fn selected_contact_notes_render_as_exact_saved_text() {
+        assert!(asks_for_contact_notes(
+            "Summarize the saved notes on the selected contact. What is the source?",
+            false,
+        ));
+        assert!(asks_for_contact_notes("What do the notes say?", true));
+        assert!(!asks_for_contact_notes("What do the notes say?", false));
+        assert!(!asks_for_contact_notes("Do not show the notes.", true));
+        assert!(!asks_for_contact_notes("Compare the notes across contacts", true));
+        let mut contact = LiveSnapshot {
+            entity_type: "contact".into(),
+            entity_id: 42,
+            label: "Contact #42".into(),
+            snapshot_at: "2026-11-20T20:00:00Z".into(),
+            row: json!({"description": "Source is row 22. Current status is unconfirmed."}),
+            relations: Vec::new(),
+        };
+        let result = contact_note_facts(&contact);
+        assert_eq!(
+            result.facts,
+            ["Saved notes: Source is row 22. Current status is unconfirmed."]
+        );
+        assert!(result.limitations.is_empty());
+        contact.row = json!({});
+        let result = contact_note_facts(&contact);
+        assert!(result.facts.is_empty());
+        assert!(!result.limitations.is_empty());
+    }
 
     fn entry() -> LiveSnapshot {
         LiveSnapshot {
