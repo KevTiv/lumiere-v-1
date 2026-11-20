@@ -758,7 +758,8 @@ async fn persist_document_evidence(
         read_document_evidence_sources(evidence_reader, organization_id, company_id, document_id)
             .await?,
         "document evidence source",
-    ).await?;
+    )
+    .await?;
 
     let version_key = document_version_key(document.version_number, &document.checksum);
     let existing_versions =

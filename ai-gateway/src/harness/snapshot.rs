@@ -223,7 +223,10 @@ pub(crate) async fn fetch_authorized_contact_notes(
     company_id: u64,
     contact: &EntityRef,
 ) -> Result<Vec<LiveSnapshot>> {
-    anyhow::ensure!(contact.entity_type == "contact", "contact notes require a contact");
+    anyhow::ensure!(
+        contact.entity_type == "contact",
+        "contact notes require a contact"
+    );
     fetch_live_snapshots(
         state,
         actor,

@@ -1188,10 +1188,15 @@ pub async fn post_rag(
             .filter(|candidate| candidate.entity_type == "contact");
             if let Some(contact) = candidate {
                 skill_access.require("rag_generation").await?;
-                let snapshots =
-                    fetch_authorized_contact_notes(&state, &actor, org_id, req.company_id, &contact)
-                        .await
-                        .map_err(|_| AppError::RetrievalUnavailable)?;
+                let snapshots = fetch_authorized_contact_notes(
+                    &state,
+                    &actor,
+                    org_id,
+                    req.company_id,
+                    &contact,
+                )
+                .await
+                .map_err(|_| AppError::RetrievalUnavailable)?;
                 let mut response = match snapshots.as_slice() {
                     [snapshot] => exact_record_reply_with_facts(
                         snapshot,

@@ -366,7 +366,10 @@ mod tests {
         assert!(asks_for_contact_notes("What do the notes say?", true));
         assert!(!asks_for_contact_notes("What do the notes say?", false));
         assert!(!asks_for_contact_notes("Do not show the notes.", true));
-        assert!(!asks_for_contact_notes("Compare the notes across contacts", true));
+        assert!(!asks_for_contact_notes(
+            "Compare the notes across contacts",
+            true
+        ));
         let mut contact = LiveSnapshot {
             entity_type: "contact".into(),
             entity_id: 42,
