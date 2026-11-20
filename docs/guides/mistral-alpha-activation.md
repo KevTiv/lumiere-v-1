@@ -211,14 +211,13 @@ managed sponsored period at UTC month rollover through normal spend admission.
 ### Verify a Railway release through authenticated chat
 
 The registry-backed check stores versioned scenario metadata in SpaceTimeDB.
-Release jobs exchange GitHub OIDC for short-lived WorkOS access tokens for
-dedicated test accounts scoped to their individual companies. Both checks still
-call the public chat streaming route and require indexed evidence and persisted
-claim support for the exact document versions.
+The **Grounded chat acceptance** workflow exchanges GitHub OIDC for short-lived
+WorkOS access tokens for dedicated, company-scoped test accounts. It calls the
+public chat streaming route and requires indexed evidence and persisted claim
+support for the exact document versions.
 
 1. Land and deploy the new native contract, API server, web image, and Kong
-   route. The first deploy must use the legacy gate described below because its
-   preflight still runs against the previously live edge.
+   route. Railway deployment completes independently of chat fixture setup.
 2. Configure the API server with sealed Railway variables
    `AI_CHAT_ACCEPTANCE_PROOF_PRIVATE_KEY` (an Ed25519 PKCS#8 PEM, stable across
    deployments) and `AI_CHAT_ACCEPTANCE_BROKER_CONFIG`. Set
@@ -251,7 +250,7 @@ configuration.
 }
 ```
 
-Register the `upgraded` fixture before enabling the new mode. It uses the
+Register the `upgraded` baseline before running acceptance. It uses the
 existing `companyId`, `documentId`, `sourceVersion`, `question`, and
 `expectedAnswerText` fields. An existing dedicated `FARM_ACCEPT_` company
 such as 4098 is eligible once its expected document is indexed. Use a native
@@ -262,12 +261,13 @@ platform superuser from a private operator environment with `STDB_HOST`,
 node scripts/register-grounded-chat-fixtures.mjs 4097 production baseline /private/upgraded.json
 ```
 
-Set the GitHub Environment variable `AI_CHAT_ACCEPTANCE_SOURCE=registry` and
-keep `AI_CHAT_ACCEPTANCE_URL` set to the verified public HTTPS origin.
-Preflight checks the upgraded fixture and membership before deployment. After
-edge cutover, the release job prints the candidate SHA and a signed cutover
-receipt and waits up to 15 minutes for the fresh fixture. After the receipt
-appears, create a new `AI_CHAT_ACCEPT_` company in the same tenant, bind the
+Set `AI_CHAT_ACCEPTANCE_URL` in the GitHub production environment to the
+verified public HTTPS origin. After Railway serves the new web build, run
+**Grounded chat acceptance** from `main` and enter the deployed web commit as
+`release_sha`. The job checks the served revision. If the manifest is missing,
+it prints the release SHA and a signed cutover receipt, then waits up to 15
+minutes for the fresh fixture. After the receipt appears, create a new
+`AI_CHAT_ACCEPT_` company in the same tenant, bind the
 fresh actor's read-only membership to it, and upload and index a synthetic
 known-answer document through the candidate. Register an exact release
 manifest with the unchanged `upgraded` fixture, `fresh` with the same five
@@ -279,34 +279,16 @@ registering the immutable revision. Each fresh company can prove one release.
 node scripts/register-grounded-chat-fixtures.mjs 4097 production "$RELEASE_SHA" /private/acceptance.json
 ```
 
-Nightly resolves the exact fixture for the currently served web build. Registry
-mode ignores the legacy JSON and fails if the registry, runtime provenance,
-sessions, or acceptance assertions fail. Remove `AI_CHAT_ACCEPTANCE_JSON`
-from GitHub after stack, web, and nightly runs have passed in registry mode.
+The nightly run at 03:17 UTC verifies the manifest for the currently served web
+build. Leave `release_sha` blank to run the same check on demand. A missing
+manifest, invalid session, or failed assertion fails the acceptance run and
+appears in its summary. GitHub workflows read fixtures only from the registry.
+Remove any leftover `AI_CHAT_ACCEPTANCE_JSON` environment secret.
 
-#### Legacy bootstrap mode
+#### Optional acceptance scenarios
 
-The check is on by default for every AI-enabled stack release and for every web
-release; there is no opt-in variable. Set the GitHub Environment variable
-`AI_CHAT_ACCEPTANCE_URL` to the application's HTTPS origin. Set the Environment
-secret `AI_CHAT_ACCEPTANCE_JSON` with `fresh` and `upgraded` fixtures in different
-dedicated test companies. Provision the fresh fixture through the version being
-accepted and retain the upgraded fixture from an earlier version. Each fixture
-supplies `companyId`, `cookie` for an
-authorized signed-in operator, an indexed `documentId` and its `sourceVersion`,
-a `question` and an `expectedAnswerText` unique to that document. Use approved
-test data and an existing funded allowance. Rotate the session cookies before
-they expire.
-
-The check runs against the public chat streaming route after edge cutover. It
-requires a completed provider response, healthy retrieval, the expected fact and
-persisted claim support from the expected document version in both companies.
-It makes one chat attempt per configured case and prints only outcome labels.
-Run the check from the configured environment with
-`node scripts/verify-grounded-chat.mjs`.
-
-Add a `journal` object to the same secret to verify a posted journal entry
-through live Accounting chat. Supply `companyId`, `cookie`, `accountMoveId` as
+Add a `journal` object to the release manifest to verify a posted journal entry
+through live Accounting chat. Supply `companyId`, `accountMoveId` as
 a decimal string, `question`, `expectedAmountText`, and `expectedDebitText`.
 Use a dedicated test company's posted entry with a stable reference and a
 known debit account. Match the amount and debit wording to the requested
@@ -321,21 +303,12 @@ entry, and a synthetic `forbiddenText` marker from that entry. Both cases use
 the journal fixture's signed-in company and check that the assistant
 withholds generation and evidence.
 
-#### Release scenarios, skip and nightly run
-
-A missing or invalid URL or selected fixture source fails an AI-enabled release.
-The explicit bypass is the `skip_grounded_chat` workflow_dispatch
-input on `Release Railway stack` and `Release Railway web`; every use is written
-to the job summary with `github.actor`. The same check runs nightly at 03:17 UTC
-(`grounded-chat-nightly.yml`) against production with the selected source and,
-on failure, writes the run ID to the job summary.
-
 Add any of the following optional top-level scenarios to the manifest. Each case
-references a test `companyId`. Legacy mode also supplies a `cookie` for each
-case, while registry mode uses the configured read-only actor for that company.
+references a test `companyId` and uses the configured read-only actor for that
+company.
 Cases are strictly validated when present and may set `"expectedGap": true`.
 A failing scenario is then reported as
-`known-gap` (with its reason under `knownGaps`) and does not fail the release; a
+`known-gap` (with its reason under `knownGaps`) without failing the check. A
 passing one reports `gap-closed`, which is the cue to remove the flag.
 
 | Key | Extra fields | Checks |

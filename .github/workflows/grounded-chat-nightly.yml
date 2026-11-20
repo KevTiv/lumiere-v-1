@@ -1,9 +1,14 @@
-name: Grounded chat nightly
+name: Grounded chat acceptance
 
 on:
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Deployed web commit SHA to verify. Leave blank to check the current manifest.
+        required: false
+        type: string
 
 concurrency:
   group: grounded-chat-nightly
@@ -16,33 +21,40 @@ permissions:
 jobs:
   check:
     name: Grounded chat acceptance (production)
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment:
       name: production
     env:
-      AI_CHAT_ACCEPTANCE_SOURCE: ${{ vars.AI_CHAT_ACCEPTANCE_SOURCE }}
+      AI_CHAT_ACCEPTANCE_SOURCE: registry
       AI_CHAT_ACCEPTANCE_URL: ${{ vars.AI_CHAT_ACCEPTANCE_URL }}
-      AI_CHAT_ACCEPTANCE_JSON: ${{ vars.AI_CHAT_ACCEPTANCE_SOURCE != 'registry' && secrets.AI_CHAT_ACCEPTANCE_JSON || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          persist-credentials: false
           fetch-depth: 1
 
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
 
-      - name: Verify grounded chat scenarios against production
+      - name: Verify the current production manifest
+        if: '!inputs.release_sha'
         run: node scripts/verify-grounded-chat.mjs --nightly
+
+      - name: Verify a deployed release with a fresh fixture
+        if: inputs.release_sha
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: node scripts/verify-grounded-chat.mjs
 
       - name: Record failure
         if: failure()
         shell: bash
         run: |
           {
-            echo "### Nightly grounded chat check failed"
+            echo "### Grounded chat acceptance failed"
             echo "Run ID: \`$GITHUB_RUN_ID\` (attempt \`$GITHUB_RUN_ATTEMPT\`)"
             echo "Inspect the failed step above for the fixture, release, or session error."
           } >> "$GITHUB_STEP_SUMMARY"
