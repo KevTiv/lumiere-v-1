@@ -558,6 +558,99 @@ pub async fn resolve_session(
     .map(Some)
 }
 
+/// Use the provider's normal authentication and session admission for a preconfigured
+/// test user. Never return provider refresh tokens or the underlying STDB credential.
+pub(crate) async fn authenticate_acceptance_actor(
+    state: &AppState,
+    http: &reqwest::Client,
+    user_id: &str,
+    password: &str,
+    organization_id: u64,
+    company_id: u64,
+) -> Result<String, ApiError> {
+    #[derive(Deserialize)]
+    struct Authentication {
+        access_token: String,
+    }
+    let unavailable =
+        || ApiError::Unavailable("Dedicated acceptance sign-in was unavailable".into());
+    let config = state.config.workos_auth.as_ref().ok_or_else(unavailable)?;
+    let admission = config
+        .admissions
+        .iter()
+        .find(|admission| {
+            admission.user_id == user_id && admission.organization_id == Some(organization_id)
+        })
+        .ok_or(ApiError::Unauthorized)?;
+    let authentication = http
+        .post("https://api.workos.com/user_management/authenticate")
+        .json(&serde_json::json!({
+            "client_id": config.client_id,
+            "client_secret": config.api_key,
+            "grant_type": "password",
+            "email": admission.email,
+            "password": password,
+        }))
+        .send()
+        .await
+        .map_err(|_| unavailable())?
+        .error_for_status()
+        .map_err(|_| unavailable())?
+        .json::<Authentication>()
+        .await
+        .map_err(|_| unavailable())?;
+    let token = authentication.access_token;
+    let session = resolve_session(state, Some(&format!("Bearer {token}")), None)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+    // Normal session verification fetched and checked the issuer keys above.
+    let keys = state
+        .workos_jwks
+        .read()
+        .await
+        .as_ref()
+        .map(|(_, keys)| keys.clone())
+        .ok_or(ApiError::Unauthorized)?;
+    let now = chrono::Utc::now().timestamp() as u64;
+    let claims = verify_claims(&token, &keys, config, now)?;
+    if claims.sub != user_id
+        || claims.exp - claims.iat > 1800
+        || claims.exp.saturating_sub(now) <= 210
+        || session.organization_id != Some(organization_id)
+        || !session
+            .field_access
+            .as_ref()
+            .is_some_and(acceptance_read_only)
+        || crate::query_exec::membership_company_id(
+            &state.stdb,
+            organization_id,
+            &session.identity_hex,
+        )
+        .await?
+            != Some(company_id)
+    {
+        return Err(ApiError::Forbidden(
+            "Acceptance identity requires a read-only role bound to this test company".into(),
+        ));
+    }
+    Ok(token)
+}
+
+fn acceptance_read_only(access: &stdb_auth::FieldAccessContext) -> bool {
+    let read = |resource: &str, action: &str| {
+        !resource.is_empty() && !resource.contains('*') && action == "read"
+    };
+    !access.is_superuser
+        && access.role_permissions.iter().all(|item| {
+            item.split_once(':')
+                .is_some_and(|(resource, action)| read(resource, action))
+        })
+        && access
+            .org_permissions
+            .iter()
+            .all(|grant| !grant.allow || read(&grant.resource, &grant.action))
+}
+
 fn complete_verified_session(
     binding: VerifiedBinding,
     organization_id: u64,
@@ -603,6 +696,27 @@ mod tests {
     use jsonwebtoken::{encode, EncodingKey, Header};
     use rsa::{pkcs8::EncodePrivateKey, traits::PublicKeyParts, RsaPrivateKey};
     use serde_json::json;
+
+    #[test]
+    fn acceptance_actor_cannot_hold_write_or_wildcard_access() {
+        let mut access = stdb_auth::FieldAccessContext {
+            role_permissions: vec!["document:read".into()],
+            ..Default::default()
+        };
+        assert!(acceptance_read_only(&access));
+        access.role_permissions.push("*:read".into());
+        assert!(!acceptance_read_only(&access));
+        access.role_permissions.pop();
+        access.org_permissions.push(stdb_auth::ActionPermission {
+            resource: "document".into(),
+            action: "write".into(),
+            allow: true,
+        });
+        assert!(!acceptance_read_only(&access));
+        access.org_permissions.clear();
+        access.is_superuser = true;
+        assert!(!acceptance_read_only(&access));
+    }
 
     fn verified_profile_session() -> (VerifiedBinding, stdb_auth::FieldAccessContext) {
         let identity = "ab".repeat(32);

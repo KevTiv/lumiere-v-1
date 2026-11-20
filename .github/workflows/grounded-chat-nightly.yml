@@ -11,6 +11,7 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   check:
@@ -20,8 +21,9 @@ jobs:
     environment:
       name: production
     env:
+      AI_CHAT_ACCEPTANCE_SOURCE: ${{ vars.AI_CHAT_ACCEPTANCE_SOURCE }}
       AI_CHAT_ACCEPTANCE_URL: ${{ vars.AI_CHAT_ACCEPTANCE_URL }}
-      AI_CHAT_ACCEPTANCE_JSON: ${{ secrets.AI_CHAT_ACCEPTANCE_JSON }}
+      AI_CHAT_ACCEPTANCE_JSON: ${{ vars.AI_CHAT_ACCEPTANCE_SOURCE != 'registry' && secrets.AI_CHAT_ACCEPTANCE_JSON || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,11 +34,8 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Validate the grounded chat fixtures
-        run: node scripts/verify-grounded-chat.mjs --check-config
-
       - name: Verify grounded chat scenarios against production
-        run: node scripts/verify-grounded-chat.mjs
+        run: node scripts/verify-grounded-chat.mjs --nightly
 
       - name: Record failure
         if: failure()
@@ -45,5 +44,5 @@ jobs:
           {
             echo "### Nightly grounded chat check failed"
             echo "Run ID: \`$GITHUB_RUN_ID\` (attempt \`$GITHUB_RUN_ATTEMPT\`)"
-            echo "Inspect the failed step above; the likeliest cause of a sudden failure is an expired acceptance session cookie."
+            echo "Inspect the failed step above for the fixture, release, or session error."
           } >> "$GITHUB_STEP_SUMMARY"

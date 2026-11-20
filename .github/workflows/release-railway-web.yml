@@ -18,6 +18,7 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   RAILWAY_PROJECT_ID: cc695d4b-030c-43e3-bbd6-a41095b09257
@@ -30,7 +31,7 @@ jobs:
   release:
     name: Build and deploy production
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     environment:
       name: production
     env:
@@ -87,8 +88,10 @@ jobs:
       - name: Validate the grounded chat release fixtures
         if: '!inputs.skip_grounded_chat'
         env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          AI_CHAT_ACCEPTANCE_SOURCE: ${{ vars.AI_CHAT_ACCEPTANCE_SOURCE }}
           AI_CHAT_ACCEPTANCE_URL: ${{ vars.AI_CHAT_ACCEPTANCE_URL }}
-          AI_CHAT_ACCEPTANCE_JSON: ${{ secrets.AI_CHAT_ACCEPTANCE_JSON }}
+          AI_CHAT_ACCEPTANCE_JSON: ${{ vars.AI_CHAT_ACCEPTANCE_SOURCE != 'registry' && secrets.AI_CHAT_ACCEPTANCE_JSON || '' }}
         run: node scripts/verify-grounded-chat.mjs --check-config
 
       - name: Install frontend dependencies
@@ -120,6 +123,8 @@ jobs:
           fi
 
           test -f "$runtime_root/frontend/web/server.js"
+          node frontend/web/scripts/write-release-acceptance-manifest.mjs \
+            "$runtime_root/frontend/web/release-acceptance.json" "$(git rev-parse HEAD)"
           cp .github/railway/web-standalone.Dockerfile "$dockerfile"
           cp frontend/web/scripts/doppler-entrypoint.sh "$release_root/frontend/web/doppler-entrypoint.sh"
 
@@ -243,6 +248,8 @@ jobs:
       - name: Verify grounded chat scenarios through the deployed web release
         if: '!inputs.skip_grounded_chat'
         env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          AI_CHAT_ACCEPTANCE_SOURCE: ${{ vars.AI_CHAT_ACCEPTANCE_SOURCE }}
           AI_CHAT_ACCEPTANCE_URL: ${{ vars.AI_CHAT_ACCEPTANCE_URL }}
-          AI_CHAT_ACCEPTANCE_JSON: ${{ secrets.AI_CHAT_ACCEPTANCE_JSON }}
+          AI_CHAT_ACCEPTANCE_JSON: ${{ vars.AI_CHAT_ACCEPTANCE_SOURCE != 'registry' && secrets.AI_CHAT_ACCEPTANCE_JSON || '' }}
         run: node scripts/verify-grounded-chat.mjs

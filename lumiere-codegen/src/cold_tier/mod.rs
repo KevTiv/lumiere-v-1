@@ -267,14 +267,16 @@ pub fn run(paths: &Paths) -> Result<()> {
 }
 
 /// Reviewed platform control truth is outside tenant projection/restore. These
-/// three private tables select the centrally approved AI template and retain
+/// private tables select the centrally approved AI template and retain
 /// the historical sponsored-enrollment ledger. Even though enrollment carries
 /// organization_id for authorization, tenant rollback must not rewind its
-/// sponsorship cap history or replace its deployment-local template pin.
+/// sponsorship cap history or replace its deployment-local template pin. The
+/// release acceptance registry also belongs to the live deployment.
 /// Do not infer exclusions from a missing organization_id: unknown tables must
 /// continue to fail C0 ownership validation.
 pub(crate) fn platform_control_table_names(module_schema: &Value) -> Result<BTreeSet<String>> {
-    const PLATFORM_CONTROL_TABLES: [&str; 3] = [
+    const PLATFORM_CONTROL_TABLES: [&str; 4] = [
+        "ai_chat_acceptance_fixture",
         "ai_platform_default",
         "ai_platform_template",
         "ai_managed_enrollment",
@@ -328,6 +330,7 @@ mod tests {
     #[test]
     fn platform_control_exclusion_is_closed_and_private() {
         let schema = serde_json::json!({"tables": [
+            {"name":"ai_chat_acceptance_fixture","table_access":{"Private":[]}},
             {"name":"ai_platform_default","table_access":{"Private":[]}},
             {"name":"ai_platform_template","table_access":"Private"},
             {"name":"ai_managed_enrollment","table_access":{"Private":[]}},
@@ -340,12 +343,14 @@ mod tests {
                 .into_iter()
                 .collect::<Vec<_>>(),
             vec![
+                "ai_chat_acceptance_fixture",
                 "ai_managed_enrollment",
                 "ai_platform_default",
                 "ai_platform_template"
             ]
         );
         for name in [
+            "ai_chat_acceptance_fixture",
             "ai_platform_default",
             "ai_platform_template",
             "ai_managed_enrollment",

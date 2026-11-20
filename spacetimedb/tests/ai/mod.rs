@@ -1,6 +1,7 @@
 //! AI domain test suite — invoke via `run_all_ai_tests` reducer.
 pub mod adversarial_drafts_test;
 pub mod capability_grants_test;
+pub mod chat_acceptance_test;
 pub mod company_defaults_test;
 pub mod decision_events_test;
 pub mod embedding_isolation_test;
@@ -18,6 +19,7 @@ use spacetimedb::ReducerContext;
 
 #[spacetimedb::reducer]
 pub fn run_ai_owner_configuration_tests(ctx: &ReducerContext) -> Result<(), String> {
+    chat_acceptance_test::test_fixture_versions_and_company_scope(ctx)?;
     owner_configuration_test::test_agent_action_preserves_configuration(ctx)?;
     platform_defaults_test::test_platform_defaults(ctx)?;
     company_defaults_test::test_company_defaults(ctx)?;

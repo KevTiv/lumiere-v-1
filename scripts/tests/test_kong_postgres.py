@@ -138,6 +138,7 @@ def main():
                 ('POST', '/api/ai/skills/run'),
                 ('GET', '/api/ai/rag'),
                 ('GET', '/api/ai/rag/stream'),
+                ('GET', '/api/ai/acceptance/session'),
                 ('GET', '/api/ai/context/ingest'),
                 ('GET', '/api/ai/evidence/ingestion/documents'),
                 ('POST', '/api/ai/search'),

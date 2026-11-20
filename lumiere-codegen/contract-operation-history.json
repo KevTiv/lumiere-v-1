@@ -3558,6 +3558,10 @@
       "name": "register_ai_calibration_profile",
       "shape_fingerprint": "sha256:64b05a263b2191635ef4f1559e3eae4bb72870941f80a4a056b4f35222a0544a"
     },
+    "erp.register_ai_chat_acceptance_fixture": {
+      "name": "register_ai_chat_acceptance_fixture",
+      "shape_fingerprint": "sha256:8d335e5281014615be367cbdd6715b07e735fc30997b792ed84d4cf9e0a5ccee"
+    },
     "erp.register_ai_decision_type": {
       "name": "register_ai_decision_type",
       "shape_fingerprint": "sha256:7e6a045a06d0374fda41236bb2b3e2c941bc7ca7cb4677713f64e3bcceb0f7e9"
@@ -6564,6 +6568,14 @@
       "current_operations_fingerprint": "sha256:fa13f43d8903ee75b4091a5ba76a907a7a8a5a5a381a6075248dfab3ee7e77a7",
       "operation_count": 1533,
       "reason": "release on top of v0.3.184: add correct_withheld_ai_agent_runs; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.185",
+      "previous_ir_sha256": "sha256:a95f8f4cb3ba0a9a021bb5805d02fea2af3e6e094b96e147bc920f0a4307cb2b",
+      "previous_operations_fingerprint": "sha256:fa13f43d8903ee75b4091a5ba76a907a7a8a5a5a381a6075248dfab3ee7e77a7",
+      "current_operations_fingerprint": "sha256:2f6b5b3529d7866c65be543eecff5f0f91fb081b3d49647bc233e70a4b67a4dc",
+      "operation_count": 1534,
+      "reason": "PR #458: add the private SpaceTimeDB grounded chat acceptance fixture registry and its native registration reducer."
     }
   ]
 }

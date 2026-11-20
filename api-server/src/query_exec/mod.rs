@@ -16,6 +16,7 @@ pub(crate) use authoritative_search::{
     execute_authorized_resource_search, AuthoritativeSearchQuery,
 };
 mod company_scope;
+pub(crate) use company_scope::membership_company_id;
 mod crm;
 mod documents;
 mod forms;

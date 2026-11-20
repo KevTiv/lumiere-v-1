@@ -2,6 +2,11 @@
   "version": 1,
   "reducers": [
     {
+      "name": "register_ai_chat_acceptance_fixture",
+      "exposure": "denied",
+      "reason": "Platform superuser-only native acceptance fixture registration; release CI is read-only."
+    },
+    {
       "name": "ensure_ai_managed_allowance",
       "exposure": "denied",
       "reason": "Reviewed managed AI setup; native authorization enforces organization configuration permissions or platform superuser authority."

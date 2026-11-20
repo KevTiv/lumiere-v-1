@@ -250,7 +250,7 @@ pub async fn post_provision_surfaces(
             skills = existing_generation_surfaces(state.stdb.as_ref(), req.org_id)
                 .await
                 .map_err(setup_error)?;
-            let status = managed_company_setup_status(state.stdb.as_ref(), req.org_id, company_id)
+            let status = company_chat_setup_status(state.stdb.as_ref(), req.org_id, company_id)
                 .await
                 .map_err(AppError::from_agent_resolution)?;
             Some(CompanySetup::binding_setup(company_id, status))
@@ -268,30 +268,20 @@ pub async fn post_provision_surfaces(
     }))
 }
 
-async fn managed_company_setup_status(
+async fn company_chat_setup_status(
     reader: &stdb_client::StdbClient,
     org_id: u64,
     company_id: u64,
 ) -> anyhow::Result<&'static str> {
-    let rows = reader.query_sql(&format!(
-        "SELECT agent_id, is_enabled FROM ai_managed_enrollment WHERE organization_id = {org_id} LIMIT 2"
-    )).await?;
-    let [row] = rows.as_slice() else {
+    // Enrollment owns its private state. Report the company's actual chat
+    // binding so setup also works with a non-owner gateway identity.
+    let Some((agent_id, _)) =
+        company_harness_binding(reader, org_id, company_id, "rag_generation").await?
+    else {
         return Ok("profile_required");
     };
-    if row
-        .get("isEnabled")
-        .or_else(|| row.get("is_enabled"))
-        .and_then(serde_json::Value::as_bool)
-        != Some(true)
-    {
-        return Ok("preserved");
-    }
-    let Some(agent_id) = crate::wire_decode::row_u64(row, "agentId", "agent_id") else {
-        return Ok("preserved");
-    };
     Ok(
-        if company_chat_bound(reader, org_id, company_id, agent_id).await? {
+        if company_chat_agent_available(reader, org_id, company_id, agent_id).await? {
             "bindings_applied"
         } else {
             "preserved"
@@ -300,6 +290,19 @@ async fn managed_company_setup_status(
 }
 
 async fn company_chat_bound(
+    reader: &stdb_client::StdbClient,
+    org_id: u64,
+    company_id: u64,
+    agent_id: u64,
+) -> anyhow::Result<bool> {
+    let binding = company_harness_binding(reader, org_id, company_id, "rag_generation").await?;
+    if !binding.is_some_and(|(bound, _)| bound == agent_id) {
+        return Ok(false);
+    }
+    company_chat_agent_available(reader, org_id, company_id, agent_id).await
+}
+
+async fn company_chat_agent_available(
     reader: &stdb_client::StdbClient,
     org_id: u64,
     company_id: u64,
@@ -339,8 +342,7 @@ async fn company_chat_bound(
     {
         return Ok(false);
     }
-    let binding = company_harness_binding(reader, org_id, company_id, "rag_generation").await?;
-    Ok(binding.is_some_and(|(bound, _)| bound == agent_id))
+    Ok(true)
 }
 
 async fn company_harness_binding(

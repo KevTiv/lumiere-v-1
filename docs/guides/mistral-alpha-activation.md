@@ -210,6 +210,82 @@ managed sponsored period at UTC month rollover through normal spend admission.
 
 ### Verify a Railway release through authenticated chat
 
+The registry-backed check stores versioned scenario metadata in SpaceTimeDB.
+Release jobs exchange GitHub OIDC for short-lived WorkOS access tokens for
+dedicated test accounts scoped to their individual companies. Both checks still
+call the public chat streaming route and require indexed evidence and persisted
+claim support for the exact document versions.
+
+1. Land and deploy the new native contract, API server, web image, and Kong
+   route. The first deploy must use the legacy gate described below because its
+   preflight still runs against the previously live edge.
+2. Configure the API server with sealed Railway variables
+   `AI_CHAT_ACCEPTANCE_PROOF_PRIVATE_KEY` (an Ed25519 PKCS#8 PEM, stable across
+   deployments) and `AI_CHAT_ACCEPTANCE_BROKER_CONFIG`. Set
+   `AI_CHAT_ACCEPTANCE_PROOF_PUBLIC_KEY` to the corresponding public PEM in
+   both the API service and the operator environment. The web and API services
+   use their existing shared
+   `LUMIERE_AI_GATEWAY_INTERNAL_SECRET` to authenticate the build stamp.
+3. Provision admitted WorkOS test users with read-only roles and a single
+   company-bound membership each. The broker uses their normal provider
+   sign-in, subject pin, active profile, membership, and role checks. The
+   provider must issue access tokens lasting at most 30 minutes and longer
+   than 210 seconds for the streaming request. The broker never returns a
+   refresh token. If WorkOS requires an interactive challenge, the check
+   fails with a sign-in error.
+
+The broker config uses this shape. Set the actual GitHub numeric repository ID
+and pinned WorkOS user subjects. Keep the values in the API service's secret
+configuration.
+
+```json
+{
+  "repository": "KevTiv/lumiere-v-1",
+  "repositoryId": "123456",
+  "environment": "production",
+  "organizationId": 4097,
+  "actors": [
+    {"companyId": 4098, "userId": "user_upgraded_fixture", "password": "PLACEHOLDER"}
+  ],
+  "freshActor": {"userId": "user_fresh_fixture", "password": "PLACEHOLDER"}
+}
+```
+
+Register the `upgraded` fixture before enabling the new mode. It uses the
+existing `companyId`, `documentId`, `sourceVersion`, `question`, and
+`expectedAnswerText` fields. An existing dedicated `FARM_ACCEPT_` company
+such as 4098 is eligible once its expected document is indexed. Use a native
+platform superuser from a private operator environment with `STDB_HOST`,
+`STDB_MODULE`, and `AI_CHAT_ACCEPTANCE_OPERATOR_STDB_TOKEN` set.
+
+```sh
+node scripts/register-grounded-chat-fixtures.mjs 4097 production baseline /private/upgraded.json
+```
+
+Set the GitHub Environment variable `AI_CHAT_ACCEPTANCE_SOURCE=registry` and
+keep `AI_CHAT_ACCEPTANCE_URL` set to the verified public HTTPS origin.
+Preflight checks the upgraded fixture and membership before deployment. After
+edge cutover, the release job prints the candidate SHA and a signed cutover
+receipt and waits up to 15 minutes for the fresh fixture. After the receipt
+appears, create a new `AI_CHAT_ACCEPT_` company in the same tenant, bind the
+fresh actor's read-only membership to it, and upload and index a synthetic
+known-answer document through the candidate. Register an exact release
+manifest with the unchanged `upgraded` fixture, `fresh` with the same five
+fields plus `provisionedReleaseSha`, and the top-level `activationProof` from
+the job. The operator command verifies the receipt and creation dates before
+registering the immutable revision. Each fresh company can prove one release.
+
+```sh
+node scripts/register-grounded-chat-fixtures.mjs 4097 production "$RELEASE_SHA" /private/acceptance.json
+```
+
+Nightly resolves the exact fixture for the currently served web build. Registry
+mode ignores the legacy JSON and fails if the registry, runtime provenance,
+sessions, or acceptance assertions fail. Remove `AI_CHAT_ACCEPTANCE_JSON`
+from GitHub after stack, web, and nightly runs have passed in registry mode.
+
+#### Legacy bootstrap mode
+
 The check is on by default for every AI-enabled stack release and for every web
 release; there is no opt-in variable. Set the GitHub Environment variable
 `AI_CHAT_ACCEPTANCE_URL` to the application's HTTPS origin. Set the Environment
@@ -245,18 +321,20 @@ entry, and a synthetic `forbiddenText` marker from that entry. Both cases use
 the journal fixture's signed-in company and check that the assistant
 withholds generation and evidence.
 
-### Release scenarios, skip and nightly run
+#### Release scenarios, skip and nightly run
 
-A missing or invalid `AI_CHAT_ACCEPTANCE_URL`/`AI_CHAT_ACCEPTANCE_JSON` fails an
-AI-enabled release. The only bypass is the `skip_grounded_chat` workflow_dispatch
+A missing or invalid URL or selected fixture source fails an AI-enabled release.
+The explicit bypass is the `skip_grounded_chat` workflow_dispatch
 input on `Release Railway stack` and `Release Railway web`; every use is written
 to the job summary with `github.actor`. The same check runs nightly at 03:17 UTC
-(`grounded-chat-nightly.yml`) against production with the same secret and, on
-failure, writes only the run ID to the job summary.
+(`grounded-chat-nightly.yml`) against production with the selected source and,
+on failure, writes the run ID to the job summary.
 
-Add any of the following optional top-level objects to the secret. Each carries
-its own `companyId` and `cookie` (like `journal`), is strictly validated when
-present, and may set `"expectedGap": true`: a failing scenario is then reported as
+Add any of the following optional top-level scenarios to the manifest. Each case
+references a test `companyId`. Legacy mode also supplies a `cookie` for each
+case, while registry mode uses the configured read-only actor for that company.
+Cases are strictly validated when present and may set `"expectedGap": true`.
+A failing scenario is then reported as
 `known-gap` (with its reason under `knownGaps`) and does not fail the release; a
 passing one reports `gap-closed`, which is the cue to remove the flag.
 

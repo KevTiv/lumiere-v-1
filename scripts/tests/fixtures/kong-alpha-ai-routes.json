@@ -1,5 +1,6 @@
 {
   "post": [
+    "/api/ai/acceptance/session",
     "/api/ai/harness/profile",
     "/api/ai/rag",
     "/api/ai/rag/stream",

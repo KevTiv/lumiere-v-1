@@ -254,7 +254,7 @@ fn json_u64(value: Option<&Value>) -> Option<u64> {
     value?.as_u64().or_else(|| value?.as_str()?.parse().ok())
 }
 
-fn timestamp_micros(value: &Value) -> Option<i64> {
+pub(crate) fn timestamp_micros(value: &Value) -> Option<i64> {
     value
         .as_i64()
         .or_else(|| value.as_str()?.parse().ok())

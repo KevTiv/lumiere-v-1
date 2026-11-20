@@ -93,6 +93,7 @@ class PrivateReleaseTests(unittest.TestCase):
             ('GET', '/api/ai/rag'),
             ('GET', '/api/ai/rag/stream'),
             ('POST', '/api/ai/rag/stream/extra'),
+            ('GET', '/api/ai/acceptance/session'),
             ('GET', '/api/ai/context/ingest'),
             ('GET', '/api/ai/evidence/ingestion/documents'),
             ('POST', '/api/ai/search'),

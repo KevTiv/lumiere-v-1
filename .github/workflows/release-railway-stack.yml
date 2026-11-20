@@ -89,6 +89,7 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   RAILWAY_PROJECT_ID: cc695d4b-030c-43e3-bbd6-a41095b09257
@@ -178,13 +179,6 @@ jobs:
           echo "### Grounded chat check SKIPPED" >> "$GITHUB_STEP_SUMMARY"
           echo "skip_grounded_chat was set by \`$RELEASE_ACTOR\` for release \`$RELEASE_SHA\` (environment \`$RAILWAY_ENVIRONMENT\`)." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Validate the grounded chat release fixtures
-        if: inputs.enable_ai && !inputs.skip_grounded_chat
-        env:
-          AI_CHAT_ACCEPTANCE_URL: ${{ vars.AI_CHAT_ACCEPTANCE_URL }}
-          AI_CHAT_ACCEPTANCE_JSON: ${{ secrets.AI_CHAT_ACCEPTANCE_JSON }}
-        run: node scripts/verify-grounded-chat.mjs --check-config
-
       - name: Verify production ancestry
         shell: bash
         run: |
@@ -201,6 +195,14 @@ jobs:
               exit 1
             }
           fi
+
+      - name: Validate the grounded chat release fixtures
+        if: inputs.enable_ai && !inputs.skip_grounded_chat
+        env:
+          AI_CHAT_ACCEPTANCE_SOURCE: ${{ vars.AI_CHAT_ACCEPTANCE_SOURCE }}
+          AI_CHAT_ACCEPTANCE_URL: ${{ vars.AI_CHAT_ACCEPTANCE_URL }}
+          AI_CHAT_ACCEPTANCE_JSON: ${{ vars.AI_CHAT_ACCEPTANCE_SOURCE != 'registry' && secrets.AI_CHAT_ACCEPTANCE_JSON || '' }}
+        run: node scripts/verify-grounded-chat.mjs --check-config
 
       - name: Install pinned Railway CLI
         run: npm install --global "@railway/cli@$RAILWAY_CLI_VERSION"
@@ -360,8 +362,9 @@ jobs:
       - name: Verify grounded chat scenarios through the public edge
         if: inputs.enable_ai && !inputs.skip_grounded_chat
         env:
+          AI_CHAT_ACCEPTANCE_SOURCE: ${{ vars.AI_CHAT_ACCEPTANCE_SOURCE }}
           AI_CHAT_ACCEPTANCE_URL: ${{ vars.AI_CHAT_ACCEPTANCE_URL }}
-          AI_CHAT_ACCEPTANCE_JSON: ${{ secrets.AI_CHAT_ACCEPTANCE_JSON }}
+          AI_CHAT_ACCEPTANCE_JSON: ${{ vars.AI_CHAT_ACCEPTANCE_SOURCE != 'registry' && secrets.AI_CHAT_ACCEPTANCE_JSON || '' }}
         run: node scripts/verify-grounded-chat.mjs
 
       - name: Failure diagnostics

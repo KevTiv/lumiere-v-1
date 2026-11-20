@@ -1,16 +1,24 @@
 #!/usr/bin/env node
 // Authenticated release acceptance for indexed documents, an optional live journal and optional scenarios.
 import { appendFileSync } from 'node:fs'
+import { setTimeout as pause } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
+import { isDeepStrictEqual } from 'node:util'
 
 const requireValue = (condition, message) => { if (!condition) throw new Error(message) }
 const positive = value => Number.isSafeInteger(value) && value > 0
 const text = value => typeof value === 'string' && value.trim().length > 0
 const cohorts = ['fresh', 'upgraded']
 const journalContext = { route: '/accounting', module: 'accounting', active_tab: 'journal-entries' }
+const acceptanceBearer = Symbol('acceptanceBearer')
 
 const validSession = fixture => positive(fixture?.companyId)
-  && text(fixture?.cookie) && /^[\x20-\x7e]+$/.test(fixture.cookie)
+  && (typeof fixture[acceptanceBearer] === 'function' || (text(fixture.cookie) && /^[\x20-\x7e]+$/.test(fixture.cookie)))
+const token = value => typeof value === 'string' && value.length <= 16384 && /^[A-Za-z0-9._~+/-]+=*$/.test(value)
+const gitSha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value)
+const object = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+const compactProof = value => typeof value === 'string' && value.length <= 4096
+  && /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value)
 const recordId = value => {
   const id = positive(value) ? String(value) : value
   return typeof id === 'string' && /^[1-9][0-9]{0,19}$/.test(id)
@@ -66,22 +74,26 @@ const scenarioValidators = {
     && (fixture.expectedText === undefined || text(fixture.expectedText)),
 }
 
-export function readChatFixtures(env) {
-  let origin, config
+function acceptanceOrigin(env) {
+  let origin
   try {
     origin = new URL(env.AI_CHAT_ACCEPTANCE_URL)
-    config = JSON.parse(env.AI_CHAT_ACCEPTANCE_JSON)
   } catch {
-    throw new Error('configure the chat acceptance URL and fixture secret')
+    throw new Error('configure AI_CHAT_ACCEPTANCE_URL')
   }
   requireValue(origin.protocol === 'https:' && !origin.username && !origin.password
     && !origin.search && !origin.hash && origin.pathname === '/', 'chat acceptance URL must be an HTTPS origin')
-  for (const cohort of cohorts) {
+  return origin.origin
+}
+
+function validateFixtures(config, preflightOnly = false) {
+  for (const cohort of preflightOnly ? ['upgraded'] : cohorts) {
     const fixture = config?.[cohort]
     requireValue(validSession(fixture) && positive(fixture.documentId)
       && text(fixture?.sourceVersion) && text(fixture?.question) && text(fixture?.expectedAnswerText),
     `invalid ${cohort} chat fixture`)
   }
+  if (preflightOnly) return
   requireValue(config.fresh.companyId !== config.upgraded.companyId, 'chat fixtures must use different companies')
   if (config.journal !== undefined) validateJournalFixture(config.journal)
   if (config.maxWithholdRate !== undefined) {
@@ -91,7 +103,177 @@ export function readChatFixtures(env) {
   for (const [name, validate] of Object.entries(scenarioValidators)) {
     if (config[name] !== undefined) requireValue(validate(config[name], name, config), `invalid ${name} chat fixture`)
   }
-  return { origin: origin.origin, config }
+}
+
+export function readChatFixtures(env) {
+  const origin = acceptanceOrigin(env)
+  let config
+  try { config = JSON.parse(env.AI_CHAT_ACCEPTANCE_JSON) } catch {
+    throw new Error('configure the AI_CHAT_ACCEPTANCE_JSON fixture secret in legacy mode')
+  }
+  validateFixtures(config)
+  return { origin, config }
+}
+
+const acceptanceAudience = 'lumiere-grounded-chat-acceptance'
+const maxRegistryReplyBytes = 256 * 1024
+const registryLabel = 'chat acceptance registry session exchange'
+const chatTimeoutMs = 180_000
+const minRemainingSessionMs = chatTimeoutMs + 30_000
+const maxSessionLifetimeMs = 31 * 60_000 // 30-minute TTL plus bounded clock skew.
+
+async function readBoundedJson(response, label) {
+  requireValue(response.headers.get('content-type')?.split(';')[0].trim() === 'application/json',
+    `${label} returned a non-JSON response`)
+  requireValue(response.body, `${label} returned an empty response`)
+  const decoder = new TextDecoder('utf-8', { fatal: true })
+  let length = 0, raw = ''
+  try {
+    for await (const chunk of response.body) {
+      length += chunk.byteLength
+      if (length > maxRegistryReplyBytes) throw new Error()
+      raw += decoder.decode(chunk, { stream: true })
+    }
+    return JSON.parse(raw + decoder.decode())
+  } catch {
+    throw new Error(`${label} returned invalid or overlarge JSON`)
+  }
+}
+
+async function registryFetch(fetcher, url, options, label) {
+  try {
+    return await fetcher(url, { redirect: 'error', signal: AbortSignal.timeout(30_000), ...options })
+  } catch {
+    throw new Error(`${label} transport failed`)
+  }
+}
+
+function githubOidcRequest(env) {
+  let url
+  try { url = new URL(env.ACTIONS_ID_TOKEN_REQUEST_URL) } catch {
+    throw new Error('configure GitHub Actions OIDC (id-token: write)')
+  }
+  requireValue(url.protocol === 'https:' && !url.username && !url.password && !url.hash && !url.port
+    && url.hostname.endsWith('.actions.githubusercontent.com') && token(env.ACTIONS_ID_TOKEN_REQUEST_TOKEN),
+  'GitHub Actions OIDC request configuration is invalid')
+  url.searchParams.set('audience', acceptanceAudience)
+  return { url: url.href, credential: env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }
+}
+
+async function githubOidcToken(request, fetcher) {
+  const label = 'GitHub Actions OIDC exchange'
+  const response = await registryFetch(fetcher, request.url, { headers: { Authorization: `Bearer ${request.credential}` } }, label)
+  requireValue(response.ok, `${label} returned HTTP ${response.status}`)
+  const body = await readBoundedJson(response, label)
+  requireValue(token(body?.value), `${label} did not issue a token`)
+  return body.value
+}
+
+// The API validates JWT signatures and authorization. This claim only schedules renewal.
+function sessionExpiry(tokenValue) {
+  if (!token(tokenValue)) return NaN
+  const parts = tokenValue.split('.')
+  if (parts.length !== 3 || !parts.every(part => /^[A-Za-z0-9_-]+$/.test(part))) return NaN
+  try {
+    const { exp } = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))
+    return Number.isSafeInteger(exp) ? exp * 1000 : NaN
+  } catch {
+    return NaN
+  }
+}
+
+function authenticateRegistryFixtures(fixtures, accessTokens, preflightOnly, credentialFor, now) {
+  requireValue(object(fixtures) && object(accessTokens), 'chat acceptance registry returned invalid fixtures or sessions')
+  const companyIds = new Set()
+  const bind = fixture => {
+    requireValue(object(fixture) && positive(fixture.companyId)
+      && !Object.hasOwn(fixture, 'cookie') && !Object.hasOwn(fixture, 'accessToken'),
+      'chat acceptance registry returned invalid fixture authentication')
+    const companyKey = String(fixture.companyId)
+    const remaining = sessionExpiry(accessTokens[companyKey]) - now()
+    requireValue(Object.hasOwn(accessTokens, companyKey) && remaining > 0 && remaining <= maxSessionLifetimeMs,
+      'chat acceptance registry omitted a valid company session')
+    companyIds.add(companyKey)
+    return { ...fixture, [acceptanceBearer]: credentialFor }
+  }
+  const config = { upgraded: bind(fixtures.upgraded) }
+  if (!preflightOnly) {
+    config.fresh = bind(fixtures.fresh)
+    if (fixtures.journal !== undefined) config.journal = bind(fixtures.journal)
+    if (fixtures.maxWithholdRate !== undefined) config.maxWithholdRate = fixtures.maxWithholdRate
+    for (const name of Object.keys(scenarioValidators)) {
+      if (name === 'revoked' || fixtures[name] === undefined) continue
+      if (name === 'nonEnglish') {
+        requireValue(object(fixtures.nonEnglish), 'chat acceptance registry returned invalid language fixtures')
+        config.nonEnglish = Object.fromEntries(Object.entries(fixtures.nonEnglish).map(([language, fixture]) => [language, bind(fixture)]))
+      } else {
+        config[name] = bind(fixtures[name])
+      }
+    }
+    if (fixtures.revoked !== undefined) {
+      requireValue(!companyIds.has(String(fixtures.revoked?.companyId)),
+        'the revoked fixture must use a dedicated company session')
+      config.revoked = bind(fixtures.revoked)
+    }
+  }
+  requireValue(Object.keys(accessTokens).length === companyIds.size
+    && new Set(Object.values(accessTokens)).size === companyIds.size,
+  'chat acceptance registry returned unexpected or shared company sessions')
+  validateFixtures(config, preflightOnly)
+  return config
+}
+
+async function readRegistrySession(response, stage, releaseSha) {
+  requireValue(response.ok, `${registryLabel} returned HTTP ${response.status}`)
+  const body = await readBoundedJson(response, registryLabel)
+  requireValue(gitSha(body?.releaseSha), `${registryLabel} returned an invalid release`)
+  if (stage !== 'preflight') {
+    requireValue(stage === 'nightly' || body.releaseSha === releaseSha, 'chat acceptance registry does not serve the requested release')
+    requireValue(body.fixtures?.fresh?.provisionedReleaseSha === body.releaseSha,
+      'fresh chat fixture was not provisioned on the deployed release')
+  }
+  return body
+}
+
+async function readRegistryFixtures(env, stage, { fetcher, wait, onPending, now }) {
+  const origin = acceptanceOrigin(env)
+  const releaseSha = stage === 'nightly' ? undefined : env.RELEASE_SHA?.toLowerCase()
+  requireValue(stage === 'nightly' || gitSha(releaseSha), 'set RELEASE_SHA to the full release commit SHA')
+  const request = githubOidcRequest(env)
+  const exchange = async () => {
+    const idToken = await githubOidcToken(request, fetcher)
+    return registryFetch(fetcher, `${origin}/api/ai/acceptance/session`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${idToken}`, Origin: origin, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage, ...(releaseSha && { releaseSha }) }),
+    }, registryLabel)
+  }
+  let response = await exchange()
+  for (let attempt = 0; stage === 'verify' && response.status === 409; attempt++) {
+    const body = await readBoundedJson(response, registryLabel)
+    requireValue(body?.code === 'fresh_fixture_pending' && body.releaseSha === releaseSha && compactProof(body.activationProof),
+      `${registryLabel} returned HTTP 409`)
+    requireValue(attempt < 30, 'the fresh chat fixture is missing for this deployed release; provision and register it before retrying')
+    if (attempt === 0) onPending(releaseSha, body.activationProof)
+    await wait(30_000)
+    response = await exchange()
+  }
+  const original = await readRegistrySession(response, stage, releaseSha)
+  let accessTokens = original.accessTokens
+  const preflightOnly = stage === 'preflight'
+  const credentialFor = async companyId => {
+    if (sessionExpiry(accessTokens[companyId]) - now() <= minRemainingSessionMs) {
+      const refreshed = await readRegistrySession(await exchange(), stage, releaseSha)
+      requireValue(refreshed.releaseSha === original.releaseSha && isDeepStrictEqual(refreshed.fixtures, original.fixtures),
+        'chat acceptance registry changed the release or fixtures while renewing the session')
+      authenticateRegistryFixtures(refreshed.fixtures, refreshed.accessTokens, preflightOnly, credentialFor, now)
+      accessTokens = refreshed.accessTokens
+    }
+    requireValue(sessionExpiry(accessTokens[companyId]) - now() > minRemainingSessionMs,
+      'chat acceptance registry issued a session too short for the chat timeout')
+    return accessTokens[companyId]
+  }
+  return { origin, config: authenticateRegistryFixtures(original.fixtures, accessTokens, preflightOnly, credentialFor, now) }
 }
 
 function verifyProviderReply(body) {
@@ -178,10 +360,13 @@ function completedStream(raw) {
 }
 
 async function requestChat(origin, fetcher, label, session, query, uiContext, extra) {
+  const authentication = session[acceptanceBearer]
+    ? { Authorization: `Bearer ${await session[acceptanceBearer](session.companyId)}` }
+    : { Cookie: session.cookie }
   try {
     return await fetcher(`${origin}/api/ai/rag/stream`, {
-      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(180_000),
-      headers: { Origin: origin, Cookie: session.cookie, 'Content-Type': 'application/json' },
+      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(chatTimeoutMs),
+      headers: { Origin: origin, ...authentication, 'Content-Type': 'application/json' },
       body: JSON.stringify({ companyId: session.companyId, query, ...(uiContext && { ui_context: uiContext }), ...extra }),
     })
   } catch {
@@ -190,7 +375,7 @@ async function requestChat(origin, fetcher, label, session, query, uiContext, ex
 }
 
 async function checkStream(response, label, check) {
-  requireValue(response.status !== 401, `${label} chat session is expired or invalid; sign in the acceptance user again and replace its cookie in AI_CHAT_ACCEPTANCE_JSON`)
+  requireValue(response.status !== 401, `${label} chat session is expired or invalid; sign in the acceptance user again or renew the registry session`)
   requireValue(response.ok, `${label} chat returned HTTP ${response.status}`)
   requireValue(response.headers.get('content-type')?.startsWith('text/event-stream'), `${label} chat did not return an event stream`)
   const raw = await response.text().catch(() => null)
@@ -344,23 +529,33 @@ async function runScenarios(origin, fetcher, config, result) {
 // Cheap session pre-flight: an empty query is rejected after authentication and before any model call,
 // so 401 means the cookie expired and 400 means it signed in.
 export async function preflightSessions(env, fetcher = fetch) {
-  const { origin, config } = readChatFixtures(env)
+  return checkSessions(readChatFixtures(env), fetcher)
+}
+
+async function checkSessions({ origin, config }, fetcher) {
   const seen = new Set()
   const sessions = [['fresh', config.fresh], ['upgraded', config.upgraded], ['journal', config.journal],
     ...Object.entries(config).filter(([name]) => name in scenarioRunners && name !== 'nonEnglish'),
     ...Object.entries(config.nonEnglish ?? {}).map(([language, fixture]) => [`nonEnglish ${language}`, fixture])]
   for (const [label, session] of sessions) {
-    if (!session || seen.has(session.cookie)) continue
-    seen.add(session.cookie)
+    if (!session) continue
+    const credential = session[acceptanceBearer] ? session.companyId : session.cookie
+    if (seen.has(credential)) continue
+    seen.add(credential)
     const response = await requestChat(origin, fetcher, label, session, '')
     await response.arrayBuffer().catch(() => null)
-    requireValue(response.status !== 401, `${label} session cookie is expired or invalid; sign in the acceptance user again and replace its cookie in AI_CHAT_ACCEPTANCE_JSON`)
+    requireValue(response.status !== 401, session[acceptanceBearer]
+      ? `${label} registry session is expired or invalid`
+      : `${label} session cookie is expired or invalid; sign in the acceptance user again and replace its cookie in AI_CHAT_ACCEPTANCE_JSON`)
     requireValue(response.status === 400, `${label} session pre-flight returned HTTP ${response.status}`)
   }
 }
 
 export async function verifyGroundedChat(env, fetcher = fetch) {
-  const { origin, config } = readChatFixtures(env)
+  return verifyFixtures(readChatFixtures(env), fetcher)
+}
+
+async function verifyFixtures({ origin, config }, fetcher) {
   const result = {}
   for (const cohort of cohorts) {
     const fixture = config[cohort]
@@ -395,6 +590,19 @@ export async function verifyGroundedChat(env, fetcher = fetch) {
   return result
 }
 
+export async function runAcceptanceCheck(env, stage, {
+  fetcher = fetch, wait = pause, onPending = () => {}, now = Date.now,
+} = {}) {
+  requireValue(['preflight', 'verify', 'nightly'].includes(stage), 'unknown chat acceptance stage')
+  const source = env.AI_CHAT_ACCEPTANCE_SOURCE || 'legacy'
+  requireValue(['legacy', 'registry'].includes(source), 'AI_CHAT_ACCEPTANCE_SOURCE must be legacy or registry')
+  const context = source === 'registry'
+    ? await readRegistryFixtures(env, stage, { fetcher, wait, onPending, now })
+    : readChatFixtures(env)
+  if (stage !== 'preflight' || source === 'registry') await checkSessions(context, fetcher)
+  if (stage !== 'preflight') return verifyFixtures(context, fetcher)
+}
+
 function writeSummary(result) {
   if (!process.env.GITHUB_STEP_SUMMARY) return
   const rows = Object.entries(result).filter(([, value]) => typeof value === 'string').map(([name, value]) => `| ${name} | ${value} |`)
@@ -402,16 +610,27 @@ function writeSummary(result) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, ['### Grounded chat acceptance', '', '| Check | Result |', '| --- | --- |', ...rows, '', ...gaps, ''].join('\n'))
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  if (process.argv[2] === '--check-config') {
-    try { readChatFixtures(process.env) } catch (error) { console.error(error.message); process.exitCode = 1 }
-  } else {
-    preflightSessions(process.env).then(() => verifyGroundedChat(process.env)).then(result => {
-      console.log(JSON.stringify(result))
-      writeSummary(result)
-    }).catch(error => {
-      console.error(error.message)
-      process.exitCode = 1
-    })
+function recordPendingFixture(releaseSha, activationProof) {
+  const message = [
+    `Waiting up to 15 minutes for the fresh grounded chat fixture for ${releaseSha}.`,
+    'Create and index the fresh test fixture on this deployment, then register the release manifest with this activationProof.',
+    `activationProof: ${activationProof}`,
+  ].join('\n')
+  console.log(message)
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Fresh grounded chat fixture pending\n\n${message}\n\n`)
   }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const stage = { '--check-config': 'preflight', '--nightly': 'nightly' }[process.argv[2]]
+    ?? (process.argv[2] === undefined ? 'verify' : null)
+  runAcceptanceCheck(process.env, stage, { onPending: recordPendingFixture }).then(result => {
+    if (!result) return
+    console.log(JSON.stringify(result))
+    writeSummary(result)
+  }).catch(error => {
+    console.error(error.message)
+    process.exitCode = 1
+  })
 }

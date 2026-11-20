@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { preflightSessions, readChatFixtures, verifyGroundedChat } from '../verify-grounded-chat.mjs'
+import { preflightSessions, readChatFixtures, runAcceptanceCheck, verifyGroundedChat } from '../verify-grounded-chat.mjs'
 
 const fixture = companyId => ({ companyId, documentId: companyId + 10, sourceVersion: `current-${companyId}`,
   cookie: `fixture-session=${companyId}`, question: 'Who reviews the expense?', expectedAnswerText: 'Aurora board' })
@@ -314,4 +314,180 @@ test('reports an expired session precisely and pre-flights each distinct cookie 
   assert.deepEqual(calls, [['fixture-session=1', ''], ['fixture-session=2', ''], ['scenario-session=4', '']])
   await assert.rejects(preflightSessions(env, async () => new Response('', { status: 401 })), /fresh session cookie is expired or invalid/)
   await assert.rejects(preflightSessions(env, async () => new Response('', { status: 502 })), /pre-flight returned HTTP 502/)
+})
+
+const candidateSha = 'a'.repeat(40)
+const baselineSha = 'b'.repeat(40)
+const registryEnv = {
+  ...env,
+  AI_CHAT_ACCEPTANCE_SOURCE: 'registry',
+  RELEASE_SHA: candidateSha,
+  ACTIONS_ID_TOKEN_REQUEST_URL: 'https://pipelines.actions.githubusercontent.com/token?job=acceptance',
+  ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'github-request-token',
+}
+const withoutCookie = ({ cookie, ...metadata }) => metadata
+const registryFixtures = {
+  fresh: { ...withoutCookie(config.fresh), provisionedReleaseSha: candidateSha },
+  upgraded: { ...withoutCookie(config.upgraded), provisionedReleaseSha: baselineSha },
+}
+const workosToken = (signature, expiry) =>
+  `header.${Buffer.from(JSON.stringify({ exp: Math.floor(expiry / 1000) })).toString('base64url')}.${signature}`
+const sessionsExp = Date.now() + 15 * 60_000
+const registryReply = {
+  releaseSha: candidateSha,
+  fixtures: registryFixtures,
+  accessTokens: { '1': workosToken('fresh', sessionsExp), '2': workosToken('upgraded', sessionsExp) },
+}
+
+function registryFetch(stage, ...responses) {
+  const exchanges = []
+  const chats = []
+  let activeTokens = {}
+  const fetcher = async (address, options) => {
+    const url = new URL(address)
+    assert.equal(options.redirect, 'error')
+    if (url.hostname === 'pipelines.actions.githubusercontent.com') {
+      assert.equal(url.searchParams.get('job'), 'acceptance')
+      assert.equal(url.searchParams.get('audience'), 'lumiere-grounded-chat-acceptance')
+      assert.deepEqual(options.headers, { Authorization: 'Bearer github-request-token' })
+      return Response.json({ value: 'github-issued-oidc-token' })
+    }
+    assert.equal(url.origin, env.AI_CHAT_ACCEPTANCE_URL)
+    const body = JSON.parse(options.body)
+    assert.equal(options.headers.Origin, url.origin)
+    assert.equal(options.headers.Cookie, undefined)
+    if (url.pathname === '/api/ai/acceptance/session') {
+      assert.equal(options.method, 'POST')
+      assert.equal(options.headers.Authorization, 'Bearer github-issued-oidc-token')
+      assert.deepEqual(body, { stage, ...(stage !== 'nightly' && { releaseSha: candidateSha }) })
+      exchanges.push(body)
+      const response = responses.shift() ?? Response.json(registryReply)
+      if (response.ok) activeTokens = (await response.clone().json()).accessTokens
+      return response
+    }
+    assert.equal(url.pathname, '/api/ai/rag/stream')
+    assert.equal(options.headers.Authorization, `Bearer ${activeTokens[body.companyId]}`)
+    chats.push(body)
+    if (!body.query) return new Response('', { status: 400 })
+    return stream(body.companyId === 1 ? config.fresh : config.upgraded)
+  }
+  return { fetcher, exchanges, chats }
+}
+
+test('registry preflight accepts the existing upgraded fixture without requiring the fresh candidate', async () => {
+  const { fetcher, chats } = registryFetch('preflight', Response.json({
+    releaseSha: baselineSha,
+    fixtures: { upgraded: registryFixtures.upgraded },
+    accessTokens: { '2': registryReply.accessTokens[2] },
+  }))
+  assert.equal(await runAcceptanceCheck(registryEnv, 'preflight', { fetcher }), undefined)
+  assert.deepEqual(chats, [{ companyId: 2, query: '' }])
+})
+
+test('registry release and nightly checks stream the two company scopes with separate bearer sessions', async () => {
+  for (const stage of ['verify', 'nightly']) {
+    const { fetcher, exchanges, chats } = registryFetch(stage)
+    assert.deepEqual(await runAcceptanceCheck(registryEnv, stage, { fetcher }),
+      { fresh: 'passed', upgraded: 'passed' })
+    assert.equal(exchanges.length, 1)
+    assert.deepEqual(chats.map(({ companyId, query }) => [companyId, query]), [
+      [1, ''], [2, ''], [1, config.fresh.question], [2, config.upgraded.question],
+    ])
+  }
+})
+
+test('registry rejects wrong releases, stale freshness, and mismatched company sessions without using legacy', async () => {
+  for (const [reply, error] of [
+    [{ ...registryReply, releaseSha: baselineSha }, /does not serve the requested release/],
+    [{ ...registryReply, fixtures: { ...registryFixtures, fresh: { ...registryFixtures.fresh, provisionedReleaseSha: baselineSha } } },
+      /was not provisioned on the deployed release/],
+    [{ ...registryReply, accessTokens: { '2': registryReply.accessTokens[2] } }, /omitted a valid company session/],
+    [{ ...registryReply, accessTokens: { ...registryReply.accessTokens, '3': 'unexpected-session' } },
+      /unexpected or shared company sessions/],
+    [{ ...registryReply, accessTokens: { '1': registryReply.accessTokens[1], '2': registryReply.accessTokens[1] } },
+      /unexpected or shared company sessions/],
+    [{ ...registryReply, accessTokens: { ...registryReply.accessTokens, '1': workosToken('long-lived', sessionsExp + 40 * 60_000) } },
+      /omitted a valid company session/],
+    [{ ...registryReply, fixtures: { ...registryFixtures, revoked: { ...scenarios.revoked, companyId: 1, cookie: undefined } } },
+      /revoked fixture must use a dedicated company session/],
+    [{ ...registryReply, fixtures: { ...registryFixtures, upgraded: { ...registryFixtures.upgraded, cookie: 'should-not-pass' } } },
+      /invalid fixture authentication/],
+  ]) {
+    const { fetcher, chats } = registryFetch('verify', Response.json(reply))
+    await assert.rejects(runAcceptanceCheck(registryEnv, 'verify', { fetcher }), error)
+    assert.deepEqual(chats, [])
+  }
+  const { fetcher, chats } = registryFetch('verify', Response.json({ detail: 'secret-server-message' }, { status: 401 }))
+  await assert.rejects(runAcceptanceCheck(registryEnv, 'verify', { fetcher }),
+    error => /registry session exchange returned HTTP 401/.test(error.message) && !error.message.includes('secret-server-message'))
+  assert.deepEqual(chats, [])
+})
+
+test('only a candidate fresh fixture that is explicitly pending is retried', async () => {
+  const proof = 'activation.payload.signature'
+  const pending = (releaseSha = candidateSha, activationProof = proof) =>
+    Response.json({ code: 'fresh_fixture_pending', releaseSha, activationProof }, { status: 409 })
+  const { fetcher, chats, exchanges } = registryFetch('verify', pending(), pending(candidateSha, 'new.payload.signature'))
+  const reported = []
+  await runAcceptanceCheck(registryEnv, 'verify', {
+    fetcher,
+    onPending: (...args) => reported.push(args),
+    wait: async ms => {
+      assert.equal(ms, 30_000)
+      assert.equal(chats.length, 0)
+    },
+  })
+  assert.equal(exchanges.length, 3)
+  assert.deepEqual(reported, [[candidateSha, proof]])
+  const nightly = registryFetch('nightly', pending())
+  const unknown = registryFetch('verify', Response.json({ code: 'other_problem' }, { status: 409 }))
+  const wrongRelease = registryFetch('verify', pending(baselineSha))
+  const invalidProof = registryFetch('verify', pending(candidateSha, 'untrusted\npayload'))
+  for (const [stage, fixtureFetch] of [['nightly', nightly], ['verify', unknown], ['verify', wrongRelease], ['verify', invalidProof]]) {
+    await assert.rejects(runAcceptanceCheck(registryEnv, stage, {
+      fetcher: fixtureFetch.fetcher, wait: async () => assert.fail('unexpected retry'),
+    }), /HTTP 409/)
+    assert.equal(fixtureFetch.chats.length, 0)
+  }
+  const neverReady = registryFetch('verify', ...Array.from({ length: 31 }, () => pending()))
+  await assert.rejects(runAcceptanceCheck(registryEnv, 'verify', {
+    fetcher: neverReady.fetcher, wait: async () => {},
+  }), /fresh chat fixture is missing for this deployed release/)
+  assert.equal(neverReady.exchanges.length, 31)
+  assert.equal(neverReady.chats.length, 0)
+})
+
+test('renewal happens before the next chat call and cannot change the deployed release or fixtures', async () => {
+  const changed = { ...registryReply, fixtures: {
+    ...registryFixtures, upgraded: { ...registryFixtures.upgraded, expectedAnswerText: 'unreviewed fact' },
+  } }
+  const renewed = { ...registryReply, accessTokens: {
+    '1': workosToken('fresh-renewed', sessionsExp + 10 * 60_000),
+    '2': workosToken('upgraded-renewed', sessionsExp + 10 * 60_000),
+  } }
+  for (const [reply, expected] of [[renewed, 'success'], [changed, 'failure']]) {
+    const { fetcher, exchanges, chats } = registryFetch('verify', Response.json(registryReply), Response.json(reply))
+    const run = runAcceptanceCheck(registryEnv, 'verify', {
+      fetcher,
+      now: () => chats.some(chat => chat.query) ? sessionsExp - 60_000 : Date.now(),
+    })
+    if (expected === 'success') assert.deepEqual(await run, { fresh: 'passed', upgraded: 'passed' })
+    else await assert.rejects(run, /changed the release or fixtures while renewing/)
+    assert.equal(exchanges.length, 2)
+    assert.deepEqual(chats.filter(chat => chat.query).map(chat => chat.companyId), expected === 'success' ? [1, 2] : [1])
+  }
+})
+
+test('registry never sends the GitHub token request credential to a different host or a redirect', async () => {
+  await assert.rejects(runAcceptanceCheck({
+    ...registryEnv, ACTIONS_ID_TOKEN_REQUEST_URL: 'https://pipelines.actions.githubusercontent.com.bad.example/token',
+  }, 'verify', {
+    fetcher: async () => assert.fail('unexpected network call'),
+  }), /GitHub Actions OIDC request configuration is invalid/)
+  await assert.rejects(runAcceptanceCheck(registryEnv, 'verify', {
+    fetcher: async (_address, options) => {
+      assert.equal(options.redirect, 'error')
+      throw new Error('redirect detail must not leak')
+    },
+  }), /GitHub Actions OIDC exchange transport failed/)
 })
