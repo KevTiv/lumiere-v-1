@@ -1,5 +1,6 @@
 //! Lumiere Axum API server — library surface for the `api-server` binary.
 
+mod acceptance_registry;
 mod ai_index_queue;
 mod auth_password;
 pub mod cold_tier;

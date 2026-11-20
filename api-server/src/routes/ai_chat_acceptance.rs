@@ -26,13 +26,14 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tokio::sync::Semaphore;
 
-use crate::{error::ApiError, session::workos, state::AppState};
+use crate::{
+    acceptance_registry::AcceptanceRegistry, error::ApiError, session::workos, state::AppState,
+};
 
 const ISSUER: &str = "https://token.actions.githubusercontent.com";
 const AUDIENCE: &str = "lumiere-grounded-chat-acceptance";
 const ACTIVATION_ISSUER: &str = "lumiere-acceptance-cutover-v1";
 const MAIN_REF: &str = "refs/heads/main";
-const MAX_MANIFEST_BYTES: usize = 64 * 1024;
 const MAX_ACTORS: usize = 16;
 const SCENARIOS: &[&str] = &[
     "fresh",
@@ -291,12 +292,26 @@ fn served_build(headers: &HeaderMap) -> Result<ServedBuild<'_>, ApiError> {
     Ok(ServedBuild { sha })
 }
 
-fn verify_job(
+/// Read authority minted only by the signed GitHub job verification below.
+pub(crate) struct VerifiedAcceptanceJob<'a> {
+    organization_id: u64,
+    environment: &'a str,
+    fixture_release: &'a str,
+}
+
+impl VerifiedAcceptanceJob<'_> {
+    pub(crate) fn registry_scope(&self) -> (u64, &str, &str) {
+        (self.organization_id, self.environment, self.fixture_release)
+    }
+}
+
+fn verify_job<'a>(
     token: &str,
     keys: &JwkSet,
-    config: &BrokerConfig,
+    config: &'a BrokerConfig,
     stage: Stage,
-) -> Result<(), ApiError> {
+    served_release: &'a str,
+) -> Result<VerifiedAcceptanceJob<'a>, ApiError> {
     let header = decode_header(token).map_err(|_| ApiError::Unauthorized)?;
     let key = header
         .kid
@@ -324,7 +339,15 @@ fn verify_job(
     {
         return Err(ApiError::Unauthorized);
     }
-    Ok(())
+    Ok(VerifiedAcceptanceJob {
+        organization_id: config.organization_id,
+        environment: &config.environment,
+        fixture_release: if stage == Stage::Preflight {
+            ""
+        } else {
+            served_release
+        },
+    })
 }
 
 fn authorized_job(claims: &JobClaims, config: &BrokerConfig, stage: Stage) -> bool {
@@ -356,42 +379,6 @@ fn authorized_job(claims: &JobClaims, config: &BrokerConfig, stage: Stage) -> bo
         || (caller == workflow("release-main")
             && job == workflow("release-railway-stack")
             && (manual || matches!(claims.event_name.as_str(), "push" | "workflow_run")))
-}
-
-async fn registry(
-    state: &AppState,
-    config: &BrokerConfig,
-    release_sha: &str,
-) -> Result<Option<Value>, ApiError> {
-    let org = config.organization_id;
-    let environment = &config.environment;
-    let rows = state
-        .stdb
-        .with_query_limits(2, MAX_MANIFEST_BYTES * 2)
-        .map_err(ApiError::internal)?
-        .query_sql(&format!(
-            "SELECT fixture_json FROM ai_chat_acceptance_fixture WHERE organization_id = {org} \
-             AND environment = '{environment}' AND release_sha = '{release_sha}' LIMIT 2"
-        ))
-        .await
-        .map_err(ApiError::unavailable)?;
-    match rows.as_slice() {
-        [] => Ok(None),
-        [row] => {
-            let manifest = row["fixtureJson"]
-                .as_str()
-                .filter(|text| text.len() <= MAX_MANIFEST_BYTES)
-                .and_then(|text| serde_json::from_str(text).ok())
-                .filter(Value::is_object)
-                .ok_or_else(|| {
-                    ApiError::Unavailable("Acceptance registry has an invalid manifest".into())
-                })?;
-            Ok(Some(manifest))
-        }
-        _ => Err(ApiError::Unavailable(
-            "Acceptance registry has duplicate manifests".into(),
-        )),
-    }
 }
 
 fn company_ids(fixtures: &Value) -> Result<BTreeSet<u64>, ApiError> {
@@ -429,119 +416,6 @@ fn fresh_scope(fixtures: &Value, sha: &str) -> Result<(u64, u64), ApiError> {
     company
         .zip(document)
         .ok_or_else(|| ApiError::Conflict("Fresh acceptance fixture is incomplete".into()))
-}
-
-async fn verify_provisioning_dates(
-    state: &AppState,
-    org: u64,
-    company: u64,
-    document: u64,
-    activated_at: i64,
-) -> Result<(), ApiError> {
-    let company_sql = format!(
-        "SELECT created_at FROM company WHERE organization_id = {org} AND id = {company} LIMIT 1"
-    );
-    let document_sql = format!(
-        "SELECT company_id, create_date FROM document WHERE organization_id = {org} AND id = {document} LIMIT 1"
-    );
-    let (companies, documents) = tokio::try_join!(
-        state.stdb.query_sql(&company_sql),
-        state.stdb.query_sql(&document_sql),
-    )
-    .map_err(ApiError::unavailable)?;
-    let new = |timestamp: &Value| {
-        crate::session::timestamp_micros(timestamp).is_some_and(|micros| micros > activated_at)
-    };
-    if matches!(companies.as_slice(), [row] if new(&row["createdAt"]))
-        && matches!(documents.as_slice(), [row] if row["companyId"].as_u64() == Some(company) && new(&row["createDate"]))
-    {
-        Ok(())
-    } else {
-        Err(ApiError::Conflict(
-            "Fresh acceptance company and source must be created for this candidate".into(),
-        ))
-    }
-}
-
-async fn verify_upgraded_source(
-    state: &AppState,
-    org: u64,
-    upgraded: &Value,
-) -> Result<(), ApiError> {
-    let stale = || {
-        ApiError::Conflict("Upgraded acceptance document is no longer current and indexed".into())
-    };
-    let company = upgraded["companyId"]
-        .as_u64()
-        .filter(|id| *id > 0)
-        .ok_or_else(stale)?;
-    let document = upgraded["documentId"]
-        .as_u64()
-        .filter(|id| *id > 0)
-        .ok_or_else(stale)?;
-    let version = upgraded["sourceVersion"]
-        .as_str()
-        .filter(|text| {
-            text.strip_prefix('v')
-                .and_then(|rest| rest.split_once('-'))
-                .is_some_and(|(number, hash)| {
-                    number.parse::<u32>().is_ok()
-                        && hash.len() == 16
-                        && hash
-                            .bytes()
-                            .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
-                })
-        })
-        .ok_or_else(stale)?;
-    let rows = state
-        .stdb
-        .query_sql(&format!(
-            "SELECT company_id, current_version_id, is_deleted FROM document \
-         WHERE organization_id = {org} AND id = {document} LIMIT 1"
-        ))
-        .await
-        .map_err(ApiError::unavailable)?;
-    let [row] = rows.as_slice() else {
-        return Err(stale());
-    };
-    let current = row["currentVersionId"]
-        .as_u64()
-        .filter(|id| *id > 0)
-        .ok_or_else(stale)?;
-    if row["companyId"].as_u64() != Some(company) || row["isDeleted"].as_bool() != Some(false) {
-        return Err(stale());
-    }
-    let rows = state
-        .stdb
-        .query_sql(&format!(
-            "SELECT version_number, checksum FROM document_version WHERE organization_id = {org} \
-         AND document_id = {document} AND id = {current} AND is_current = true LIMIT 1"
-        ))
-        .await
-        .map_err(ApiError::unavailable)?;
-    let [row] = rows.as_slice() else {
-        return Err(stale());
-    };
-    let number = row["versionNumber"].as_u64().ok_or_else(stale)?;
-    let prefix = row["checksum"]
-        .as_str()
-        .and_then(|checksum| checksum.get(..16))
-        .ok_or_else(stale)?;
-    if format!("v{number}-{}", prefix.to_ascii_lowercase()) != version {
-        return Err(stale());
-    }
-    let rows = state.stdb.query_sql(&format!(
-        "SELECT source_version_id FROM ai_evidence_passage WHERE organization_id = {org} AND company_id = {company} \
-         AND source_kind = 'document' AND source_key = 'document:{document}' \
-         AND source_version = '{version}' AND status = 'current' AND text_state = 'present' LIMIT 1"
-    )).await.map_err(ApiError::unavailable)?;
-    if !rows
-        .iter()
-        .any(|row| row["sourceVersionId"].as_u64().is_some_and(|id| id > 0))
-    {
-        return Err(stale());
-    }
-    Ok(())
 }
 
 async fn exchange(
@@ -589,21 +463,22 @@ async fn exchange(
         .json()
         .await
         .map_err(ApiError::unavailable)?;
-    verify_job(token, &keys, &config, stage)?;
+    let job = verify_job(token, &keys, &config, stage, build.sha)?;
     if stage == Stage::Verify && request.release_sha.as_deref() != Some(build.sha) {
         return Err(ApiError::Conflict(
             "Public web build does not match the requested candidate".into(),
         ));
     }
 
+    let registry = AcceptanceRegistry::for_verified_job(state.as_ref(), &job)?;
     let public_key = proof_key("AI_CHAT_ACCEPTANCE_PROOF_PUBLIC_KEY")?;
     let fixtures = if stage == Stage::Preflight {
-        let baseline = registry(&state, &config, "").await?.ok_or_else(|| {
+        let baseline = registry.manifest().await?.ok_or_else(|| {
             ApiError::Unavailable("Upgraded acceptance baseline is missing".into())
         })?;
         json!({"upgraded": baseline["upgraded"]})
     } else {
-        let Some(mut fixtures) = registry(&state, &config, build.sha).await? else {
+        let Some(mut fixtures) = registry.manifest().await? else {
             if stage != Stage::Verify {
                 return Err(ApiError::Conflict(
                     "The active release has no acceptance fixture".into(),
@@ -631,14 +506,9 @@ async fn exchange(
             public_key.as_bytes(),
             Utc::now().timestamp_micros(),
         )?;
-        verify_provisioning_dates(
-            &state,
-            config.organization_id,
-            company,
-            document,
-            activated_at,
-        )
-        .await?;
+        registry
+            .verify_provisioning_dates(company, document, activated_at)
+            .await?;
         fixtures
             .as_object_mut()
             .ok_or_else(|| {
@@ -647,7 +517,9 @@ async fn exchange(
             .remove("activationProof");
         fixtures
     };
-    verify_upgraded_source(&state, config.organization_id, &fixtures["upgraded"]).await?;
+    registry
+        .verify_upgraded_source(&fixtures["upgraded"])
+        .await?;
     let companies = company_ids(&fixtures)?;
     if companies.is_empty() || companies.len() > MAX_ACTORS {
         return Err(ApiError::Unavailable(
