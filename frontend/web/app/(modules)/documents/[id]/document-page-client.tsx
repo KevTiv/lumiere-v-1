@@ -67,6 +67,7 @@ import {
   useDocumentFolders,
   useDocumentVersions,
   useDocuments,
+  useIngestDocumentEvidence,
   useLockDocument,
   useRestoreDocument,
   useSetDocumentRetention,
@@ -282,6 +283,7 @@ function DocumentPageLoaded({
   );
 
   const uploads = useManagedDocumentUpload(orgId, operatingCompanyId, { enabled: Boolean(document) && document?.isDeleted !== true, contextKey: documentId });
+  const indexDocument = useIngestDocumentEvidence(orgId);
   const versionReceipts = uploads.rows.filter(({ receipt, pointer }) => (receipt?.registration ?? pointer.target)?.versionDocumentId === documentId);
   const moveDocument = useDocumentLocationMutation(orgId, operatingCompanyId, (action) => {
     uploads.assertCurrent('version');
@@ -379,6 +381,18 @@ function DocumentPageLoaded({
   const isDeleted = document.isDeleted === true;
   const isLocked = document.isLocked === true;
   const url = typeof document.url === 'string' && document.url ? document.url : undefined;
+  const canRetryIndexing = uploads.canVersion
+    && documentViewerCompanyId(document) === operatingCompanyId
+    && url?.startsWith('/api/documents/blobs/object/');
+  const retryIndexingLabel = t('documents.receipts.retryIndexing', { defaultValue: 'Retry indexing' });
+  const retryIndexing = () => run(retryIndexingLabel, async () => {
+    uploads.assertCurrent('version');
+    await indexDocument.mutateAsync({ companyId: operatingCompanyId, documentId: id });
+    showWorkflowToast({
+      kind: 'success',
+      title: t('documents.receipts.indexQueued', { defaultValue: 'AI indexing pending · queued' }),
+    });
+  });
   const file = documentFileIdentity(document);
   const label = file.title || file.fileName || `#${documentId}`;
   const linkedHref = linkedRecordHref(document);
@@ -635,6 +649,11 @@ function DocumentPageLoaded({
                     <DropdownMenuItem data-testid="document-action-move" onSelect={() => setFormAction('move')}>
                       {t('documents.page.move', { defaultValue: 'Move to folder' })}
                     </DropdownMenuItem>
+                    {canRetryIndexing ? (
+                      <DropdownMenuItem disabled={indexDocument.isPending} onSelect={() => void retryIndexing()}>
+                        {retryIndexingLabel}
+                      </DropdownMenuItem>
+                    ) : null}
                     <DropdownMenuItem
                       disabled={busy}
                       data-testid={isLocked ? 'document-action-unlock' : 'document-action-lock'}

@@ -298,6 +298,10 @@ async fn main() -> anyhow::Result<()> {
             "/v1/documents/ocr",
             post(routes::ocr::post_ocr).layer(DefaultBodyLimit::max(14 * 1024 * 1024)),
         )
+        .route(
+            "/v1/internal/documents/evidence-readback",
+            post(routes::document_evidence::post_readback),
+        )
         .route("/v1/kaggle/search", post(routes::kaggle::post_search))
         .route("/v1/kaggle/download", post(routes::kaggle::post_download))
         .route("/v1/kaggle/status/:job_id", get(routes::kaggle::get_status))

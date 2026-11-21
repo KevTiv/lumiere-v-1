@@ -432,8 +432,9 @@ pub async fn canonical_passage_for_job(
     let rows = stdb
         .query_sql(&format!(
             "SELECT id, organization_id, company_id, content_hash, passage_text, status, text_state \
-             FROM ai_evidence_passage WHERE id = {} LIMIT 1",
-            payload.content_id
+             FROM ai_evidence_passage_read WHERE organization_id = {organization_id} \
+             AND company_id = {} AND id = {} LIMIT 1",
+            payload.company_id, payload.content_id
         ))
         .await
         .map_err(|error| anyhow::anyhow!("{error}"))?;

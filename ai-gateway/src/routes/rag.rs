@@ -1472,7 +1472,7 @@ pub async fn post_rag(
         state: &state,
         actor_identity: &actor.identity_hex,
         actor_token: &actor.stdb_token,
-        reader: state.stdb.as_ref(),
+        reader: state.spend_read_stdb.as_deref(),
     };
     let has_passage_candidates = company_hits
         .iter()
