@@ -14,7 +14,7 @@ DOMAINS = ("rust", "contracts", "frontend", "pdf", "e2e")
 
 
 def scope(enabled: tuple[str, ...], reason: str) -> dict[str, str]:
-    return {"valid": "true", "reason": reason,
+    return {"valid": "true", "reason": reason, "browser_preview": "all",
             **{f"run_{name}": str(name in enabled).lower() for name in DOMAINS}}
 
 
@@ -64,6 +64,23 @@ def changed_paths(base: str, head: str) -> list[str]:
     return [path for path in output.split("\0") if path]
 
 
+def preview_browser_groups(paths: list[str]) -> str:
+    """Estimate affected CI browser groups for module-local changes."""
+    module_groups = {
+        "fleet": "operations", "products": "operations", "warehouse": "operations",
+        "sales": "work-board", "accounting": "finance", "reports": "finance",
+    }
+    groups = set()
+    for path in paths:
+        parts = PurePosixPath(path).parts
+        if (parts[:3] != ("frontend", "web", "app") or len(parts) < 6
+                or parts[3] != "(modules)" or parts[4] not in module_groups
+                or PurePosixPath(path).suffix not in {".ts", ".tsx"}):
+            return "all"
+        groups.add(module_groups[parts[4]])
+    return ", ".join(sorted(groups)) or "all"
+
+
 def event_scope(event_name: str, event: dict, head: str, base: str | None = None) -> dict[str, str]:
     if event_name in {"schedule", "workflow_dispatch", "merge_group"} and not base:
         return scope(DOMAINS, "explicit full validation event")
@@ -72,7 +89,11 @@ def event_scope(event_name: str, event: dict, head: str, base: str | None = None
                 if event_name == "pull_request" else event.get("before"))
     if not base or set(base) == {"0"}:
         return scope(DOMAINS, "missing base; full validation")
-    return classify_paths(changed_paths(base, head))
+    paths = changed_paths(base, head)
+    result = classify_paths(paths)
+    if event_name == "pull_request" and result["run_frontend"] == "true":
+        result["browser_preview"] = preview_browser_groups(paths)
+    return result
 
 
 def main() -> int:

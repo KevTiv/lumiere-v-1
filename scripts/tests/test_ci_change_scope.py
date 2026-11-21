@@ -59,6 +59,20 @@ class ChangeScopeTests(unittest.TestCase):
         self.assert_domains(module.classify_paths(["frontend/web/app/page.tsx", "api-server/src/main.rs"]),
                             module.DOMAINS)
 
+    def test_browser_preview_is_conservative_and_does_not_skip_jobs(self):
+        fleet = "frontend/web/app/(modules)/fleet/page.tsx"
+        sales = "frontend/web/app/(modules)/sales/orders/page.tsx"
+        self.assertEqual(module.preview_browser_groups([fleet, sales]), "operations, work-board")
+        for path in ["frontend/packages/ui/src/table.tsx", ".github/workflows/ci.yml",
+                     "frontend/web/app/(modules)/layout.tsx", "frontend/web/app/api/auth/route.ts",
+                     "frontend/web/app/(modules)/fleet/package.json"]:
+            with self.subTest(path=path):
+                self.assertEqual(module.preview_browser_groups([fleet, path]), "all")
+        with patch.object(module, "changed_paths", return_value=[fleet]):
+            result = module.event_scope("pull_request", {}, "HEAD", "base")
+            self.assertEqual(result["browser_preview"], "operations")
+            self.assert_domains(result, ("frontend", "e2e"))
+
     def test_empty_scope(self):
         self.assert_domains(module.classify_paths([]), module.DOMAINS)
 
