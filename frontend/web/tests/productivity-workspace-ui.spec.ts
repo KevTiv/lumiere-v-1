@@ -191,7 +191,8 @@ for (const width of [390, 1440]) {
     test.setTimeout(120_000)
     await page.setViewportSize({ width, height: 950 })
     for (const [module, group, tab] of [["documents", "files", "documents"], ["calendar", "schedule", "calendar"], ["messages", "conversations", "messages"]]) {
-      await page.goto(`/navigation?module=${module}&company=7`, { waitUntil: "domcontentloaded" })
+      // Next can finish parsing the fixture HTML before its async client bundles load.
+      await page.goto(`/navigation?module=${module}&company=7`, { waitUntil: "load" })
       await expect(page.getByTestId("navigation-disclosure")).toHaveAttribute("data-hydrated", "true")
       await expect(page.getByTestId(`module-workspace-${module}-${group}`)).toHaveAttribute("aria-current", "page")
       await expect(page.getByTestId(`module-panel-${module}-${tab}`)).toBeVisible()
@@ -204,7 +205,7 @@ for (const width of [390, 1440]) {
       await expect(page.getByTestId(`module-panel-${module}-${tab}`)).toBeVisible()
       await page.goForward({ waitUntil: "domcontentloaded" })
       await page.waitForURL(/tab=dashboard/)
-      await page.reload({ waitUntil: "domcontentloaded" })
+      await page.reload({ waitUntil: "load" })
       await expect(page.getByTestId(`module-view-${module}`)).toHaveAttribute("data-hydrated", "true")
       await expect(page.getByTestId(`module-tab-${module}-dashboard`)).toHaveCount(0)
       await expect(page.getByRole("tabpanel", { name: "dashboard", exact: true })).toBeVisible()
