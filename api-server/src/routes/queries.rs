@@ -84,6 +84,8 @@ pub(crate) struct AuthoritativeQuery {
     company_id: u64,
     #[serde(default, rename = "includeRelations")]
     include_relations: bool,
+    #[serde(rename = "documentEvidenceVersion")]
+    document_evidence_version: Option<String>,
 }
 
 fn owner_read_permission_resource(resource: &str) -> Option<&str> {
@@ -474,6 +476,15 @@ pub(crate) async fn get_authoritative_resource(
             record_id,
         )
         .await?;
+        if let Some(version) = query.document_evidence_version.as_deref() {
+            crate::evidence_ingestion::require_current_evidence_version(
+                &scoped_context,
+                company_id,
+                record_id,
+                version,
+            )
+            .await?;
+        }
         scoped_context.require_current_placement(&state.organization_placements)?;
         return Ok(Json(json!({ "data": row })));
     }

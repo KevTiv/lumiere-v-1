@@ -112,12 +112,63 @@ pub(crate) trait EvidenceAccess: Send + Sync {
 }
 
 /// Production access: the session-owning API server's grant envelope plus the
-/// private evidence tables read as the gateway service principal.
+/// sender-scoped evidence views read by the dedicated gateway reader.
 pub(super) struct LiveEvidenceAccess<'a> {
     pub state: &'a AppState,
     pub actor_identity: &'a str,
     pub actor_token: &'a str,
-    pub reader: &'a StdbClient,
+    pub reader: Option<&'a StdbClient>,
+}
+
+impl LiveEvidenceAccess<'_> {
+    async fn can_read_document_version(
+        &self,
+        scope: EvidenceScope,
+        passage: &Value,
+    ) -> Result<bool> {
+        let Some(document_id) = text(passage, "sourceKey")
+            .and_then(|key| key.strip_prefix("document:")?.parse::<u64>().ok())
+            .filter(|id| *id > 0)
+        else {
+            return Ok(false);
+        };
+        let Some(version) = text(passage, "sourceVersion") else {
+            return Ok(false);
+        };
+        let api = self
+            .state
+            .config
+            .api_server_url
+            .as_deref()
+            .context("document authority is unavailable")?;
+        let response = self
+            .state
+            .http
+            .get(format!(
+                "{}/v1/authoritative/documents/{document_id}",
+                api.trim_end_matches('/')
+            ))
+            .bearer_auth(self.actor_token)
+            .header("x-stdb-identity", self.actor_identity)
+            .query(&[
+                ("companyId", scope.company_id.to_string()),
+                ("documentEvidenceVersion", version),
+            ])
+            .timeout(std::time::Duration::from_secs(8))
+            .send()
+            .await?;
+        match response.status().as_u16() {
+            200 => {
+                let response: Value = response.json().await?;
+                let row = &response["data"];
+                Ok(number(row, "id") == Some(document_id)
+                    && number(row, "organizationId") == Some(scope.organization_id)
+                    && number(row, "companyId") == Some(scope.company_id))
+            }
+            401 | 403 | 404 | 409 => Ok(false),
+            status => anyhow::bail!("document authority returned HTTP {status}"),
+        }
+    }
 }
 
 #[async_trait]
@@ -143,23 +194,27 @@ impl EvidenceAccess for LiveEvidenceAccess<'_> {
             organization_id,
             company_id,
         } = scope;
-        let passages = self
-            .reader
+        let reader = self.reader.context("evidence reader is unavailable")?;
+        let passages = reader
             .query_sql(&format!(
-                "SELECT * FROM ai_evidence_passage WHERE id = {passage_id} AND organization_id = {organization_id} AND company_id = {company_id} LIMIT 1"
+                "SELECT * FROM ai_evidence_passage_read WHERE id = {passage_id} AND organization_id = {organization_id} AND company_id = {company_id} LIMIT 1"
             ))
             .await
             .context("load authoritative evidence passage")?;
         let Some(passage) = passages.into_iter().next() else {
             return Ok(None);
         };
+        if text(&passage, "sourceKind").as_deref() == Some("document")
+            && !self.can_read_document_version(scope, &passage).await?
+        {
+            return Ok(None);
+        }
         let Some(source_version_id) = number(&passage, "sourceVersionId") else {
             return Ok(None);
         };
-        let versions = self
-            .reader
+        let versions = reader
             .query_sql(&format!(
-                "SELECT * FROM ai_evidence_source_version WHERE id = {source_version_id} AND organization_id = {organization_id} AND company_id = {company_id} LIMIT 1"
+                "SELECT * FROM ai_evidence_source_version_read WHERE id = {source_version_id} AND organization_id = {organization_id} AND company_id = {company_id} LIMIT 1"
             ))
             .await
             .context("load authoritative evidence source version")?;
@@ -169,10 +224,9 @@ impl EvidenceAccess for LiveEvidenceAccess<'_> {
         let Some(source_id) = number(&version, "sourceId") else {
             return Ok(None);
         };
-        let sources = self
-            .reader
+        let sources = reader
             .query_sql(&format!(
-                "SELECT * FROM ai_evidence_source WHERE id = {source_id} AND organization_id = {organization_id} LIMIT 1"
+                "SELECT * FROM ai_evidence_source_read WHERE id = {source_id} AND organization_id = {organization_id} LIMIT 1"
             ))
             .await
             .context("load authoritative evidence source")?;
@@ -652,6 +706,57 @@ mod tests {
             }),
             hash,
         )
+    }
+
+    #[tokio::test]
+    async fn document_passages_require_current_actor_access_to_the_indexed_version() {
+        use axum::{extract::Query, http::HeaderMap, routing::get, Json, Router};
+        use std::collections::HashMap;
+
+        let app = Router::new().route(
+            "/v1/authoritative/documents/42",
+            get(
+                |headers: HeaderMap, Query(query): Query<HashMap<String, String>>| async move {
+                    assert_eq!(headers["authorization"], "Bearer actor-token");
+                    assert_eq!(headers["x-stdb-identity"], "actor-identity");
+                    assert_eq!(query["companyId"], "2");
+                    if query["documentEvidenceVersion"] != "v3-current" {
+                        return (axum::http::StatusCode::NOT_FOUND, Json(Value::Null));
+                    }
+                    (
+                        axum::http::StatusCode::OK,
+                        Json(json!({"data": {"id": "42", "organizationId": "1", "companyId": 2}})),
+                    )
+                },
+            ),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut config = crate::routes::harness_descriptor::test_support::config();
+        config.api_server_url = Some(format!("http://{}", listener.local_addr().unwrap()));
+        let state = crate::routes::harness_descriptor::test_support::state(config).await;
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let access = LiveEvidenceAccess {
+            state: &state,
+            actor_identity: "actor-identity",
+            actor_token: "actor-token",
+            reader: None,
+        };
+        let mut passage = json!({"sourceKey": "document:42", "sourceVersion": "v3-current"});
+        assert!(access
+            .can_read_document_version(SCOPE, &passage)
+            .await
+            .unwrap());
+        passage["sourceVersion"] = json!("v2-stale");
+        assert!(!access
+            .can_read_document_version(SCOPE, &passage)
+            .await
+            .unwrap());
+        passage["sourceKey"] = json!("document:0");
+        assert!(!access
+            .can_read_document_version(SCOPE, &passage)
+            .await
+            .unwrap());
+        server.abort();
     }
 
     #[test]

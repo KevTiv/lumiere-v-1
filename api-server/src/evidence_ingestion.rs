@@ -623,7 +623,29 @@ async fn ingest_document(
 }
 
 fn document_version_key(version_number: u64, checksum: &str) -> String {
-    format!("v{version_number}-{}", &checksum[..checksum.len().min(16)])
+    format!(
+        "v{version_number}-{}",
+        checksum.get(..16).unwrap_or(checksum)
+    )
+}
+
+/// Confirm that indexed evidence still describes the file the actor just read.
+pub(crate) async fn require_current_evidence_version(
+    context: &TrustedOperationContext,
+    company_id: u64,
+    document_id: u64,
+    expected_version: &str,
+) -> Result<(), ApiError> {
+    let document = load_current_document(context, context.organization_id(), document_id).await?;
+    if document.company_id != company_id
+        || document.is_deleted
+        || document_version_key(document.version_number, &document.checksum) != expected_version
+    {
+        return Err(ApiError::NotFound(
+            "Current document evidence not found".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn passage_chunks(text: &str) -> Vec<(String, String, usize, usize)> {
@@ -686,32 +708,86 @@ async fn read_document_embedding_job_id(
     exact_row_id(jobs, "document embedding job").await
 }
 
-async fn read_document_evidence_sources(
-    client: &stdb_client::StdbClient,
+/// Read the persisted metadata through the gateway, which owns the dedicated
+/// sender-scoped SpacetimeDB reader. Writes still use the actor's session.
+struct DocumentEvidenceReadback {
+    client: reqwest::Client,
+    url: String,
+    secret: String,
     organization_id: u64,
     company_id: u64,
     document_id: u64,
-) -> Result<Vec<Value>, ApiError> {
-    client
-        .query_sql_sats(&format!(
-            "SELECT id FROM ai_evidence_source WHERE organization_id = {organization_id} AND company_id = {company_id} AND source_kind = 'document' AND source_key = 'document:{document_id}' LIMIT 2"
-        ))
-        .await
-        .map_err(ApiError::internal)
 }
 
-async fn read_document_evidence_versions(
-    client: &stdb_client::StdbClient,
-    organization_id: u64,
-    company_id: u64,
-    source_id: u64,
-) -> Result<Vec<Value>, ApiError> {
-    client
-        .query_sql_sats(&format!(
-            "SELECT id, version, status, supersedes_version_id FROM ai_evidence_source_version WHERE organization_id = {organization_id} AND company_id = {company_id} AND source_id = {source_id}"
-        ))
-        .await
-        .map_err(ApiError::internal)
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DocumentEvidenceVersions {
+    source_id: Option<u64>,
+    versions: Vec<Value>,
+}
+
+#[derive(Deserialize)]
+struct DocumentEvidencePassages {
+    passages: Vec<Value>,
+}
+
+impl DocumentEvidenceReadback {
+    fn new(
+        state: &AppState,
+        organization_id: u64,
+        company_id: u64,
+        document_id: u64,
+    ) -> Result<Self, ApiError> {
+        let secret = std::env::var("LUMIERE_AI_GATEWAY_INTERNAL_SECRET")
+            .ok()
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                ApiError::Unavailable("Document evidence reader is unavailable".into())
+            })?;
+        let client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .map_err(ApiError::internal)?;
+        Ok(Self {
+            client,
+            url: format!(
+                "{}/v1/internal/documents/evidence-readback",
+                state.config.ai_gateway_url.trim_end_matches('/')
+            ),
+            secret,
+            organization_id,
+            company_id,
+            document_id,
+        })
+    }
+
+    async fn read<T: serde::de::DeserializeOwned>(
+        &self,
+        passage: Option<Value>,
+    ) -> Result<T, ApiError> {
+        fn unavailable() -> ApiError {
+            ApiError::Unavailable("Document evidence reader is unavailable".into())
+        }
+        self.client
+            .post(&self.url)
+            .header("x-lumiere-gateway-secret", &self.secret)
+            .json(&json!({
+                "organizationId": self.organization_id,
+                "companyId": self.company_id,
+                "documentId": self.document_id,
+                "passage": passage,
+            }))
+            .send()
+            .await
+            .map_err(|_| unavailable())?
+            .error_for_status()
+            .map_err(|_| unavailable())?
+            .json()
+            .await
+            .map_err(|_| unavailable())
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -733,6 +809,8 @@ async fn persist_document_evidence(
     // Keep this check at the mutation owner as well as the extractor, so any
     // future caller cannot persist unchecked OCR or other derived text.
     inspect_extracted_text(content)?;
+    let evidence_reader =
+        DocumentEvidenceReadback::new(state, organization_id, company_id, document_id)?;
     let source_key = format!("document:{document_id}");
     dispatch_ai_evidence_mutation(
         state,
@@ -750,21 +828,13 @@ async fn persist_document_evidence(
         }]),
     )
     .await?;
-    // The upload has passed document authorization, and the source mutation
-    // used the actor session. Private readback uses the server-owned client
-    // with the exact organization, company and document keys from that path.
-    let evidence_reader = &state.stdb;
-    let source_id = exact_row_id(
-        read_document_evidence_sources(evidence_reader, organization_id, company_id, document_id)
-            .await?,
-        "document evidence source",
-    )
-    .await?;
+    let readback: DocumentEvidenceVersions = evidence_reader.read(None).await?;
+    let source_id = readback.source_id.ok_or_else(|| {
+        ApiError::Internal("persisted document evidence source could not be resolved".into())
+    })?;
 
     let version_key = document_version_key(document.version_number, &document.checksum);
-    let existing_versions =
-        read_document_evidence_versions(evidence_reader, organization_id, company_id, source_id)
-            .await?;
+    let existing_versions = readback.versions;
     let existing = existing_versions
         .iter()
         .find(|row| value_text(row, "version", "version") == Some(version_key.as_str()));
@@ -796,13 +866,21 @@ async fn persist_document_evidence(
         }]),
     )
     .await?;
+    let readback: DocumentEvidenceVersions = evidence_reader.read(None).await?;
+    if readback.source_id != Some(source_id) {
+        return Err(ApiError::Conflict(
+            "document evidence source changed while indexing".into(),
+        ));
+    }
     let source_version_id = exact_row_id(
-        evidence_reader.query_sql_sats(&format!(
-            "SELECT id FROM ai_evidence_source_version WHERE organization_id = {organization_id} AND company_id = {company_id} AND source_id = {source_id} AND version = '{}' LIMIT 2",
-            document_version_key(document.version_number, &document.checksum)
-        )).await.map_err(ApiError::internal)?,
+        readback
+            .versions
+            .into_iter()
+            .filter(|row| value_text(row, "version", "version") == Some(version_key.as_str()))
+            .collect(),
         "document evidence version",
-    ).await?;
+    )
+    .await?;
     if let Some(predecessor_id) = predecessor_id {
         if predecessor_id != source_version_id
             && existing_versions.iter().any(|row| {
@@ -855,17 +933,18 @@ async fn persist_document_evidence(
             }]),
         )
         .await?;
-        let passage_rows = evidence_reader.query_sql_sats(&format!(
-            "SELECT id, passage_text, content_hash, source_version_id FROM ai_evidence_passage WHERE organization_id = {organization_id} AND company_id = {company_id} AND source_kind = 'document' AND source_key = 'document:{document_id}' AND source_version = '{}' AND passage_key = '{}' LIMIT 2",
-            document_version_key(document.version_number, &document.checksum),
-            passage_key,
-        )).await.map_err(ApiError::internal)?;
-        if passage_rows.len() != 1 {
+        let readback: DocumentEvidencePassages = evidence_reader
+            .read(Some(json!({
+                "versionNumber": document.version_number,
+                "checksum": document.checksum,
+                "startByte": start,
+            })))
+            .await?;
+        let [passage] = readback.passages.as_slice() else {
             return Err(ApiError::Internal(
                 "persisted passage could not be resolved uniquely".into(),
             ));
-        }
-        let passage = &passage_rows[0];
+        };
         if value_u64(passage, "sourceVersionId", "source_version_id") != Some(source_version_id) {
             return Err(ApiError::Conflict(
                 "persisted passage is linked to a different evidence version".into(),
@@ -873,11 +952,9 @@ async fn persist_document_evidence(
         }
         let passage_id = value_u64(passage, "id", "id")
             .ok_or_else(|| ApiError::Internal("invalid persisted passage id".into()))?;
-        let persisted_text = value_text(passage, "passageText", "passage_text")
-            .ok_or_else(|| ApiError::Internal("invalid persisted passage text".into()))?;
         let content_hash = value_text(passage, "contentHash", "content_hash")
             .ok_or_else(|| ApiError::Internal("invalid persisted passage hash".into()))?;
-        if persisted_text != passage_text {
+        if content_hash != hex::encode(Sha256::digest(passage_text.as_bytes())) {
             return Err(ApiError::Conflict(
                 "persisted passage differs from the extracted blob text".into(),
             ));
@@ -949,26 +1026,7 @@ fn document_evidence_provenance(
     })
 }
 
-async fn evidence_source_versions(
-    reader: &stdb_client::StdbClient,
-    organization_id: u64,
-    company_id: u64,
-    document_id: u64,
-) -> Result<Vec<(u64, String)>, ApiError> {
-    let sources =
-        read_document_evidence_sources(reader, organization_id, company_id, document_id).await?;
-    if sources.is_empty() {
-        return Ok(Vec::new());
-    }
-    if sources.len() != 1 {
-        return Err(ApiError::Internal(
-            "document evidence source is not unique".into(),
-        ));
-    }
-    let source_id = value_u64(&sources[0], "id", "id")
-        .ok_or_else(|| ApiError::Internal("invalid evidence source id".into()))?;
-    let versions =
-        read_document_evidence_versions(reader, organization_id, company_id, source_id).await?;
+fn lifecycle_versions(versions: Vec<Value>) -> Result<Vec<(u64, String)>, ApiError> {
     versions
         .into_iter()
         .map(|row| {
@@ -1018,9 +1076,11 @@ async fn change_document_evidence(
             "document must be deleted before its evidence is tombstoned".into(),
         ));
     }
-    let source_versions =
-        evidence_source_versions(&state.stdb, organization_id, company_id, body.document_id)
+    let readback: DocumentEvidenceVersions =
+        DocumentEvidenceReadback::new(&state, organization_id, company_id, body.document_id)?
+            .read(None)
             .await?;
+    let source_versions = lifecycle_versions(readback.versions)?;
     let target_rank = if body.change_kind == "deleted" { 4 } else { 3 };
     let mut changed = Vec::new();
     for (source_version_id, status) in source_versions {
@@ -1109,26 +1169,32 @@ mod tests {
 
     #[tokio::test]
     async fn document_evidence_readback_is_scoped_to_one_document_and_company() {
-        let server = crate::company_read_test_support::serve(|sql| {
-            assert!(sql.contains("organization_id = 1"));
-            assert!(sql.contains("company_id = 2"));
-            if sql.contains("FROM ai_evidence_source WHERE") {
-                assert!(sql.contains("source_kind = 'document'"));
-                assert!(sql.contains("source_key = 'document:42' LIMIT 2"));
-                return vec![json!({"id": 13})];
-            }
-            assert!(sql.contains("FROM ai_evidence_source_version WHERE"));
-            assert!(sql.ends_with("source_id = 13"));
-            vec![json!({"id": 21, "version": "v1-abc", "status": "current"})]
-        })
-        .await;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!(
+            "http://{}/v1/internal/documents/evidence-readback",
+            listener.local_addr().unwrap()
+        );
+        let app = Router::new().route("/v1/internal/documents/evidence-readback", post(|headers: HeaderMap, Json(request): Json<Value>| async move {
+            assert_eq!(headers["x-lumiere-gateway-secret"], "test-secret");
+            assert_eq!(request, json!({"organizationId": 1, "companyId": 2, "documentId": 42, "passage": null}));
+            Json(json!({"sourceId": 13, "versions": [{"id": 21, "version": "v1-abc", "status": "current"}]}))
+        }));
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let reader = DocumentEvidenceReadback {
+            url,
+            client: reqwest::Client::new(),
+            secret: "test-secret".into(),
+            organization_id: 1,
+            company_id: 2,
+            document_id: 42,
+        };
+        let readback: DocumentEvidenceVersions = reader.read(None).await.unwrap();
+        assert_eq!(readback.source_id, Some(13));
         assert_eq!(
-            evidence_source_versions(&server.client, 1, 2, 42)
-                .await
-                .unwrap(),
+            lifecycle_versions(readback.versions).unwrap(),
             [(21, "current".to_owned())],
         );
-        assert_eq!(server.requests.lock().unwrap().len(), 2);
+        server.abort();
     }
 
     #[tokio::test]

@@ -228,7 +228,9 @@ async fn process_claimed_job(
         .context("failed to load embedding index state")?;
     match payload.operation.as_str() {
         "upsert" => {
-            let passage = canonical_passage_for_job(stdb, organization_id, payload)
+            let reader =
+                spend_reader.context("document indexing requires the private spend reader")?;
+            let passage = canonical_passage_for_job(reader, organization_id, payload)
                 .await
                 .context("failed to load canonical passage")?;
             if embedder.name() != "mistral" {
@@ -241,8 +243,6 @@ async fn process_claimed_job(
                 .check_ready()
                 .await
                 .context("semantic index readiness is required before paid embedding")?;
-            let reader =
-                spend_reader.context("document indexing requires the private spend reader")?;
             let agent = crate::ai_agent::resolve_surface_agent(
                 stdb,
                 organization_id,

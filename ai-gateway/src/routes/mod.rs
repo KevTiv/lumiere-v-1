@@ -3,6 +3,7 @@ pub mod actions;
 pub mod alpha_analytics;
 pub mod context;
 pub mod distributor;
+pub(crate) mod document_evidence;
 pub mod evidence;
 pub mod forms;
 mod guide_retrieval;
