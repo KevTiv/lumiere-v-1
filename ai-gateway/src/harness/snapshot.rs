@@ -213,7 +213,7 @@ pub async fn fetch_authorized_live_snapshots(
     company_id: u64,
     candidates: &[EntityRef],
 ) -> Result<Vec<LiveSnapshot>> {
-    fetch_live_snapshots(state, actor, org_id, company_id, candidates, false).await
+    fetch_authoritative_snapshots(state, actor, org_id, company_id, candidates, false).await
 }
 
 pub(crate) async fn fetch_authorized_contact_notes(
@@ -227,7 +227,7 @@ pub(crate) async fn fetch_authorized_contact_notes(
         contact.entity_type == "contact",
         "contact notes require a contact"
     );
-    fetch_live_snapshots(
+    fetch_authoritative_snapshots(
         state,
         actor,
         org_id,
@@ -238,7 +238,7 @@ pub(crate) async fn fetch_authorized_contact_notes(
     .await
 }
 
-async fn fetch_live_snapshots(
+async fn fetch_authoritative_snapshots(
     state: &AppState,
     actor: &ActorCredentials,
     org_id: u64,
