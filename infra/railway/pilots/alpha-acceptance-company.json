@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "organizationId": 4097,
+  "reuseFromCompanyId": 4097,
+  "companyId": 4098,
+  "agentId": 2,
+  "intelligencePolicyRef": "mistral-mugisha-usd5@1",
+  "currency": "USD",
+  "pricesReviewedAt": "2026-11-16",
+  "surfaces": [
+    { "skillKey": "report_analysis", "skillId": 2 },
+    { "skillKey": "rag_generation", "skillId": 3 },
+    { "skillKey": "form_suggestion", "skillId": 4097 },
+    { "skillKey": "action_draft_generation", "skillId": 4098 },
+    { "skillKey": "embedding_query", "skillId": 8215 },
+    { "skillKey": "document_embeddings", "skillId": 8214 },
+    { "skillKey": "activity_indexing", "skillId": 8213 }
+  ],
+  "meters": [
+    { "model": "mistral-embed", "unit": "tokens", "unitsPer1k": 100 }
+  ]
+}

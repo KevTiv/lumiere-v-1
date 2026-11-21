@@ -85,6 +85,99 @@ test('offline plan validates exact meters and declares separate release and acce
   assert.ok(plan.remainingGates.some(gate => gate.includes('contract')))
 })
 
+function reuseFixture() {
+  const f = fixture()
+  f.config.reuseFromCompanyId = 4
+  f.config.surfaces = f.config.surfaces.filter(surface => surface.skillKey !== 'document_ocr')
+  f.config.meters = f.config.meters.filter(meter => meter.unit === 'tokens')
+  f.state.prices = f.config.meters.map(meter => ({
+    id: 1, organization_id: 9, agent_id: 12, model: meter.model, unit: meter.unit,
+    currency: 'USD', units_per_1_k: meter.unitsPer1k, version: 1,
+  }))
+  f.state.sourceCompany = { id: 4, organization_id: 9, deleted_at: [1, []] }
+  f.state.targetCompany = { id: 3, organization_id: 9, deleted_at: null }
+  f.state.bindings = f.config.surfaces.map(surface => ({
+    id: surface.skillId, organization_id: 9, company_id: [0, 4], skill_id: surface.skillId, is_enabled: true,
+    config_json: '{"defaultAgentId":12,"intelligencePolicyRef":"fixture-policy@1","sourceOnly":true}',
+    custom_instructions: { some: 'source company instructions' },
+  }))
+  const sql = f.client.sql.bind(f.client)
+  f.client.sql = (statement, role) => {
+    if (statement.includes('FROM company ')) return [statement.endsWith('= 4') ? f.state.sourceCompany : f.state.targetCompany]
+    if (statement.includes('FROM ai_skill ') && statement.includes('skill_key = ')) {
+      const surface = f.config.surfaces.find(item => statement.includes(`'${item.skillKey}'`))
+      return statement.includes('organization_id = 0') && surface
+        ? [{ id: surface.skillId, organization_id: 0, skill_key: surface.skillKey, is_active: true }] : []
+    }
+    return sql(statement, role)
+  }
+  f.probes = []
+  f.client.verifyActivationAuthority = async (...args) => { f.probes.push(args) }
+  f.client.call = async (name, args) => {
+    assert.equal(name, 'upsert_ai_skill_config')
+    f.writes.push({ name, args: structuredClone(args) })
+    f.state.bindings.push({ ...args[1], id: f.state.bindings.length + 100, organization_id: args[0] })
+  }
+  return f
+}
+
+test('company reuse preflights owner share without invoking it or changing scope', async () => {
+  const f = reuseFixture()
+  f.state.agent.company_id = [0, 4]
+  const plan = planCapabilities(f.config)
+  assert.deepEqual(plan.writes, ['missing company upsert_ai_skill_config'])
+  const result = await provisionCapabilities(f.config, f.client, false, now)
+  assert.equal(result.ready, false)
+  assert.deepEqual(result.ownerShare, { budgetId: 11, expectedRevision: 0, expectedCompanyId: 4 })
+  assert.ok(result.missing.includes('binding:rag_generation'))
+  await assert.rejects(provisionCapabilities(f.config, f.client, true, now), /an organization owner must share/)
+  assert.deepEqual(f.state.agent.company_id, [0, 4])
+  assert.deepEqual(f.probes, [])
+  assert.deepEqual(f.writes, [])
+})
+
+test('after owner share, reuse writes only missing target bindings and preserves the funded pool', async () => {
+  const f = reuseFixture()
+  const before = structuredClone(f.state)
+  const result = await provisionCapabilities(f.config, f.client, true, now)
+  assert.equal(result.ready, true)
+  assert.equal(result.billableCalls, 0)
+  assert.deepEqual(f.probes, [[9, 12, false]])
+  assert.deepEqual(f.state.agent, before.agent)
+  assert.deepEqual(f.state.budgets, before.budgets)
+  assert.deepEqual(f.state.prices, before.prices)
+  assert.deepEqual(f.state.bindings.slice(0, before.bindings.length), before.bindings)
+  for (const { args: [org, binding] } of f.writes) {
+    assert.equal(org, 9)
+    assert.deepEqual(binding.company_id, { some: 3 })
+    assert.deepEqual(JSON.parse(binding.config_json), { defaultAgentId: 12, intelligencePolicyRef: 'fixture-policy@1' })
+    assert.deepEqual(binding.custom_instructions, { none: [] })
+  }
+  assert.equal(f.writes.length, f.config.surfaces.length)
+  await provisionCapabilities(f.config, f.client, true, now)
+  assert.equal(f.writes.length, f.config.surfaces.length)
+})
+
+test('company reuse fails closed on wrong scope, existing overrides, missing meter or missing authority', async () => {
+  for (const [change, error] of [
+    [f => { f.state.sourceCompany.organization_id = 8 }, /company scope mismatch/],
+    [f => { f.state.targetCompany.deleted_at = [0, [123]] }, /company is not active/],
+    [f => { f.state.agent.company_id = [0, 5] }, /agent is outside/],
+    [f => { f.state.bindings[0].is_enabled = false }, /source .* binding is disabled/],
+    [f => { f.state.bindings[0].config_json = '{}' }, /source .* uses a different agent or policy/],
+    [f => { f.state.bindings.push({ ...f.state.bindings[0], company_id: [0, 3], config_json: '{"keep":true}' }) }, /will not be overwritten/],
+    [f => { f.state.bindings.push({ ...f.state.bindings[0], company_id: [0, 3], is_enabled: false }) }, /explicitly disabled/],
+    [f => { f.state.prices = [] }, /requires the existing reviewed meter/],
+    [f => { f.client.verifyActivationAuthority = async () => { throw new Error('authority refused') } }, /authority refused/],
+    [f => { f.config.agentCapabilities = { addActions: ['embedding_query'] } }, /cannot change agent capabilities/],
+  ]) {
+    const f = reuseFixture()
+    change(f)
+    await assert.rejects(provisionCapabilities(f.config, f.client, true, now), error)
+    assert.deepEqual(f.writes, [])
+  }
+})
+
 function reviewedRepair() {
   const f = fixture()
   f.config.surfaces = f.config.surfaces.filter(s => s.skillKey !== 'document_ocr')
