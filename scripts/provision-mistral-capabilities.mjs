@@ -8,6 +8,10 @@ const infrastructure = new Map([
   ['document_ocr', 'ocr'], ['document_embeddings', 'embedding_index'],
   ['activity_indexing', 'embedding_index'], ['embedding_query', 'embedding_query'],
 ])
+const reuseSurfaces = new Set([
+  'report_analysis', 'rag_generation', 'form_suggestion', 'action_draft_generation',
+  'embedding_query', 'document_embeddings', 'activity_indexing',
+])
 const check = (condition, message) => { if (!condition) throw new Error(message) }
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const id = (value, name) => { check(Number.isSafeInteger(value) && value > 0, `invalid ${name}`); return value }
@@ -31,7 +35,12 @@ const parsedObject = (raw, name) => {
 }
 export function validateManifest(config) {
   fields(config, ['version', 'organizationId', 'companyId', 'agentId', 'intelligencePolicyRef',
-    'currency', 'pricesReviewedAt', 'surfaces', 'meters', 'agentCapabilities'], 'manifest')
+    'currency', 'pricesReviewedAt', 'surfaces', 'meters', 'agentCapabilities', 'reuseFromCompanyId'], 'manifest')
+  if (config.reuseFromCompanyId !== undefined) {
+    id(config.reuseFromCompanyId, 'reuseFromCompanyId')
+    check(config.reuseFromCompanyId !== config.companyId, 'source and target company must differ')
+    check(config.agentCapabilities === undefined, 'company binding reuse cannot change agent capabilities')
+  }
   if (config.agentCapabilities !== undefined) {
     fields(config.agentCapabilities, ['addModels', 'addActions'], 'agentCapabilities')
     for (const [key, allowed] of Object.entries({ addModels: ['mistral-embed'], addActions: ['embedding_query', 'embedding_index'] })) {
@@ -55,6 +64,7 @@ export function validateManifest(config) {
     fields(surface, ['skillKey', 'skillId', 'sourceHash'], 'surface')
     check(label(surface.skillKey), 'invalid surface key'); id(surface.skillId, 'skillId')
     check(!keys.has(surface.skillKey) && !ids.has(surface.skillId), 'duplicate surface')
+    check(config.reuseFromCompanyId === undefined || reuseSurfaces.has(surface.skillKey), 'unsupported company binding reuse surface')
     keys.add(surface.skillKey); ids.add(surface.skillId)
     check(surface.sourceHash === undefined || hash(surface.sourceHash), 'invalid legacy sourceHash')
   }
@@ -82,8 +92,10 @@ export function planCapabilities(config) {
     intelligencePolicyRef: config.intelligencePolicyRef, currency: config.currency, pricesReviewedAt: config.pricesReviewedAt,
     surfaces: config.surfaces, meters: config.meters, billableCalls: 0, deploymentAcceptance: false,
     agentCapabilities: config.agentCapabilities,
-    writes: [...(config.agentCapabilities ? ['missing reviewed set_ai_agent_model', 'missing reviewed set_ai_agent_action'] : []),
-      'missing configure_ai_metered_price', 'missing company upsert_ai_skill_config'],
+    reuseFromCompanyId: config.reuseFromCompanyId,
+    writes: config.reuseFromCompanyId !== undefined ? ['missing company upsert_ai_skill_config']
+      : [...(config.agentCapabilities ? ['missing reviewed set_ai_agent_model', 'missing reviewed set_ai_agent_action'] : []),
+        'missing configure_ai_metered_price', 'missing company upsert_ai_skill_config'],
     remainingGates: ['immutable contract release and aligned deployment', 'provider usage and billing acceptance', 'signed-in company isolation and recovery acceptance'],
     prerequisites: ['existing company-compatible agent and current-month monetary pool', 'reviewed model policy', 'exact platform-registered ai_spend_writer matching the gateway identity',
       'active skill catalog entries'] }
@@ -107,6 +119,8 @@ function permits(actions, action) {
 
 async function inspectCapabilities(config, client, now, requireChatBinding) {
   const org = config.organizationId, companyId = config.companyId, agentId = config.agentId
+  const sourceCompanyId = config.reuseFromCompanyId
+  const reusing = sourceCompanyId !== undefined
   await client.verifyTarget(org)
   const writerIdentity = await client.writerIdentity()
   check(typeof writerIdentity === 'string' && /^[a-f0-9]{64}$/.test(writerIdentity), 'spend writer identity not verified by server')
@@ -116,14 +130,18 @@ async function inspectCapabilities(config, client, now, requireChatBinding) {
   const registeredIdentity = (typeof rawWriterIdentity === 'string' ? rawWriterIdentity : rawWriterIdentity?.__identity__)?.replace(/^0x/, '').toLowerCase()
   check(number(writer.organization_id, 'writer organization') === org && writer.service_name === 'ai_spend_writer'
     && writer.is_active === true && registeredIdentity === writerIdentity, 'platform spend writer binding does not match the gateway identity')
-  const company = one(await client.sql(`SELECT id, organization_id FROM company WHERE id = ${companyId}`), 'company')
-  check(number(company.id, 'company id') === companyId && number(company.organization_id, 'company organization') === org, 'company scope mismatch')
+  for (const requested of reusing ? [companyId, sourceCompanyId] : [companyId]) {
+    const company = one(await client.sql(`SELECT id, organization_id${reusing ? ', deleted_at' : ''} FROM company WHERE id = ${requested}`), 'company')
+    check(number(company.id, 'company id') === requested && number(company.organization_id, 'company organization') === org, 'company scope mismatch')
+    check(!reusing || unwrap(company.deleted_at) === null, 'company is not active')
+  }
   const agent = structuredClone(one(await client.sql(`SELECT * FROM ai_agent WHERE organization_id = ${org} AND id = ${agentId}`), 'Mistral agent'))
   check(number(agent.organization_id, 'agent organization') === org && number(agent.id, 'agent id') === agentId
     && agent.is_active === true && agent.provider === 'mistral', 'active Mistral agent required')
   const agentCompanyId = unwrap(agent.company_id)
   const matchesCompany = agentCompanyId === companyId || agentCompanyId === String(companyId)
-  check(agentCompanyId === null || matchesCompany, 'agent is outside the requested company scope')
+  const shareRequired = reusing && (agentCompanyId === sourceCompanyId || agentCompanyId === String(sourceCompanyId))
+  check(agentCompanyId === null || (!reusing && matchesCompany) || shareRequired, 'agent is outside the requested company scope')
   check(Array.isArray(agent.allowed_models) && agent.allowed_models.includes(agent.model)
     && agent.allowed_models.every(exactModel), 'agent model allowlist is invalid')
   check(Array.isArray(agent.allowed_actions), 'agent action allowlist is invalid')
@@ -154,8 +172,14 @@ async function inspectCapabilities(config, client, now, requireChatBinding) {
   check(!budgets.some(row => number(row.agent_id, 'budget agent') !== agentId &&
     ['limit_units', 'settled_units', 'outstanding_units'].some(key => number(row[key], key) > 0)), 'another monetary pool exists; consolidate through its canonical owner first')
 
-  const owners = await client.sql(`SELECT agent_id, organization_id FROM ai_owner_configuration_read WHERE organization_id = ${org}`, 'spend')
+  const owners = await client.sql(`SELECT agent_id, organization_id${shareRequired ? ', revision' : ''} FROM ai_owner_configuration_read WHERE organization_id = ${org}`, 'spend')
   check(owners.every(row => number(row.organization_id, 'owner pool organization') === org && number(row.agent_id, 'owner pool agent') === agentId), 'another managed monetary pool exists')
+  check(owners.length <= 1, 'duplicate owner pool configuration')
+  const ownerShare = shareRequired ? {
+    budgetId: id(Number(budget.id), 'budgetId'),
+    expectedRevision: owners.length ? number(owners[0].revision, 'owner revision') : 0,
+    expectedCompanyId: sourceCompanyId,
+  } : undefined
 
   const [policyKey, policyVersion] = config.intelligencePolicyRef.split('@')
   const policy = one(await client.sql(`SELECT * FROM ai_intelligence_policy WHERE organization_id = ${org} AND policy_key = '${policyKey}' AND policy_version = ${Number(policyVersion)}`), 'intelligence policy')
@@ -181,6 +205,10 @@ async function inspectCapabilities(config, client, now, requireChatBinding) {
 
   const bindingWrites = [], priceWrites = [], missing = []
   for (const surface of config.surfaces) {
+    if (reusing) {
+      const effective = await effectiveSurface(client, org, surface.skillKey)
+      check(effective.skillId === surface.skillId, 'reviewed skill is not the effective catalog entry')
+    }
     const skill = one(await client.sql(`SELECT * FROM ai_skill WHERE id = ${surface.skillId}`), `${surface.skillKey} catalog entry`)
     check(number(skill.id, 'skill id') === surface.skillId && skill.skill_key === surface.skillKey && skill.is_active === true
       && [0, org].includes(number(skill.organization_id, 'skill organization')), 'skill catalog scope/key mismatch')
@@ -191,6 +219,15 @@ async function inspectCapabilities(config, client, now, requireChatBinding) {
     const inherited = rows.filter(row => unwrap(row.company_id) == null)
     check(inherited.length <= 1, 'duplicate organization skill bindings')
     const previous = scoped[0]
+    if (reusing) {
+      const source = one(rows.filter(row => Number(unwrap(row.company_id)) === sourceCompanyId), `source ${surface.skillKey} binding`)
+      check(source.is_enabled === true, `source ${surface.skillKey} binding is disabled`)
+      const sourceSettings = parsedObject(source.config_json, 'source skill settings')
+      check(bindingMatches(sourceSettings, config)
+        && (sourceSettings.default_agent_id == null || sourceSettings.default_agent_id === agentId)
+        && (sourceSettings.intelligence_policy_ref == null || sourceSettings.intelligence_policy_ref === config.intelligencePolicyRef),
+      `source ${surface.skillKey} binding uses a different agent or policy`)
+    }
     const preserveBinding = requireChatBinding && surface.skillKey === 'rag_generation'
     check((previous ?? inherited[0])?.is_enabled !== false, 'skill is explicitly disabled')
     if (preserveBinding) check(previous?.is_enabled === true, `enabled company binding required for ${surface.skillKey}`)
@@ -198,7 +235,8 @@ async function inspectCapabilities(config, client, now, requireChatBinding) {
     const settings = priorSettings ? parsedObject(priorSettings.config_json, 'skill settings') : {}
     for (const key of ['defaultAgentId', 'default_agent_id']) check(settings[key] == null || Number(settings[key]) === agentId, 'skill is bound to another agent')
     for (const key of ['intelligencePolicyRef', 'intelligence_policy_ref']) check(settings[key] == null || settings[key] === config.intelligencePolicyRef, 'skill is bound to another policy')
-    if (!previous || settings.defaultAgentId !== agentId || settings.intelligencePolicyRef !== config.intelligencePolicyRef) {
+    if (!previous || !bindingMatches(settings, config)) {
+      check(!reusing || !previous, 'existing target company binding needs review; it will not be overwritten')
       check(!preserveBinding, `confirmed company binding required for ${surface.skillKey}`)
       bindingWrites.push({ company_id: some(companyId), skill_id: surface.skillId, is_enabled: true,
         config_json: JSON.stringify({ ...settings, defaultAgentId: agentId, intelligencePolicyRef: config.intelligencePolicyRef }),
@@ -213,20 +251,28 @@ async function inspectCapabilities(config, client, now, requireChatBinding) {
     check(new Set(prices.map(row => number(row.version, 'price version'))).size === prices.length, 'duplicate metered price versions')
     const latest = prices.reduce((a, b) => !a || number(b.version, 'price version') > number(a.version, 'price version') ? b : a, null)
     check(!latest || number(latest.units_per_1_k, 'metered rate') === meter.unitsPer1k, 'metered price differs; review a separate immutable price update')
+    check(!reusing || latest, 'company binding reuse requires the existing reviewed meter')
     if (!latest) { priceWrites.push({ model: meter.model, unit: meter.unit, currency: config.currency, units_per_1_k: meter.unitsPer1k }); missing.push(`meter:${meter.model}:${meter.unit}`) }
   }
   missing.unshift(...capabilityWrites.map(write => `${write.reducer}:${write.item}`))
-  if (capabilityWrites.length || (requireChatBinding && (priceWrites.length || bindingWrites.length))) {
+  if (ownerShare) missing.unshift('organization-owner agent share')
+  if (capabilityWrites.length || (requireChatBinding && (priceWrites.length || bindingWrites.length))
+    || (reusing && !ownerShare && bindingWrites.length)) {
     check(typeof client.verifyActivationAuthority === 'function', 'native operator authority and deployed toggle schema probe required before capability writes')
     await client.verifyActivationAuthority(org, agentId, priceWrites.length > 0)
   }
-  return { bindingWrites, priceWrites, capabilityWrites, originalAgent, budgets: structuredClone(budgets), missing, billingPeriod: period }
+  return { bindingWrites, priceWrites, capabilityWrites, originalAgent, budgets: structuredClone(budgets), missing, ownerShare, billingPeriod: period }
+}
+
+function bindingMatches(settings, config) {
+  return settings.defaultAgentId === config.agentId && settings.intelligencePolicyRef === config.intelligencePolicyRef
 }
 
 export async function provisionCapabilities(config, client, apply = false, now = new Date(), { requireChatBinding = false } = {}) {
   validateManifest(config)
   const inspection = await inspectCapabilities(config, client, now, requireChatBinding)
   if (apply) {
+    check(!inspection.ownerShare, 'an organization owner must share the existing agent before company bindings can be applied; run --check for the current selectors')
     // Every structural prerequisite was checked before the first mutation.
     // An uncertain response stops immediately; check durable state before retry.
     for (const toggle of inspection.capabilityWrites) await client.call(toggle.reducer, [config.organizationId, config.agentId, toggle.item, true])
@@ -247,7 +293,7 @@ export async function provisionCapabilities(config, client, apply = false, now =
   }
   return { organizationId: config.organizationId, companyId: config.companyId, agentId: config.agentId,
     billingPeriod: inspection.billingPeriod, applied: apply, ready: apply || inspection.missing.length === 0,
-    missing: apply ? [] : inspection.missing, billableCalls: 0, deploymentAcceptance: false }
+    missing: apply ? [] : inspection.missing, ownerShare: inspection.ownerShare, billableCalls: 0, deploymentAcceptance: false }
 }
 
 async function effectiveSurface(client, organizationId, skillKey) {

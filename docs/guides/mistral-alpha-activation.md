@@ -170,6 +170,70 @@ conflicting configuration block writes. Keep credentials in the existing server
 environment. An uncertain write stops; inspect exact state before another apply.
 Provision the current UTC monthly period without resetting previous use or holds.
 
+### Connect Alpha acceptance company 4098 to the existing harness
+
+Use [`alpha-acceptance-company.json`](../../infra/railway/pilots/alpha-acceptance-company.json)
+in the private operator environment. It reuses the Mistral harness from company
+4097 in the same organization, the existing embedding meter, and agent 2's
+single allowance. It does not publish a platform default or change prices,
+funding, the allowance, model capabilities, or source company bindings.
+
+```sh
+manifest=infra/railway/pilots/alpha-acceptance-company.json
+node scripts/provision-mistral-capabilities.mjs --check "$manifest"
+```
+
+If the check reports `ownerShare`, a signed-in **organization 4097 owner or
+administrator** must explicitly share the existing agent with the organization
+using the `erp.share_ai_owner_agent` session command. This changes agent
+availability at the organization level, not company data permissions. Each
+enabled surface still needs a company binding, and each run still requires
+company authorization. The company-only setup role and runtime service identities
+cannot authorize this change.
+
+With organization 4097 active in the owner's session, send
+`POST /api/operations/erp.share_ai_owner_agent` on the same origin. The session
+supplies the organization; the request body supplies the agent and share
+parameters. Use the latest `ownerShare` values, not historical budget IDs or
+revisions. On an uncertain response, check state instead of issuing a new request
+key.
+
+```js
+await fetch("/api/operations/erp.share_ai_owner_agent", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    agent_id: 2,
+    params: {
+      budget_id: ownerShare.budgetId,
+      expected_revision: ownerShare.expectedRevision,
+      expected_company_id: ownerShare.expectedCompanyId,
+      request_key: "alpha-acceptance-company-4098-share",
+      reason: "Use the existing funded harness for Alpha acceptance in company 4098"
+    }
+  })
+}).then(async response => {
+  if (!response.ok) {
+    throw new Error(`Owner share failed (${response.status}): ${await response.text()}`)
+  }
+})
+```
+
+After owner approval, the operator runs `--check` again. A missing-binding result
+is expected on the first pass; resolve any other error before applying. Use a
+single configuration writer during apply; do not edit AI Skills concurrently.
+
+```sh
+node scripts/provision-mistral-capabilities.mjs --apply "$manifest"
+node scripts/provision-mistral-capabilities.mjs --check "$manifest"
+```
+
+Apply creates only missing bindings for company 4098. It refuses disabled or
+conflicting settings and does not copy instructions or other configuration from
+company 4097. The binding check makes no provider calls. Prepare an indexed
+company-4098 document and run the [authenticated chat acceptance](#verify-a-railway-release-through-authenticated-chat)
+to prove actual execution and citation scope.
+
 ### Restore retrieval for an existing chat agent
 
 Use the private operator environment when the company already has an enabled
