@@ -5,6 +5,7 @@ import { canUseModuleData, type ModuleDataState } from "../lib/module-data-state
 
 import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react"
 import { useErpSession } from "@lumiere/erp-session"
+import { productNamePrefill } from "@lumiere/query-hooks/assistant-actions"
 import { buildEntitySelection, resolveAiEntityType } from "@lumiere/query-hooks/ai-ui-context"
 import {
   useErpAiSelectionReporter,
@@ -29,6 +30,7 @@ import { buildModuleNavigationAreas, type ModuleConfig, type ModuleTab } from ".
 import type { EntityBoardRuntimeContext } from "../lib/module-types"
 import type { EntityRow, EntitySurfacePermission } from "../lib/entity-view-types"
 import type { FormConfig, FormValues } from "../lib/form-types"
+import { mergeFieldDefaultValues } from "../lib/form-config-merge"
 import { getEntityRowKey } from "../lib/entity-row-utils"
 import { decideCreateGate, withTabCreateCta } from "../lib/list-empty-state"
 import { useRBAC } from "../lib/rbac-context"
@@ -263,6 +265,12 @@ export function ModuleView({
   })
   const [openForm, setOpenForm] = useState<string | null>(null)
   const [assistantFormPrompt, setAssistantFormPrompt] = useState<{ tabId: string; text: string } | null>(null)
+  const prefilledProductForm = useMemo(() => {
+    if (config.id !== "products" || assistantFormPrompt?.tabId !== "products") return undefined
+    const form = config.tabs.find((tab) => tab.id === "products")?.createForm
+    const name = productNamePrefill(assistantFormPrompt.text)
+    return form && name ? mergeFieldDefaultValues(form, { name }) : undefined
+  }, [config, assistantFormPrompt])
   const [assistantEditorScope, setAssistantEditorScope] = useState<string | null>(null)
   const assistantForms = useAssistantNativeForms()
   const [activationEditor, setActivationEditor] = useState<{ requestId: string; tabId: string } | null>(null)
@@ -700,7 +708,7 @@ export function ModuleView({
                             open={openForm === tab.id && assistantScopeCurrent && (!assistantEditorScope || createGate(tab.createPermission) === "allowed")}
                             draftKey={assistantEditorScope ? `${activationEditor ? "activation" : "assistant"}:${assistantEditorScope}` : undefined}
                             onOpenChange={(open) => !open && closeCreateForm()}
-                            staticConfig={tab.createForm}
+                            staticConfig={tab.id === "products" ? prefilledProductForm ?? tab.createForm : tab.createForm}
                             renderPreview={renderCreatePreview
                               ? (values) => renderCreatePreview(tab.id, values, tab.createForm!)
                               : undefined}
@@ -730,7 +738,7 @@ export function ModuleView({
                             open={openForm === tab.id && assistantScopeCurrent && (!assistantEditorScope || createGate(tab.createPermission) === "allowed")}
                             draftKey={assistantEditorScope ? `${activationEditor ? "activation" : "assistant"}:${assistantEditorScope}` : undefined}
                             onOpenChange={(open) => !open && closeCreateForm()}
-                            config={tab.createForm}
+                            config={tab.id === "products" ? prefilledProductForm ?? tab.createForm : tab.createForm}
                             renderPreview={renderCreatePreview
                               ? (values) => renderCreatePreview(tab.id, values, tab.createForm!)
                               : undefined}

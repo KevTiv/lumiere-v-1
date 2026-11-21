@@ -918,6 +918,15 @@ export interface AssistantRequestContext {
   page?: AssistantPageCatalog
 }
 
+const OPEN_NEW_PRODUCT_FORM = /^open\s+(?:(?:the|a)\s+)?new\s+product\s+form\b/i
+
+export function productNamePrefill(prompt: string): string | undefined {
+  // Only copy a literal name from an explicit product form instruction.
+  const name = /(?:^|[.!?]\s+)prefill\s+(?:the\s+)?(?:product\s+)?name\s+(?:as|with|to)\s+(?:"([^"\r\n]+)"|([^\r\n]+?))(?=[.!?](?:\s|$)|$)/i.exec(prompt)
+  const value = (name?.[1] ?? name?.[2])?.trim()
+  return value && value.length <= 200 ? value : undefined
+}
+
 /** Resolve explicit page editing separately from business-record creation. */
 function resolvePageActionRequest(
   command: string,
@@ -1064,6 +1073,7 @@ export function resolveAssistantActionRequest(
         : { kind: "clarify", reason: "record_required", candidates: ["farm.batch.open"] }
     }
   }
+  if (OPEN_NEW_PRODUCT_FORM.test(command)) return finish("products.product.create")
   if (surface && mode === "open") return finish(assistantSurfaceNavigationKey(surface))
   if (mode === "open" && target === "my work") return finish("tasks.navigate")
   if (mode === "open" || verb === "review") {

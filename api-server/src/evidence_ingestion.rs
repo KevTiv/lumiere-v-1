@@ -686,6 +686,34 @@ async fn read_document_embedding_job_id(
     exact_row_id(jobs, "document embedding job").await
 }
 
+async fn read_document_evidence_sources(
+    client: &stdb_client::StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    document_id: u64,
+) -> Result<Vec<Value>, ApiError> {
+    client
+        .query_sql_sats(&format!(
+            "SELECT id FROM ai_evidence_source WHERE organization_id = {organization_id} AND company_id = {company_id} AND source_kind = 'document' AND source_key = 'document:{document_id}' LIMIT 2"
+        ))
+        .await
+        .map_err(ApiError::internal)
+}
+
+async fn read_document_evidence_versions(
+    client: &stdb_client::StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    source_id: u64,
+) -> Result<Vec<Value>, ApiError> {
+    client
+        .query_sql_sats(&format!(
+            "SELECT id, version, status, supersedes_version_id FROM ai_evidence_source_version WHERE organization_id = {organization_id} AND company_id = {company_id} AND source_id = {source_id}"
+        ))
+        .await
+        .map_err(ApiError::internal)
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn persist_document_evidence(
     state: &AppState,
@@ -722,17 +750,21 @@ async fn persist_document_evidence(
         }]),
     )
     .await?;
+    // The upload has passed document authorization, and the source mutation
+    // used the actor session. Private readback uses the server-owned client
+    // with the exact organization, company and document keys from that path.
+    let evidence_reader = &state.stdb;
     let source_id = exact_row_id(
-        context.client().query_sql_sats(&format!(
-            "SELECT * FROM ai_evidence_source WHERE organization_id = {organization_id} AND company_id = {company_id} AND source_kind = 'document' AND source_key = 'document:{document_id}' LIMIT 2"
-        )).await.map_err(ApiError::internal)?,
+        read_document_evidence_sources(evidence_reader, organization_id, company_id, document_id)
+            .await?,
         "document evidence source",
-    ).await?;
+    )
+    .await?;
 
     let version_key = document_version_key(document.version_number, &document.checksum);
-    let existing_versions = context.client().query_sql_sats(&format!(
-        "SELECT * FROM ai_evidence_source_version WHERE organization_id = {organization_id} AND company_id = {company_id} AND source_id = {source_id}"
-    )).await.map_err(ApiError::internal)?;
+    let existing_versions =
+        read_document_evidence_versions(evidence_reader, organization_id, company_id, source_id)
+            .await?;
     let existing = existing_versions
         .iter()
         .find(|row| value_text(row, "version", "version") == Some(version_key.as_str()));
@@ -765,8 +797,8 @@ async fn persist_document_evidence(
     )
     .await?;
     let source_version_id = exact_row_id(
-        context.client().query_sql_sats(&format!(
-            "SELECT * FROM ai_evidence_source_version WHERE organization_id = {organization_id} AND company_id = {company_id} AND source_id = {source_id} AND version = '{}' LIMIT 2",
+        evidence_reader.query_sql_sats(&format!(
+            "SELECT id FROM ai_evidence_source_version WHERE organization_id = {organization_id} AND company_id = {company_id} AND source_id = {source_id} AND version = '{}' LIMIT 2",
             document_version_key(document.version_number, &document.checksum)
         )).await.map_err(ApiError::internal)?,
         "document evidence version",
@@ -823,8 +855,8 @@ async fn persist_document_evidence(
             }]),
         )
         .await?;
-        let passage_rows = context.client().query_sql_sats(&format!(
-            "SELECT * FROM ai_evidence_passage WHERE organization_id = {organization_id} AND company_id = {company_id} AND source_kind = 'document' AND source_key = 'document:{document_id}' AND source_version = '{}' AND passage_key = '{}' LIMIT 2",
+        let passage_rows = evidence_reader.query_sql_sats(&format!(
+            "SELECT id, passage_text, content_hash, source_version_id FROM ai_evidence_passage WHERE organization_id = {organization_id} AND company_id = {company_id} AND source_kind = 'document' AND source_key = 'document:{document_id}' AND source_version = '{}' AND passage_key = '{}' LIMIT 2",
             document_version_key(document.version_number, &document.checksum),
             passage_key,
         )).await.map_err(ApiError::internal)?;
@@ -834,6 +866,11 @@ async fn persist_document_evidence(
             ));
         }
         let passage = &passage_rows[0];
+        if value_u64(passage, "sourceVersionId", "source_version_id") != Some(source_version_id) {
+            return Err(ApiError::Conflict(
+                "persisted passage is linked to a different evidence version".into(),
+            ));
+        }
         let passage_id = value_u64(passage, "id", "id")
             .ok_or_else(|| ApiError::Internal("invalid persisted passage id".into()))?;
         let persisted_text = value_text(passage, "passageText", "passage_text")
@@ -913,15 +950,13 @@ fn document_evidence_provenance(
 }
 
 async fn evidence_source_versions(
-    context: &TrustedOperationContext,
+    reader: &stdb_client::StdbClient,
     organization_id: u64,
     company_id: u64,
     document_id: u64,
-    _version_number: u64,
 ) -> Result<Vec<(u64, String)>, ApiError> {
-    let sources = context.client().query_sql_sats(&format!(
-        "SELECT * FROM ai_evidence_source WHERE organization_id = {organization_id} AND company_id = {company_id} AND source_kind = 'document' AND source_key = 'document:{document_id}' LIMIT 2"
-    )).await.map_err(ApiError::internal)?;
+    let sources =
+        read_document_evidence_sources(reader, organization_id, company_id, document_id).await?;
     if sources.is_empty() {
         return Ok(Vec::new());
     }
@@ -932,9 +967,8 @@ async fn evidence_source_versions(
     }
     let source_id = value_u64(&sources[0], "id", "id")
         .ok_or_else(|| ApiError::Internal("invalid evidence source id".into()))?;
-    let versions = context.client().query_sql_sats(&format!(
-        "SELECT * FROM ai_evidence_source_version WHERE organization_id = {organization_id} AND company_id = {company_id} AND source_id = {source_id}"
-    )).await.map_err(ApiError::internal)?;
+    let versions =
+        read_document_evidence_versions(reader, organization_id, company_id, source_id).await?;
     versions
         .into_iter()
         .map(|row| {
@@ -984,14 +1018,9 @@ async fn change_document_evidence(
             "document must be deleted before its evidence is tombstoned".into(),
         ));
     }
-    let source_versions = evidence_source_versions(
-        &context,
-        organization_id,
-        company_id,
-        body.document_id,
-        document.version_number,
-    )
-    .await?;
+    let source_versions =
+        evidence_source_versions(&state.stdb, organization_id, company_id, body.document_id)
+            .await?;
     let target_rank = if body.change_kind == "deleted" { 4 } else { 3 };
     let mut changed = Vec::new();
     for (source_version_id, status) in source_versions {
@@ -1077,6 +1106,30 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn document_evidence_readback_is_scoped_to_one_document_and_company() {
+        let server = crate::company_read_test_support::serve(|sql| {
+            assert!(sql.contains("organization_id = 1"));
+            assert!(sql.contains("company_id = 2"));
+            if sql.contains("FROM ai_evidence_source WHERE") {
+                assert!(sql.contains("source_kind = 'document'"));
+                assert!(sql.contains("source_key = 'document:42' LIMIT 2"));
+                return vec![json!({"id": 13})];
+            }
+            assert!(sql.contains("FROM ai_evidence_source_version WHERE"));
+            assert!(sql.ends_with("source_id = 13"));
+            vec![json!({"id": 21, "version": "v1-abc", "status": "current"})]
+        })
+        .await;
+        assert_eq!(
+            evidence_source_versions(&server.client, 1, 2, 42)
+                .await
+                .unwrap(),
+            [(21, "current".to_owned())],
+        );
+        assert_eq!(server.requests.lock().unwrap().len(), 2);
+    }
 
     #[tokio::test]
     async fn nullable_company_job_readback_requires_exact_scope_and_reference() {
