@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1
+
+FROM rust:1-bookworm AS module-build
+WORKDIR /app
+RUN rustup target add wasm32-unknown-unknown
+
+COPY crates/presentation-core crates/presentation-core
+COPY crates/policy-core crates/policy-core
+COPY crates/file-inspection crates/file-inspection
+COPY crates/report-schedule crates/report-schedule
+COPY lumiere-codegen/storage-policy-manifest.json lumiere-codegen/storage-policy-manifest.json
+COPY crates/stdb-auth/assets/resource_registry.json crates/stdb-auth/assets/resource_registry.json
+COPY spacetimedb spacetimedb
+
+ARG LUMIERE_ALPHA_FOUNDER_IDENTITIES
+RUN printf '%s\n' "$LUMIERE_ALPHA_FOUNDER_IDENTITIES" | grep -Eq '^[0-9a-f]{64}$' \
+  && LUMIERE_ENABLE_DEV_REDUCERS=0 cargo build --locked \
+    --manifest-path spacetimedb/Cargo.toml \
+    --target wasm32-unknown-unknown --profile ci-contracts --no-default-features
+
+FROM debian:bookworm-slim
+ARG SPACETIMEDB_VERSION=2.8.2
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl jq \
+  && rm -rf /var/lib/apt/lists/* \
+  && curl -sSf https://install.spacetimedb.com | sh -s -- -y \
+  && /root/.local/bin/spacetime version install "$SPACETIMEDB_VERSION" \
+  && /root/.local/bin/spacetime version use "$SPACETIMEDB_VERSION"
+
+ENV PATH="/root/.local/bin:${PATH}"
+WORKDIR /app
+COPY --from=module-build /app/spacetimedb/target/wasm32-unknown-unknown/ci-contracts/lumiere_v1.wasm /app/spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm
+COPY spacetimedb/assets/ai-builtin-skills.json spacetimedb/assets/ai-builtin-skills.json
+COPY spacetimedb/assets/ai-infrastructure-skills.json spacetimedb/assets/ai-infrastructure-skills.json
+COPY scripts/railway-publish-spacetimedb.sh scripts/railway-publish-spacetimedb.sh
+RUN test -s /app/spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm \
+  && chmod 0755 /app/scripts/railway-publish-spacetimedb.sh
+
+CMD ["/app/scripts/railway-publish-spacetimedb.sh"]
