@@ -25,12 +25,15 @@ import {
   ACTIVITY_INDEX_KINDS,
   parseActivityIngestBody,
 } from "@/app/api/ai/context/ingest/body"
-import { companyRowsToSelectOptions } from "@/lib/form-lookup"
+import {
+  companyRowsToSelectOptions,
+  type CompanyLookupRow,
+} from "@/lib/form-lookup"
 
 export function SearchIndexingPanel({
   companies,
 }: {
-  companies: Record<string, unknown>[]
+  companies: readonly CompanyLookupRow[]
 }) {
   const { t } = useTranslation()
   const { activeCompanyId } = useErpSession()

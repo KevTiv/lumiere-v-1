@@ -436,7 +436,11 @@ async fn apply_intent(
     let mut arguments = scope.to_vec();
     arguments.push(params);
     let arguments = Value::Array(arguments);
-    tracing::info!(stage = "harness_lifecycle_dispatch", run_id, operation = reducer);
+    tracing::info!(
+        stage = "harness_lifecycle_dispatch",
+        run_id,
+        operation = reducer
+    );
     if is_follow_up_reducer(reducer) {
         // The module takes the follow-up author from `ctx.sender()`, so these
         // commands are issued with the acting user's own STDB token rather than

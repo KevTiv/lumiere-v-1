@@ -531,7 +531,12 @@ async fn run_llm_with_context(
     .await
     .map_err(AppError::from_generation)
     .inspect_err(|_| {
-        tracing::warn!(stage = "harness_execution_failed", org_id, company_id, skill_key);
+        tracing::warn!(
+            stage = "harness_execution_failed",
+            org_id,
+            company_id,
+            skill_key
+        );
     })?;
     if let Some(run) = &result.run {
         tracing::info!(
@@ -545,7 +550,12 @@ async fn run_llm_with_context(
             citation_count = run.citations.len()
         );
     } else {
-        tracing::info!(stage = "harness_policy_denied", org_id, company_id, skill_key);
+        tracing::info!(
+            stage = "harness_policy_denied",
+            org_id,
+            company_id,
+            skill_key
+        );
     }
     Ok(Json(result))
 }
