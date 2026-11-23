@@ -212,6 +212,13 @@ pub async fn post_run_lifecycle(
         ));
     }
     let actor = actor_context(&headers, req.company_id)?;
+    tracing::info!(
+        stage = "harness_lifecycle_requested",
+        org_id = actor.organization_id,
+        company_id = actor.company_id,
+        run_id = req.run_id,
+        read_only = matches!(&req.intent, RunLifecycleIntent::View)
+    );
     let granted = require_scoped_capability_grant(
         &state,
         &actor.identity,
@@ -264,6 +271,13 @@ pub async fn post_run_lifecycle(
     )
     .await?;
     let response = enforce_lifecycle_bounds(response, bounds)?;
+    tracing::info!(
+        stage = "harness_lifecycle_updated",
+        org_id = actor.organization_id,
+        company_id = actor.company_id,
+        run_id = response.run_id,
+        state = response.state.as_str()
+    );
     Ok(Json(response))
 }
 
@@ -422,6 +436,7 @@ async fn apply_intent(
     let mut arguments = scope.to_vec();
     arguments.push(params);
     let arguments = Value::Array(arguments);
+    tracing::info!(stage = "harness_lifecycle_dispatch", run_id, operation = reducer);
     if is_follow_up_reducer(reducer) {
         // The module takes the follow-up author from `ctx.sender()`, so these
         // commands are issued with the acting user's own STDB token rather than

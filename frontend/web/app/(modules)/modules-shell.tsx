@@ -82,8 +82,8 @@ import { parseAssistantSupportRecord, readAssistantSupportRecord } from "@/lib/a
 import { useErpAiSelectionReporter } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { performSignOut } from "@/lib/auth-sign-out"
 import {
-  assistantAnswer, assistantAnswerMetadata, assistantHistoryResult, assistantSetupFailure, coordinateAssistantTurn,
-  parseStoredAssistantRecovery, readAssistantStream, withAssistantRecoveryMetadata, type AssistantTurnFailure,
+  assistantAnswer, assistantHistoryResult, assistantRagPath, assistantSetupFailure, coordinateAssistantTurn,
+  parseStoredAssistantRecovery, readAssistantReply, withAssistantRecoveryMetadata, type AssistantTurnFailure,
 } from "@/lib/assistant-turn"
 import { i18n } from "@lumiere/i18n"
 import { readChatAttachments, readStoredChatAttachmentNames } from "@/lib/ai-chat-attachments"
@@ -854,7 +854,10 @@ function ErpAiChatPanel({
               attachments,
               ...(requestedAgentId ? { agent_id: requestedAgentId } : {}),
             }))
-            const response = await fetch("/api/ai/rag/stream", {
+            const explicitRecord = uiContext?.explicit_record === true
+            // The live-record path already returns a verified complete reply.
+            // Pick JSON before dispatch so a lost stream never reruns the turn.
+            const response = await fetch(assistantRagPath(explicitRecord), {
               signal,
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -870,7 +873,7 @@ function ErpAiChatPanel({
               }),
             })
             // A missing reply does not establish the gateway outcome, so do not redispatch.
-            return await readAssistantStream(response, (data) => assistantAnswerMetadata(JSON.parse(data)), (delta) => {
+            return await readAssistantReply(response, explicitRecord ? "json" : "sse", (delta) => {
               if (isCurrent()) onDelta(delta)
             })
           } finally {

@@ -23,6 +23,12 @@ export async function fetchAiGateway(path: string, init: RequestInit & { body?: 
   status: number
   text: string
 }> {
+  const res = await fetchAiGatewayResponse(path, init)
+  const text = await res.text()
+  return { ok: res.ok, status: res.status, text }
+}
+
+export async function fetchAiGatewayResponse(path: string, init: RequestInit): Promise<Response> {
   const base = resolveAiGatewayBaseUrl()
   if (!base) {
     throw new Error('AI gateway URL not configured')
@@ -42,11 +48,9 @@ export async function fetchAiGateway(path: string, init: RequestInit & { body?: 
   if (secret) {
     headers.set('X-Lumiere-Gateway-Secret', secret)
   }
-  const res = await fetch(url, {
+  return fetch(url, {
     ...init,
     headers,
     cache: 'no-store',
   })
-  const text = await res.text()
-  return { ok: res.ok, status: res.status, text }
 }

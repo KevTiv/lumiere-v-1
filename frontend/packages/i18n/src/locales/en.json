@@ -14579,6 +14579,26 @@
       "evidenceReviewer": "Evidence reviewer",
       "runLifecycle": "Run lifecycle"
     },
+    "searchIndex": {
+      "title": "Search indexing",
+      "description": "Index saved records from the active company so chat can find them.",
+      "selectCompany": "Select a company to index its records.",
+      "recordType": "Record type",
+      "recordIds": "Record IDs (up to eight, separated by commas)",
+      "invalidIds": "Enter one to eight unique numeric record IDs.",
+      "apply": "Index records",
+      "indexing": "Indexing records…",
+      "result": "{{indexed}} indexed, {{unchanged}} already current, {{withheld}} withheld",
+      "kinds": {
+        "sale_order": "Sales orders",
+        "purchase_order": "Purchase orders",
+        "project_task": "Tasks",
+        "account_move": "Journal entries",
+        "mrp_production": "Manufacturing orders",
+        "product": "Products",
+        "contact": "Contacts"
+      }
+    },
     "auditTrail": {
       "title": "Audit trail",
       "correlationId": "Correlation ID"

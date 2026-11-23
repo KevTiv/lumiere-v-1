@@ -6,6 +6,7 @@ mod error;
 mod harness;
 mod kaggle;
 mod non_llm_spend;
+mod observed_chat;
 mod orchestrator;
 mod providers;
 mod qdrant_client;
@@ -28,7 +29,7 @@ use std::sync::Arc;
 
 use axum::{
     body::Body,
-    extract::{DefaultBodyLimit, State},
+    extract::{DefaultBodyLimit, MatchedPath, State},
     http::{Request, StatusCode},
     middleware::{self, Next},
     response::Response,
@@ -40,6 +41,7 @@ use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
 };
+use tracing::Instrument;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use config::Config;
@@ -87,6 +89,50 @@ async fn require_gateway_secret(
     Ok(next.run(request).await)
 }
 
+async fn trace_ai_request(request: Request<Body>, next: Next) -> Response {
+    const REQUEST_ID: &str = "x-lumiere-ai-request-id";
+    let route = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(MatchedPath::as_str)
+        .unwrap_or_default();
+    if !matches!(
+        route,
+        "/v1/rag" | "/v1/rag/stream" | "/v1/context/ingest" | "/v1/evidence/rag-outcomes"
+    ) && !route.starts_with("/v1/skills/")
+        && !route.starts_with("/v1/harness/")
+        && !route.starts_with("/v1/internal/harness/")
+        && !route.starts_with("/v1/actions/")
+    {
+        return next.run(request).await;
+    }
+    let request_id = request
+        .headers()
+        .get(REQUEST_ID)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| uuid::Uuid::parse_str(value).ok())
+        .unwrap_or_else(uuid::Uuid::new_v4);
+    let span = tracing::info_span!("ai_request", %request_id, route);
+    async move {
+        let started = std::time::Instant::now();
+        tracing::info!(stage = "received");
+        let mut response = next.run(request).await;
+        if let Ok(header) = axum::http::HeaderValue::from_str(&request_id.to_string()) {
+            response.headers_mut().insert(REQUEST_ID, header);
+        }
+        let status = response.status().as_u16();
+        let duration_ms = started.elapsed().as_millis() as u64;
+        if status >= 400 {
+            tracing::warn!(stage = "rejected", status, duration_ms);
+        } else {
+            tracing::info!(stage = "response_ready", status, duration_ms);
+        }
+        response
+    }
+    .instrument(span)
+    .await
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     if std::env::args().nth(1).as_deref() == Some("certification-bundles") {
@@ -118,7 +164,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "ai_gateway=debug,tower_http=info".parse().unwrap()),
+                .unwrap_or_else(|_| "gateway=info,tower_http=info".parse().unwrap()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -243,8 +289,8 @@ async fn main() -> anyhow::Result<()> {
             post(routes::alpha_analytics::post_analytics),
         )
         .route("/v1/search", post(routes::search::post_search))
-        .route("/v1/rag", post(routes::rag::post_rag))
-        .route("/v1/rag/stream", post(routes::rag::post_rag_stream))
+        .route("/v1/rag", post(observed_chat::post_json))
+        .route("/v1/rag/stream", post(observed_chat::post_stream))
         .route("/v1/actions/draft", post(routes::actions::post_draft))
         .route(
             "/v1/actions/bridge",
@@ -370,6 +416,7 @@ async fn main() -> anyhow::Result<()> {
             "/v1/skills/supplier-discovery",
             post(routes::harness_skills::post_supplier_discovery),
         )
+        .route_layer(middleware::from_fn(trace_ai_request))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             require_gateway_secret,
