@@ -1,12 +1,14 @@
-const RESOURCE_KINDS = new Set([
+export const ACTIVITY_INDEX_KINDS = [
   'sale_order', 'purchase_order', 'project_task', 'account_move',
   'mrp_production', 'product', 'contact',
-])
+] as const
+type ActivityIndexKind = (typeof ACTIVITY_INDEX_KINDS)[number]
+const RESOURCE_KINDS: ReadonlySet<string> = new Set(ACTIVITY_INDEX_KINDS)
 const U64_MAX = 18_446_744_073_709_551_615n
 
 export interface ActivityIngestBody {
   companyId: number
-  resources: { resource_kind: string; resource_id: string }[]
+  resources: { resource_kind: ActivityIndexKind; resource_id: string }[]
 }
 
 function object(value: unknown): Record<string, unknown> {
@@ -42,7 +44,7 @@ export function parseActivityIngestBody(raw: unknown): ActivityIngestBody {
     const key = `${resource_kind}:${resource_id}`
     if (seen.has(key)) throw new Error('Duplicate resource reference')
     seen.add(key)
-    return { resource_kind, resource_id }
+    return { resource_kind: resource_kind as ActivityIndexKind, resource_id }
   })
   return { companyId: body.companyId, resources }
 }

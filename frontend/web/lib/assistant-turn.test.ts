@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { HttpResponseError, httpResponseError } from "@lumiere/api-client/response-error"
-import { assistantAnswer, assistantAnswerMetadata, assistantHistoryResult, coordinateAssistantTurn, parseStoredAssistantRecovery, readAssistantStream, turnFailure, withAssistantRecoveryMetadata } from "./assistant-turn"
+import { assistantAnswer, assistantAnswerMetadata, assistantHistoryResult, assistantRagPath, coordinateAssistantTurn, parseStoredAssistantRecovery, readAssistantReply, readAssistantStream, turnFailure, withAssistantRecoveryMetadata } from "./assistant-turn"
 
 const metadata = (raw: string): { sources: string[]; run_id: number } => {
   const parsed = JSON.parse(raw)
@@ -147,10 +147,22 @@ test("the admitted SSE answer, sources and run identity require a terminal done 
   for (const crlf of [false, true]) assert.deepEqual(await readAssistantStream(sse(complete, crlf), metadata), { answer: "Admitted answer", sources: ["source"], run_id: 7 })
 })
 
+test("an explicit record uses the verified JSON reply with its live citation", async () => {
+  assert.equal(assistantRagPath(true), "/api/ai/rag")
+  assert.equal(assistantRagPath(false), "/api/ai/rag/stream")
+  const source = { kind: "live", trust: "authoritative", entity_type: "product", entity_id: "4119", text_snippet: "SKU: ACCEPT-20261031-BIG-TILAPIA" }
+  const reply = await readAssistantReply(Response.json({ answer: source.text_snippet, sources: [source] }), "json", () => {
+    assert.fail("a complete JSON reply should not emit provisional deltas")
+  })
+  assert.equal(reply.answer, source.text_snippet)
+  assert.deepEqual(reply.sources, [source])
+})
+
 test("admitted answer text reaches chat before the stream completes", async () => {
   const encoder = new TextEncoder()
   const { readable, writable } = new TransformStream<Uint8Array>()
   const writer = writable.getWriter()
+  void writer.closed.catch(() => undefined)
   const { promise: firstDelta, resolve: deliverDelta } = Promise.withResolvers<string>()
   const deltas: string[] = []
   let completed = false
@@ -170,10 +182,34 @@ test("admitted answer text reaches chat before the stream completes", async () =
   assert.equal(await firstDelta, "Admitted ")
   assert.equal(completed, false)
   await writer.write(encoder.encode(complete.replace("Admitted answer", "answer")))
-  await writer.close()
 
   assert.deepEqual(await result, { answer: "Admitted answer", sources: ["source"], run_id: 7 })
   assert.deepEqual(deltas, ["Admitted ", "answer"])
+})
+
+test("a complete answer does not wait for a second network read after terminal done", async () => {
+  let pulls = 0
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (++pulls === 1) controller.enqueue(new TextEncoder().encode(complete))
+      else controller.error(new TypeError("late disconnect"))
+    },
+  }, { highWaterMark: 0 })
+  const result = await readAssistantStream(new Response(body, { headers: { "content-type": "text/event-stream" } }), metadata)
+  assert.equal(result.answer, "Admitted answer")
+  assert.equal(pulls, 1)
+})
+
+test("stream diagnostics expose the support ID and stage without response content", async t => {
+  const log = t.mock.method(console, "warn", () => undefined)
+  const requestId = "00000000-0000-4000-8000-000000000001"
+  const response = new Response(complete.replace('{"sources":["source"],"run_id":7}', "private invalid payload"), {
+    headers: { "content-type": "text/event-stream", "x-lumiere-ai-request-id": requestId },
+  })
+  await assert.rejects(readAssistantReply(response, "sse", () => undefined), /metadata is invalid/)
+  assert.deepEqual(log.mock.calls[0]?.arguments, ["[ai.chat] reply_rejected", {
+    requestId, status: 200, transport: "sse", reason: "metadata",
+  }])
 })
 
 test("visible provisional text does not verify an interrupted stream", async () => {

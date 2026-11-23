@@ -113,6 +113,52 @@ const MAX_ASSISTANT_STREAM_BYTES = 4 * 1024 * 1024
 const MAX_ASSISTANT_EVENT_LENGTH = 1024 * 1024
 const MAX_ASSISTANT_ANSWER_LENGTH = 256 * 1024
 
+export function assistantRagPath(explicitRecord: boolean) {
+  return explicitRecord ? "/api/ai/rag" : "/api/ai/rag/stream"
+}
+
+class AssistantStreamError extends Error {
+  constructor(
+    readonly reason: "content_type" | "event_size" | "answer_size" | "stream_size"
+      | "metadata" | "upstream_error" | "incomplete" | "unexpected_event",
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
+function assistantRequestId(response: Response) {
+  const requestId = response.headers.get("x-lumiere-ai-request-id")
+  return requestId && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(requestId)
+    ? requestId
+    : undefined
+}
+
+export async function readAssistantReply(
+  response: Response,
+  transport: "json" | "sse",
+  onDelta: (text: string) => void,
+) {
+  const diagnostics = { requestId: assistantRequestId(response), status: response.status, transport }
+  try {
+    if (!response.ok) throw await httpResponseError(response, "Assistant request rejected")
+    const reply = transport === "sse"
+      ? await readAssistantStream(response, (data) => assistantAnswerMetadata(JSON.parse(data)), onDelta)
+      : assistantAnswer(await response.json())
+    console.info("[ai.chat] reply_confirmed", {
+      ...diagnostics, runId: reply.run_id, sourceCount: reply.sources.length, verification: reply.verification?.outcome,
+    })
+    return reply
+  } catch (error) {
+    const reason = error instanceof AssistantStreamError ? error.reason
+      : error instanceof HttpResponseError ? "http_error"
+      : error instanceof TypeError ? "read_error"
+      : "invalid_reply"
+    console.warn("[ai.chat] reply_rejected", { ...diagnostics, reason })
+    throw error
+  }
+}
+
 /** Deliver admitted text provisionally. Only a complete stream returns answer metadata. */
 export async function readAssistantStream<T>(
   response: Response,
@@ -121,7 +167,7 @@ export async function readAssistantStream<T>(
 ): Promise<T & { answer: string }> {
   if (!response.ok) throw await httpResponseError(response, "Assistant stream rejected")
   if (!response.body || !response.headers.get("content-type")?.includes("text/event-stream")) {
-    throw new Error("Assistant stream is unavailable")
+    throw new AssistantStreamError("content_type", "Assistant stream is unavailable")
   }
   const reader = response.body.getReader()
   const decoder = new TextDecoder("utf-8", { fatal: true })
@@ -131,18 +177,23 @@ export async function readAssistantStream<T>(
   let metadata: T | undefined
   let completed = false
   const event = (raw: string) => {
-    if (raw.length > MAX_ASSISTANT_EVENT_LENGTH) throw new Error("Assistant stream event exceeds its size limit")
+    if (raw.length > MAX_ASSISTANT_EVENT_LENGTH) throw new AssistantStreamError("event_size", "Assistant stream event exceeds its size limit")
     const lines = raw.split(/\r?\n/)
     const name = lines.find(line => line.startsWith("event:"))?.slice(6).trim()
     const data = lines.filter(line => line.startsWith("data:")).map(line => line.slice(5).replace(/^ /, "")).join("\n")
-    if (completed && name) throw new Error("Assistant stream continued after completion")
+    if (completed && name) throw new AssistantStreamError("unexpected_event", "Assistant stream continued after completion")
     if (name === "delta") {
-      if (answer.length + data.length > MAX_ASSISTANT_ANSWER_LENGTH) throw new Error("Assistant answer exceeds its size limit")
+      if (answer.length + data.length > MAX_ASSISTANT_ANSWER_LENGTH) throw new AssistantStreamError("answer_size", "Assistant answer exceeds its size limit")
       answer += data
-    } else if (name === "sources") metadata = parseMetadata(data)
-    else if (name === "error") throw new Error("Assistant stream failed")
+    } else if (name === "sources") {
+      try {
+        metadata = parseMetadata(data)
+      } catch {
+        throw new AssistantStreamError("metadata", "Assistant source metadata is invalid")
+      }
+    } else if (name === "error") throw new AssistantStreamError("upstream_error", "Assistant stream failed")
     else if (name === "done") {
-      if (!metadata || !answer.trim()) throw new Error("Assistant stream is incomplete")
+      if (!metadata || !answer.trim()) throw new AssistantStreamError("incomplete", "Assistant stream is incomplete")
       completed = true
     }
   }
@@ -150,21 +201,23 @@ export async function readAssistantStream<T>(
     while (true) {
       const { value, done } = await reader.read()
       receivedBytes += value?.byteLength ?? 0
-      if (receivedBytes > MAX_ASSISTANT_STREAM_BYTES) throw new Error("Assistant stream exceeds its size limit")
+      if (receivedBytes > MAX_ASSISTANT_STREAM_BYTES) throw new AssistantStreamError("stream_size", "Assistant stream exceeds its size limit")
       buffer += done ? decoder.decode() : decoder.decode(value, { stream: true })
       const parts = buffer.split(/\r?\n\r?\n/)
       buffer = parts.pop() ?? ""
-      if (buffer.length > MAX_ASSISTANT_EVENT_LENGTH) throw new Error("Assistant stream event exceeds its size limit")
+      if (buffer.length > MAX_ASSISTANT_EVENT_LENGTH) throw new AssistantStreamError("event_size", "Assistant stream event exceeds its size limit")
       const priorLength = answer.length
       for (const part of parts) event(part)
       if (answer.length > priorLength) onDelta?.(answer.slice(priorLength))
-      if (done) break
+      // The gateway emits done only after verification. A late connection
+      // error must not invalidate a reply whose terminal event already arrived.
+      if (completed || done) break
     }
     if (buffer.trim()) event(buffer)
-    if (!completed || !metadata) throw new Error("Assistant stream ended before completion")
+    if (!completed || !metadata) throw new AssistantStreamError("incomplete", "Assistant stream ended before completion")
     return { ...metadata, answer }
   } finally {
-    await reader.cancel().catch(() => undefined)
+    void reader.cancel().catch(() => undefined)
     reader.releaseLock()
   }
 }

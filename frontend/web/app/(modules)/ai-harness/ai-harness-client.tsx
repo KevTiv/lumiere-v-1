@@ -15,6 +15,7 @@ import { RedActionDraftPanel } from "./red-action-draft-panel"
 import { EvidenceReviewerPanel } from "./evidence-reviewer-panel"
 import { RunLifecyclePanel } from "./run-lifecycle-panel"
 import { PlatformAiProfilePanel } from "./platform-ai-profile-panel"
+import { SearchIndexingPanel } from "./search-indexing-panel"
 
 interface AiHarnessClientProps {
   organizationId: bigint
@@ -37,6 +38,7 @@ export function AiHarnessClient({
   const [tab, setTab] = useState(() => {
     const requested = searchParams.get("tab")
     if (requested === "ai-profile" && canManagePlatformProfile) return requested
+    if (requested === "search-indexing") return requested
     if (["finance-reviews", "report-analysis", "report-composer", "low-stock", "red-action-drafts", "evidence-reviewer", "run-lifecycle"].includes(requested ?? "")) return requested!
     return searchParams.has("runId") ? "evidence-reviewer" : "report-composer"
   })
@@ -64,6 +66,7 @@ export function AiHarnessClient({
         <TabsTrigger value="run-lifecycle">
           {t("aiHarness.tabs.runLifecycle")}
         </TabsTrigger>
+        <TabsTrigger value="search-indexing">{t("aiHarness.searchIndex.title")}</TabsTrigger>
       </TabsList>
 
       {canManagePlatformProfile ? <TabsContent value="ai-profile"><PlatformAiProfilePanel organizationId={organizationId} /></TabsContent> : null}
@@ -100,6 +103,9 @@ export function AiHarnessClient({
 
       <TabsContent value="run-lifecycle">
         <RunLifecyclePanel companies={companies} />
+      </TabsContent>
+      <TabsContent value="search-indexing">
+        <SearchIndexingPanel companies={companies} />
       </TabsContent>
     </Tabs>
     </div>

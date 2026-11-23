@@ -500,6 +500,15 @@ async fn run_llm_with_context(
     input: GovernedLlmSkillInput,
     org_privacy_policy: OrgPrivacyPolicy,
 ) -> AppResult<Json<GovernedLlmSkillResult>> {
+    let org_id = actor.organization_id;
+    let company_id = actor.company_id;
+    tracing::info!(
+        stage = "harness_admission_started",
+        org_id,
+        company_id,
+        skill_key,
+        resume_run_id = ?input.resume_run_id
+    );
     let policy = policy_for(
         state,
         actor.organization_id,
@@ -520,7 +529,34 @@ async fn run_llm_with_context(
         policy,
     )
     .await
-    .map_err(AppError::from_generation)?;
+    .map_err(AppError::from_generation)
+    .inspect_err(|_| {
+        tracing::warn!(
+            stage = "harness_execution_failed",
+            org_id,
+            company_id,
+            skill_key
+        );
+    })?;
+    if let Some(run) = &result.run {
+        tracing::info!(
+            stage = "harness_run_returned",
+            org_id,
+            company_id,
+            skill_key,
+            run_id = run.run_id,
+            status = run.status.as_str(),
+            step_count = run.steps.len(),
+            citation_count = run.citations.len()
+        );
+    } else {
+        tracing::info!(
+            stage = "harness_policy_denied",
+            org_id,
+            company_id,
+            skill_key
+        );
+    }
     Ok(Json(result))
 }
 

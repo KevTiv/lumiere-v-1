@@ -587,7 +587,21 @@ pub async fn post_ingest(
     let refs = references(&req.resources).map_err(|e| AppError::BadRequest(e.to_string()))?;
     let actor = ActorCredentials::new(req.stdb_token, req.identity_hex)
         .map_err(|_| AppError::Forbidden("authenticated actor required".into()))?;
+    tracing::info!(
+        stage = "activity_index_started",
+        org_id = req.org_id,
+        company_id = req.company_id,
+        reference_count = refs.len()
+    );
     let report = ingest_references(&state, &actor, req.org_id, req.company_id, &refs).await?;
+    tracing::info!(
+        stage = "activity_index_finished",
+        org_id = req.org_id,
+        company_id = req.company_id,
+        indexed = report.indexed,
+        unchanged = report.unchanged,
+        withheld = report.withheld
+    );
     Ok(Json(ContextIngestResponse {
         indexed: report.indexed,
         unchanged: report.unchanged,
