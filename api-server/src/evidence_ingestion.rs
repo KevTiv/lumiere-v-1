@@ -74,6 +74,36 @@ struct CurrentDocument {
     is_deleted: bool,
 }
 
+// The HTTP transport encodes top-level options, while options nested in
+// reducer parameter objects must already be SATS sums.
+fn sats_option<T: Serialize>(value: Option<T>) -> Value {
+    match value {
+        Some(value) => json!({ "some": value }),
+        None => json!({ "none": [] }),
+    }
+}
+
+fn document_source_version_params(
+    document: &CurrentDocument,
+    version_key: &str,
+    object_key: &str,
+    source_url: Option<&str>,
+    predecessor_id: Option<u64>,
+) -> Value {
+    json!({
+        "version": version_key,
+        "edition": sats_option(Some(format!("DMS version {}", document.version_number))),
+        "publication_date_micros": sats_option::<i64>(None),
+        "uri": sats_option(Some(source_url.unwrap_or(&document.url))),
+        "retrieved_at_micros": sats_option::<i64>(None),
+        "content_hash": sats_option(Some(document.checksum.as_str())),
+        "snapshot_ref": sats_option(Some(object_key)),
+        "origin": "user_provided",
+        "verification": "inspected",
+        "supersedes_version_id": sats_option(predecessor_id),
+    })
+}
+
 fn value_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
     // Company and current-version IDs are nullable SATS values on document rows.
     crate::query_exec::row_u64(row, camel, snake).ok().flatten()
@@ -822,7 +852,7 @@ async fn persist_document_evidence(
             "title": document.title,
             "author_attribution": "unknown",
             "authors": [],
-            "author_organization": null,
+            "author_organization": sats_option::<&str>(None),
             "scope": "company",
             "retention_policy": "retain_snapshot",
         }]),
@@ -852,18 +882,18 @@ async fn persist_document_evidence(
         state,
         session,
         "record_ai_evidence_source_version",
-        json!([organization_id, company_id, source_id, {
-            "version": version_key,
-            "edition": format!("DMS version {}", document.version_number),
-            "publication_date_micros": null,
-            "uri": source_url.unwrap_or(&document.url),
-            "retrieved_at_micros": null,
-            "content_hash": document.checksum,
-            "snapshot_ref": object_key,
-            "origin": "user_provided",
-            "verification": "inspected",
-            "supersedes_version_id": predecessor_id,
-        }]),
+        json!([
+            organization_id,
+            company_id,
+            source_id,
+            document_source_version_params(
+                document,
+                &version_key,
+                object_key,
+                source_url,
+                predecessor_id,
+            )
+        ]),
     )
     .await?;
     let readback: DocumentEvidenceVersions = evidence_reader.read(None).await?;
@@ -894,7 +924,7 @@ async fn persist_document_evidence(
                 "record_ai_evidence_source_change",
                 json!([organization_id, company_id, predecessor_id, {
                     "change_kind": "corrected",
-                    "replacement_version_id": source_version_id,
+                    "replacement_version_id": sats_option(Some(source_version_id)),
                     "reason": format!("DMS document {document_id} current version changed"),
                 }]),
             )
@@ -923,13 +953,13 @@ async fn persist_document_evidence(
                 "source_version": source_version,
                 "passage_key": passage_key,
                 "passage_text": passage_text,
-                "effective_from_micros": null,
-                "effective_to_micros": null,
+                "effective_from_micros": sats_option::<i64>(None),
+                "effective_to_micros": sats_option::<i64>(None),
                 "applicability": [format!("document:{document_id}")],
-                "source_version_id": source_version_id,
+                "source_version_id": sats_option(Some(source_version_id)),
                 "coordinates": [format!("chars:{start}-{end}")],
                 "text_origin": text_origin,
-                "processor_ref": format!("server.document_blob_ingestion.v1:{processor}"),
+                "processor_ref": sats_option(Some(format!("server.document_blob_ingestion.v1:{processor}"))),
             }]),
         )
         .await?;
@@ -968,13 +998,13 @@ async fn persist_document_evidence(
                 "content_id": passage_id,
                 "expected_fingerprint": content_hash,
                 "index_generation": "semantic-index-v1",
-                "metadata": json!({
+                "metadata": sats_option(Some(json!({
                     "sourceKind": "document",
                     "sourceKey": format!("document:{document_id}"),
                     "sourceVersion": document_version_key(document.version_number, &document.checksum),
                     "passageKey": passage_key,
                     "admission": admission_provenance,
-                }).to_string(),
+                }).to_string())),
             }]),
         )
         .await?;
@@ -1101,7 +1131,7 @@ async fn change_document_evidence(
             "record_ai_evidence_source_change",
             json!([organization_id, company_id, source_version_id, {
                 "change_kind": body.change_kind,
-                "replacement_version_id": null,
+                "replacement_version_id": sats_option::<u64>(None),
                 "reason": body.reason.trim(),
             }]),
         )
@@ -1166,6 +1196,49 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn document_version_params_encode_nested_sats_options() {
+        let document = CurrentDocument {
+            company_id: 2,
+            current_version_id: 21,
+            version_number: 3,
+            title: "Fixture".into(),
+            url: "/api/documents/blobs/object/fixture".into(),
+            checksum: "a".repeat(64),
+            mimetype: "text/plain".into(),
+            is_deleted: false,
+        };
+        let params = document_source_version_params(
+            &document,
+            "v3",
+            "fixture",
+            Some("https://example.com/fixture.txt"),
+            Some(20),
+        );
+        assert_eq!(
+            params,
+            json!({
+                "version": "v3",
+                "edition": { "some": "DMS version 3" },
+                "publication_date_micros": { "none": [] },
+                "uri": { "some": "https://example.com/fixture.txt" },
+                "retrieved_at_micros": { "none": [] },
+                "content_hash": { "some": document.checksum },
+                "snapshot_ref": { "some": "fixture" },
+                "origin": "user_provided",
+                "verification": "inspected",
+                "supersedes_version_id": { "some": 20 },
+            })
+        );
+
+        let first_version = document_source_version_params(&document, "v3", "fixture", None, None);
+        assert_eq!(first_version["uri"], json!({ "some": document.url }));
+        assert_eq!(
+            first_version["supersedes_version_id"],
+            json!({ "none": [] })
+        );
+    }
 
     #[tokio::test]
     async fn document_evidence_readback_is_scoped_to_one_document_and_company() {
