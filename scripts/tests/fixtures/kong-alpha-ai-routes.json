@@ -29,6 +29,7 @@
     "/api/ai/actions/draft",
     "/api/ai/evidence/inspect",
     "/api/ai/evidence/review-queue",
+    "/api/ai/evidence/rag-outcomes",
     "/api/ai/evidence/contributions",
     "/api/ai/evidence/decisions",
     "/api/ai/evidence/reviews",

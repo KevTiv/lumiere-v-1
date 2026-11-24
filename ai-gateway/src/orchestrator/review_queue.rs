@@ -111,7 +111,7 @@ impl QueueRows for StdbClient {
         if let Some(method) = method {
             predicate.push_str(&format!(" AND verification_method = '{}'", label(method)?));
         }
-        self.query_newest_rows("ai_evidence_claim", &predicate, limit)
+        self.query_newest_rows("ai_evidence_claim_read", &predicate, limit)
             .await
             .context("load claims for review")
     }
@@ -124,7 +124,7 @@ impl QueueRows for StdbClient {
         limit: usize,
     ) -> Result<Vec<Value>> {
         self.query_newest_rows(
-            "ai_evidence_decision",
+            "ai_evidence_decision_read",
             &format!(
                 "organization_id = {organization_id} \
                  AND company_id = {company_id} AND status = '{}'",
@@ -143,7 +143,7 @@ impl QueueRows for StdbClient {
         limit: usize,
     ) -> Result<Vec<Value>> {
         self.query_newest_rows(
-            "ai_artifact_component",
+            "ai_artifact_component_read",
             &format!(
                 "organization_id = {organization_id} \
                  AND company_id = {company_id} AND component_kind = 'workflow_step' \
@@ -609,6 +609,11 @@ mod tests {
 
     #[tokio::test]
     async fn native_queue_reads_use_supported_scoped_sql_for_every_list() {
+        let views = [
+            "ai_evidence_claim_read",
+            "ai_evidence_decision_read",
+            "ai_artifact_component_read",
+        ];
         let queries = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let captured = queries.clone();
         let app = axum::Router::new().route(
@@ -619,6 +624,9 @@ mod tests {
                     assert!(!sql.contains("ORDER BY"));
                     assert!(sql.contains("organization_id = 7 AND company_id = 3"));
                     assert!(sql.contains("LIMIT "));
+                    assert!(views
+                        .iter()
+                        .any(|view| sql.contains(&format!("FROM {view} "))));
                     captured.lock().unwrap().push(sql);
                     axum::Json(json!([{
                         "schema": {"elements": [{"name": {"some":"id"}, "algebraic_type":{"U64":[]}}]},
@@ -637,14 +645,10 @@ mod tests {
         );
         let queries = queries.lock().unwrap();
         assert_eq!(queries.len(), 7);
-        for table in [
-            "ai_evidence_claim",
-            "ai_evidence_decision",
-            "ai_artifact_component",
-        ] {
+        for view in views {
             assert!(queries
                 .iter()
-                .any(|sql| sql.contains(&format!("FROM {table} "))));
+                .any(|sql| sql.contains(&format!("FROM {view} "))));
         }
         server.abort();
     }
@@ -963,7 +967,7 @@ mod tests {
         let client = StdbClient::new(env("STDB_URL"), env("STDB_MODULE"), env("STDB_TOKEN"));
         let flagged = client
             .query_sql(
-                "SELECT * FROM ai_artifact_component WHERE component_kind = 'workflow_step' \
+                "SELECT * FROM ai_artifact_component_read WHERE component_kind = 'workflow_step' \
                  AND status = 'current' AND link_state = 'unresolved'",
             )
             .await

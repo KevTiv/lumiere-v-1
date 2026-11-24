@@ -307,7 +307,7 @@ pub async fn post_inspect(
             .ok_or_else(|| {
                 AppError::BadRequest("nodeKey is required for a workflow step".into())
             })?;
-        inspect_workflow_step(state.stdb.as_ref(), viewer, req.id, node_key).await
+        inspect_workflow_step(evidence_reader(&state)?, viewer, req.id, node_key).await
     } else {
         if req.node_key.is_some() {
             return Err(AppError::BadRequest(
@@ -320,7 +320,7 @@ pub async fn post_inspect(
                     .into(),
             )
         })?;
-        inspect(state.stdb.as_ref(), viewer, target).await
+        inspect(evidence_reader(&state)?, viewer, target).await
     };
     let inspection = inspected.map_err(|error| {
         // A record outside the caller's scope reads as absent, not forbidden.
@@ -335,6 +335,13 @@ pub async fn post_inspect(
         .headers_mut()
         .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
     Ok(response)
+}
+
+fn evidence_reader(state: &AppState) -> AppResult<&stdb_client::StdbClient> {
+    state
+        .spend_read_stdb
+        .as_deref()
+        .ok_or_else(|| AppError::Internal("evidence reader is not configured".into()))
 }
 
 fn row_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
@@ -748,10 +755,7 @@ async fn inspect_run(
     transcript.truncate(MAX_RUN_TRANSCRIPT_STEPS.min(remaining_rows));
     remaining_rows = remaining_rows.saturating_sub(transcript.len());
 
-    let reader = state
-        .spend_read_stdb
-        .as_deref()
-        .ok_or_else(|| AppError::Internal("evidence reader is not configured".into()))?;
+    let reader = evidence_reader(state)?;
     let contributions = reader
         .query_sql(&format!(
             "SELECT * FROM ai_evidence_contribution_read WHERE organization_id = {} AND company_id = {}",
@@ -1009,7 +1013,7 @@ pub async fn post_review_queue(
         company_id: actor.company_id,
         actor_identity: ActorIdentity::parse(&actor.identity),
     };
-    let queue = build_queue(state.stdb.as_ref(), viewer, DEFAULT_QUEUE_LIMIT)
+    let queue = build_queue(evidence_reader(&state)?, viewer, DEFAULT_QUEUE_LIMIT)
         .await
         .map_err(|error| AppError::Internal(error.to_string()))?;
     let mut response = Json(queue).into_response();

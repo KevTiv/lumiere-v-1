@@ -226,11 +226,12 @@ function assistantVerification(value: unknown): AssistantVerification | undefine
   if (value == null) return undefined
   if (typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid assistant verification")
   const raw = value as Partial<AssistantVerification>
+  const limitations = raw.limitations === undefined ? [] : raw.limitations
   if (!["admitted", "qualified", "requires_review", "blocked"].includes(raw.outcome ?? "")
     || !Array.isArray(raw.methods) || raw.methods.some(method => typeof method !== "string")
-    || !Array.isArray(raw.limitations) || raw.limitations.some(limit => typeof limit !== "string")
+    || !Array.isArray(limitations) || limitations.some(limit => typeof limit !== "string")
     || (raw.reason != null && typeof raw.reason !== "string")) throw new Error("Invalid assistant verification")
-  return { outcome: raw.outcome as AssistantVerification["outcome"], methods: raw.methods, limitations: raw.limitations, reason: raw.reason }
+  return { outcome: raw.outcome as AssistantVerification["outcome"], methods: raw.methods, limitations, reason: raw.reason }
 }
 
 /** Persist the verdict rather than treating a successful transport as an admitted answer.
