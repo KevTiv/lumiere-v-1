@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test"
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: ["ai-chat-layout.spec.ts", "sidebar-workspace-ui.spec.ts"],
+  testMatch: ["ai-chat-layout.spec.ts", "sidebar-workspace-ui.spec.ts", "local-runner-browser.spec.ts"],
   globalSetup: "./tests/ai-chat-layout-warmup.ts",
   workers: 1,
   timeout: 60_000,

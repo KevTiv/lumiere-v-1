@@ -1,6 +1,7 @@
 //! Promoted green skill: low-stock inventory scan.
 
 use axum::{extract::State, Json};
+use lumiere_auth_context::ActorContext;
 use serde::Deserialize;
 
 use crate::{
@@ -52,42 +53,52 @@ pub async fn post_scan(
         ));
     }
 
-    let identity_hex = req.identity_hex.unwrap_or_default();
-    ActorSkillAccess::new(
-        &state,
+    let actor = ActorContext::new(
+        req.identity_hex.as_deref().unwrap_or_default(),
+        &req.stdb_token,
         req.org_id,
         req.company_id,
-        &req.stdb_token,
-        &identity_hex,
-    )?
-    .require(LOW_STOCK_SKILL_KEY)
-    .await?;
+    )
+    .map_err(|_| crate::orchestrator::skill_access::SkillAccessError::Denied)?;
+    run_scoped_low_stock(
+        &state,
+        &actor,
+        LowStockInput {
+            threshold: req.threshold,
+            location_id: req.location_id,
+        },
+        req.org_privacy_policy,
+    )
+    .await
+    .map(Json)
+}
+
+/// Execute the promoted read with the acting user's current skill access and
+/// the organization privacy policy resolved by the trusted BFF.
+pub(super) async fn run_scoped_low_stock(
+    state: &AppState,
+    actor: &ActorContext,
+    input: LowStockInput,
+    org_privacy_policy: OrgPrivacyPolicy,
+) -> AppResult<LowStockScanResult> {
+    let org_id = actor.organization_id;
+    let company_id = actor.company_id;
+    ActorSkillAccess::new(state, org_id, company_id, &actor.token, &actor.identity)?
+        .require(LOW_STOCK_SKILL_KEY)
+        .await?;
     let manifest = load_builtin_execution_manifest(
         &state.stdb,
-        req.org_id,
-        req.company_id,
+        org_id,
+        company_id,
         LOW_STOCK_SKILL_KEY,
         LOW_STOCK_SKILL_VERSION,
     )
     .await
     .map_err(AppError::Forbidden)?;
     let policy = PolicyEngine::new(SkillRegistry::exact(manifest), ResourceRegistry::built_in())
-        .with_org_privacy(req.org_privacy_policy);
-    let stdb = state.stdb.with_token(req.stdb_token);
-
-    let result = scan_low_stock(
-        &stdb,
-        req.org_id,
-        &identity_hex,
-        LowStockInput {
-            threshold: req.threshold,
-            location_id: req.location_id,
-        },
-        req.company_id,
-        policy,
-    )
-    .await
-    .map_err(AppError::Internal)?;
-
-    Ok(Json(result))
+        .with_org_privacy(org_privacy_policy);
+    let stdb = state.stdb.with_token(actor.token.clone());
+    scan_low_stock(&stdb, org_id, &actor.identity, input, company_id, policy)
+        .await
+        .map_err(AppError::Internal)
 }
