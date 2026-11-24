@@ -490,7 +490,7 @@ services:
         strip_path: false
       - name: web-ai-alpha-evidence-workflows
         paths:
-          - '~/api/ai/evidence/(?:inspect|review-queue|contributions|decisions|reviews)$'
+          - '~/api/ai/evidence/(?:inspect|review-queue|rag-outcomes|contributions|decisions|reviews)$'
           - '~/api/ai/evidence/runs/export$'
         methods: [POST]
         regex_priority: 10

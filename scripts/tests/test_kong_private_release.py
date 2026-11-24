@@ -76,6 +76,7 @@ class PrivateReleaseTests(unittest.TestCase):
             ('GET', '/api/ai/inventory/low-stock'),
             ('GET', '/api/ai/evidence/runs/export'),
             ('GET', '/api/ai/evidence/review-queue'),
+            ('GET', '/api/ai/evidence/rag-outcomes'),
             ('GET', '/api/ai/evidence/runs/history'),
             ('GET', '/api/ai/skills/finance/finance_report_review'),
             ('POST', '/api/ai/skills/certifications/42'),

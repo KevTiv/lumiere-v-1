@@ -27,7 +27,12 @@ test("JSON and SSE retain a withheld verdict and persist a failed message with i
 })
 
 test("malformed answer verdicts cannot silently become completed chat messages", () => {
-  for (const verification of [{ outcome: "completed" }, { outcome: "admitted", methods: [], limitations: "none" }]) {
+  for (const verification of [
+    { outcome: "completed" },
+    { outcome: "admitted", methods: [], limitations: "none" },
+    { outcome: "admitted", methods: [], limitations: null },
+    { outcome: "admitted", methods: [], limitations: [1] },
+  ]) {
     assert.throws(() => assistantAnswerMetadata({ sources: [], verification }), /Invalid assistant verification/)
   }
   assert.deepEqual(assistantHistoryResult(undefined, null), { status: "completed", metadata: null })
@@ -151,11 +156,19 @@ test("an explicit record uses the verified JSON reply with its live citation", a
   assert.equal(assistantRagPath(true), "/api/ai/rag")
   assert.equal(assistantRagPath(false), "/api/ai/rag/stream")
   const source = { kind: "live", trust: "authoritative", entity_type: "product", entity_id: "4119", text_snippet: "SKU: ACCEPT-20261031-BIG-TILAPIA" }
-  const reply = await readAssistantReply(Response.json({ answer: source.text_snippet, sources: [source] }), "json", () => {
+  const verification = { outcome: "admitted", methods: ["deterministic"] }
+  const payload = { answer: source.text_snippet, sources: [source], verification }
+  const reply = await readAssistantReply(Response.json(payload), "json", () => {
     assert.fail("a complete JSON reply should not emit provisional deltas")
   })
   assert.equal(reply.answer, source.text_snippet)
   assert.deepEqual(reply.sources, [source])
+  assert.deepEqual(reply.verification, { ...verification, limitations: [], reason: undefined })
+  const stream = await readAssistantStream(
+    sse(`event: delta\ndata: ${payload.answer}\n\nevent: sources\ndata: ${JSON.stringify(payload)}\n\nevent: done\ndata: {}\n\n`),
+    raw => assistantAnswerMetadata(JSON.parse(raw)),
+  )
+  assert.deepEqual(stream.verification, reply.verification)
 })
 
 test("admitted answer text reaches chat before the stream completes", async () => {
