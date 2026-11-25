@@ -15,6 +15,7 @@ use crate::{
 use anyhow::{Context, Result};
 use axum::{extract::State, Json};
 use lumiere_auth_context::CapabilityGrantBounds;
+use lumiere_policy_core::ai_catalog::SHARED_CATALOG_READ;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -149,6 +150,63 @@ fn references(resources: &[ActivityReference]) -> Result<Vec<EntityRef>> {
 #[error("query embedding failed at {0}")]
 pub(super) struct QueryEmbeddingStage(pub &'static str);
 
+#[derive(Clone, Copy)]
+struct SearchGrants {
+    evidence: Option<CapabilityGrantBounds>,
+    catalog: Option<CapabilityGrantBounds>,
+}
+
+impl SearchGrants {
+    fn for_query(self, bytes: usize) -> Self {
+        let fits = |bounds: &CapabilityGrantBounds| bounds.max_bytes >= bytes as u64;
+        Self {
+            evidence: self.evidence.filter(fits),
+            catalog: self.catalog.filter(fits),
+        }
+    }
+}
+
+async fn search_grants(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org: u64,
+    company: u64,
+) -> AppResult<SearchGrants> {
+    let actor = lumiere_auth_context::ActorContext::new(
+        &actor.identity_hex,
+        &actor.stdb_token,
+        org,
+        company,
+    )?;
+    let grants = super::evidence::current_actor_grants(state, &actor).await?;
+    Ok(SearchGrants {
+        evidence: grants.bounds_for(&actor, RETRIEVE_CAPABILITY),
+        catalog: grants.bounds_for(&actor, SHARED_CATALOG_READ),
+    })
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum QueryPurpose {
+    Chat,
+    Erp,
+    Activity,
+    PrivateActivity,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DocumentSearch {
+    Skipped,
+    Ready,
+    Unavailable,
+}
+
+pub(crate) struct AdmittedQuery {
+    pub vector: Vec<f32>,
+    pub activity_ready: bool,
+    pub documents: DocumentSearch,
+    query_bytes: usize,
+}
+
 /// Reuses one settled vector for the same actor/model/query, including lost replies.
 /// Callers may reuse it across document and activity ANN, but still reauthorize hits.
 pub(crate) async fn admitted_query_vector(
@@ -157,36 +215,39 @@ pub(crate) async fn admitted_query_vector(
     org: u64,
     company: u64,
     query: &str,
-    _operation_ref: &str,
+    purpose: QueryPurpose,
     agent: Option<&ResolvedAgentConfig>,
-    generation_skill_key: Option<&str>,
-) -> Result<Vec<f32>> {
+) -> Result<AdmittedQuery> {
     if query.trim().is_empty() || query.len() > 8192 || !state.config.embedding_enabled() {
         return Err(QueryEmbeddingStage("configuration_or_input_bound").into());
     }
-    let bounds = super::evidence::require_scoped_capability_grant(
-        state,
-        &actor.identity_hex,
-        &actor.stdb_token,
-        org,
-        company,
-        RETRIEVE_CAPABILITY,
-    )
-    .await
-    .context(QueryEmbeddingStage("evidence_grant"))?;
-    if bounds.max_rows == 0 || bounds.max_bytes < query.len() as u64 {
-        return Err(QueryEmbeddingStage("evidence_grant_bound").into());
+    let grants = search_grants(state, actor, org, company)
+        .await
+        .context(QueryEmbeddingStage("search_authority"))?
+        .for_query(query.len());
+    let evidence_allowed = grants.evidence.is_some();
+    let catalog_allowed =
+        !matches!(purpose, QueryPurpose::PrivateActivity) && grants.catalog.is_some();
+    if !evidence_allowed && !catalog_allowed {
+        return Err(
+            anyhow::Error::new(AppError::Forbidden("AI search is not permitted".into()))
+                .context(QueryEmbeddingStage("search_grant")),
+        );
     }
-    state
-        .vector_store
-        .check_ready()
-        .await
-        .context(QueryEmbeddingStage("document_collection"))?;
-    state
-        .rig
-        .check_ready()
-        .await
-        .context(QueryEmbeddingStage("activity_collection"))?;
+    let activity_ready = state.rig.check_ready().await.is_ok();
+    let documents = if evidence_allowed && matches!(purpose, QueryPurpose::Chat | QueryPurpose::Erp)
+    {
+        if state.vector_store.check_ready().await.is_ok() {
+            DocumentSearch::Ready
+        } else {
+            DocumentSearch::Unavailable
+        }
+    } else {
+        DocumentSearch::Skipped
+    };
+    if !activity_ready && documents != DocumentSearch::Ready {
+        return Err(QueryEmbeddingStage("search_collections").into());
+    }
     let resolved;
     let agent = match agent {
         Some(agent) => agent,
@@ -229,6 +290,7 @@ pub(crate) async fn admitted_query_vector(
         unit: MeteredUnit::Tokens,
         allowance: u32::try_from(query.len() + 128)?,
     };
+    let generation_skill_key = matches!(purpose, QueryPurpose::Chat).then_some("rag_generation");
     if let Some(key) = generation_skill_key {
         crate::orchestrator::skill_access::ActorSkillAccess::new(
             state,
@@ -240,7 +302,7 @@ pub(crate) async fn admitted_query_vector(
         .require(key)
         .await?;
     }
-    execute_query_embedding(
+    let vector = execute_query_embedding(
         state.stdb.as_ref(),
         reader,
         state.providers.embedder.as_ref(),
@@ -248,7 +310,13 @@ pub(crate) async fn admitted_query_vector(
         query,
         generation_skill_key,
     )
-    .await
+    .await?;
+    Ok(AdmittedQuery {
+        vector,
+        activity_ready,
+        documents,
+        query_bytes: query.len(),
+    })
 }
 
 /// The paid embedding boundary; the skill key is supplied only by server code.
@@ -294,56 +362,34 @@ pub async fn post_search(
 ) -> AppResult<Json<ContextSearchResponse>> {
     let actor = ActorCredentials::new(req.stdb_token, req.identity_hex)
         .map_err(|_| AppError::Forbidden("authenticated actor required".into()))?;
-    state
-        .rig
-        .check_ready()
-        .await
-        .map_err(|_| unavailable("activity index unavailable"))?;
-    let vector = admitted_query_vector(
+    let query = admitted_query_vector(
         &state,
         &actor,
         req.org_id,
         req.company_id,
         &req.query,
-        "context_search",
-        None,
+        QueryPurpose::Activity,
         None,
     )
     .await
-    .map_err(|_| unavailable("query embedding admission unavailable"))?;
-    let bounds = super::evidence::require_scoped_capability_grant(
+    .map_err(activity_search_error)?;
+    let hits = search_authorized_activity(
         &state,
-        &actor.identity_hex,
-        &actor.stdb_token,
+        &actor,
         req.org_id,
         req.company_id,
-        RETRIEVE_CAPABILITY,
+        query,
+        req.top_k.unwrap_or(8).clamp(1, 50),
     )
-    .await?;
-    let top_k = req
-        .top_k
-        .unwrap_or(8)
-        .clamp(1, 50)
-        .min(bounds.max_rows as usize);
-    if top_k == 0 {
-        return Err(AppError::Forbidden(
-            "activity retrieval not permitted".into(),
-        ));
-    }
-    let mut hits =
-        search_authorized_activity(&state, &actor, req.org_id, req.company_id, vector, top_k)
-            .await
-            .map_err(|_| unavailable("authorized activity retrieval unavailable"))?;
-    while serde_json::to_vec(&hits)
-        .map_err(|_| unavailable("activity encoding failed"))?
-        .len() as u64
-        > bounds.max_bytes
-    {
-        if hits.pop().is_none() {
-            break;
-        }
-    }
+    .await
+    .map_err(activity_search_error)?;
     Ok(Json(ContextSearchResponse { hits }))
+}
+
+fn activity_search_error(error: anyhow::Error) -> AppError {
+    error
+        .downcast::<AppError>()
+        .unwrap_or_else(|_| unavailable("authorized activity retrieval unavailable"))
 }
 
 /// Search distinct company and actor lanes so unapproved shared candidates
@@ -354,17 +400,29 @@ pub(crate) async fn search_authorized_activity(
     actor: &ActorCredentials,
     org: u64,
     company: u64,
-    vector: Vec<f32>,
+    query: AdmittedQuery,
     top_k: usize,
 ) -> Result<Vec<ContextHit>> {
+    let grants = search_grants(state, actor, org, company)
+        .await?
+        .for_query(query.query_bytes);
+    let bounds = grants
+        .evidence
+        .or(grants.catalog)
+        .ok_or_else(|| AppError::Forbidden("AI search is not permitted".into()))?;
+    let top_k = top_k.min(bounds.max_rows.min(50) as usize);
+    let vector = query.vector;
+    let private_vector = grants.evidence.map(|_| vector.clone());
     let (private, shared) = tokio::try_join!(
-        state.rig.search_scope_with_vector(
-            org,
-            company,
-            &actor.identity_hex,
-            vector.clone(),
-            top_k
-        ),
+        async {
+            let Some(vector) = private_vector else {
+                return Ok(Vec::new());
+            };
+            state
+                .rig
+                .search_scope_with_vector(org, company, &actor.identity_hex, vector, top_k)
+                .await
+        },
         state
             .rig
             .search_company_reindex_with_vector(org, company, vector, top_k),
@@ -372,12 +430,9 @@ pub(crate) async fn search_authorized_activity(
     if private.is_empty() && shared.is_empty() {
         return Ok(Vec::new());
     }
-    let bounds = activity_read_bounds(state, actor, org, company).await?;
-    let private_count = (bounds.max_rows.min(50) as usize).min(private.len());
-    let shared_count = bounds.max_rows.min(50) as usize - private_count;
     let (mut private, shared) = tokio::try_join!(
-        resolve_private_activity_hits(state, actor, org, company, private, private_count),
-        reauthorize_company_hits(state, actor, org, company, shared, shared_count),
+        resolve_private_activity_hits(state, actor, org, company, private, top_k),
+        reauthorize_company_hits(state, actor, org, company, shared, top_k),
     )?;
     private.extend(shared);
     private.sort_by(|a, b| b.score.total_cmp(&a.score));
@@ -672,12 +727,16 @@ async fn require_catalog_owner(
     let owners = state
         .stdb
         .query_sql(&format!(
-            "SELECT id FROM role WHERE id = {role} AND organization_id = {org} \
-         AND name = 'owner' AND is_system = true AND is_active = true LIMIT 1"
+            "SELECT id, name, permissions FROM role WHERE id = {role} AND organization_id = {org} \
+         AND is_system = true AND is_active = true LIMIT 1"
         ))
         .await
         .map_err(|_| unavailable("catalog owner could not be verified"))?;
-    if !matches!(owners.as_slice(), [row] if catalog_id(row, "id", "id") == Some(role)) {
+    if !matches!(owners.as_slice(), [row] if catalog_id(row, "id", "id") == Some(role)
+    && row["name"].as_str().is_some_and(|name| name.eq_ignore_ascii_case("owner"))
+    && row["permissions"].as_array().is_some_and(|values| {
+        values.iter().any(|value| value.as_str() == Some("*:*"))
+    })) {
         return Err(denied());
     }
     Ok(())
@@ -818,6 +877,9 @@ async fn index_catalog(
                 ready += 1;
             }
         }
+        if ready > 0 {
+            indexing_authority(state, org, company).await?;
+        }
     }
     tracing::info!(
         stage = "catalog_index_batch",
@@ -931,15 +993,13 @@ pub(crate) async fn ingest_references(
     Ok(report)
 }
 
-async fn publish_activities(
+/// Read the same agent and model authority before offering or applying a batch.
+/// The native ledger still authorizes and reserves each actual embedding.
+async fn indexing_authority(
     state: &AppState,
-    actor: &ActorCredentials,
     org_id: u64,
     company_id: u64,
-    activities: Vec<Activity>,
-    report: &mut IngestReport,
-    shared_catalog: bool,
-) -> AppResult<()> {
+) -> AppResult<(ResolvedAgentConfig, &stdb_client::StdbClient)> {
     let agent = resolve_surface_agent(
         state.stdb.as_ref(),
         org_id,
@@ -953,10 +1013,29 @@ async fn publish_activities(
     .map_err(|_| unavailable("activity indexing agent not configured"))?;
     ensure_allowed_action(&agent, "embedding_index")
         .map_err(|_| AppError::Forbidden("activity indexing action not permitted".into()))?;
+    let model = state.config.embedding_model_name();
+    if !agent.provider.eq_ignore_ascii_case("mistral") || !agent.allowed_models.contains(&model) {
+        return Err(AppError::Forbidden(
+            "activity indexing model is not admitted for this company".into(),
+        ));
+    }
     let reader = state
         .spend_read_stdb
         .as_deref()
         .ok_or_else(|| unavailable("embedding spend reader unavailable"))?;
+    Ok((agent, reader))
+}
+
+async fn publish_activities(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org_id: u64,
+    company_id: u64,
+    activities: Vec<Activity>,
+    report: &mut IngestReport,
+    shared_catalog: bool,
+) -> AppResult<()> {
+    let (agent, reader) = indexing_authority(state, org_id, company_id).await?;
     for activity in activities {
         let entity_id: u64 = activity
             .entity_id
@@ -1084,6 +1163,66 @@ async fn publish_activities(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn catalog_only_authority_cannot_dispatch_private_activity_queries() {
+        use crate::routes::harness_descriptor::test_support;
+        use axum::{routing::get, Router};
+
+        let identity = "a".repeat(64);
+        let stub_identity = identity.clone();
+        let app = Router::new().route(
+            "/v1/ai/capability-grants",
+            get(move || {
+                let identity = stub_identity.clone();
+                async move {
+                    Json(serde_json::json!({
+                        "organizationId": 7, "companyId": 11, "actorIdentity": identity,
+                        "grants": [{"capabilityKey": SHARED_CATALOG_READ, "maxRows": 20, "maxBytes": 65536}]
+                    }))
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut config = test_support::config();
+        config.api_server_url = Some(format!("http://{}", listener.local_addr().unwrap()));
+        config.embedding_provider = "ollama".into();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let state = test_support::state(config).await;
+        let actor = ActorCredentials::new("member", identity).unwrap();
+        let grants = search_grants(&state, &actor, 7, 11).await.unwrap();
+        assert!(grants.catalog.is_some());
+        assert!(grants.evidence.is_none());
+        let result = admitted_query_vector(
+            &state,
+            &actor,
+            7,
+            11,
+            "Test product",
+            QueryPurpose::PrivateActivity,
+            None,
+        )
+        .await;
+        assert!(matches!(result, Err(ref error) if error.is::<AppError>()));
+        server.abort();
+    }
+
+    #[test]
+    fn catalog_bounds_do_not_widen_an_explicit_evidence_grant() {
+        let grants = SearchGrants {
+            evidence: Some(CapabilityGrantBounds {
+                max_rows: 2,
+                max_bytes: 4,
+            }),
+            catalog: Some(CapabilityGrantBounds {
+                max_rows: 20,
+                max_bytes: 1024,
+            }),
+        };
+        let grants = grants.for_query(5);
+        assert!(grants.catalog.is_some());
+        assert!(grants.evidence.is_none());
+    }
 
     #[test]
     fn catalog_preview_is_bound_to_the_owner_company_and_current_projection() {

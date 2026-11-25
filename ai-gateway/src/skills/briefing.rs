@@ -175,15 +175,13 @@ pub async fn collect_briefing_context(
     let top_k = req.top_k.unwrap_or(DEFAULT_TOP_K).clamp(1, MAX_TOP_K);
 
     let search_result = async {
-        state.rig.check_ready().await?;
-        let vector = crate::routes::context::admitted_query_vector(
+        let query = crate::routes::context::admitted_query_vector(
             state,
             actor,
             req.org_id,
             req.company_id,
             &query,
-            "daily_briefing",
-            None,
+            crate::routes::context::QueryPurpose::PrivateActivity,
             None,
         )
         .await?;
@@ -193,7 +191,7 @@ pub async fn collect_briefing_context(
                 req.org_id,
                 req.company_id,
                 &actor.identity_hex,
-                vector,
+                query.vector,
                 top_k,
             )
             .await

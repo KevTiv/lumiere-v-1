@@ -11,9 +11,12 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use lumiere_policy_core::ai_catalog::{
+    SHARED_CATALOG_FIELDS, SHARED_CATALOG_MAX_BYTES, SHARED_CATALOG_MAX_ROWS, SHARED_CATALOG_READ,
+};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use stdb_auth::identity_sql_literal;
+use stdb_auth::{has_resource_field_read_permission, identity_sql_literal, FieldAccessContext};
 
 use crate::{
     error::ApiError, query_exec::resolve_membership_company_id, session::resolve_api_session,
@@ -67,7 +70,7 @@ async fn get_capability_grants(
     let context = TrustedOperationContext::for_resource_read(&state, &session)?;
     context.require_current_placement(&state.organization_placements)?;
 
-    let effective = resolve_effective_capability_grants(
+    let mut effective = resolve_effective_capability_grants(
         &state,
         context.organization_id(),
         context.actor_identity(),
@@ -83,6 +86,7 @@ async fn get_capability_grants(
             "Capability grant company scope mismatch",
         )
         .await?;
+        apply_shared_catalog_access(context.field_access(), &mut effective);
         let policy_snapshot_hash = resolve_policy_snapshot_hash(
             &state,
             context.organization_id(),
@@ -111,6 +115,26 @@ async fn get_capability_grants(
         None
     };
     Ok(Json(capability_response(effective, authority)))
+}
+
+/// Shared ERP discovery follows ordinary read policy. Persisted evidence and
+/// private activity retain their own explicit grants.
+fn apply_shared_catalog_access(access: &FieldAccessContext, grants: &mut Vec<CapabilityGrant>) {
+    grants.retain(|grant| grant.capability_key != SHARED_CATALOG_READ);
+    if SHARED_CATALOG_FIELDS.iter().any(|(_, resource, field)| {
+        has_resource_field_read_permission(Some(access), resource, field)
+    }) {
+        let index =
+            grants.partition_point(|grant| grant.capability_key.as_str() < SHARED_CATALOG_READ);
+        grants.insert(
+            index,
+            CapabilityGrant {
+                capability_key: SHARED_CATALOG_READ.into(),
+                max_rows: SHARED_CATALOG_MAX_ROWS,
+                max_bytes: SHARED_CATALOG_MAX_BYTES,
+            },
+        );
+    }
 }
 
 fn capability_response(
@@ -550,6 +574,51 @@ mod tests {
         assert_eq!(
             bound["capabilityGrantsHash"],
             format!("sha256:{}", "a".repeat(64))
+        );
+    }
+
+    #[test]
+    fn native_catalog_read_does_not_require_or_create_an_evidence_grant() {
+        let mut access = FieldAccessContext {
+            organization_id: 7,
+            role_id: 2,
+            role_name: "member".into(),
+            is_superuser: false,
+            role_permissions: vec!["product:read".into()],
+            identity_hex: "a".repeat(64),
+            field_permissions: Vec::new(),
+            role_ids: vec![2],
+            org_permissions: Vec::new(),
+        };
+        let mut grants = Vec::new();
+        apply_shared_catalog_access(&access, &mut grants);
+        assert_eq!(grants.len(), 1);
+        assert_eq!(grants[0].capability_key, SHARED_CATALOG_READ);
+        assert_eq!(grants[0].max_rows, SHARED_CATALOG_MAX_ROWS);
+
+        access
+            .field_permissions
+            .push(stdb_auth::FieldPermissionLike {
+                id: None,
+                organization_id: Some(7),
+                role_id: Some(2),
+                resource: "product".into(),
+                action: "read".into(),
+                allowed_fields: vec!["id".into()],
+                subject_user_hex: None,
+                subject_role_id: Some(2),
+            });
+        apply_shared_catalog_access(&access, &mut grants);
+        assert!(
+            grants.is_empty(),
+            "a hidden display field cannot authorize discovery"
+        );
+
+        access.role_permissions = vec!["dms_document:read".into()];
+        apply_shared_catalog_access(&access, &mut grants);
+        assert!(
+            grants.is_empty(),
+            "a document role does not authorize ERP discovery"
         );
     }
 

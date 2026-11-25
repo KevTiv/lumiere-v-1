@@ -13,6 +13,7 @@ WORKDIR /app
 COPY .ci/contracts-module.wasm /app/spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm
 COPY spacetimedb/assets/ai-builtin-skills.json /app/spacetimedb/assets/ai-builtin-skills.json
 COPY spacetimedb/assets/ai-infrastructure-skills.json /app/spacetimedb/assets/ai-infrastructure-skills.json
+COPY spacetimedb/assets/ai-owner-capability-grants.json /app/spacetimedb/assets/ai-owner-capability-grants.json
 COPY scripts/railway-publish-spacetimedb.sh /app/scripts/railway-publish-spacetimedb.sh
 RUN test -s /app/spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm \
   && chmod 0755 /app/scripts/railway-publish-spacetimedb.sh
