@@ -7,7 +7,7 @@ const chromiumPath =
 // Production presentation components with synthetic ports; no live ERP effect claim.
 export default defineConfig({
   testDir: "./tests",
-  testMatch: "assistant-native-actions-ui.spec.ts",
+  testMatch: ["assistant-native-actions-ui.spec.ts", "assistant-webmcp-ui.spec.ts"],
   workers: 1,
   timeout: 60_000,
   expect: { timeout: 15_000 },

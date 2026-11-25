@@ -47,5 +47,13 @@ export default async function ModulesLayout({
     }
   }
 
-  return <ModulesShell firstOrgProfile={firstOrgProfile}>{children}</ModulesShell>
+  const webMcpPilotCompanyId = firstOrgProfile
+    ? process.env['LUMIERE_WEBMCP_PILOT_COMPANY_ID']?.trim()
+    : undefined
+
+  return (
+    <ModulesShell firstOrgProfile={firstOrgProfile} webMcpPilotCompanyId={webMcpPilotCompanyId}>
+      {children}
+    </ModulesShell>
+  )
 }
