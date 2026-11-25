@@ -4,11 +4,11 @@ use crate::{
     error::{AppError, AppResult},
     harness::{
         entity_registry::lookup_entity_spec, fetch_authorized_live_snapshots,
-        resolve_snapshot_candidates, ActorCredentials, EntityRef,
+        resolve_snapshot_candidates, ActorCredentials, EntityRef, LiveSnapshot,
     },
     non_llm_spend::{execute_metered, MeteredResult, MeteredScope, MeteredUnit},
     rig_agent::{
-        activity_fingerprint, activity_for_snapshot, company_reindex_activity, ContextHit,
+        activity_fingerprint, activity_for_snapshot, company_reindex_activity, Activity, ContextHit,
     },
     state::AppState,
 };
@@ -60,16 +60,35 @@ pub struct ActivityReference {
 pub struct ContextIngestRequest {
     pub org_id: u64,
     pub company_id: u64,
+    #[serde(default)]
     pub resources: Vec<ActivityReference>,
+    pub catalog: Option<CatalogIndexRequest>,
     pub stdb_token: String,
     pub identity_hex: String,
 }
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CatalogIndexRequest {
+    before: Option<String>,
+    preview: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct ContextIngestResponse {
     pub indexed: usize,
     pub unchanged: usize,
     pub withheld: usize,
     pub automatic_backfill: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub catalog: Option<CatalogIndexResult>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CatalogIndexResult {
+    pub ready: usize,
+    pub preview: Option<String>,
+    pub next_before: Option<String>,
 }
 fn unavailable(message: &str) -> AppError {
     AppError::Unavailable(message.into())
@@ -584,9 +603,17 @@ pub async fn post_ingest(
     State(state): State<AppState>,
     Json(req): Json<ContextIngestRequest>,
 ) -> AppResult<Json<ContextIngestResponse>> {
-    let refs = references(&req.resources).map_err(|e| AppError::BadRequest(e.to_string()))?;
     let actor = ActorCredentials::new(req.stdb_token, req.identity_hex)
         .map_err(|_| AppError::Forbidden("authenticated actor required".into()))?;
+    if let Some(catalog) = req.catalog {
+        if !req.resources.is_empty() {
+            return Err(AppError::BadRequest("choose one indexing mode".into()));
+        }
+        return index_catalog(&state, &actor, req.org_id, req.company_id, catalog)
+            .await
+            .map(Json);
+    }
+    let refs = references(&req.resources).map_err(|e| AppError::BadRequest(e.to_string()))?;
     tracing::info!(
         stage = "activity_index_started",
         org_id = req.org_id,
@@ -607,7 +634,213 @@ pub async fn post_ingest(
         unchanged: report.unchanged,
         withheld: report.withheld,
         automatic_backfill: false,
+        catalog: None,
     }))
+}
+
+async fn require_catalog_owner(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org: u64,
+    company: u64,
+) -> AppResult<()> {
+    let context = lumiere_auth_context::ActorContext::new(
+        &actor.identity_hex,
+        &actor.stdb_token,
+        org,
+        company,
+    )
+    .map_err(|_| AppError::Forbidden("authenticated actor required".into()))?;
+    // Verify the session and company with the same authority used by chat.
+    super::evidence::current_actor_grants(state, &context).await?;
+    let identity = stdb_auth::identity_sql_literal(&context.identity)
+        .map_err(|_| AppError::Forbidden("authenticated actor required".into()))?;
+    let rows = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT role_id FROM user_organization WHERE organization_id = {org} \
+         AND user_identity = {identity} AND is_active = true LIMIT 2"
+        ))
+        .await
+        .map_err(|_| unavailable("catalog owner could not be verified"))?;
+    let denied =
+        || AppError::Forbidden("only the tenant Owner can rebuild the shared catalog".into());
+    let [membership] = rows.as_slice() else {
+        return Err(denied());
+    };
+    let role = catalog_id(membership, "roleId", "role_id").ok_or_else(denied)?;
+    let owners = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT id FROM role WHERE id = {role} AND organization_id = {org} \
+         AND name = 'owner' AND is_system = true AND is_active = true LIMIT 1"
+        ))
+        .await
+        .map_err(|_| unavailable("catalog owner could not be verified"))?;
+    if !matches!(owners.as_slice(), [row] if catalog_id(row, "id", "id") == Some(role)) {
+        return Err(denied());
+    }
+    Ok(())
+}
+
+fn catalog_id(row: &serde_json::Value, camel: &str, snake: &str) -> Option<u64> {
+    let value = row.get(camel).or_else(|| row.get(snake))?;
+    value
+        .as_u64()
+        .or_else(|| value.as_str()?.parse().ok())
+        .filter(|id| *id > 0)
+}
+
+fn catalog_activity(org: u64, company: u64, snapshot: &LiveSnapshot) -> Option<Activity> {
+    company_reindex_activity(
+        org,
+        company,
+        &snapshot.entity_type,
+        snapshot.entity_id,
+        &snapshot.row,
+    )
+}
+
+fn catalog_preview_key(
+    org: u64,
+    company: u64,
+    actor: &str,
+    model: &str,
+    ids: &[u64],
+    activities: &[Activity],
+) -> String {
+    let mut parts = ids.iter().map(u64::to_string).collect::<Vec<_>>();
+    parts.extend(activities.iter().map(activity_fingerprint));
+    request_digest(
+        "catalog-preview",
+        org,
+        company,
+        actor,
+        model,
+        parts.join("\n").as_bytes(),
+    )
+}
+
+async fn index_catalog(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org: u64,
+    company: u64,
+    request: CatalogIndexRequest,
+) -> AppResult<ContextIngestResponse> {
+    require_catalog_owner(state, actor, org, company).await?;
+    if !state.config.embedding_enabled() {
+        return Err(unavailable("embeddings disabled"));
+    }
+    let before = request
+        .before
+        .as_deref()
+        .map(|raw| {
+            raw.parse::<u64>()
+                .ok()
+                .filter(|id| *id > 0 && id.to_string() == raw)
+                .ok_or_else(|| AppError::BadRequest("invalid catalog cursor".into()))
+        })
+        .transpose()?;
+    // Products are organization-owned in the canonical ERP resource registry.
+    // Every field projection still goes through the company-scoped actor read.
+    let mut ids = state
+        .stdb
+        .query_newest_ids(
+            "product",
+            &format!("organization_id = {org}"),
+            before,
+            MAX_REFERENCES + 1,
+        )
+        .await
+        .map_err(|_| unavailable("catalog records could not be listed"))?;
+    let has_more = ids.len() > MAX_REFERENCES;
+    ids.truncate(MAX_REFERENCES);
+    let refs = ids
+        .iter()
+        .map(|id| EntityRef {
+            entity_type: "product".into(),
+            entity_id: *id,
+            priority: 1.0,
+        })
+        .collect::<Vec<_>>();
+    let snapshots = if refs.is_empty() {
+        Vec::new()
+    } else {
+        fetch_authorized_live_snapshots(state, actor, org, company, &refs)
+            .await
+            .map_err(|_| unavailable("authorized catalog projection unavailable"))?
+    };
+    let mut activities = snapshots
+        .iter()
+        .filter_map(|row| catalog_activity(org, company, row))
+        .collect::<Vec<_>>();
+    activities.sort_unstable_by(|a, b| a.entity_id.cmp(&b.entity_id));
+    let key = catalog_preview_key(
+        org,
+        company,
+        &actor.identity_hex,
+        &state.config.embedding_model_name(),
+        &ids,
+        &activities,
+    );
+    if request
+        .preview
+        .as_ref()
+        .is_some_and(|preview| preview != &key)
+    {
+        return Err(AppError::BadRequest(
+            "catalog changed; preview this batch again".into(),
+        ));
+    }
+    state
+        .rig
+        .check_ready()
+        .await
+        .map_err(|_| unavailable("activity index unavailable"))?;
+    let mut report = IngestReport {
+        withheld: ids.len().saturating_sub(activities.len()),
+        ..Default::default()
+    };
+    let mut ready = 0;
+    if request.preview.is_some() && !activities.is_empty() {
+        publish_activities(state, actor, org, company, activities, &mut report, true).await?;
+    } else {
+        for activity in activities {
+            if state
+                .rig
+                .activity_is_current(&activity)
+                .await
+                .map_err(|_| unavailable("activity index read unavailable"))?
+            {
+                report.unchanged += 1;
+            } else {
+                ready += 1;
+            }
+        }
+    }
+    tracing::info!(
+        stage = "catalog_index_batch",
+        org_id = org,
+        company_id = company,
+        preview = request.preview.is_none(),
+        ready,
+        indexed = report.indexed,
+        unchanged = report.unchanged,
+        withheld = report.withheld,
+        has_more
+    );
+    Ok(ContextIngestResponse {
+        indexed: report.indexed,
+        unchanged: report.unchanged,
+        withheld: report.withheld,
+        automatic_backfill: false,
+        catalog: Some(CatalogIndexResult {
+            ready,
+            preview: request.preview.is_none().then_some(key),
+            next_before: ids.last().filter(|_| has_more).map(u64::to_string),
+        }),
+    })
 }
 
 /// The one indexing path, shared by the explicit endpoint and the queue drain:
@@ -685,6 +918,28 @@ pub(crate) async fn ingest_references(
             );
         }
     }
+    publish_activities(
+        state,
+        actor,
+        org_id,
+        company_id,
+        activities,
+        &mut report,
+        false,
+    )
+    .await?;
+    Ok(report)
+}
+
+async fn publish_activities(
+    state: &AppState,
+    actor: &ActorCredentials,
+    org_id: u64,
+    company_id: u64,
+    activities: Vec<Activity>,
+    report: &mut IngestReport,
+    shared_catalog: bool,
+) -> AppResult<()> {
     let agent = resolve_surface_agent(
         state.stdb.as_ref(),
         org_id,
@@ -716,6 +971,9 @@ pub(crate) async fn ingest_references(
             report.record(&activity.entity_type, entity_id, IngestOutcome::Unchanged);
             continue;
         }
+        if shared_catalog {
+            require_catalog_owner(state, actor, org_id, company_id).await?;
+        }
         let model = state.config.embedding_model_name();
         let scope = MeteredScope {
             organization_id: org_id,
@@ -724,7 +982,11 @@ pub(crate) async fn ingest_references(
             run_id: 0,
             actor_identity: actor.identity_hex.clone(),
             request_key: request_digest(
-                "index",
+                if shared_catalog {
+                    "catalog-index"
+                } else {
+                    "index"
+                },
                 org_id,
                 company_id,
                 &actor.identity_hex,
@@ -756,15 +1018,19 @@ pub(crate) async fn ingest_references(
         })
         .await
         .map_err(|_| unavailable("activity embedding admission or settlement unavailable"))?;
-        super::evidence::require_scoped_capability_grant(
-            state,
-            &actor.identity_hex,
-            &actor.stdb_token,
-            org_id,
-            company_id,
-            INDEX_CAPABILITY,
-        )
-        .await?;
+        if shared_catalog {
+            require_catalog_owner(state, actor, org_id, company_id).await?;
+        } else {
+            super::evidence::require_scoped_capability_grant(
+                state,
+                &actor.identity_hex,
+                &actor.stdb_token,
+                org_id,
+                company_id,
+                INDEX_CAPABILITY,
+            )
+            .await?;
+        }
         let current = fetch_authorized_live_snapshots(
             state,
             actor,
@@ -781,21 +1047,27 @@ pub(crate) async fn ingest_references(
         let unchanged = current
             .first()
             .and_then(|snapshot| {
-                activity_for_snapshot(org_id, company_id, &actor.identity_hex, snapshot).ok()
+                if shared_catalog {
+                    catalog_activity(org_id, company_id, snapshot)
+                } else {
+                    activity_for_snapshot(org_id, company_id, &actor.identity_hex, snapshot).ok()
+                }
             })
             .is_some_and(|fresh| activity_fingerprint(&fresh) == activity_fingerprint(&activity));
         if !unchanged {
-            state
-                .rig
-                .delete_reference(
-                    org_id,
-                    company_id,
-                    &actor.identity_hex,
-                    &activity.entity_type,
-                    &activity.entity_id,
-                )
-                .await
-                .map_err(|_| unavailable("activity index removal unavailable"))?;
+            if !shared_catalog {
+                state
+                    .rig
+                    .delete_reference(
+                        org_id,
+                        company_id,
+                        &actor.identity_hex,
+                        &activity.entity_type,
+                        &activity.entity_id,
+                    )
+                    .await
+                    .map_err(|_| unavailable("activity index removal unavailable"))?;
+            }
             report.record(&activity.entity_type, entity_id, IngestOutcome::Withheld);
             continue;
         }
@@ -807,11 +1079,46 @@ pub(crate) async fn ingest_references(
             .map_err(|_| unavailable("activity publication unavailable"))?;
         report.record(&kind, entity_id, IngestOutcome::Indexed);
     }
-    Ok(report)
+    Ok(())
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn catalog_preview_is_bound_to_the_owner_company_and_current_projection() {
+        let ids = [17, 5];
+        let mut product = LiveSnapshot {
+            entity_type: "product".into(),
+            entity_id: 17,
+            label: "Product #17".into(),
+            snapshot_at: "now".into(),
+            relations: Vec::new(),
+            row: serde_json::json!({"name":"Test chicken", "private_note":"never embed"}),
+        };
+        let activity = catalog_activity(4097, 4097, &product).unwrap();
+        assert!(!activity.text.contains("never embed"));
+        let activities = [activity];
+        let key = catalog_preview_key(4097, 4097, "owner-a", "embed", &ids, &activities);
+        assert_ne!(
+            key,
+            catalog_preview_key(4097, 4098, "owner-a", "embed", &ids, &activities)
+        );
+        assert_ne!(
+            key,
+            catalog_preview_key(4097, 4097, "owner-b", "embed", &ids, &activities)
+        );
+        assert_ne!(
+            key,
+            catalog_preview_key(4097, 4097, "owner-a", "embed", &[17], &activities)
+        );
+        product.row = serde_json::json!({"name":"Renamed"});
+        let updated = catalog_activity(4097, 4097, &product).unwrap();
+        assert_ne!(
+            key,
+            catalog_preview_key(4097, 4097, "owner-a", "embed", &ids, &[updated])
+        );
+    }
 
     #[test]
     fn shared_candidate_requires_the_readers_current_exact_projection() {

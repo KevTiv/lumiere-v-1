@@ -75,6 +75,25 @@ pub(crate) async fn select_ids(
 }
 
 impl StdbClient {
+    /// Read IDs in descending order with an exclusive cursor.
+    pub async fn query_newest_ids(
+        &self,
+        table: &'static str,
+        predicate: &str,
+        before: Option<u64>,
+        limit: usize,
+    ) -> Result<Vec<u64>> {
+        ensure!(
+            !table.is_empty()
+                && table
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'_'),
+            "invalid table name"
+        );
+        let high = before.map_or(u64::MAX, |id| id.saturating_sub(1));
+        select_ids(self, table, predicate, 1, high, limit, true).await
+    }
+
     /// Newest rows matching a server-owned SQL predicate, without ORDER BY.
     /// Callers must validate/interpolate selectors as they do for `query_sql`;
     /// this helper does not grant access or accept browser-authored SQL.
@@ -84,14 +103,7 @@ impl StdbClient {
         predicate: &str,
         limit: usize,
     ) -> Result<Vec<Value>> {
-        ensure!(
-            !table.is_empty()
-                && table
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b == b'_'),
-            "invalid table name"
-        );
-        let ids = select_ids(self, table, predicate, 1, u64::MAX, limit, true).await?;
+        let ids = self.query_newest_ids(table, predicate, None, limit).await?;
         let bounded = self.with_query_limits(PAYLOAD_BATCH_ROWS, 1024 * 1024)?;
         let mut result = Vec::with_capacity(ids.len());
         for batch in ids.chunks(PAYLOAD_BATCH_ROWS) {

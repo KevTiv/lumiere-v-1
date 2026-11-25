@@ -3,16 +3,16 @@ import { type NextRequest, NextResponse } from 'next/server'
 
 import { fetchAiGateway } from '@/lib/ai-gateway-server'
 import { requireAiRouteContext, validateCompanyScope } from '../../_lib/route-helpers'
-import { parseActivityIngestBody, type ActivityIngestBody } from './body'
+import { parseContextIngestBody } from './body'
 
 export async function POST(request: NextRequest) {
   const contextResult = await requireAiRouteContext(request)
   if (!contextResult.ok) return contextResult.response
   const { orgId, session } = contextResult.context
 
-  let body: ActivityIngestBody
+  let body: ReturnType<typeof parseContextIngestBody>
   try {
-    body = parseActivityIngestBody(await request.json())
+    body = parseContextIngestBody(await request.json())
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Invalid request' }, { status: 400 })
   }
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         org_id: orgId,
         company_id: body.companyId,
-        resources: body.resources,
+        ...('catalog' in body ? { catalog: body.catalog } : { resources: body.resources }),
         stdb_token: session.stdbToken,
         identity_hex: session.identityHex,
       }),
