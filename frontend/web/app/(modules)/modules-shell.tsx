@@ -4,7 +4,7 @@ import { WorkspaceProfileProvider, useWorkspaceProfile } from "@lumiere/ui/lib/w
 import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
 import { getProductSurface, isFirstOrgRouteAdmitted } from "@lumiere/ui/lib/product-surface-catalog"
 import { Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { Button } from "@lumiere/ui/components/button"
 import { toast } from "sonner"
@@ -12,7 +12,7 @@ import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { ModuleActivity } from "../../components/module-activity"
 import { NavigationEditorContext } from "@lumiere/ui/forms/navigation-guard-context"
 import { AssistantNativeFormProvider, useAssistantNativeFormController, useAssistantNativeForms } from "@lumiere/ui/components/assistant-native-form-provider"
-import { ALPHA_ASSISTANT_CAPABILITIES, ASSISTANT_PAGE_MODULES, assistantActionHref, decodeAssistantAction, getAssistantCapability, isAssistantPageAction, resolveAssistantActionRequest, type AssistantAction, type AssistantActionScope } from "@lumiere/query-hooks/assistant-actions"
+import { ALPHA_ASSISTANT_CAPABILITIES, ASSISTANT_PAGE_MODULES, getAssistantCapability, isAssistantPageAction, resolveAssistantActionRequest, type AssistantAction, type AssistantActionScope } from "@lumiere/query-hooks/assistant-actions"
 import { ModulePageCompositionProvider, useModulePageComposition } from "@/lib/module-page-composition"
 import {
   DashboardSidebar,
@@ -108,7 +108,15 @@ import type { ImportPreparation } from "@/lib/import-preparation"
 type SelectionImportHandler = (files: File[], preparation: ImportPreparation) => Promise<void>
 
 import { recordPageHref } from "@/lib/record-page-href"
-import { parseStoredImportTaskIds, scopedImportTaskStatuses } from "@/lib/import-task-status"
+import { parseStoredImportTaskIds, readChatImportTaskReviewHref, scopedImportTaskStatuses } from "@/lib/import-task-status"
+import {
+  canPresentDestination,
+  dispatchAssistantPresentation,
+  dispatchPresentationDestination,
+  type DispatchPresentationDestination,
+} from "@/lib/assistant-presentation-dispatcher"
+import { apiFetch } from "@/lib/api-fetch"
+import { useAssistantWebMcp } from "@/lib/use-assistant-webmcp"
 import { assistantPresentationReply, modelNativeChatActions, parseNativeChatActions, withNativeActionsMetadata } from "@/lib/assistant-native-actions"
 import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
 import {
@@ -219,6 +227,7 @@ function withStoredTurnMetadata(turnId: string, earlierContextUnavailable: boole
 function ErpAiChatPanel({
   firstOrgProfile,
   farmOperationsEnabled,
+  webMcpPilotCompanyId,
   onRevealWorkspace,
   onRevealChat,
   selectionDraft,
@@ -227,6 +236,7 @@ function ErpAiChatPanel({
 }: Omit<ComponentProps<typeof AIChatPanel>, "onSendMessage" | "context"> & {
   firstOrgProfile: boolean
   farmOperationsEnabled: boolean
+  webMcpPilotCompanyId?: string
   onRevealWorkspace: () => void
   onRevealChat: () => void
   selectionDraft: DocumentSelectionDraft | null
@@ -239,6 +249,7 @@ function ErpAiChatPanel({
   const orgReady = organizationId != null && organizationId > 0
   const operatingCompanyId = useOperatingCompanyId(organizationId)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const workspaceProfile = useWorkspaceProfile()
   const { checkPermission, permissionsReady, isAdmin } = useRBAC()
   const skillSetupCapability = getProductSurface("ai-skills").requiredCapability
@@ -346,8 +357,26 @@ function ErpAiChatPanel({
   revealWorkspace.current = onRevealWorkspace
   const activeScope = useRef<string | null>(null)
   activeScope.current = actorHistoryScope
-  const currentActionContext = useRef({ actionScope, actorHistoryScope, checkPermission, permissionsReady, allowedActionModules, pageComposition })
-  currentActionContext.current = { actionScope, actorHistoryScope, checkPermission, permissionsReady, allowedActionModules, pageComposition }
+  const currentActionContext = useRef({ actionScope, scopeKey: actorHistoryScope, checkPermission, permissionsReady, allowedModules: allowedActionModules, pageComposition })
+  currentActionContext.current = { actionScope, scopeKey: actorHistoryScope, checkPermission, permissionsReady, allowedModules: allowedActionModules, pageComposition }
+  const dispatchDestination = useCallback<DispatchPresentationDestination>((destination, options) =>
+    dispatchPresentationDestination(destination, {
+      current: () => currentActionContext.current,
+      navigationGuard,
+      push: href => router.push(href),
+      reveal: () => revealWorkspace.current(),
+      readImportHref: (scope, taskId, signal) => readChatImportTaskReviewHref(apiFetch, {
+        organizationId: Number(scope.organizationId),
+        companyId: Number(scope.companyId),
+      }, taskId, signal),
+    }, options?.signal), [navigationGuard, router])
+  useAssistantWebMcp({
+    scopeKey: webMcpPilotCompanyId === String(operatingCompanyId) ? actorHistoryScope : null,
+    routeKey: JSON.stringify([route, searchParams.toString(), activeTab]),
+    canOpenInventoryRecord: canPresentDestination(currentActionContext.current, "open_inventory_record"),
+    canOpenImportReview: canPresentDestination(currentActionContext.current, "open_import_review"),
+    dispatch: dispatchDestination,
+  })
   const contextOptions = useMemo(
     () => aiWorkspaceScopesForProfile(workspaceProfile, farmOperationsEnabled),
     [workspaceProfile, farmOperationsEnabled],
@@ -602,63 +631,18 @@ function ErpAiChatPanel({
         if (!operatingCompanyId || (draft.companyId != null && draft.companyId !== operatingCompanyId)) throw new Error("Draft scope changed")
         return fetchAiActionDraftPayload(orgId, operatingCompanyId, draft.draftId)
       },
-      onNativeAction: (proposed: AssistantAction, messageId: string): Promise<ChatNativeActionOutcome> => {
-        const validate = () => {
-          const current = currentActionContext.current
-          if (currentHistoryScope.current !== historyScope) return { outcome: "scope_changed" } as const
-          const action = current.actionScope && decodeAssistantAction(proposed, current.actionScope, { allowedModules: current.allowedActionModules, allowedPageModules: ASSISTANT_PAGE_MODULES })
-          const capability = action && getAssistantCapability(action.capabilityKey)
-          if (!action || !capability || !current.actorHistoryScope) return { outcome: "scope_changed" } as const
-          if (!current.permissionsReady || !current.checkPermission(capability.permission.resource, capability.permission.action).allowed) return { outcome: "denied" } as const
-          return { action, capability, scopeKey: current.actorHistoryScope } as const
-        }
-        const initial = validate()
-        if (initial.outcome) return Promise.resolve(initial.outcome)
-        const currentPage = currentActionContext.current.pageComposition?.page
-        const changesPage = !isAssistantPageAction(initial.action) || currentPage?.moduleId !== initial.capability.module || Boolean(initial.action.pageId && currentPage?.pageId !== initial.action.pageId)
-        return new Promise((resolve, reject) => {
-          const open = () => {
-            try {
-              const current = validate()
-              if (current.outcome) { resolve(current.outcome); return }
-              const { action, capability, scopeKey } = current
-              const href = assistantActionHref(action)
-              if (!href) { resolve("unavailable"); return }
-              if (isAssistantPageAction(action)) {
-                const composer = currentActionContext.current.pageComposition
-                if (!composer) { resolve("unavailable"); return }
-                const origin = action.kind === "add_widget" && !action.widgetKey && sessionKey && /^[1-9][0-9]{0,19}$/.test(messageId)
-                  ? { sessionKey, messageId } : undefined
-                const result = composer.requestPage({
-                  requestId: crypto.randomUUID(), scopeKey, moduleId: capability.module, pageId: action.pageId,
-                  kind: action.kind, widgetKey: action.widgetKey, prompt: action.prompt, origin,
-                  onPresentationOutcome: resolve,
-                })
-                if (result !== "pending") { resolve(result); return }
-                // Preserve the current date range and filters when opening this page's editor.
-                if (composer.page?.moduleId !== capability.module || (action.pageId && composer.page.pageId !== action.pageId)) router.push(href)
-              } else {
-                const farmEventForm = capability.module === "farm-batches" && action.kind === "prepare_workflow"
-                if (action.kind === "open_form" || farmEventForm) {
-                  if (!nativeForms || !capability.tab) { resolve("unavailable"); return }
-                  const result = nativeForms.requestForm({
-                    requestId: crypto.randomUUID(), scopeKey, moduleId: capability.module, tabId: capability.tab,
-                    prompt: action.prompt,
-                    targetRecordId: farmEventForm ? action.recordId : undefined,
-                    onPresentationOutcome: resolve,
-                  })
-                  if (result !== "pending") { resolve(result); return }
-                }
-                router.push(href)
-                if (action.kind !== "open_form" && !farmEventForm) resolve("requested")
-              }
-              revealWorkspace.current()
-            } catch (error) { reject(error) }
-          }
-          if (changesPage && navigationGuard) navigationGuard.proceed(open, () => resolve("cancelled"))
-          else open()
-        })
-      },
+      onNativeAction: (proposed: AssistantAction, messageId: string): Promise<ChatNativeActionOutcome> =>
+        dispatchAssistantPresentation(proposed, {
+          current: () => currentActionContext.current,
+          nativeForms,
+          navigationGuard,
+          pageComposition: () => currentActionContext.current.pageComposition,
+          push: router.push,
+          reveal: () => revealWorkspace.current(),
+        }, {
+          isCurrent: () => currentHistoryScope.current === historyScope,
+          origin: sessionKey && /^[1-9][0-9]{0,19}$/.test(messageId) ? { sessionKey, messageId } : undefined,
+        }),
       onOpenDocumentSource: (source: ChatMessageSourceRef) => {
         if (!actorHistoryScope || source.source_kind !== "managed_document_selection" ||
           !source.entity_id || !source.source_version ||
@@ -1341,11 +1325,14 @@ function HeaderNotificationBell({ organizationId }: { organizationId: number }) 
 function ModulesContent({
   children,
   firstOrgProfile,
+  webMcpPilotCompanyId,
 }: {
   children: ReactNode
   firstOrgProfile: boolean
+  webMcpPilotCompanyId?: string
 }) {
   const [workspaceTool, setWorkspaceTool] = useState<"assistant" | "notebook" | null>(null)
+  const [signingOut, setSigningOut] = useState(false)
   const [isAIChatDocked, setIsAIChatDocked] = useState(true)
   const [isNotebookDocked, setIsNotebookDocked] = useState(true)
   const [isJournalOpen, setIsJournalOpen] = useState(false)
@@ -1391,6 +1378,10 @@ function ModulesContent({
   const openNotebook = () => setWorkspaceTool("notebook")
   const closeTool = (tool: "assistant" | "notebook") =>
     setWorkspaceTool((current) => current === tool ? null : current)
+  const signOut = useCallback(() => {
+    setSigningOut(true)
+    return performSignOut()
+  }, [])
 
   const [selectionDraft, setSelectionDraft] = useState<DocumentSelectionDraft | null>(null)
   const selectionImport = useRef<SelectionImportHandler | undefined>(undefined)
@@ -1437,7 +1428,7 @@ function ModulesContent({
       <DashboardWorkspace
         dockRequest={dockRequest}
         onOpenSearch={() => setIsSearchOpen(true)}
-        onSignOut={performSignOut}
+        onSignOut={signOut}
         userProfile={currentUserProfile.data}
         headerTools={<ModuleActivity />}
         notifications={orgReady && messagesVisible ? <HeaderNotificationBell organizationId={orgId} /> : null}
@@ -1458,6 +1449,7 @@ function ModulesContent({
             <ErpAiChatPanel
               firstOrgProfile={firstOrgProfile}
               farmOperationsEnabled={farmOperationsEnabled}
+              webMcpPilotCompanyId={signingOut ? undefined : webMcpPilotCompanyId}
               selectionDraft={selectionDraft}
               registerSelectionImport={registerSelectionImport}
               open={isAIChatOpen}
@@ -1515,9 +1507,11 @@ function ModulesContent({
 export default function ModulesShell({
   children,
   firstOrgProfile = false,
+  webMcpPilotCompanyId,
 }: {
   children: ReactNode
   firstOrgProfile?: boolean
+  webMcpPilotCompanyId?: string
 }) {
   return (
     <WorkspaceProfileProvider value="finance-alpha">
@@ -1527,7 +1521,9 @@ export default function ModulesShell({
           <ChatterUploaderProvider value={useWebChatterUploader}>
             <EntityCurrencyBoundary>
               <ModulePageCompositionProvider>
-              <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
+              <ModulesContent firstOrgProfile={firstOrgProfile} webMcpPilotCompanyId={webMcpPilotCompanyId}>
+                {children}
+              </ModulesContent>
               </ModulePageCompositionProvider>
             </EntityCurrencyBoundary>
           </ChatterUploaderProvider>

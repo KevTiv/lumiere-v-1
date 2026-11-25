@@ -10,6 +10,8 @@ import { Button, buttonVariants } from "../components/button"
 import { useCurrencyFormat } from "../lib/currency-context"
 import { AssistantActionCard } from "./assistant-action-card"
 import {
+  importTaskHasResults,
+  importTaskNextView,
   importTaskStatusIsCurrent,
   IMPORT_TASK_STATUS_MAX_AGE_MS,
   type ChatImportPostingStatus,
@@ -28,25 +30,7 @@ export function formatImportAmount(amount: string, locale?: string) {
   return formatted + (decimals ? separator + decimals : "")
 }
 
-export function importTaskNextView({
-  preparationStatus,
-  sourceRows,
-  hasPreparedProposal,
-  hasResults,
-}: Pick<ChatImportTaskStatus, "preparationStatus" | "sourceRows"> & {
-  hasPreparedProposal: boolean
-  hasResults: boolean
-}): "sources" | "decisions" | "preview" | "results" {
-  if (preparationStatus === "inspection_ready") {
-    return sourceRows.total ? "decisions" : "sources"
-  }
-  if (preparationStatus !== "needs_review") return "sources"
-  if (hasResults) return "results"
-  if (hasPreparedProposal || (sourceRows.ready > 0 && sourceRows.held === 0)) {
-    return "preview"
-  }
-  return sourceRows.total ? "decisions" : "sources"
-}
+export { importTaskNextView } from "../lib/import-task-status"
 
 export function ImportTaskStatusCard({
   status,
@@ -94,10 +78,7 @@ export function ImportTaskStatusCard({
   const hasBatchLink = recordIds.length > 0 && recordIds.length <= 200
   const reviewed = status.reviewedRecords
   const verifiedRecords = reviewed?.counts.verified ?? 0
-  const hasResults =
-    verifiedRecords > 0 ||
-    status.proposals.some((proposal) => proposal.status !== "prepared") ||
-    nativeResults.length > 0
+  const hasResults = importTaskHasResults(status)
   const view = importTaskNextView({
     ...status,
     hasPreparedProposal: status.proposals.some(

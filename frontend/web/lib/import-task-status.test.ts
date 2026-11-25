@@ -4,6 +4,7 @@ import {
   parseImportTaskStatuses,
   parseStoredImportTaskIds,
   readChatImportPostingStatus,
+  readChatImportTaskReviewHref,
   readChatImportTaskStatus,
   scopedImportTaskStatuses,
 } from "./import-task-status"
@@ -249,6 +250,36 @@ test("a saved import selector reopens 11 journal drafts without the model or any
   const laterConversation = { ...conversation, conversationKey: "another" }
   const reopened = await readChatImportTaskStatus(fetcher, laterConversation, taskId)
   assert.deepEqual(reopened.proposals, restored.proposals)
+  const resultLink = new URL(
+    await readChatImportTaskReviewHref(fetcher, conversation, taskId),
+    "https://lumiere.test",
+  )
+  assert.equal(resultLink.searchParams.get("importView"), "results")
+  const pendingReview = {
+    id: "72",
+    title: "Pending source review",
+    targetEntity: "source_observation",
+    total: 1,
+    pending: 1,
+    confirmed: 0,
+    excluded: 0,
+  }
+  const pendingLink = new URL(
+    await readChatImportTaskReviewHref(
+      async (url) => {
+        assert.equal(url, `/api/import-tasks/${taskId}?companyId=3`)
+        return Response.json({ ...task, reviews: [...task.reviews, pendingReview] })
+      },
+      conversation,
+      taskId,
+    ),
+    "https://lumiere.test",
+  )
+  assert.equal(pendingLink.pathname, "/settings")
+  assert.equal(pendingLink.searchParams.get("importCompany"), "3")
+  assert.equal(pendingLink.searchParams.get("importTask"), taskId)
+  assert.equal(pendingLink.searchParams.get("importView"), "decisions")
+  assert.equal(pendingLink.searchParams.get("sourceReview"), "72")
   await assert.rejects(
     readChatImportTaskStatus(
       fetcher,
