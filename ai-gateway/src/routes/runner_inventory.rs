@@ -334,16 +334,16 @@ pub(crate) fn candidate_evidence_id(candidate: &str) -> AppResult<Uuid> {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct VerifiedLowStockReadback {
-    answer: String,
-    evidence_id: String,
-    sources: Vec<LowStockSource>,
+    pub(super) answer: String,
+    pub(super) evidence_id: String,
+    pub(super) sources: Vec<LowStockSource>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct LowStockSource {
-    product_id: String,
-    label: String,
+pub(super) struct LowStockSource {
+    pub(super) product_id: String,
+    pub(super) label: String,
     href: String,
 }
 
@@ -384,7 +384,7 @@ fn render_verified_readback(
     current: &[LowStockItem],
 ) -> AppResult<VerifiedLowStockReadback> {
     if current != evidence.items {
-        return Err(AppError::Unavailable(
+        return Err(AppError::BadRequest(
             "inventory changed during the turn; read it again".into(),
         ));
     }
@@ -583,9 +583,34 @@ pub(super) mod tests {
 
     pub(in crate::routes) async fn inventory_fixture(
     ) -> (AppState, Fixture, tokio::task::JoinHandle<()>) {
+        inventory_fixture_with_stock_failures(Arc::new(AtomicUsize::new(0))).await
+    }
+
+    pub(in crate::routes) async fn inventory_fixture_with_stock_failures(
+        stock_failures: Arc<AtomicUsize>,
+    ) -> (AppState, Fixture, tokio::task::JoinHandle<()>) {
         let revoked = Arc::new(AtomicBool::new(false));
         let inventory_reads = Arc::new(AtomicUsize::new(0));
         let app = Router::new()
+            .route(
+                "/v1/ai/capability-grants",
+                get(
+                    |State((revoked, _)): State<Fixture>, headers: HeaderMap| async move {
+                        assert_eq!(headers["authorization"], "Bearer test-session");
+                        if revoked.load(Ordering::Relaxed) {
+                            return StatusCode::FORBIDDEN.into_response();
+                        }
+                        Json(json!({
+                            "organizationId": 7, "companyId": 9, "actorIdentity": "a".repeat(64),
+                            "grants": [{
+                                "capabilityKey": crate::routes::run_lifecycle::LIFECYCLE_CAPABILITY,
+                                "maxRows": 100, "maxBytes": 65536
+                            }]
+                        }))
+                        .into_response()
+                    },
+                ),
+            )
             .route(
                 "/v1/ai/skills/access/check",
                 get(
@@ -624,8 +649,20 @@ pub(super) mod tests {
             .route(
                 "/v1/database/tenant_module/sql",
                 post(
-                    |State((_, reads)): State<Fixture>, headers: HeaderMap, sql: String| async move {
-                        fake_inventory_sql(&reads, &headers, &sql)
+                    move |State((_, reads)): State<Fixture>, headers: HeaderMap, sql: String| {
+                        let stock_failures = stock_failures.clone();
+                        async move {
+                            if sql.contains(" FROM stock_quant WHERE ")
+                                && stock_failures
+                                    .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |left| {
+                                        left.checked_sub(1)
+                                    })
+                                    .is_ok()
+                            {
+                                return StatusCode::SERVICE_UNAVAILABLE.into_response();
+                            }
+                            fake_inventory_sql(&reads, &headers, &sql).into_response()
+                        }
                     },
                 ),
             )

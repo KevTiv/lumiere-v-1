@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { localRunnerOperation } from '../app/api/ai/local-runner/contract'
+import { assistantHistoryResult, localRunnerAnswer } from './assistant-turn'
 import { followRunnerTurn, issueRunnerPairing, startRunnerTurn } from './local-runner-client'
 import { applyRunnerEvent, initialRunnerActivity, parseRunnerDiscovery, type RunnerEvent } from './local-runner-state'
 
@@ -79,6 +80,25 @@ test('raw candidates and non-contiguous events fail closed', async (t) => {
   await assert.rejects(followRunnerTurn(companyId, run, signal(), state => published.push(state)), /Invalid local runner activity/)
   assert.equal(published.length, 0)
   assert.throws(() => applyRunnerEvent(initialRunnerActivity(), { seq: 2, type: 'verified', answer: 'unconfirmed' }), /sequence/)
+})
+
+test('verified runner evidence survives the same stream parser and history projection used by chat', async (t) => {
+  const evidenceId = 'c63c8d76-2bce-41f4-a72c-55015f356b82'
+  const source = {
+    kind: 'live', trust: 'authoritative', entity_type: 'product', entity_id: '42',
+    text_snippet: 'Product #42 has 4 units on hand.',
+  }
+  const reply = { seq: 1, type: 'verified', answer: 'Low stock verified.', run_id: 41, sources: [source] }
+  const fetch = t.mock.method(globalThis, 'fetch', async () => sse({ ...reply, evidence_id: evidenceId }))
+  const result = await followRunnerTurn(companyId, run, signal(), () => {})
+  assert.equal(result?.type, 'verified')
+  const answer = localRunnerAnswer(result)
+  assert.deepEqual(answer.sources, [source])
+  assert.equal(answer.run_id, 41)
+  assert.equal(JSON.parse(assistantHistoryResult(answer.verification, null).metadata!).answerVerification.evidenceId, evidenceId)
+
+  fetch.mock.mockImplementation(async () => sse({ ...reply, evidence_id: 'invalid' }))
+  await assert.rejects(followRunnerTurn(companyId, run, signal(), () => {}), /Invalid local runner activity/)
 })
 
 test('runtime permissions and scoped usage update without an ERP effect or an invented charge', () => {

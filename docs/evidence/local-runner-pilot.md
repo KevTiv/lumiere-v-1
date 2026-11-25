@@ -6,7 +6,7 @@ The first device pilot uses the existing signed-in Codex CLI on macOS and compan
 
 | Scenario | Automated proof | Live acceptance |
 | --- | --- | --- |
-| Device pairing | Browser authentication, single-use and expired codes, identity and company scoping, and revocation require the gateway route fixture. | Pair the macOS runner as the intended user. Verify the device and its CLI readiness are visible to that user. |
+| Device pairing | Gateway fixtures cover single-use pairing, exact company and lifecycle grants, and device revocation. | Pair the macOS runner as the intended user. Verify the device and its CLI readiness are visible to that user. |
 | Duplicate dispatch and reconnect | Host replay sends the same attempt after a connection break, asserts one adapter launch, and verifies replay starts after the acknowledged event. | Reload web chat mid-turn. The original run is still visible and finishes once. |
 | Cancellation and failure | Host replay exercises repeated cancellation and a CLI abort. Gateway persistence checks distinguish an acknowledged stop from an unknown outcome. | Cancel an active turn from chat and check that it settles as cancelled. |
 | Billing and provider state | Replay checks that unknown economic usage remains unknown. Provider adapters verify normalized usage and auth states against their fixtures. | Confirm the provider account that actually funds the turn, record any reported usage scope, and exercise the signed-out or limited path using an authorized test account. |
@@ -19,6 +19,20 @@ The first device pilot uses the existing signed-in Codex CLI on macOS and compan
 From the repository root, run `node --test 'local-runner/**/*.test.mjs' scripts/tests/local-runner-replay.test.mjs`. This exercises recorded provider protocols and synthetic sessions through the native host. It uses no account or ERP data.
 
 The web regressions run with `pnpm --dir frontend/web test:unit`. From `frontend/web` with Playwright dependencies installed, use `pnpm exec playwright test --config playwright.ai-chat.config.ts local-runner-browser.spec.ts` for the browser proof. It drives the production local runner client and controls against intercepted gateway responses and checks that page reload reattaches without a second dispatch.
+
+The Rust gateway fixture runs with `cargo test --locked -p ai-gateway --bin gateway routes::runner_dispatch::tests`. It drives enrollment, dispatch, scoped MCP inventory read, candidate admission, controller restart, and browser SSE replay against a shared transactional test store. Revocation and cancellation must withhold any late candidate.
+
+## Gateway configuration
+
+The deployment enables native routes after a released contract includes the runner reducers and the configured SpaceTimeDB identity has an active `ai_local_runner` service binding for the pilot organization. Use one gateway instance for this pilot so the browser API and the device WebSocket reach the same dispatch process. Configure these values on that instance.
+
+| Setting | Pilot value |
+| --- | --- |
+| `LUMIERE_AI_LOCAL_RUNNER_ORIGIN` | HTTPS origin the signed-in native runner can reach. |
+| `LUMIERE_AI_LOCAL_RUNNER_PILOT_COMPANY_ID` | The single authorized pilot company, initially `4097`. |
+| `LUMIERE_AI_LOCAL_RUNNER_STDB_TOKEN` | Dedicated service credential for the runner store. |
+
+A missing or unrecognized contract keeps discovery disabled. After a gateway restart, the authenticated browser can reattach and rebind its acting credential to the durable attempt. The native socket reconnects and replays unacknowledged events for the same attempt. A turn whose dispatch is uncertain must settle before the operator starts a new one.
 
 ## Release evidence
 

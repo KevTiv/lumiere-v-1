@@ -84,7 +84,8 @@ import { useErpAiSelectionReporter } from "@lumiere/query-hooks/erp-ai-selection
 import { performSignOut } from "@/lib/auth-sign-out"
 import {
   assistantAnswer, assistantHistoryResult, assistantRagPath, assistantSetupFailure, coordinateAssistantTurn,
-  parseStoredAssistantRecovery, readAssistantReply, withAssistantRecoveryMetadata, type AssistantTurnFailure,
+  localRunnerAnswer, parseStoredAssistantRecovery, readAssistantReply, withAssistantRecoveryMetadata,
+  type AssistantTurnFailure,
 } from "@/lib/assistant-turn"
 import { i18n } from "@lumiere/i18n"
 import { discoverRunners, followRunnerTurn, startRunnerTurn } from "@/lib/local-runner-client"
@@ -783,12 +784,8 @@ function ErpAiChatPanel({
           throw new Error(final.message)
         }
         if (final?.type !== "verified") throw new Error("The local runner result is unconfirmed.")
-        const answer = assistantAnswer({ answer: final.answer, sources: final.sources ?? [], run_id: final.run_id,
-          verification: { outcome: "admitted", methods: ["runner_evidence"], limitations: [] } })
+        const answer = localRunnerAnswer(final)
         const sources = answer.sources.map(mapRagSourceToChatSource)
-        if (sources.some(source => source.url && !/^https?:\/\//i.test(source.url))) {
-          throw new Error("A local runner source could not be verified.")
-        }
         if (verifiedActivity) showActivity(verifiedActivity, false)
         // History is append-only. Once saving begins, reattach must not replay the exchange.
         clearReceipt()

@@ -1,5 +1,6 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import { isScopedMcp } from '../protocol/v1.mjs'
 import { AdapterError } from './stdio.mjs'
 
 const MAX_TEXT = 32_768
@@ -59,20 +60,6 @@ export function candidate(text) {
   return text?.trim() ? { type: 'candidate', text } : failure('answer_missing')
 }
 
-function validMcp(toolScope) {
-  if (!toolScope) return true
-  try {
-    const endpoint = new URL(toolScope.url)
-    const loopback = ['127.0.0.1', '[::1]', 'localhost'].includes(endpoint.hostname)
-    const supported = endpoint.protocol === 'https:' || (endpoint.protocol === 'http:' && loopback)
-    return supported && !endpoint.username && !endpoint.password && !endpoint.hash &&
-      typeof toolScope.token === 'string' &&
-      /^[a-zA-Z0-9._~+\/=-]{1,4096}$/.test(toolScope.token)
-  } catch {
-    return false
-  }
-}
-
 export function makeAdapter({ provider, executable, workDirectory, spawn, isolated, protocol }) {
   const attempts = new Map()
   const cwd = join(workDirectory, provider)
@@ -108,7 +95,7 @@ export function makeAdapter({ provider, executable, workDirectory, spawn, isolat
       if (!executable) return emit(failure('not_installed'))
       if (!isolated) return emit(failure('isolation_required'))
       if (lease.provider !== provider || typeof lease.prompt !== 'string' || !lease.prompt.trim() ||
-          lease.prompt.length > MAX_TEXT || !validMcp(lease.mcp) ||
+          lease.prompt.length > MAX_TEXT || (lease.mcp !== undefined && !isScopedMcp(lease.mcp)) ||
           (lease.nativeSessionId !== undefined && !wireId(lease.nativeSessionId))) {
         return emit(failure('invalid_lease'))
       }

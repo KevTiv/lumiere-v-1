@@ -15,6 +15,7 @@ const usageMetrics = {
 export const devicePaths = Object.freeze({
   claim: '/v1/local-runner/pair/claim',
   connect: '/v1/local-runner/device',
+  mcp: '/v1/local-runner/mcp',
 })
 
 const identityKeys = ['runId', 'attemptId', 'leaseId']
@@ -43,8 +44,9 @@ function optional(value, validate) {
   return value === undefined || validate(value)
 }
 
-function scopedMcp(value) {
-  if (!shape(value, ['url', 'token']) || !string(value.url, 2048) || !string(value.token, 4096)) {
+export function isScopedMcp(value) {
+  if (!shape(value, ['url', 'token']) || !string(value.url, 2048) ||
+      typeof value.token !== 'string' || !/^[A-Za-z0-9._~+\/=-]{1,4096}$/.test(value.token)) {
     return false
   }
 
@@ -141,7 +143,7 @@ export function isGatewayMessage(value) {
       return attemptMessage(value, ['provider', 'prompt', 'nativeSessionId', 'mcp']) &&
         providers.includes(value.provider) && string(value.prompt, 32768) &&
         optional(value.nativeSessionId, session => string(session, 512)) &&
-        optional(value.mcp, scopedMcp)
+        optional(value.mcp, isScopedMcp)
     case 'ack':
       return attemptMessage(value, ['seq']) && integer(value.seq)
     case 'cancel':

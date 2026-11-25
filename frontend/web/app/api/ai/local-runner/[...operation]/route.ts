@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { fetchAiGatewayResponse } from '@/lib/ai-gateway-server'
+import { resolveAiPrivacyPolicy } from '../../_lib/ai-privacy-policy'
 import { parseJsonBody, requireAiRouteContext, validateCompanyScope } from '../../_lib/route-helpers'
 import { localRunnerOperation } from '../contract'
 
@@ -43,6 +44,9 @@ async function forward(request: NextRequest, method: 'GET' | 'POST', segments: s
 
   try {
     const expected = operation.stream ? 'text/event-stream' : 'application/json'
+    const body = operation.path === 'runs' && method === 'POST'
+      ? { ...operation.body, orgPrivacyPolicy: resolveAiPrivacyPolicy(session.fieldAccess) }
+      : operation.body
     const gateway = await fetchAiGatewayResponse(`/v1/internal/local-runner/${operation.path}`, {
       method,
       headers: {
@@ -52,7 +56,7 @@ async function forward(request: NextRequest, method: 'GET' | 'POST', segments: s
         'x-lumiere-actor-identity': session.identityHex,
         'x-lumiere-actor-token': session.stdbToken,
       },
-      body: operation.body ? JSON.stringify(operation.body) : undefined,
+      body: body ? JSON.stringify(body) : undefined,
       signal: request.signal,
     })
     if (!gateway.ok) {

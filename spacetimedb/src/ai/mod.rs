@@ -28,6 +28,7 @@ pub mod evidence_source;
 pub mod intelligence;
 pub mod knowledge_entry;
 pub mod knowledge_promotion;
+pub mod local_runner;
 pub mod metered_spend;
 pub mod model_configuration;
 pub mod owner_configuration;

@@ -91,6 +91,7 @@ dependencies = [
  "stdb-config",
  "thiserror 1.0.69",
  "tokio",
+ "tokio-tungstenite 0.24.0",
  "tower-http 0.5.2",
  "tracing",
  "tracing-subscriber",

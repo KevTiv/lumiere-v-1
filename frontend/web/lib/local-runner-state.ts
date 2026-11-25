@@ -47,10 +47,16 @@ type Tool = { type: 'tool'; toolId: string; name: string; status: 'running' | 'c
 type Permission = { type: 'permission'; permissionId: string; label: string }
 type PermissionResolved = { type: 'permissionResolved'; permissionId: string }
 type Usage = { type: 'usage'; scope: keyof typeof usageMetrics; metric: string; value: number; estimated?: boolean }
-type Verified = { type: 'verified'; answer: string; sources?: unknown[]; run_id?: number }
+export type RunnerVerifiedReply = {
+  type: 'verified'
+  answer: string
+  sources?: unknown[]
+  run_id?: number
+  evidence_id?: string
+}
 type Failed = { type: 'failed'; code: string; message: string }
 type Cancelled = { type: 'cancelled' }
-export type RunnerEvent = { seq: number } & (Activity | Tool | Permission | PermissionResolved | Usage | Verified | Failed | Cancelled)
+export type RunnerEvent = { seq: number } & (Activity | Tool | Permission | PermissionResolved | Usage | RunnerVerifiedReply | Failed | Cancelled)
 
 export interface RunnerActivity {
   cursor: number
@@ -59,12 +65,16 @@ export interface RunnerActivity {
   tools: Tool[]
   permissions: Permission[]
   usage: Usage[]
-  terminal?: Verified | Failed | Cancelled
+  terminal?: RunnerVerifiedReply | Failed | Cancelled
 }
 
 const maxTrackedItems = 12
 const maxFrameSize = 256 * 1024
 const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$/
+
+export function isRunnerEvidenceId(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value)
+}
 
 function record(value: unknown) {
   return value != null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined
@@ -185,9 +195,16 @@ function parseRunnerEvent(raw: string): RunnerEvent | undefined {
         || (estimated !== undefined && typeof estimated !== 'boolean')) return
       return { seq, type, scope, metric, value: amount, estimated }
     }
-    case 'verified': if (nonempty(value.answer, 32768) && (value.sources === undefined || (Array.isArray(value.sources) && value.sources.length <= 100))) {
-      return { seq, type, answer: value.answer, sources: value.sources, ...(integer(value.run_id) && { run_id: value.run_id }) }
-    } return
+    case 'verified': {
+      if (!nonempty(value.answer, 32768)
+        || (value.sources !== undefined && (!Array.isArray(value.sources) || value.sources.length > 100))
+        || (value.run_id !== undefined && !integer(value.run_id))
+        || (value.evidence_id !== undefined && !isRunnerEvidenceId(value.evidence_id))) return
+      return {
+        seq, type, answer: value.answer, sources: value.sources,
+        run_id: value.run_id, evidence_id: value.evidence_id,
+      }
+    }
     case 'failed': if (isRunnerId(value.code) && nonempty(value.message, 512)) return { seq, type, code: value.code, message: value.message }; return
     case 'cancelled': return { seq, type }
   }

@@ -24,4 +24,6 @@ Production discovery is disabled in this implementation. Release requires durabl
 
 Version 1 is defined in [v1.mjs](./protocol/v1.mjs). The native socket sends the device ID and device bearer in separate headers. Pairing exchanges the code for that credential once. The server binds dispatch to its stored device, actor and company. A dispatch carries the run ID, attempt ID and lease ID. Those IDs fence subsequent events, permission replies and cancellation. The server acknowledges a sequence only after persisting the corresponding event.
 
+For a scoped MCP dispatch, the runner sends the attempt credential only to `/v1/local-runner/mcp` on the paired gateway. Codex receives the credential through its process environment and uses the `inventory_low_stock` tool with a structured evidence candidate.
+
 The provider's final text is sent as a candidate for server verification. The browser consumes a separate event projection and receives an answer only after server admission.

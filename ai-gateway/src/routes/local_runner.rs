@@ -19,7 +19,7 @@ use crate::{
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DevicesQuery {
-    company_id: u64,
+    pub(super) company_id: u64,
 }
 
 #[derive(Serialize)]
@@ -39,8 +39,15 @@ pub async fn get_devices(
     }
     let actor = ActorContext::from_headers(&headers)?;
     actor.require_company(query.company_id)?;
+    disabled_discovery(&state, &actor).await
+}
+
+pub(super) async fn disabled_discovery(
+    state: &AppState,
+    actor: &ActorContext,
+) -> AppResult<Response> {
     require_scoped_capability_grant(
-        &state,
+        state,
         &actor.identity,
         &actor.token,
         actor.organization_id,
