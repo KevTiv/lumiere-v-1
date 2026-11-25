@@ -120,11 +120,9 @@ fn projected_activity(
 /// The only ERP fields eligible for shared embeddings. Readers must see the
 /// exact same display field on their own current authorized record read.
 pub(crate) fn company_reindex_field(kind: &str) -> Option<&'static str> {
-    match kind {
-        "sale_order" => Some("reference"),
-        "purchase_order" | "account_move" | "project_task" | "product" | "contact" => Some("name"),
-        _ => None,
-    }
+    lumiere_policy_core::ai_catalog::SHARED_CATALOG_FIELDS
+        .iter()
+        .find_map(|(record_kind, _, field)| (*record_kind == kind).then_some(*field))
 }
 
 pub(crate) fn company_reindex_activity(

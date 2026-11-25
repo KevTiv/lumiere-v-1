@@ -13,7 +13,7 @@ use crate::accounting::fiscal_periods::{
     accounting_ownership_backfill_issue, accounting_ownership_backfill_run,
     AccountingOwnershipBackfillIssue, AccountingOwnershipBackfillRun,
 };
-use crate::ai::capability_grants::provision_owner_ai_capability_grants;
+use crate::ai::capability_grants::{is_system_owner, provision_owner_ai_capability_grants};
 use crate::core::auth::{password_reset_token, user_credential};
 use crate::core::cold_tier_identity::cold_tier_service_identity;
 use crate::core::country_pack::{country_pack_definition, country_pack_tax_rule};
@@ -963,12 +963,7 @@ pub(crate) fn backfill_owner_ai_capability_grants_for_organization(
         .filter(|candidate| {
             candidate.organization_id == organization_id
                 && candidate.is_active
-                && candidate.is_system
-                && candidate.name.eq_ignore_ascii_case("owner")
-                && candidate
-                    .permissions
-                    .iter()
-                    .any(|permission| permission == "*:*")
+                && is_system_owner(candidate)
         })
         .min_by_key(|candidate| candidate.id)
         .ok_or_else(|| "active system owner role with full access was not found".to_string())?;

@@ -487,11 +487,7 @@ async fn extract_with_ocr(
             "documentId":document_id,"versionId":document.current_version_id,"sourceSha256":document.checksum,
             "contentType":content_type,"contentBase64":BASE64.encode(bytes),"pageAllowance":pages,"language":language}))
         .send().await.map_err(|_|ApiError::Unavailable("document OCR is unavailable".into()))?;
-    if !response.status().is_success() {
-        return Err(ApiError::Unavailable(
-            "document OCR admission or extraction is unavailable".into(),
-        ));
-    }
+    require_ocr_success(response.status())?;
     if response
         .content_length()
         .is_some_and(|size| size > MAX_OCR_RESPONSE_BYTES as u64)
@@ -518,6 +514,19 @@ async fn extract_with_ocr(
     let (text, provenance) =
         validate_ocr_result(result, organization_id, document_id, document, pages)?;
     Ok((text, "mistral_ocr".into(), Some(provenance)))
+}
+
+fn require_ocr_success(status: reqwest::StatusCode) -> Result<(), ApiError> {
+    match status {
+        status if status.is_success() => Ok(()),
+        reqwest::StatusCode::FORBIDDEN => Err(ApiError::Forbidden(
+            "OCR is not permitted for this document. Check OCR access and the company AI profile."
+                .into(),
+        )),
+        _ => Err(ApiError::Unavailable(
+            "document OCR admission or extraction is unavailable".into(),
+        )),
+    }
 }
 
 async fn ingest_document(
@@ -1386,6 +1395,20 @@ mod tests {
             }],
         };
         (document, result)
+    }
+
+    #[test]
+    fn ocr_denial_is_distinct_from_provider_failure() {
+        use reqwest::StatusCode;
+        assert!(require_ocr_success(StatusCode::OK).is_ok());
+        assert!(matches!(
+            require_ocr_success(StatusCode::FORBIDDEN),
+            Err(ApiError::Forbidden(_))
+        ));
+        assert!(matches!(
+            require_ocr_success(StatusCode::SERVICE_UNAVAILABLE),
+            Err(ApiError::Unavailable(_))
+        ));
     }
 
     #[test]

@@ -1,0 +1,9 @@
+[
+  { "capability_key": "ai.context.index", "max_rows": 8, "max_bytes": 65536 },
+  { "capability_key": "ai.document.ocr", "max_rows": 20, "max_bytes": 10485760 },
+  { "capability_key": "ai.evidence.inspect", "max_rows": 100, "max_bytes": 1048576 },
+  { "capability_key": "ai.evidence.retrieve", "max_rows": 20, "max_bytes": 65536 },
+  { "capability_key": "ai.harness.descriptor.read", "max_rows": 1, "max_bytes": 65536 },
+  { "capability_key": "ai.knowledge.retrieve", "max_rows": 20, "max_bytes": 65536 },
+  { "capability_key": "ai.run.lifecycle", "max_rows": 100, "max_bytes": 1048576 }
+]

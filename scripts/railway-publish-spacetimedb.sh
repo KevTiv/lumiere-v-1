@@ -8,6 +8,7 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 catalog_file="${script_dir}/../spacetimedb/assets/ai-builtin-skills.json"
 infrastructure_file="${script_dir}/../spacetimedb/assets/ai-infrastructure-skills.json"
+owner_defaults_file="${script_dir}/../spacetimedb/assets/ai-owner-capability-grants.json"
 
 umask 077
 config_file="$(mktemp)"
@@ -80,14 +81,53 @@ missing_builtin_skills() {
     '
 }
 
+owner_defaults_missing() {
+  local roles grants
+  roles="$(spacetime --config-path "${config_file}" sql "${STDB_MODULE}" \
+    'SELECT organization_id, id, name, permissions FROM role WHERE organization_id > 0 AND is_system = true AND is_active = true' \
+    --server "${STDB_HOST}" --format json -y --no-config)" || return
+  grants="$(spacetime --config-path "${config_file}" sql "${STDB_MODULE}" \
+    'SELECT organization_id, role_id, capability_key FROM ai_capability_role_grant' \
+    --server "${STDB_HOST}" --format json -y --no-config)" || return
+
+  # Same canonical owner selection as backfill_owner_ai_capability_grants_for_organization.
+  # Presence is sufficient, including deliberately disabled or narrowed grants.
+  printf '%s\n' "${roles}" "${grants}" | jq -es --slurpfile defaults "${owner_defaults_file}" '
+    def rows:
+      [.. | objects | select(has("rows")) | .rows]
+      | if length == 1 and (.[0] | type) == "array" then .[0]
+        else error("expected one Owner grant reconciliation query result") end;
+    ($defaults[0] | map(.capability_key)) as $keys
+    | if ($keys | length == 0 or length != (unique | length))
+      then error("invalid Owner AI capability defaults") else . end
+    | (.[0] | rows | map(select((.[2] | ascii_downcase) == "owner" and (.[3] | index("*:*") != null)))
+      | group_by(.[0]) | map(min_by(.[1] | tonumber))) as $owners
+    | (.[1] | rows | INDEX(tojson)) as $grants
+    | [$owners[] as $owner | $keys[] as $key
+      | [$owner[0], $owner[1], $key] | select($grants[tojson] == null)]
+    | length
+  '
+}
+
 missing="$(missing_builtin_skills)"
-if [[ -n "${missing}" ]]; then
-  echo "Registering missing built-in AI skills: ${missing}"
+owner_missing="$(owner_defaults_missing)"
+if [[ -n "${missing}" || "${owner_missing}" != 0 ]]; then
+  if [[ -n "${missing}" ]]; then
+    echo "Registering missing built-in AI skills: ${missing}"
+  fi
+  if [[ "${owner_missing}" != 0 ]]; then
+    echo "Reconciling ${owner_missing} missing Owner AI capability grants"
+  fi
   spacetime --config-path "${config_file}" call "${STDB_MODULE}" apply_global_migrations \
     --server "${STDB_HOST}" -y --no-config
   missing="$(missing_builtin_skills)"
   if [[ -n "${missing}" ]]; then
     echo "Built-in AI skills still missing after migration: ${missing}" >&2
+    exit 1
+  fi
+  owner_missing="$(owner_defaults_missing)"
+  if [[ "${owner_missing}" != 0 ]]; then
+    echo "Owner AI capability grants still missing after migration: ${owner_missing}" >&2
     exit 1
   fi
 fi

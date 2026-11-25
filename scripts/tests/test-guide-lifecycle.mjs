@@ -69,8 +69,10 @@ test('internal evidence setup matches fixed native contracts without admitting h
 })
 
 test('inspection fixture grants only the bounded read-only owner baseline capability', async () => {
-  const source = await readFile(new URL('../../spacetimedb/src/ai/capability_grants.rs', import.meta.url), 'utf8')
-  assert.match(source, /capability_key: "ai\.evidence\.inspect",\s*max_rows: 100,\s*max_bytes: 1024 \* 1024,/)
+  const ownerGrants = JSON.parse(await readFile(new URL('../../spacetimedb/assets/ai-owner-capability-grants.json', import.meta.url), 'utf8'))
+  assert.deepEqual(ownerGrants.find(grant => grant.capability_key === 'ai.evidence.inspect'), {
+    capability_key: 'ai.evidence.inspect', max_rows: 100, max_bytes: 1048576,
+  })
   assert.deepEqual(guideInspectionFixtureGrantArguments(7, 2), [7, 2, 'ai.evidence.inspect', 100, 1048576, true])
   assert.throws(() => guideInspectionFixtureGrantArguments(0, 2))
   assert.throws(() => guideInspectionFixtureGrantArguments(7, 0))
