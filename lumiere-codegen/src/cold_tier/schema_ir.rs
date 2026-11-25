@@ -10,6 +10,8 @@
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
+pub(crate) const EXPECTED_SCHEMA_TABLES: usize = 539;
+
 /// Root manifest written to `lumiere-schema-manifest.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LumiereSchemaManifest {
@@ -110,9 +112,9 @@ impl LumiereSchemaManifest {
 
     /// Enforce the C0 organization-ownership invariant for every manifest relation.
     pub fn validate_tenant_ownership(&self) -> Result<()> {
-        if self.tables.len() != 536 {
+        if self.tables.len() != EXPECTED_SCHEMA_TABLES {
             bail!(
-                "C0 requires 536 organization-owned relations (531 application + 5 protocol), found {}",
+                "C0 requires {EXPECTED_SCHEMA_TABLES} organization-owned relations, found {}",
                 self.tables.len()
             );
         }
@@ -322,10 +324,13 @@ mod tests {
     }
 
     #[test]
-    fn c0_validation_requires_536_direct_relations() {
+    fn c0_validation_requires_the_complete_census() {
         let complete = LumiereSchemaManifest {
             version: 1,
-            tables: vec![table("orders", Some((GeneratedType::U64, false)), true); 536],
+            tables: vec![
+                table("orders", Some((GeneratedType::U64, false)), true);
+                EXPECTED_SCHEMA_TABLES
+            ],
             enum_types: vec![],
         };
         complete.validate_tenant_ownership().unwrap();

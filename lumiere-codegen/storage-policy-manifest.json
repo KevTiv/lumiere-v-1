@@ -2167,6 +2167,99 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "ai_local_runner_device",
+      "module": "ai",
+      "rationale": "Private pairing credentials and revocation state stay available to the active organization runner service.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "standalone",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "device_id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:ai/local-runner/private-active-state",
+      "dependency_behavior": "none",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_local_runner_pairing",
+      "module": "ai",
+      "rationale": "Private, expiring pairing offers and their single-use claims must survive gateway restarts.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "standalone",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "digest",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:ai/local-runner/private-active-state",
+      "dependency_behavior": "none",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "ai_local_runner_run",
+      "module": "ai",
+      "rationale": "Private attempt state and verified replay survive gateway restarts and can outlive device revocation.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "standalone",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "run_id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:ai/local-runner/private-active-state",
+      "dependency_behavior": "none",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
       "table": "ai_metered_price",
       "module": "ai",
       "rationale": "Immutable Mistral token/page prices; retain the actual unit and reviewed version for shared-pool spend reconstruction.",

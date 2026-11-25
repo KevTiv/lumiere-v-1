@@ -366,6 +366,67 @@
           "meaning": "active membership company owning the caller personal module page preferences"
         }
       ]
+    },
+    {
+      "name": "claim_ai_local_runner_pairing",
+      "company_paths": [],
+      "asserts_no_company_parameter": true,
+      "notes": "The service resolves company ownership from the saved pairing offer identified by its digest."
+    },
+    {
+      "name": "issue_ai_local_runner_pairing",
+      "company_paths": [
+        {
+          "path": [
+            "params",
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "Company owning the saved runner record, validated by the native service reducer."
+        }
+      ]
+    },
+    {
+      "name": "revoke_ai_local_runner_device",
+      "company_paths": [
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "Company owning the saved runner record, validated by the native service reducer."
+        }
+      ]
+    },
+    {
+      "name": "start_ai_local_runner_run",
+      "company_paths": [
+        {
+          "path": [
+            "params",
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "Company owning the saved runner record, validated by the native service reducer."
+        }
+      ]
+    },
+    {
+      "name": "update_ai_local_runner_run",
+      "company_paths": [
+        {
+          "path": [
+            "params",
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "Company owning the saved runner record, validated by the native service reducer."
+        }
+      ]
     }
   ]
 }
