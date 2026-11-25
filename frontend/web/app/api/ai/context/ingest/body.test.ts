@@ -1,7 +1,18 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { parseActivityIngestBody } from './body'
+import { parseActivityIngestBody, parseContextIngestBody } from './body'
+
+test('catalog preview and apply use the same scoped request and reject caller authority', () => {
+  const preview = `context:catalog-preview:${'a'.repeat(64)}`
+  const apply = { companyId: 4097, catalog: { before: '18446744073709551615', preview } }
+  assert.deepEqual(parseContextIngestBody(apply), apply)
+  assert.deepEqual(parseContextIngestBody({ companyId: 4097, catalog: {} }).companyId, 4097)
+  for (const catalog of [{ before: '01' }, { preview: 'approved' }, { identity: 'owner' }, { text: 'fake' }]) {
+    assert.throws(() => parseContextIngestBody({ companyId: 4097, catalog }))
+  }
+  assert.throws(() => parseContextIngestBody({ ...apply, resources: [] }))
+})
 
 const reference = (resource_id: unknown = '42') => ({ resource_kind: 'sale_order', resource_id })
 const body = (resources: unknown = [reference()]) => ({ companyId: 7, resources })

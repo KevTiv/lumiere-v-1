@@ -11,9 +11,37 @@ export interface ActivityIngestBody {
   resources: { resource_kind: ActivityIndexKind; resource_id: string }[]
 }
 
+export interface CatalogIngestBody {
+  companyId: number
+  catalog: { before?: string; preview?: string }
+}
+
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('JSON object required')
   return value as Record<string, unknown>
+}
+
+export function parseContextIngestBody(raw: unknown): ActivityIngestBody | CatalogIngestBody {
+  const body = object(raw)
+  if (!Object.hasOwn(body, 'catalog')) return parseActivityIngestBody(body)
+  if (Object.keys(body).some(key => key !== 'companyId' && key !== 'catalog')) {
+    throw new Error('Only companyId and catalog are accepted for a catalog batch')
+  }
+  if (typeof body.companyId !== 'number' || !Number.isSafeInteger(body.companyId) || body.companyId <= 0) {
+    throw new Error('companyId must be a positive safe integer')
+  }
+  const catalog = object(body.catalog)
+  if (Object.keys(catalog).some(key => key !== 'before' && key !== 'preview')) {
+    throw new Error('Only before and preview are accepted for a catalog batch')
+  }
+  const { before, preview } = catalog
+  if (before !== undefined && (typeof before !== 'string' || !/^[1-9][0-9]{0,19}$/.test(before) || BigInt(before) > U64_MAX)) {
+    throw new Error('Invalid catalog cursor')
+  }
+  if (preview !== undefined && (typeof preview !== 'string' || !/^context:catalog-preview:[0-9a-f]{64}$/.test(preview))) {
+    throw new Error('Invalid catalog preview')
+  }
+  return { companyId: body.companyId, catalog: { before, preview } }
 }
 
 /** Accept identities only. Authority, credentials and source text come from the server. */

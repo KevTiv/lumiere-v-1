@@ -1099,14 +1099,15 @@ mod tests {
     #[test]
     fn owner_baseline_covers_descriptor_but_not_budget_resolve() {
         use crate::ai::capability_grants::{
-            AI_HARNESS_DESCRIPTOR_READ_CAPABILITY, AI_RUN_BUDGET_RESOLVE_CAPABILITY,
-            OWNER_AI_CAPABILITY_GRANTS,
+            owner_ai_capability_grants, AI_HARNESS_DESCRIPTOR_READ_CAPABILITY,
+            AI_RUN_BUDGET_RESOLVE_CAPABILITY,
         };
-        let grants: Vec<GrantView> = OWNER_AI_CAPABILITY_GRANTS
-            .iter()
+        let grants: Vec<GrantView> = owner_ai_capability_grants()
+            .unwrap()
+            .into_iter()
             .map(|grant| GrantView {
                 role_id: 1,
-                capability_key: grant.capability_key.into(),
+                capability_key: grant.capability_key,
                 is_active: true,
                 max_rows: grant.max_rows,
                 max_bytes: grant.max_bytes,

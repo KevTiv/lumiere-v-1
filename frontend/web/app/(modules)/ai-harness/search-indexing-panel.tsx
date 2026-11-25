@@ -3,7 +3,7 @@
 import { useRef, useState, type FormEvent } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
-import { useAiMemoryIngest } from "@lumiere/query-hooks/hooks/ai-memory"
+import { useAiCatalogIngest, useAiMemoryIngest } from "@lumiere/query-hooks/hooks/ai-memory"
 import { Button } from "@lumiere/ui/components/button"
 import {
   Card,
@@ -50,11 +50,14 @@ export function SearchIndexingPanel({
       </CardHeader>
       <CardContent>
         {company && activeCompanyId != null ? (
-          <IndexRecordsForm
-            key={company.value}
-            companyId={activeCompanyId}
-            companyName={company.label}
-          />
+          <div key={company.value} className="space-y-6">
+            <p className="text-sm font-medium">{company.label} · #{activeCompanyId}</p>
+            <CatalogIndexForm companyId={activeCompanyId} />
+            <details className="space-y-4">
+              <summary className="cursor-pointer text-sm font-medium">{t("aiHarness.searchIndex.personalTitle")}</summary>
+              <IndexRecordsForm companyId={activeCompanyId} />
+            </details>
+          </div>
         ) : (
           <p role="status">{t("aiHarness.searchIndex.selectCompany")}</p>
         )}
@@ -63,12 +66,67 @@ export function SearchIndexingPanel({
   )
 }
 
+function CatalogIndexForm({ companyId }: { companyId: number }) {
+  const { t } = useTranslation()
+  const indexing = useAiCatalogIngest()
+  const submitting = useRef(false)
+  const [before, setBefore] = useState<string>()
+  const result = indexing.data
+  const preview = result?.catalog.preview
+
+  async function run(cursor: string | undefined, confirmation?: string) {
+    if (submitting.current) return
+    submitting.current = true
+    setBefore(cursor)
+    try {
+      await indexing.mutateAsync({ companyId, catalog: { before: cursor, preview: confirmation } })
+    } catch {
+      // Keep the same cursor so the owner can preview and resume the batch.
+    } finally {
+      submitting.current = false
+    }
+  }
+
+  return (
+    <section className="space-y-3">
+      <h3 className="text-sm font-medium">{t("aiHarness.searchIndex.catalogTitle")}</h3>
+      <p className="text-sm text-muted-foreground">{t("aiHarness.searchIndex.catalogDescription")}</p>
+      {result && (
+        <p role="status">
+          {preview
+            ? t("aiHarness.searchIndex.catalogPreviewResult", { ...result, ready: result.catalog.ready })
+            : t("aiHarness.searchIndex.result", { ...result })}
+        </p>
+      )}
+      {indexing.error && <p role="alert">{indexing.error.message}</p>}
+      <div className="flex flex-wrap gap-2">
+        {(!result || (preview && result.catalog.ready > 0)) && (
+          <Button type="button" variant={preview ? "outline" : "default"} disabled={indexing.isPending} onClick={() => void run(before)}>
+            {t("aiHarness.searchIndex.previewCatalog")}
+          </Button>
+        )}
+        {preview && result.catalog.ready > 0 && (
+          <Button type="button" disabled={indexing.isPending} onClick={() => void run(before, preview)}>
+            {t("aiHarness.searchIndex.applyCatalog")}
+          </Button>
+        )}
+        {result?.catalog.next_before && (!preview || result.catalog.ready === 0) && (
+          <Button type="button" disabled={indexing.isPending} onClick={() => void run(result.catalog.next_before ?? undefined)}>
+            {t("aiHarness.searchIndex.nextCatalogBatch")}
+          </Button>
+        )}
+        {result && !result.catalog.next_before && (!preview || result.catalog.ready === 0) && (
+          <p role="status">{t("aiHarness.searchIndex.catalogComplete")}</p>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function IndexRecordsForm({
   companyId,
-  companyName,
 }: {
   companyId: number
-  companyName: string
 }) {
   const { t } = useTranslation()
   const indexing = useAiMemoryIngest()
@@ -105,9 +163,6 @@ function IndexRecordsForm({
 
   return (
     <form className="max-w-xl space-y-4" onSubmit={submit}>
-      <p className="text-sm font-medium">
-        {companyName} · #{companyId}
-      </p>
       <Field>
         <FieldLabel htmlFor="index-record-kind">
           {t("aiHarness.searchIndex.recordType")}

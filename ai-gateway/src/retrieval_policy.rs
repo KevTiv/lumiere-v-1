@@ -1,3 +1,4 @@
+#[derive(Default)]
 pub struct RetrievalOutcome<T> {
     pub value: T,
     pub degraded: bool,

@@ -254,15 +254,21 @@ async fn require_actor_grant_bounds(
     actor: &ActorCredentials,
     capability: &str,
 ) -> AppResult<CapabilityGrantBounds> {
+    let grants = current_actor_grants(state, actor).await?;
+    grants
+        .bounds_for(actor, capability)
+        .ok_or_else(|| AppError::Forbidden("evidence access is not permitted".into()))
+}
+
+pub(super) async fn current_actor_grants(
+    state: &AppState,
+    actor: &ActorCredentials,
+) -> AppResult<CapabilityGrantEnvelope> {
     let api_server_url =
         state.config.api_server_url.as_deref().ok_or_else(|| {
             AppError::Unavailable("acting-user authorization is unavailable".into())
         })?;
-    let grants =
-        fetch_actor_grants(&state.http, api_server_url, actor, ACTOR_GRANT_TIMEOUT).await?;
-    grants
-        .bounds_for(actor, capability)
-        .ok_or_else(|| AppError::Forbidden("evidence access is not permitted".into()))
+    fetch_actor_grants(&state.http, api_server_url, actor, ACTOR_GRANT_TIMEOUT).await
 }
 
 /// Re-check a BFF-supplied acting user's exact capability before a route reads

@@ -144,14 +144,14 @@ pub async fn post_report_readiness(
         ));
     }
     let actor = report_readiness_actor(&headers, &req)?;
-    crate::routes::evidence::require_scoped_capability_grant(
+    ActorSkillAccess::new(
         &state,
-        &actor.identity,
-        &actor.token,
         actor.organization_id,
         actor.company_id,
-        crate::routes::harness_descriptor::DESCRIPTOR_CAPABILITY,
-    )
+        &actor.token,
+        &actor.identity,
+    )?
+    .require(REPORT_ANALYSIS_SKILL_KEY)
     .await?;
     let blocker = if state.config.kong_llm_url.is_some() {
         Some(ReportReadinessBlocker::ModelPolicy)
@@ -657,6 +657,70 @@ mod tests {
 #[cfg(test)]
 mod report_readiness_actor_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn readiness_checks_the_same_skill_access_as_execution() {
+        use crate::routes::harness_descriptor::test_support;
+        use axum::{extract::Query, routing::get, Router};
+        use std::collections::HashMap;
+
+        let identity = "a".repeat(64);
+        let stub_identity = identity.clone();
+        let app = Router::new().route(
+            "/v1/ai/skills/access/check",
+            get(
+                move |Query(query): Query<HashMap<String, String>>, headers: HeaderMap| {
+                    let identity = stub_identity.clone();
+                    async move {
+                        assert_eq!(query["companyId"], "13");
+                        assert_eq!(query["skillKey"], REPORT_ANALYSIS_SKILL_KEY);
+                        assert_eq!(headers["x-stdb-identity"].to_str().unwrap(), identity);
+                        Json(serde_json::json!({
+                            "organizationId": 11,
+                            "companyId": 13,
+                            "actorIdentity": identity,
+                            "skillKey": REPORT_ANALYSIS_SKILL_KEY,
+                            "allowed": headers["authorization"] == "Bearer allowed",
+                        }))
+                    }
+                },
+            ),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut config = test_support::config();
+        config.api_server_url = Some(format!("http://{}", listener.local_addr().unwrap()));
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let state = test_support::state(config).await;
+        let request = || {
+            Json(ReportReadinessRequest {
+                org_id: 11,
+                company_id: 13,
+                agent_id: 7,
+            })
+        };
+        let headers = |token| {
+            lumiere_auth_context::ActorContext::new(&identity, token, 11, 13)
+                .unwrap()
+                .headers()
+                .unwrap()
+        };
+
+        let denied =
+            post_report_readiness(State(state.clone()), headers("revoked"), request()).await;
+        assert!(matches!(denied, Err(AppError::Forbidden(_))));
+        let allowed = post_report_readiness(State(state), headers("allowed"), request())
+            .await
+            .unwrap();
+        // The actor can run the skill without a descriptor grant; configuration
+        // still blocks this fixture before any paid dispatch.
+        assert!(matches!(
+            allowed.0.code,
+            Some(crate::orchestrator::governed_bootstrap::ReportReadinessBlocker::ProviderUnavailable)
+        ));
+        assert_eq!(allowed.0.billable_calls, 0);
+        server.abort();
+    }
+
     #[test]
     fn readiness_rejects_missing_actor_and_foreign_requested_scope() {
         let req = ReportReadinessRequest {

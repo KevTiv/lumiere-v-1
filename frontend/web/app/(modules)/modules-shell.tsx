@@ -5,6 +5,7 @@ import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
 import { getProductSurface, isFirstOrgRouteAdmitted } from "@lumiere/ui/lib/product-surface-catalog"
 import { Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
 import { Button } from "@lumiere/ui/components/button"
 import { toast } from "sonner"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
@@ -86,6 +87,9 @@ import {
   parseStoredAssistantRecovery, readAssistantReply, withAssistantRecoveryMetadata, type AssistantTurnFailure,
 } from "@/lib/assistant-turn"
 import { i18n } from "@lumiere/i18n"
+import { discoverRunners, followRunnerTurn, startRunnerTurn } from "@/lib/local-runner-client"
+import { localRunnerOptions, LocalRunnerControls, type RunnerView } from "@/lib/local-runner-controls"
+import { initialRunnerActivity, readRunnerReceipt, type RunnerReceipt } from "@/lib/local-runner-state"
 import { readChatAttachments, readStoredChatAttachmentNames } from "@/lib/ai-chat-attachments"
 import { assistantHistoryScope, saveAssistantHistory } from "@/lib/assistant-history"
 import { assistantHistoryLink, useAssistantChatHistory } from "@/lib/use-assistant-chat-history"
@@ -195,6 +199,11 @@ type InFlightTurn = {
 }
 const MAX_RECENT_CHAT_TURNS = 4
 
+function storedRunnerReceipt(key: string) {
+  try { return readRunnerReceipt(window.sessionStorage, key) }
+  catch { return undefined }
+}
+
 function readStoredTurnId(raw?: string | null): string | undefined {
   if (!raw) return undefined
   try {
@@ -272,6 +281,20 @@ function ErpAiChatPanel({
   const actorHistoryScope = history.scope
   const sessionKey = history.sessionKey
   const historyScope = JSON.stringify([identity, organizationId, operatingCompanyId, sessionKey])
+  const runnerReceiptKey = `lumiere:local-runner:v1:${historyScope}`
+  const runnerQuery = useQuery({
+    queryKey: ["assistant-local-runner", actorHistoryScope],
+    enabled: Boolean(props.open && actorHistoryScope && operatingCompanyId && operatingCompanyId > 0),
+    queryFn: ({ signal }) => discoverRunners(operatingCompanyId!, signal),
+    retry: false,
+    refetchInterval: query => query.state.data?.enabled ? 4_000 : false,
+  })
+  const runnerDiscovery = runnerQuery.isError ? undefined : runnerQuery.data
+  const runnerAgents = useMemo(() => runnerDiscovery?.enabled ? localRunnerOptions(runnerDiscovery.devices) : [], [runnerDiscovery])
+  const selectedRunner = runnerAgents.find(option => option.value === selectedAgent)
+  const [runnerView, setRunnerView] = useState<{ scope: string; view: RunnerView }>()
+  const [reattachedAttempt, setReattachedAttempt] = useState<string>()
+  const currentRunnerView = runnerView?.scope === historyScope ? runnerView.view : undefined
   const availableHistory = !history.unavailable && (!history.session.isError || Boolean(history.session.data))
   const [failedHistoryScope, setFailedHistoryScope] = useState<string | null>(null)
   const [, refreshSending] = useState(0)
@@ -669,6 +692,7 @@ function ErpAiChatPanel({
       hasUnsavedGuideEdits = false,
       turnId: string = crypto.randomUUID(),
       files: readonly File[] = [],
+      restoredRunner?: RunnerReceipt,
     ) => {
       if (!orgReady || operatingCompanyId == null || operatingCompanyId <= 0) {
         return {
@@ -692,6 +716,71 @@ function ErpAiChatPanel({
         return persistExchange({ ...turnMeta, ...args })
       }
       const started = performance.now()
+      const localProviderSelected = selectedAgent.startsWith("local:")
+      if (restoredRunner || localProviderSelected) {
+        if (!runnerDiscovery?.enabled || (!restoredRunner && !selectedRunner)) {
+          throw new Error("The selected local agent is unavailable. Reconnect its device or choose another agent.")
+        }
+        if (files.length || questionGuide || (scopedSelectionDraft && userText.includes(scopedSelectionDraft.text)) || (!restoredRunner && selectedReferences?.length)) {
+          throw new Error("Use a managed agent for documents, guides, and conversation references.")
+        }
+        await ensureSession(userText)
+        if (!isCurrent()) throw new Error("The conversation company changed.")
+        setProgress("answering")
+        let receipt = restoredRunner
+        if (!receipt) {
+          if (!selectedRunner) throw new Error("The selected local agent is unavailable.")
+          const run = await startRunnerTurn({
+            companyId: operatingCompanyId, conversationId: sessionKey, requestId: turnId, prompt: userText,
+            deviceId: selectedRunner.device.deviceId, provider: selectedRunner.provider.provider,
+          }, signal)
+          receipt = { ...run, turnId, prompt: userText, label: selectedRunner.label, funding: selectedRunner.provider.funding }
+        }
+        const activeReceipt = receipt
+        if (currentHistoryScope.current === historyScope) setReattachedAttempt(receipt.attemptId)
+        try { window.sessionStorage.setItem(runnerReceiptKey, JSON.stringify(receipt)) } catch { /* Browser storage may be unavailable. */ }
+        const showActivity = (activity: RunnerView["activity"], reconnecting: boolean) => {
+          if (!signal.aborted && currentHistoryScope.current === historyScope) {
+            setRunnerView({ scope: historyScope, view: { receipt: activeReceipt, activity, reconnecting } })
+          }
+        }
+        showActivity(initialRunnerActivity(), false)
+        const clearReceipt = () => {
+          try {
+            if (storedRunnerReceipt(runnerReceiptKey)?.attemptId === activeReceipt.attemptId) {
+              window.sessionStorage.removeItem(runnerReceiptKey)
+            }
+          } catch { /* Browser storage may be unavailable. */ }
+        }
+        let verifiedActivity: RunnerView["activity"] | undefined
+        const final = await followRunnerTurn(operatingCompanyId, receipt, signal, (activity, reconnecting) => {
+          if (activity.terminal?.type === "verified") verifiedActivity = activity
+          else showActivity(activity, reconnecting)
+        })
+        if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[] }
+        if (final?.type === "cancelled") {
+          clearReceipt()
+          return { content: "", sources: [] as ChatMessageSourceRef[], stopped: true }
+        }
+        if (final?.type === "failed") {
+          clearReceipt()
+          throw new Error(final.message)
+        }
+        if (final?.type !== "verified") throw new Error("The local runner result is unconfirmed.")
+        const answer = assistantAnswer({ answer: final.answer, sources: final.sources ?? [], run_id: final.run_id,
+          verification: { outcome: "admitted", methods: ["runner_evidence"], limitations: [] } })
+        const sources = answer.sources.map(mapRagSourceToChatSource)
+        if (sources.some(source => source.url && !/^https?:\/\//i.test(source.url))) {
+          throw new Error("A local runner source could not be verified.")
+        }
+        if (verifiedActivity) showActivity(verifiedActivity, false)
+        // History is append-only. Once saving begins, reattach must not replay the exchange.
+        clearReceipt()
+        await saveReply({ userText, assistantText: answer.answer, sources, uiContext: null, model: receipt.label,
+          runId: answer.run_id, verification: answer.verification })
+        if (sources.length) clearFollowUpAnchors.current = null
+        return { content: answer.answer, sources, runId: answer.run_id }
+      }
       const attachments = await readChatAttachments(files)
       if (!isCurrent()) return { content: "", sources: [] as ChatMessageSourceRef[], attachmentsConsumed: false }
       const attachmentNames = attachments.length ? attachments.map(file => file.name) : undefined
@@ -912,15 +1001,18 @@ function ErpAiChatPanel({
       if (out && selectedReferences?.length && isCurrent()) clearReferences(sessionKey)
       return { content, attachmentsConsumed: turn.answer.kind === "ready", runId: out?.run_id, sources, guides, recoveryPath, importTaskIds, importTasks: taskStatuses, actions: actions.length ? actions : undefined, earlierContextUnavailable: out?.earlierContextUnavailable }
     },
-    [orgId, orgReady, identity, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, sessionKey, actorHistoryScope, history.archived, availableHistory, historyRefs, clearReferences, ensureSession, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft, farmOperationsEnabled],
+    [orgId, orgReady, identity, operatingCompanyId, selectedAgent, requestedAgentId, companiesQuery.isLoading, sessionKey, actorHistoryScope, history.archived, availableHistory, historyRefs, clearReferences, ensureSession, buildRequestContext, rag, resolveActionDrafts, persistExchange, actionScope, workspaceScope, module, allowedActionModules, permissionsReady, checkPermission, pageComposition?.page, importTasks.focusedTask, scopedSelectionDraft, farmOperationsEnabled, runnerDiscovery?.enabled, selectedRunner, runnerReceiptKey, historyScope],
   )
-  const sendTurn = useCallback(async (text: string, onDelta?: (delta: string) => void, turnId?: string, guideRefs?: GuideReference[], guide?: GuideDraft, hasUnsavedGuideEdits = false, files: readonly File[] = []) => {
+  const sendTurn = useCallback(async (text: string, onDelta?: (delta: string) => void, turnId?: string, guideRefs?: GuideReference[], guide?: GuideDraft, hasUnsavedGuideEdits = false, files: readonly File[] = [], restoredRunner?: RunnerReceipt) => {
     if (inFlight.current.has(historyScope) || inFlight.current.size >= 2) {
       throw new Error(i18n.t("aiChat.history.waitForReply", { defaultValue: "Wait for an Assistant response to finish before sending another message." }))
     }
+    if (!restoredRunner && selectedAgent.startsWith("local:") && storedRunnerReceipt(runnerReceiptKey)) {
+      throw new Error("Reconnect to the existing local run before sending another message.")
+    }
     const request: InFlightTurn = {
       controller: new AbortController(),
-      projection: onDelta && turnId ? { id: turnId, userText: text, content: "", timestamp: new Date(), settled: false } : undefined,
+      projection: (onDelta || restoredRunner) && turnId ? { id: turnId, userText: text, content: "", timestamp: new Date(), settled: false } : undefined,
     }
     const setProgress = (progress: TurnProgress, canStop = false) => {
       if (request.controller.signal.aborted || inFlight.current.get(historyScope) !== request) return
@@ -954,7 +1046,7 @@ function ErpAiChatPanel({
     inFlight.current.set(historyScope, request)
     refreshSending(version => version + 1)
     try {
-      const result = await runTurn(text, request.controller.signal, setProgress, deliverDelta, guideRefs, guide, hasUnsavedGuideEdits, turnId, files)
+      const result = await runTurn(text, request.controller.signal, setProgress, deliverDelta, guideRefs, guide, hasUnsavedGuideEdits, turnId, files, restoredRunner)
       const reply = request.stopped ? { content: "", sources: [], stopped: true } : result
       rememberTurn({ reply })
       return reply
@@ -968,7 +1060,16 @@ function ErpAiChatPanel({
         refreshSending(version => version + 1)
       }
     }
-  }, [historyScope, runTurn])
+  }, [historyScope, runTurn, selectedAgent, runnerReceiptKey])
+  const reattachRunner = useCallback((receipt: RunnerReceipt) => {
+    setReattachedAttempt(receipt.attemptId)
+    void sendTurn(receipt.prompt, undefined, receipt.turnId, undefined, undefined, false, [], receipt).catch(() => undefined)
+  }, [sendTurn])
+  useEffect(() => {
+    if (!props.open || !sessionKey || !availableHistory || history.archived || !runnerDiscovery?.enabled || inFlight.current.has(historyScope)) return
+    const receipt = storedRunnerReceipt(runnerReceiptKey)
+    if (receipt && receipt.attemptId !== reattachedAttempt) reattachRunner(receipt)
+  }, [props.open, sessionKey, availableHistory, history.archived, runnerDiscovery?.enabled, historyScope, runnerReceiptKey, reattachedAttempt, reattachRunner])
   const stopReply = useCallback(() => {
     if (currentHistoryScope.current !== historyScope) return
     const request = inFlight.current.get(historyScope)
@@ -1109,7 +1210,20 @@ function ErpAiChatPanel({
       renderMessageActions={renderMessageActions}
       renderImportTask={importTasks.renderReceipt}
       renderCitation={renderCitation}
-      composerContext={composerContext}
+      composerContext={<>
+        {composerContext}
+        {runnerDiscovery?.enabled && operatingCompanyId ? <LocalRunnerControls
+          key={historyScope}
+          companyId={operatingCompanyId}
+          devices={runnerDiscovery.devices}
+          refresh={() => { void runnerQuery.refetch() }}
+          selectedLabel={selectedRunner?.label}
+          selectedFunding={selectedRunner?.provider.funding}
+          view={currentRunnerView}
+          reattach={!pendingTurn && currentRunnerView && !currentRunnerView.activity.terminal
+            ? () => reattachRunner(currentRunnerView.receipt) : undefined}
+        /> : null}
+      </>}
       history={actorHistoryScope ? {
         open: history.filters.open,
         onToggle: () => setHistoryOpen(!history.filters.open),
@@ -1164,7 +1278,7 @@ function ErpAiChatPanel({
       selectedContext={activeScopeOption}
       onClearSelection={workspaceScope.selection ? selectionReporter?.clearSelection : undefined}
       onContextChange={setSelectedScope}
-      agentOptions={chatAgents}
+      agentOptions={runnerAgents.length ? [...chatAgents, ...runnerAgents] : chatAgents}
       selectedAgent={selectedAgent}
       onAgentChange={setSelectedAgent}
       onSendMessage={onSendMessage}
