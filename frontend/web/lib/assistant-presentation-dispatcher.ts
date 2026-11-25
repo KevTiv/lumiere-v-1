@@ -59,6 +59,11 @@ type PresentationFailure =
   | "scope_changed"
   | "unavailable"
 type Validation<T> = { value: T } | { outcome: PresentationFailure }
+type ValidatedChatAction = {
+  action: AssistantAction
+  capability: AssistantCapability
+  scopeKey: string
+}
 
 export const PRESENTATION_DESTINATION_CAPABILITIES = {
   open_inventory_record: "products.product.open",
@@ -133,7 +138,7 @@ export function dispatchAssistantPresentation(
     origin?: { sessionKey: string; messageId: string }
   },
 ): Promise<ChatNativeActionOutcome> {
-  const validate = () => {
+  const validate = (): Validation<ValidatedChatAction> => {
     const current = ports.current()
     const action =
       current.actionScope &&
@@ -143,13 +148,10 @@ export function dispatchAssistantPresentation(
       })
     const capability = action && getAssistantCapability(action.capabilityKey)
     if (!options.isCurrent() || !action || !capability || !current.scopeKey) {
-      return { outcome: "scope_changed" } as const
+      return { outcome: "scope_changed" }
     }
-    if (!hasPermission(current, capability))
-      return { outcome: "denied" } as const
-    return {
-      value: { action, capability, scopeKey: current.scopeKey },
-    } as const
+    if (!hasPermission(current, capability)) return { outcome: "denied" }
+    return { value: { action, capability, scopeKey: current.scopeKey } }
   }
   const initial = validate()
   if ("outcome" in initial) return Promise.resolve(initial.outcome)
@@ -160,7 +162,7 @@ export function dispatchAssistantPresentation(
     currentPage?.moduleId !== capability.module ||
     Boolean(action.pageId && currentPage?.pageId !== action.pageId)
 
-  return present(
+  return present<ValidatedChatAction, ChatNativeActionOutcome>(
     validate,
     ({ action, capability, scopeKey }, settle) => {
       const href = assistantActionHref(action)
@@ -186,7 +188,7 @@ export function dispatchAssistantPresentation(
         // Preserve the current date range and filters when editing this page.
         if (
           composer.page?.moduleId !== capability.module ||
-          (action.pageId && composer.page.pageId !== action.pageId)
+          (action.pageId && composer.page?.pageId !== action.pageId)
         ) {
           ports.push(href)
         }
