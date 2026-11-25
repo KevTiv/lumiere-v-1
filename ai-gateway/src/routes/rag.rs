@@ -44,7 +44,7 @@ use crate::{
             TextEvidence, WithholdReason,
         },
     },
-    retrieval_policy::optional_retrieval,
+    retrieval_policy::{optional_retrieval, RetrievalOutcome},
     routes::guide_retrieval::{
         recheck_related_guides, retrieve_related_guides, validate_guide_refs, GuideIdentity,
         RelatedGuide,
@@ -1373,17 +1373,20 @@ pub async fn post_rag(
             .await
         }
         Some(_) => Err(anyhow::anyhow!("admitted activity query unavailable")),
-        None => Ok(Vec::new()),
+        None => Ok(RetrievalOutcome::default()),
     };
-    if let Err(error) = &org_result {
+    let org_outcome = org_result.unwrap_or_else(|error| {
         tracing::warn!(
             org_id,
             company_id = req.company_id,
             error = %error,
             "Org activity retrieval unavailable; continuing with company hits only"
         );
-    }
-    let org_outcome = optional_retrieval(org_result);
+        RetrievalOutcome {
+            value: Vec::new(),
+            degraded: true,
+        }
+    });
     retrieval_degraded |= org_outcome.degraded;
     let org_hits = org_outcome.value;
 

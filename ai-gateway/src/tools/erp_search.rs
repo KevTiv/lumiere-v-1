@@ -6,7 +6,7 @@ use crate::{
         record_lookup::{lookup_record_candidates, RecordLookup},
         resolve_snapshot_candidates, HARNESS_MAX_LIVE_SNAPSHOTS,
     },
-    retrieval_policy::optional_retrieval,
+    retrieval_policy::{optional_retrieval, RetrievalOutcome},
     tools::types::{live_snapshot_citation, ToolContext, ToolOutput, ToolResult},
 };
 
@@ -142,10 +142,13 @@ pub async fn execute(ctx: &ToolContext, input: &Value) -> ToolResult {
         }
         _ => Err(anyhow::anyhow!("admitted activity query unavailable")),
     };
-    if let Err(error) = &org_result {
+    let org_outcome = org_result.unwrap_or_else(|error| {
         tracing::warn!(error = %error, "ERP activity retrieval unavailable");
-    }
-    let org_outcome = optional_retrieval(org_result);
+        RetrievalOutcome {
+            value: Vec::new(),
+            degraded: true,
+        }
+    });
     retrieval_degraded |= org_outcome.degraded;
     let org_hits = org_outcome.value;
 

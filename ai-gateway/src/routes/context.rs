@@ -1,4 +1,5 @@
 //! Explicit actor-authorized indexing. Clients select identities, never text.
+use super::evidence::RAG_EVIDENCE_RETRIEVE_CAPABILITY;
 use crate::{
     ai_agent::{ensure_allowed_action, resolve_surface_agent, ResolvedAgentConfig},
     error::{AppError, AppResult},
@@ -7,6 +8,7 @@ use crate::{
         resolve_snapshot_candidates, ActorCredentials, EntityRef, LiveSnapshot,
     },
     non_llm_spend::{execute_metered, MeteredResult, MeteredScope, MeteredUnit},
+    retrieval_policy::{optional_retrieval, RetrievalOutcome},
     rig_agent::{
         activity_fingerprint, activity_for_snapshot, company_reindex_activity, Activity, ContextHit,
     },
@@ -22,7 +24,6 @@ use std::collections::HashSet;
 const MAX_REFERENCES: usize = 8;
 const MAX_PROJECTION_BYTES: usize = 64 * 1024;
 const INDEX_CAPABILITY: &str = "ai.context.index";
-const RETRIEVE_CAPABILITY: &str = "ai.evidence.retrieve";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -180,7 +181,7 @@ async fn search_grants(
     )?;
     let grants = super::evidence::current_actor_grants(state, &actor).await?;
     Ok(SearchGrants {
-        evidence: grants.bounds_for(&actor, RETRIEVE_CAPABILITY),
+        evidence: grants.bounds_for(&actor, RAG_EVIDENCE_RETRIEVE_CAPABILITY),
         catalog: grants.bounds_for(&actor, SHARED_CATALOG_READ),
     })
 }
@@ -373,7 +374,7 @@ pub async fn post_search(
     )
     .await
     .map_err(activity_search_error)?;
-    let hits = search_authorized_activity(
+    let outcome = search_authorized_activity(
         &state,
         &actor,
         req.org_id,
@@ -383,7 +384,12 @@ pub async fn post_search(
     )
     .await
     .map_err(activity_search_error)?;
-    Ok(Json(ContextSearchResponse { hits }))
+    if outcome.degraded && outcome.value.is_empty() {
+        return Err(unavailable("authorized activity retrieval unavailable"));
+    }
+    Ok(Json(ContextSearchResponse {
+        hits: outcome.value,
+    }))
 }
 
 fn activity_search_error(error: anyhow::Error) -> AppError {
@@ -392,9 +398,8 @@ fn activity_search_error(error: anyhow::Error) -> AppError {
         .unwrap_or_else(|_| unavailable("authorized activity retrieval unavailable"))
 }
 
-/// Search distinct company and actor lanes so unapproved shared candidates
-/// cannot consume the actor's private candidate slots. Only authorized hits
-/// can participate in the final ranking.
+/// Search through the actor's existing grants and rank only reauthorized hits.
+/// Each source has its own bounds. A dependency failure withholds its hits.
 pub(crate) async fn search_authorized_activity(
     state: &AppState,
     actor: &ActorCredentials,
@@ -402,50 +407,80 @@ pub(crate) async fn search_authorized_activity(
     company: u64,
     query: AdmittedQuery,
     top_k: usize,
-) -> Result<Vec<ContextHit>> {
+) -> Result<RetrievalOutcome<Vec<ContextHit>>> {
     let grants = search_grants(state, actor, org, company)
         .await?
         .for_query(query.query_bytes);
-    let bounds = grants
-        .evidence
-        .or(grants.catalog)
+    let max_bytes = [grants.evidence, grants.catalog]
+        .into_iter()
+        .flatten()
+        .map(|bounds| bounds.max_bytes)
+        .max()
         .ok_or_else(|| AppError::Forbidden("AI search is not permitted".into()))?;
-    let top_k = top_k.min(bounds.max_rows.min(50) as usize);
+    let top_k = top_k.clamp(1, 50);
     let vector = query.vector;
-    let private_vector = grants.evidence.map(|_| vector.clone());
-    let (private, shared) = tokio::try_join!(
-        async {
-            let Some(vector) = private_vector else {
-                return Ok(Vec::new());
-            };
-            state
-                .rig
-                .search_scope_with_vector(org, company, &actor.identity_hex, vector, top_k)
-                .await
-        },
-        state
+    let private_query = grants.evidence.map(|bounds| (bounds, vector.clone()));
+    let private = async {
+        let Some((bounds, vector)) = private_query else {
+            return Ok(Vec::new());
+        };
+        let limit = bounds.max_rows.min(top_k as u64) as usize;
+        let hits = state
             .rig
-            .search_company_reindex_with_vector(org, company, vector, top_k),
-    )?;
-    if private.is_empty() && shared.is_empty() {
-        return Ok(Vec::new());
+            .search_scope_with_vector(org, company, &actor.identity_hex, vector, limit)
+            .await?;
+        let mut hits =
+            resolve_private_activity_hits(state, actor, org, company, hits, limit).await?;
+        truncate_activity_bytes(&mut hits, bounds.max_bytes)?;
+        Ok(hits)
+    };
+    let shared = async {
+        let Some(bounds) = grants.catalog else {
+            return Ok(Vec::new());
+        };
+        let limit = bounds.max_rows.min(top_k as u64) as usize;
+        let hits = state
+            .rig
+            .search_company_reindex_with_vector(org, company, vector, limit)
+            .await?;
+        let mut hits = reauthorize_company_hits(state, actor, org, company, hits, limit).await?;
+        truncate_activity_bytes(&mut hits, bounds.max_bytes)?;
+        Ok(hits)
+    };
+    let (private, shared) = tokio::join!(private, shared);
+    for (source, result) in [("actor_activity", &private), ("shared_catalog", &shared)] {
+        if let Err(error) = result {
+            tracing::warn!(org_id = org, company_id = company, source, %error, "Activity retrieval unavailable");
+        }
     }
-    let (mut private, shared) = tokio::try_join!(
-        resolve_private_activity_hits(state, actor, org, company, private, top_k),
-        reauthorize_company_hits(state, actor, org, company, shared, top_k),
-    )?;
-    private.extend(shared);
-    private.sort_by(|a, b| b.score.total_cmp(&a.score));
+    merge_activity_hits(private, shared, top_k, max_bytes)
+}
+
+fn merge_activity_hits(
+    private: Result<Vec<ContextHit>>,
+    shared: Result<Vec<ContextHit>>,
+    top_k: usize,
+    max_bytes: u64,
+) -> Result<RetrievalOutcome<Vec<ContextHit>>> {
+    let private = optional_retrieval(private);
+    let shared = optional_retrieval(shared);
+    let degraded = private.degraded || shared.degraded;
+    let mut hits = private.value;
+    hits.extend(shared.value);
+    hits.sort_by(|a, b| b.score.total_cmp(&a.score));
     let mut seen = HashSet::new();
-    private.retain(|hit| {
+    hits.retain(|hit| {
         seen.insert((
             hit.record.semantic.resource_kind.clone(),
             hit.record.semantic.resource_id.clone(),
         ))
     });
-    private.truncate(top_k);
-    truncate_activity_bytes(&mut private, bounds.max_bytes)?;
-    Ok(private)
+    hits.truncate(top_k);
+    truncate_activity_bytes(&mut hits, max_bytes)?;
+    Ok(RetrievalOutcome {
+        value: hits,
+        degraded,
+    })
 }
 
 async fn reauthorize_company_hits(
@@ -529,7 +564,7 @@ async fn activity_read_bounds(
         &actor.stdb_token,
         org,
         company,
-        RETRIEVE_CAPABILITY,
+        RAG_EVIDENCE_RETRIEVE_CAPABILITY,
     )
     .await
 }
@@ -643,7 +678,7 @@ pub async fn post_coverage(
         &actor.stdb_token,
         req.org_id,
         req.company_id,
-        RETRIEVE_CAPABILITY,
+        RAG_EVIDENCE_RETRIEVE_CAPABILITY,
     )
     .await?;
     let indexed_points = state
@@ -1402,13 +1437,19 @@ mod tests {
         };
         let alice = ActorCredentials::new("fixture-a", "reader-a").unwrap();
         let bob = ActorCredentials::new("fixture-b", "reader-b").unwrap();
-        assert_eq!(
-            reauthorize_company_hits(&state, &alice, 7, 11, vec![hit.clone()], 1)
-                .await
-                .unwrap()
-                .len(),
-            1
-        );
+        let shared = reauthorize_company_hits(&state, &alice, 7, 11, vec![hit.clone()], 1)
+            .await
+            .unwrap();
+        let outcome = merge_activity_hits(
+            Err(anyhow::anyhow!("private activity unavailable")),
+            Ok(shared),
+            1,
+            64 * 1024,
+        )
+        .unwrap();
+        assert!(outcome.degraded);
+        assert_eq!(outcome.value.len(), 1);
+        assert_eq!(outcome.value[0].record.semantic.resource_id, "42");
         assert!(
             reauthorize_company_hits(&state, &bob, 7, 11, vec![hit.clone()], 1)
                 .await
