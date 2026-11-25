@@ -5,8 +5,7 @@
 //! scope. The gateway must revalidate the lease before sending results and
 //! publishing the verified readback.
 
-// The authenticated runner transport is a separate integration. This module
-// has no HTTP route until that transport can prove fresh per-attempt authority.
+// The live runner mounts MCP only after wiring the durable lease authority.
 #![allow(dead_code)]
 
 use std::{collections::HashSet, fmt::Write};
@@ -24,7 +23,7 @@ use crate::{
         manifest::OrgPrivacyPolicy,
         snapshot::{fetch_authorized_live_snapshots, ActorCredentials, EntityRef},
     },
-    orchestrator::skill_access::ActorSkillAccess,
+    orchestrator::skill_access::{ActorSkillAccess, SkillAccessError},
     state::AppState,
 };
 
@@ -34,6 +33,7 @@ pub(crate) const INVENTORY_LOW_STOCK_TOOL: &str = "inventory_low_stock";
 const MAX_ATTEMPT_ID_BYTES: usize = 128;
 const MAX_CANDIDATE_BYTES: usize = 8 * 1024;
 const MAX_TOOL_RESULT_BYTES: usize = 48 * 1024;
+const MAX_STORED_EVIDENCE_BYTES: usize = 128 * 1024;
 
 /// Advertise the one named ERP read this module can perform.
 pub(crate) fn inventory_tool_definition() -> Value {
@@ -93,11 +93,29 @@ impl<'a> InventoryAttempt<'a> {
             attempt_id,
         })
     }
+
+    pub(super) async fn require_access(&self, state: &AppState) -> Result<(), SkillAccessError> {
+        ActorSkillAccess::new(
+            state,
+            self.actor.organization_id,
+            self.actor.company_id,
+            &self.actor.token,
+            &self.actor.identity,
+        )?
+        .require(LOW_STOCK_SKILL_KEY)
+        .await
+    }
 }
 
-/// Retain only on the gateway. This has no wire deserializer, and its scope,
-/// observed readback and proof ID are unavailable for an external CLI to set.
+/// Retain only on the gateway. The transport cannot decode this internal
+/// storage format from a client request.
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct LowStockEvidence {
+    #[serde(
+        serialize_with = "serialize_evidence_id",
+        deserialize_with = "deserialize_evidence_id"
+    )]
     id: Uuid,
     organization_id: u64,
     company_id: u64,
@@ -106,6 +124,20 @@ pub(crate) struct LowStockEvidence {
     attempt_id: String,
     input: LowStockInput,
     items: Vec<LowStockItem>,
+}
+
+fn serialize_evidence_id<S: serde::Serializer>(
+    id: &Uuid,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serializer.collect_str(id)
+}
+
+fn deserialize_evidence_id<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Uuid, D::Error> {
+    let id = String::deserialize(deserializer)?;
+    Uuid::parse_str(&id).map_err(serde::de::Error::custom)
 }
 
 impl LowStockEvidence {
@@ -120,6 +152,33 @@ impl LowStockEvidence {
             input,
             items,
         }
+    }
+
+    pub(crate) fn id(&self) -> Uuid {
+        self.id
+    }
+
+    /// Encode for the gateway's attempt evidence store.
+    pub(crate) fn encode_stored(&self) -> AppResult<String> {
+        let payload = serde_json::to_string(self)
+            .map_err(|_| AppError::Unavailable("inventory evidence is unavailable".into()))?;
+        if payload.len() > MAX_STORED_EVIDENCE_BYTES {
+            return Err(AppError::Unavailable(
+                "inventory evidence is too large".into(),
+            ));
+        }
+        Ok(payload)
+    }
+
+    /// Decode only from a server-owned record scoped to the authenticated lease.
+    pub(crate) fn decode_stored(payload: &str) -> AppResult<Self> {
+        if payload.len() > MAX_STORED_EVIDENCE_BYTES {
+            return Err(AppError::Unavailable(
+                "inventory evidence is too large".into(),
+            ));
+        }
+        serde_json::from_str(payload)
+            .map_err(|_| AppError::Unavailable("inventory evidence is unavailable".into()))
     }
 
     /// Only the minimum approved fields and the evidence selector go to the CLI.
@@ -226,15 +285,7 @@ async fn read_protected(
     {
         return Err(AppError::Forbidden("inventory read was denied".into()));
     }
-    ActorSkillAccess::new(
-        state,
-        scope.actor.organization_id,
-        scope.actor.company_id,
-        &scope.actor.token,
-        &scope.actor.identity,
-    )?
-    .require(LOW_STOCK_SKILL_KEY)
-    .await?;
+    scope.require_access(state).await?;
     Ok(scan.items)
 }
 
@@ -254,6 +305,28 @@ pub(crate) async fn inventory_low_stock(
 struct LowStockCandidate {
     evidence_id: String,
     product_ids: Vec<String>,
+}
+
+impl LowStockCandidate {
+    fn parse(candidate: &str) -> AppResult<Self> {
+        if candidate.len() > MAX_CANDIDATE_BYTES {
+            return Err(AppError::BadRequest(
+                "inventory candidate exceeds its size limit".into(),
+            ));
+        }
+        serde_json::from_str(candidate)
+            .map_err(|_| AppError::BadRequest("inventory candidate is malformed".into()))
+    }
+}
+
+/// Read the opaque evidence selector. Verification also validates scope and
+/// selected products against the gateway's retained inventory read.
+pub(crate) fn candidate_evidence_id(candidate: &str) -> AppResult<Uuid> {
+    let evidence_id = LowStockCandidate::parse(candidate)?.evidence_id;
+    Uuid::parse_str(&evidence_id)
+        .ok()
+        .filter(|id| id.to_string() == evidence_id)
+        .ok_or_else(|| AppError::BadRequest("inventory evidence ID is invalid".into()))
 }
 
 /// Server-authored text and direct record links for the verified reply. These
@@ -278,13 +351,7 @@ fn selected_items<'a>(
     evidence: &'a LowStockEvidence,
     candidate: &str,
 ) -> AppResult<Vec<&'a LowStockItem>> {
-    if candidate.len() > MAX_CANDIDATE_BYTES {
-        return Err(AppError::BadRequest(
-            "inventory candidate exceeds its size limit".into(),
-        ));
-    }
-    let candidate: LowStockCandidate = serde_json::from_str(candidate)
-        .map_err(|_| AppError::BadRequest("inventory candidate is malformed".into()))?;
+    let candidate = LowStockCandidate::parse(candidate)?;
     if candidate.evidence_id != evidence.id.to_string()
         || candidate.product_ids.is_empty() != evidence.items.is_empty()
         || candidate.product_ids.len() > evidence.items.len()
@@ -365,7 +432,7 @@ pub(crate) async fn verify_inventory_candidate(
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use axum::{
         extract::{Query, State},
@@ -512,10 +579,10 @@ mod tests {
         );
     }
 
-    type Fixture = (Arc<AtomicBool>, Arc<AtomicUsize>);
+    pub(in crate::routes) type Fixture = (Arc<AtomicBool>, Arc<AtomicUsize>);
 
-    #[tokio::test]
-    async fn authenticated_scan_uses_actor_token_and_release_rechecks_revocation() {
+    pub(in crate::routes) async fn inventory_fixture(
+    ) -> (AppState, Fixture, tokio::task::JoinHandle<()>) {
         let revoked = Arc::new(AtomicBool::new(false));
         let inventory_reads = Arc::new(AtomicUsize::new(0));
         let app = Router::new()
@@ -571,6 +638,12 @@ mod tests {
         config.api_server_url = Some(origin.clone());
         config.stdb_host = origin;
         let state = test_support::state(config).await;
+        (state, (revoked, inventory_reads), server)
+    }
+
+    #[tokio::test]
+    async fn authenticated_scan_uses_actor_token_and_release_rechecks_revocation() {
+        let (state, (revoked, inventory_reads), server) = inventory_fixture().await;
         let owner = actor(9, 'a');
         let privacy = OrgPrivacyPolicy::default();
         let scope = tool_scope(&owner, &privacy, 4, "one");
