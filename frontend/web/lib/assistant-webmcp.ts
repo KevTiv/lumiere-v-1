@@ -77,10 +77,10 @@ function createTool(
       if (executionSignal?.aborted) return { status: "cancelled" }
 
       if (!input || typeof input !== "object" || Array.isArray(input) ||
-        Object.keys(input).length !== 1 || !Object.hasOwn(input, argument)) {
+        Object.keys(input).length !== 1) {
         return { status: "invalid_input" }
       }
-      const id = (input as Record<string, unknown>)[argument]
+      const id: unknown = Object.getOwnPropertyDescriptor(input, argument)?.value
       if (typeof id !== "string" || !pattern.test(id)) return { status: "invalid_input" }
 
       const signal = executionSignal ? AbortSignal.any([scopeSignal, executionSignal]) : scopeSignal

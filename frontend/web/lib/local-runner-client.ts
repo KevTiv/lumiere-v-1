@@ -47,12 +47,15 @@ export async function discoverRunners(companyId: number, signal: AbortSignal) {
 }
 
 export async function issueRunnerPairing(companyId: number, signal?: AbortSignal) {
-  const data = await (await post('/pair', { companyId }, signal)).json() as Record<string, unknown> | null
-  if (!data || typeof data.code !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{3,127}$/.test(data.code)
+  const data: unknown = await (await post('/pair', { companyId }, signal)).json()
+  if (!data || typeof data !== 'object' || !('code' in data) || !('expiresAt' in data)
+    || typeof data.code !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{3,127}$/.test(data.code)
     || typeof data.expiresAt !== 'string' || !Number.isFinite(Date.parse(data.expiresAt))) {
     throw new Error('Invalid local runner pairing response.')
   }
-  const gateway = typeof data.gatewayOrigin === 'string' ? new URL(data.gatewayOrigin) : undefined
+  const gateway = 'gatewayOrigin' in data && typeof data.gatewayOrigin === 'string'
+    ? new URL(data.gatewayOrigin)
+    : undefined
   if (gateway && (!['http:', 'https:'].includes(gateway.protocol) || gateway.username || gateway.password || gateway.href !== gateway.origin + '/')) {
     throw new Error('Invalid local runner gateway URL.')
   }
