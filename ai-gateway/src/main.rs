@@ -389,6 +389,10 @@ async fn main() -> anyhow::Result<()> {
             post(routes::run_lifecycle::post_run_lifecycle),
         )
         .route(
+            "/v1/internal/local-runner/devices",
+            get(routes::local_runner::get_devices),
+        )
+        .route(
             "/v1/skills/import-mapping",
             post(routes::harness_skills::post_import_mapping),
         )

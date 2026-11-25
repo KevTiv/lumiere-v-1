@@ -1,0 +1,39 @@
+{
+  "hello": {
+    "type": "hello",
+    "version": 1,
+    "providers": [{
+      "provider": "codex",
+      "version": "fixture",
+      "state": "ready",
+      "capabilities": ["resume", "permission", "usage"],
+      "funding": "unknown"
+    }]
+  },
+  "dispatch": {
+    "type": "dispatch",
+    "runId": "9007199254740993",
+    "attemptId": "attempt-1",
+    "leaseId": "lease-1",
+    "provider": "codex",
+    "prompt": "Explain the available low-stock evidence."
+  },
+  "candidate": {
+    "type": "event",
+    "runId": "9007199254740993",
+    "attemptId": "attempt-1",
+    "leaseId": "lease-1",
+    "seq": 2,
+    "event": {
+      "type": "candidate",
+      "text": "Awaiting verification by the gateway."
+    }
+  },
+  "ack": {
+    "type": "ack",
+    "runId": "9007199254740993",
+    "attemptId": "attempt-1",
+    "leaseId": "lease-1",
+    "seq": 2
+  }
+}

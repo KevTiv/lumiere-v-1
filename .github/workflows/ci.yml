@@ -52,6 +52,8 @@ jobs:
         run: node --test scripts/tests/test_production_identity_bootstrap.mjs scripts/tests/inventory-workflow-cancellations.test.mjs scripts/tests/test_mistral_alpha_preflight.mjs scripts/tests/test-provision-ai-harness.mjs scripts/tests/test-provision-mistral-capabilities.mjs
       - name: Test chat rollout, upgrade and release acceptance
         run: node --test scripts/tests/configure-ai-platform.test.mjs scripts/tests/verify-grounded-chat.test.mjs
+      - name: Test local runner protocol and replay
+        run: node --test 'local-runner/**/*.test.mjs' scripts/tests/local-runner-replay.test.mjs
       - name: Test ordered Railway release orchestration
         run: |
           bash scripts/tests/test-railway-stack-release.sh
@@ -334,6 +336,9 @@ jobs:
 
       - name: ai-gateway unit tests
         run: cargo test --locked -p ai-gateway --bin gateway
+
+      - name: Local runner gateway admission
+        run: python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --lib local_runner
 
       - uses: actions/setup-node@v4
         with:

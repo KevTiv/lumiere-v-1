@@ -44,7 +44,7 @@ use crate::{
             TextEvidence, WithholdReason,
         },
     },
-    retrieval_policy::optional_retrieval,
+    retrieval_policy::{optional_retrieval, RetrievalOutcome},
     routes::guide_retrieval::{
         recheck_related_guides, retrieve_related_guides, validate_guide_refs, GuideIdentity,
         RelatedGuide,
@@ -1301,9 +1301,8 @@ pub async fn post_rag(
                 org_id,
                 req.company_id,
                 &req.query,
-                "rag",
+                super::context::QueryPurpose::Chat,
                 Some(&agent),
-                Some("rag_generation"),
             )
             .await,
         )
@@ -1329,11 +1328,11 @@ pub async fn post_rag(
     }
     let mut retrieval_degraded = false;
     let company_result = match &query_vector {
-        Some(Ok(query_vector)) => {
+        Some(Ok(query)) if query.documents == super::context::DocumentSearch::Ready => {
             state
                 .vector_store
                 .search_content_types(
-                    query_vector.clone(),
+                    query.vector.clone(),
                     org_id,
                     req.company_id,
                     content_type_filter,
@@ -1342,7 +1341,10 @@ pub async fn post_rag(
                 )
                 .await
         }
-        Some(Err(_)) => Err(anyhow::anyhow!("admitted query embedding unavailable")),
+        Some(Ok(query)) if query.documents == super::context::DocumentSearch::Skipped => {
+            Ok(Vec::new())
+        }
+        Some(_) => Err(anyhow::anyhow!("admitted evidence query unavailable")),
         None => Ok(Vec::new()),
     };
     if let Err(error) = &company_result {
@@ -1359,29 +1361,32 @@ pub async fn post_rag(
 
     let org_top_k = req.limit.clamp(1, RAG_ORG_ACTIVITY_TOP_K as u64) as usize;
     let org_result = match query_vector {
-        Some(Ok(vector)) => {
+        Some(Ok(query)) if query.activity_ready => {
             super::context::search_authorized_activity(
                 &state,
                 &actor,
                 org_id,
                 req.company_id,
-                vector,
+                query,
                 org_top_k,
             )
             .await
         }
-        Some(Err(_)) => Err(anyhow::anyhow!("admitted activity query unavailable")),
-        None => Ok(Vec::new()),
+        Some(_) => Err(anyhow::anyhow!("admitted activity query unavailable")),
+        None => Ok(RetrievalOutcome::default()),
     };
-    if let Err(error) = &org_result {
+    let org_outcome = org_result.unwrap_or_else(|error| {
         tracing::warn!(
             org_id,
             company_id = req.company_id,
             error = %error,
             "Org activity retrieval unavailable; continuing with company hits only"
         );
-    }
-    let org_outcome = optional_retrieval(org_result);
+        RetrievalOutcome {
+            value: Vec::new(),
+            degraded: true,
+        }
+    });
     retrieval_degraded |= org_outcome.degraded;
     let org_hits = org_outcome.value;
 

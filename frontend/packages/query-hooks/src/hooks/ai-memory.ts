@@ -221,18 +221,32 @@ export type AiActivityIngestResult = {
   automatic_backfill: false
 }
 
+type AiCatalogIngestRequest = { companyId: number; catalog: { before?: string; preview?: string } }
+type AiCatalogIngestResult = AiActivityIngestResult & {
+  catalog: { ready: number; preview: string | null; next_before: string | null }
+}
+
+async function indexSearchRecords<T>(args: AiCatalogIngestRequest | { companyId: number; resources: AiActivityReference[] }): Promise<T> {
+  const r = await apiFetch("/api/ai/context/ingest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+  })
+  if (!r.ok) throw new Error(await parseAiError(r))
+  return (await r.json()) as T
+}
+
 /** Index only explicitly selected records in the active company and current actor scope. */
 export function useAiMemoryIngest() {
   return useMutation({
-    mutationFn: async (args: { companyId: number; resources: AiActivityReference[] }) => {
-      const r = await apiFetch("/api/ai/context/ingest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId: args.companyId, resources: args.resources }),
-      })
-      if (!r.ok) throw new Error(await parseAiError(r))
-      return (await r.json()) as AiActivityIngestResult
-    },
+    mutationFn: (args: { companyId: number; resources: AiActivityReference[] }) =>
+      indexSearchRecords<AiActivityIngestResult>(args),
+  })
+}
+
+export function useAiCatalogIngest() {
+  return useMutation({
+    mutationFn: (args: AiCatalogIngestRequest) => indexSearchRecords<AiCatalogIngestResult>(args),
   })
 }
 

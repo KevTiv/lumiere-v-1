@@ -1,6 +1,7 @@
 //! Provider-independent permission evaluation shared by API reads and reducers.
 
 pub mod additional_tenant;
+pub mod ai_catalog;
 pub mod ai_skills;
 pub mod expense_allocations;
 pub mod skill_projection;

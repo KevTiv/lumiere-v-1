@@ -691,13 +691,28 @@ case "$1" in
     esac
     ;;
   sql)
-    [[ "$3" == 'SELECT skill_key, is_system FROM ai_skill WHERE organization_id = 0' ]]
-    if [[ "${TEST_CATALOG_FORM:-complete}" == incomplete && ! -e "$TEST_CATALOG_MIGRATION_LOG" ]] ||
-       [[ "${TEST_CATALOG_FORM:-complete}" == unrepaired ]]; then
-      jq '[{rows: map([.skill_key, true])}]' "$TEST_BUILTIN_SKILL_CATALOG"
-    else
-      jq -s '[{rows: (add | map([.skill_key, true]))}]' "$TEST_BUILTIN_SKILL_CATALOG" "$TEST_INFRASTRUCTURE_SKILL_CATALOG"
-    fi
+    case "$3" in
+      'SELECT skill_key, is_system FROM ai_skill WHERE organization_id = 0')
+        if [[ "${TEST_CATALOG_FORM:-complete}" == incomplete && ! -e "$TEST_CATALOG_MIGRATION_LOG" ]] ||
+           [[ "${TEST_CATALOG_FORM:-complete}" == unrepaired ]]; then
+          jq '[{rows: map([.skill_key, true])}]' "$TEST_BUILTIN_SKILL_CATALOG"
+        else
+          jq -s '[{rows: (add | map([.skill_key, true]))}]' "$TEST_BUILTIN_SKILL_CATALOG" "$TEST_INFRASTRUCTURE_SKILL_CATALOG"
+        fi
+        ;;
+      'SELECT organization_id, id, name, permissions FROM role WHERE organization_id > 0 AND is_system = true AND is_active = true')
+        printf '[{"rows":[[7,43,"owner",["*:*"]],[7,42,"Owner",["*:*"]],[8,44,"admin",["*:*"]],[9,45,"owner",["product:read"]]]}]\n'
+        ;;
+      'SELECT organization_id, role_id, capability_key FROM ai_capability_role_grant')
+        if [[ "${TEST_OWNER_DEFAULTS:-complete}" == incomplete && ! -e "$TEST_CATALOG_MIGRATION_LOG" ]] ||
+           [[ "${TEST_OWNER_DEFAULTS:-complete}" == unrepaired ]]; then
+          jq '[{rows: (map(select(.capability_key != "ai.document.ocr") | [7,42,.capability_key]) + [[7,43,"ai.document.ocr"]])}]' "$TEST_OWNER_AI_DEFAULTS"
+        else
+          jq '[{rows: map([7,42,.capability_key])}]' "$TEST_OWNER_AI_DEFAULTS"
+        fi
+        ;;
+      *) exit 92 ;;
+    esac
     ;;
   call)
     [[ "$3" == apply_global_migrations ]]
@@ -718,6 +733,7 @@ export TEST_PUBLISHER_CONFIG_LOG="$TMP/publisher-config-paths"
 export TEST_CATALOG_MIGRATION_LOG="$TMP/catalog-migration.log"
 export TEST_BUILTIN_SKILL_CATALOG="$ROOT/spacetimedb/assets/ai-builtin-skills.json"
 export TEST_INFRASTRUCTURE_SKILL_CATALOG="$ROOT/spacetimedb/assets/ai-infrastructure-skills.json"
+export TEST_OWNER_AI_DEFAULTS="$ROOT/spacetimedb/assets/ai-owner-capability-grants.json"
 
 publisher_output="$(env \
   "PATH=$publisher_bin:$PATH" \
@@ -748,6 +764,28 @@ if env \
   exit 1
 fi
 grep -Fq 'Built-in AI skills still missing after migration:' "$TMP/unrepaired-catalog.log"
+
+env \
+  "PATH=$publisher_bin:$PATH" \
+  TEST_CATALOG_MIGRATION_LOG="$TMP/owner-grant-migration.log" \
+  TEST_OWNER_DEFAULTS=incomplete \
+  STDB_HOST=http://spacetimedb.test \
+  STDB_MODULE=lumiere-test \
+  STDB_SERVER_TOKEN=not-a-real-secret \
+  bash "$ROOT/scripts/railway-publish-spacetimedb.sh" >/dev/null
+test "$(cat "$TMP/owner-grant-migration.log")" = apply_global_migrations
+
+if env \
+  "PATH=$publisher_bin:$PATH" \
+  TEST_OWNER_DEFAULTS=unrepaired \
+  STDB_HOST=http://spacetimedb.test \
+  STDB_MODULE=lumiere-test \
+  STDB_SERVER_TOKEN=not-a-real-secret \
+  bash "$ROOT/scripts/railway-publish-spacetimedb.sh" >"$TMP/unrepaired-owner-grants.log" 2>&1; then
+  echo "publisher accepted a missing Owner AI grant" >&2
+  exit 1
+fi
+grep -Fq 'Owner AI capability grants still missing after migration: 1' "$TMP/unrepaired-owner-grants.log"
 
 env \
   "PATH=$publisher_bin:$PATH" \
