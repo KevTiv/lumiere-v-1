@@ -266,11 +266,10 @@ test("a saved import selector reopens 11 journal drafts without the model or any
   }
   const pendingLink = new URL(
     await readChatImportTaskReviewHref(
-      async (url) => Response.json(
-        url.includes("/workflow?")
-          ? workflow
-          : { ...task, reviews: [...task.reviews, pendingReview] },
-      ),
+      async (url) => {
+        assert.equal(url, `/api/import-tasks/${taskId}?companyId=3`)
+        return Response.json({ ...task, reviews: [...task.reviews, pendingReview] })
+      },
       conversation,
       taskId,
     ),
