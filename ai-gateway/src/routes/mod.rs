@@ -23,6 +23,7 @@ pub(crate) mod rag_ui_actions;
 pub mod report;
 pub mod run_lifecycle;
 pub(crate) mod runner_inventory;
+pub(crate) mod runner_mcp;
 pub mod search;
 pub mod skill_bindings;
 pub mod skills;
