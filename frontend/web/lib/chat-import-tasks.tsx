@@ -14,7 +14,7 @@ import { ChatImportReceipt } from "./chat-import-receipt"
 import { ChatReconciliationPreview } from "./chat-reconciliation-preview"
 import { DataImportWorkspace } from "./data-import-workspace"
 import { SavedImportTaskPicker, useSavedImportTaskList } from "./saved-import-task-picker"
-import { importTaskHref, type ImportTaskView } from "./import-task-navigation"
+import { importTaskHref, pendingImportReviewId, type ImportTaskView } from "./import-task-navigation"
 import type { ImportPreparation } from "./import-preparation"
 import {
   canPrepareInspectedImport, chatImportReceiptKey, chatImportScopeKey, listChatImportTasks, parseChatImportTask,
@@ -253,7 +253,7 @@ export function useChatImportTasks(args: {
     return <ChatImportReceipt
       scope={saved ? { ...scope, conversationKey: saved.conversationKey } : scope}
       taskId={taskId}
-      onOpen={saved && !args.readonly ? view => openTask(saved, view) : undefined}
+      onOpen={saved && !args.readonly ? view => openTask(saved, view, view === "decisions" ? pendingImportReviewId(saved.reviews) : undefined) : undefined}
     />
   }
   const archivedContent = scope && visible && args.readonly && visible.tasks.length > 0 ? (
@@ -262,7 +262,7 @@ export function useChatImportTasks(args: {
         <article key={task.requestId} className="space-y-2 rounded-lg border p-3 text-sm">
           {args.renderHistoryDecision?.(task)}
           <a className="underline underline-offset-4" href={importTaskHref({
-            companyId: scope.companyId, taskId: task.requestId, view: "decisions",
+            companyId: scope.companyId, taskId: task.requestId, view: "decisions", reviewId: pendingImportReviewId(task.reviews),
           })}>
             {t("settings.importTask.openTask", { defaultValue: "Open saved task" })}
           </a>
@@ -351,7 +351,7 @@ export function useChatImportTasks(args: {
           <Button type="button" variant="outline" size="sm" disabled={visible.busy} onClick={() => openTask(task)}>{t("settings.importTask.openTask", { defaultValue: "Open saved task" })}</Button>
         ) : null}
         <a className="text-sm underline underline-offset-4" href={importTaskHref({
-          companyId: scope.companyId, taskId: task.requestId, view: task.reviews.length ? "decisions" : "sources",
+          companyId: scope.companyId, taskId: task.requestId, view: task.reviews.length ? "decisions" : "sources", reviewId: pendingImportReviewId(task.reviews),
         })}>{t("settings.importTask.permalink", { defaultValue: "Open this task in Data import" })}</a>
       </div>
       {focusedTask?.requestId === task.requestId

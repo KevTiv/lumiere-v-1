@@ -28,6 +28,7 @@ import { importWorkflowKey, useImportWorkflow } from "./use-import-workflow"
 import {
   importTaskHref,
   isImportTaskView,
+  pendingImportReviewId,
   type ImportTaskView,
 } from "./import-task-navigation"
 import {
@@ -84,6 +85,7 @@ export function SavedImportWorkspace({
     if (task) onTaskFocus?.(task)
   }, [task, onTaskFocus])
   const [reviewId, setReviewId] = useState(initialReviewId)
+  useEffect(() => setReviewId(initialReviewId), [initialReviewId])
   const [executionView, setExecutionView] = useState<"preview" | "results">(
     view === "results" ? "results" : "preview",
   )
@@ -134,7 +136,7 @@ export function SavedImportWorkspace({
       ? reviewId
       : ((view === "preview"
           ? reviews?.find((review) => review.confirmed > 0)?.id
-          : reviews?.find((review) => review.pending > 0)?.id) ??
+          : pendingImportReviewId(reviews)) ??
         allowedReviewIds[0])
   const counts = useMemo(
     () =>
@@ -179,7 +181,7 @@ export function SavedImportWorkspace({
   const nextReviewId =
     (nextView === "preview"
       ? reviews?.find((item) => item.confirmed > 0)?.id
-      : reviews?.find((item) => item.pending > 0)?.id) ?? selectedReviewId
+      : pendingImportReviewId(reviews)) ?? selectedReviewId
   useEffect(() => {
     if (
       !resumeAtNextStep ||
@@ -655,6 +657,7 @@ export function SavedImportWorkspace({
         <TabsContent value="decisions" keepMounted>
           {selectedReviewId ? (
             <ImportReviewWorkspace
+              key={selectedReviewId}
               organizationId={scope.organizationId}
               selectedId={selectedReviewId}
               allowedReviewIds={allowedReviewIds}

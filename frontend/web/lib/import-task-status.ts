@@ -4,8 +4,9 @@ import type {
   ChatImportTaskStatus,
 } from "@lumiere/ui/lib/import-task-status"
 import type { ChatMessageSourceRef } from "@lumiere/ui/lib/ai-chat-types"
-import { importTaskStatusIsCurrent } from "@lumiere/ui/lib/import-task-status"
+import { importTaskHasResults, importTaskNextView, importTaskStatusIsCurrent } from "@lumiere/ui/lib/import-task-status"
 import { parseSavedImportTask, type ChatImportScope } from "./chat-import-task"
+import { importTaskHref, pendingImportReviewId } from "./import-task-navigation"
 import { importAmountUnits, readImportWorkflow, reviewedRecordsSchema, type WorkflowFetch } from "./import-workflow"
 
 const id = z.string().regex(/^[1-9]\d{0,19}$/)
@@ -197,6 +198,32 @@ export async function readChatImportTaskStatus(
   taskId: string,
   signal?: AbortSignal,
 ): Promise<ChatImportTaskStatus> {
+  return (await readImportTaskProjection(fetcher, scope, taskId, signal)).status
+}
+
+/** Reopen an authorized task at its outstanding review, or at its native next view. */
+export async function readChatImportTaskReviewHref(
+  fetcher: WorkflowFetch,
+  scope: Pick<ChatImportScope, "companyId" | "organizationId">,
+  taskId: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const { status, task } = await readImportTaskProjection(fetcher, scope, taskId, signal)
+  const reviewId = pendingImportReviewId(task.reviews)
+  const view = reviewId ? "decisions" : importTaskNextView({
+    ...status,
+    hasPreparedProposal: status.proposals.some((proposal) => proposal.status === "prepared"),
+    hasResults: importTaskHasResults(status),
+  })
+  return importTaskHref({ companyId: scope.companyId, taskId, view, reviewId })
+}
+
+async function readImportTaskProjection(
+  fetcher: WorkflowFetch,
+  scope: Pick<ChatImportScope, "companyId" | "organizationId">,
+  taskId: string,
+  signal?: AbortSignal,
+) {
   taskIdSchema.parse(taskId)
   const read: WorkflowFetch = (url, options) =>
     fetcher(url, { ...options, signal })
@@ -220,7 +247,7 @@ export async function readChatImportTaskStatus(
     }),
     { total: 0, ready: 0, held: 0, excluded: 0 },
   )
-  return statusSchema.parse({
+  const status = statusSchema.parse({
     taskId,
     organizationId: workflow.organizationId,
     companyId: workflow.companyId,
@@ -247,6 +274,7 @@ export async function readChatImportTaskStatus(
     nativeResultsMore: workflow.nativeResultsMore,
     reviewedRecords: workflow.reviewedRecords,
   })
+  return { status, task }
 }
 
 const postingSchema = z.object({

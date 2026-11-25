@@ -13,6 +13,13 @@ export type ImportTaskLocation = {
   reviewId?: string
 }
 
+/** Match the first unresolved source group shown by the native review workspace. */
+export function pendingImportReviewId(
+  reviews: readonly { id: string; pending: number }[] | undefined,
+): string | undefined {
+  return reviews?.find(({ pending }) => pending > 0)?.id
+}
+
 export function isImportTaskView(value: unknown): value is ImportTaskView {
   return IMPORT_TASK_VIEWS.some((view) => view === value)
 }
