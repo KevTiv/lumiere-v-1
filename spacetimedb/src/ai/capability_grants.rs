@@ -49,9 +49,9 @@ pub(crate) struct DefaultAiCapabilityGrant {
 /// Production baseline for the organization owner.
 ///
 /// These are exact grants, deliberately not a wildcard. They make the
-/// read-only/reversible harness control surfaces usable after tenant bootstrap
+/// read-only/reversible harness control surfaces and bounded record indexing usable after tenant bootstrap
 /// while every other role stays default-deny until explicitly provisioned.
-pub(crate) const OWNER_AI_CAPABILITY_GRANTS: [DefaultAiCapabilityGrant; 5] = [
+pub(crate) const OWNER_AI_CAPABILITY_GRANTS: [DefaultAiCapabilityGrant; 6] = [
     DefaultAiCapabilityGrant {
         capability_key: "ai.evidence.retrieve",
         max_rows: 20,
@@ -72,6 +72,7 @@ pub(crate) const OWNER_AI_CAPABILITY_GRANTS: [DefaultAiCapabilityGrant; 5] = [
         max_rows: 100,
         max_bytes: 1024 * 1024,
     },
+    OWNER_CONTEXT_INDEX_GRANT,
     // Read-only capability negotiation (`GET /v1/harness/descriptor`). The
     // descriptor is a small fixed-shape document; bounds stay tight.
     DefaultAiCapabilityGrant {
@@ -80,6 +81,12 @@ pub(crate) const OWNER_AI_CAPABILITY_GRANTS: [DefaultAiCapabilityGrant; 5] = [
         max_bytes: 64 * 1024,
     },
 ];
+
+const OWNER_CONTEXT_INDEX_GRANT: DefaultAiCapabilityGrant = DefaultAiCapabilityGrant {
+    capability_key: "ai.context.index",
+    max_rows: 8,
+    max_bytes: 64 * 1024,
+};
 
 /// Read-only harness descriptor access. Part of the owner baseline.
 pub(crate) const AI_HARNESS_DESCRIPTOR_READ_CAPABILITY: &str = "ai.harness.descriptor.read";
@@ -121,6 +128,10 @@ pub(crate) fn provision_owner_ai_capability_grants(
             });
 
         if let Some(grant) = existing {
+            // Preserve deliberate indexing limits or revocation on an existing tenant.
+            if definition.capability_key == OWNER_CONTEXT_INDEX_GRANT.capability_key {
+                continue;
+            }
             ctx.db
                 .ai_capability_role_grant()
                 .id()
@@ -289,6 +300,7 @@ mod tests {
         assert_eq!(
             keys,
             vec![
+                "ai.context.index",
                 "ai.evidence.inspect",
                 "ai.evidence.retrieve",
                 "ai.harness.descriptor.read",
@@ -300,6 +312,18 @@ mod tests {
             assert!(!grant.capability_key.contains('*'), "no wildcard grants");
             assert!(grant.max_rows > 0 && grant.max_bytes > 0);
         }
+    }
+
+    #[test]
+    fn owner_index_grant_is_bounded_and_does_not_enable_shared_reindex() {
+        let grant = OWNER_AI_CAPABILITY_GRANTS
+            .iter()
+            .find(|grant| grant.capability_key == "ai.context.index")
+            .expect("owner record indexing grant");
+        assert_eq!((grant.max_rows, grant.max_bytes), (8, 64 * 1024));
+        assert!(OWNER_AI_CAPABILITY_GRANTS
+            .iter()
+            .all(|grant| grant.capability_key != "embedding_reindex"));
     }
 
     #[test]
