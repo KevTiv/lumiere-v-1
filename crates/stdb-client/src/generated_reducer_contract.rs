@@ -737,6 +737,9 @@ const PARAMS_CLAIM_AI_CAPABILITY_EXECUTION: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("ClaimAiCapabilityExecutionParams") },
 ];
+const PARAMS_CLAIM_AI_LOCAL_RUNNER_PAIRING: &[ReducerParam] = &[
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("ClaimRunnerPairing") },
+];
 const PARAMS_CLAIM_AI_METERED_DISPATCH: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "reservation_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -3309,6 +3312,10 @@ const PARAMS_INVOICE_PO_LINE: &[ReducerParam] = &[
     ReducerParam { name: "line_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "qty", kind: ScalarKind::Float, ref_target: None },
 ];
+const PARAMS_ISSUE_AI_LOCAL_RUNNER_PAIRING: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("IssueRunnerPairing") },
+];
 const PARAMS_LINK_DEVICE_TO_LOCATION: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "device_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -4496,6 +4503,12 @@ const PARAMS_REVISE_AI_ARTIFACT_COMPONENT: &[ReducerParam] = &[
     ReducerParam { name: "component_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("ReviseAiArtifactComponentParams") },
 ];
+const PARAMS_REVOKE_AI_LOCAL_RUNNER_DEVICE: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "actor_identity", kind: ScalarKind::String, ref_target: None },
+    ReducerParam { name: "device_id", kind: ScalarKind::String, ref_target: None },
+];
 const PARAMS_REVOKE_AI_WORK_PROGRAM_RECIPE: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -5485,6 +5498,10 @@ const PARAMS_STAGE_BANK_STATEMENT_IMPORT: &[ReducerParam] = &[
     ReducerParam { name: "currency_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("StageBankStatementImportParams") },
 ];
+const PARAMS_START_AI_LOCAL_RUNNER_RUN: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("StartRunnerRun") },
+];
 const PARAMS_START_CYCLE_COUNT_SESSION: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -5757,6 +5774,10 @@ const PARAMS_UPDATE_AI_CHAT_SESSION_TITLE: &[ReducerParam] = &[
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "session_key", kind: ScalarKind::String, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateAiChatSessionTitleParams") },
+];
+const PARAMS_UPDATE_AI_LOCAL_RUNNER_RUN: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("UpdateRunnerRun") },
 ];
 const PARAMS_UPDATE_AI_REDUCER_ALLOWLIST: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -6853,6 +6874,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "check_ai_agent_activation", contract_operation_id: "erp.check_ai_agent_activation", params: PARAMS_CHECK_AI_AGENT_ACTIVATION, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "check_mo_availability", contract_operation_id: "erp.check_mo_availability", params: PARAMS_CHECK_MO_AVAILABILITY, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "claim_ai_capability_execution", contract_operation_id: "erp.claim_ai_capability_execution", params: PARAMS_CLAIM_AI_CAPABILITY_EXECUTION, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "claim_ai_local_runner_pairing", contract_operation_id: "erp.claim_ai_local_runner_pairing", params: PARAMS_CLAIM_AI_LOCAL_RUNNER_PAIRING, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
     ReducerContract { name: "claim_ai_metered_dispatch", contract_operation_id: "erp.claim_ai_metered_dispatch", params: PARAMS_CLAIM_AI_METERED_DISPATCH, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "claim_ai_skill_certification", contract_operation_id: "erp.claim_ai_skill_certification", params: PARAMS_CLAIM_AI_SKILL_CERTIFICATION, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "claim_hub_with_token", contract_operation_id: "erp.claim_hub_with_token", params: PARAMS_CLAIM_HUB_WITH_TOKEN, lifecycle: "none", exposure: Exposure::Denied, organization_position: None, company_position: None, unscoped_reason: None },
@@ -7403,6 +7425,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "interrupt_ai_run", contract_operation_id: "erp.interrupt_ai_run", params: PARAMS_INTERRUPT_AI_RUN, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "invalidate_workflow_human_task", contract_operation_id: "erp.invalidate_workflow_human_task", params: PARAMS_INVALIDATE_WORKFLOW_HUMAN_TASK, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "invoice_po_line", contract_operation_id: "erp.invoice_po_line", params: PARAMS_INVOICE_PO_LINE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "issue_ai_local_runner_pairing", contract_operation_id: "erp.issue_ai_local_runner_pairing", params: PARAMS_ISSUE_AI_LOCAL_RUNNER_PAIRING, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "link_device_to_location", contract_operation_id: "erp.link_device_to_location", params: PARAMS_LINK_DEVICE_TO_LOCATION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "link_device_to_pos", contract_operation_id: "erp.link_device_to_pos", params: PARAMS_LINK_DEVICE_TO_POS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "link_device_to_quality_check", contract_operation_id: "erp.link_device_to_quality_check", params: PARAMS_LINK_DEVICE_TO_QUALITY_CHECK, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -7641,6 +7664,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "review_message_batch", contract_operation_id: "erp.review_message_batch", params: PARAMS_REVIEW_MESSAGE_BATCH, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "review_supplier_intake", contract_operation_id: "erp.review_supplier_intake", params: PARAMS_REVIEW_SUPPLIER_INTAKE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "revise_ai_artifact_component", contract_operation_id: "erp.revise_ai_artifact_component", params: PARAMS_REVISE_AI_ARTIFACT_COMPONENT, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "revoke_ai_local_runner_device", contract_operation_id: "erp.revoke_ai_local_runner_device", params: PARAMS_REVOKE_AI_LOCAL_RUNNER_DEVICE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "revoke_ai_work_program_recipe", contract_operation_id: "erp.revoke_ai_work_program_recipe", params: PARAMS_REVOKE_AI_WORK_PROGRAM_RECIPE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "revoke_delegated_admin_scope", contract_operation_id: "erp.revoke_delegated_admin_scope", params: PARAMS_REVOKE_DELEGATED_ADMIN_SCOPE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "revoke_field_permission", contract_operation_id: "erp.revoke_field_permission", params: PARAMS_REVOKE_FIELD_PERMISSION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -7968,6 +7992,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "solve_quality_alert", contract_operation_id: "erp.solve_quality_alert", params: PARAMS_SOLVE_QUALITY_ALERT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "stage_ai_workflow_node_provenance", contract_operation_id: "erp.stage_ai_workflow_node_provenance", params: PARAMS_STAGE_AI_WORKFLOW_NODE_PROVENANCE, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "stage_bank_statement_import", contract_operation_id: "erp.stage_bank_statement_import", params: PARAMS_STAGE_BANK_STATEMENT_IMPORT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "start_ai_local_runner_run", contract_operation_id: "erp.start_ai_local_runner_run", params: PARAMS_START_AI_LOCAL_RUNNER_RUN, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "start_cycle_count_session", contract_operation_id: "erp.start_cycle_count_session", params: PARAMS_START_CYCLE_COUNT_SESSION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "start_manufacturing_order", contract_operation_id: "erp.start_manufacturing_order", params: PARAMS_START_MANUFACTURING_ORDER, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "start_offboarding", contract_operation_id: "erp.start_offboarding", params: PARAMS_START_OFFBOARDING, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
@@ -8030,6 +8055,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "update_ai_action_draft_params", contract_operation_id: "erp.update_ai_action_draft_params", params: PARAMS_UPDATE_AI_ACTION_DRAFT_PARAMS, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "update_ai_agent", contract_operation_id: "erp.update_ai_agent", params: PARAMS_UPDATE_AI_AGENT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "update_ai_chat_session_title", contract_operation_id: "erp.update_ai_chat_session_title", params: PARAMS_UPDATE_AI_CHAT_SESSION_TITLE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
+    ReducerContract { name: "update_ai_local_runner_run", contract_operation_id: "erp.update_ai_local_runner_run", params: PARAMS_UPDATE_AI_LOCAL_RUNNER_RUN, lifecycle: "none", exposure: Exposure::Denied, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "update_ai_reducer_allowlist", contract_operation_id: "erp.update_ai_reducer_allowlist", params: PARAMS_UPDATE_AI_REDUCER_ALLOWLIST, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "update_analytic_account", contract_operation_id: "erp.update_analytic_account", params: PARAMS_UPDATE_ANALYTIC_ACCOUNT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "update_analytic_distribution_model", contract_operation_id: "erp.update_analytic_distribution_model", params: PARAMS_UPDATE_ANALYTIC_DISTRIBUTION_MODEL, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -8219,9 +8245,12 @@ pub fn company_scope_paths(reducer_name: &str) -> &'static [CompanyScopePath] {
         "create_manual_account_invoice" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: true, nullable: false }],
         "create_opportunity" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: false, nullable: true }],
         "create_whatsapp_business_account" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: false, nullable: true }],
+        "issue_ai_local_runner_pairing" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: true, nullable: false }],
         "nominate_ai_work_program_output" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: true, nullable: false }],
         "reserve_ai_metered_spend" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: true, nullable: false }],
         "save_ai_work_program_draft" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: true, nullable: false }],
+        "start_ai_local_runner_run" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: true, nullable: false }],
+        "update_ai_local_runner_run" => &[CompanyScopePath { parameter_position: 1, path: &["company_id"], required: true, nullable: false }],
         _ => &[],
     }
 }
@@ -8376,6 +8405,7 @@ pub mod reducer_names {
     pub const CHECK_AI_AGENT_ACTIVATION: ReducerName = ReducerName::new("check_ai_agent_activation");
     pub const CHECK_MO_AVAILABILITY: ReducerName = ReducerName::new("check_mo_availability");
     pub const CLAIM_AI_CAPABILITY_EXECUTION: ReducerName = ReducerName::new("claim_ai_capability_execution");
+    pub const CLAIM_AI_LOCAL_RUNNER_PAIRING: ReducerName = ReducerName::new("claim_ai_local_runner_pairing");
     pub const CLAIM_AI_METERED_DISPATCH: ReducerName = ReducerName::new("claim_ai_metered_dispatch");
     pub const CLAIM_AI_SKILL_CERTIFICATION: ReducerName = ReducerName::new("claim_ai_skill_certification");
     pub const CLAIM_HUB_WITH_TOKEN: ReducerName = ReducerName::new("claim_hub_with_token");
@@ -8926,6 +8956,7 @@ pub mod reducer_names {
     pub const INTERRUPT_AI_RUN: ReducerName = ReducerName::new("interrupt_ai_run");
     pub const INVALIDATE_WORKFLOW_HUMAN_TASK: ReducerName = ReducerName::new("invalidate_workflow_human_task");
     pub const INVOICE_PO_LINE: ReducerName = ReducerName::new("invoice_po_line");
+    pub const ISSUE_AI_LOCAL_RUNNER_PAIRING: ReducerName = ReducerName::new("issue_ai_local_runner_pairing");
     pub const LINK_DEVICE_TO_LOCATION: ReducerName = ReducerName::new("link_device_to_location");
     pub const LINK_DEVICE_TO_POS: ReducerName = ReducerName::new("link_device_to_pos");
     pub const LINK_DEVICE_TO_QUALITY_CHECK: ReducerName = ReducerName::new("link_device_to_quality_check");
@@ -9164,6 +9195,7 @@ pub mod reducer_names {
     pub const REVIEW_MESSAGE_BATCH: ReducerName = ReducerName::new("review_message_batch");
     pub const REVIEW_SUPPLIER_INTAKE: ReducerName = ReducerName::new("review_supplier_intake");
     pub const REVISE_AI_ARTIFACT_COMPONENT: ReducerName = ReducerName::new("revise_ai_artifact_component");
+    pub const REVOKE_AI_LOCAL_RUNNER_DEVICE: ReducerName = ReducerName::new("revoke_ai_local_runner_device");
     pub const REVOKE_AI_WORK_PROGRAM_RECIPE: ReducerName = ReducerName::new("revoke_ai_work_program_recipe");
     pub const REVOKE_DELEGATED_ADMIN_SCOPE: ReducerName = ReducerName::new("revoke_delegated_admin_scope");
     pub const REVOKE_FIELD_PERMISSION: ReducerName = ReducerName::new("revoke_field_permission");
@@ -9491,6 +9523,7 @@ pub mod reducer_names {
     pub const SOLVE_QUALITY_ALERT: ReducerName = ReducerName::new("solve_quality_alert");
     pub const STAGE_AI_WORKFLOW_NODE_PROVENANCE: ReducerName = ReducerName::new("stage_ai_workflow_node_provenance");
     pub const STAGE_BANK_STATEMENT_IMPORT: ReducerName = ReducerName::new("stage_bank_statement_import");
+    pub const START_AI_LOCAL_RUNNER_RUN: ReducerName = ReducerName::new("start_ai_local_runner_run");
     pub const START_CYCLE_COUNT_SESSION: ReducerName = ReducerName::new("start_cycle_count_session");
     pub const START_MANUFACTURING_ORDER: ReducerName = ReducerName::new("start_manufacturing_order");
     pub const START_OFFBOARDING: ReducerName = ReducerName::new("start_offboarding");
@@ -9553,6 +9586,7 @@ pub mod reducer_names {
     pub const UPDATE_AI_ACTION_DRAFT_PARAMS: ReducerName = ReducerName::new("update_ai_action_draft_params");
     pub const UPDATE_AI_AGENT: ReducerName = ReducerName::new("update_ai_agent");
     pub const UPDATE_AI_CHAT_SESSION_TITLE: ReducerName = ReducerName::new("update_ai_chat_session_title");
+    pub const UPDATE_AI_LOCAL_RUNNER_RUN: ReducerName = ReducerName::new("update_ai_local_runner_run");
     pub const UPDATE_AI_REDUCER_ALLOWLIST: ReducerName = ReducerName::new("update_ai_reducer_allowlist");
     pub const UPDATE_ANALYTIC_ACCOUNT: ReducerName = ReducerName::new("update_analytic_account");
     pub const UPDATE_ANALYTIC_DISTRIBUTION_MODEL: ReducerName = ReducerName::new("update_analytic_distribution_model");
@@ -9884,6 +9918,7 @@ macro_rules! reducer_call {
     ("check_ai_agent_activation", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CHECK_AI_AGENT_ACTIVATION, $args) };
     ("check_mo_availability", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CHECK_MO_AVAILABILITY, $args) };
     ("claim_ai_capability_execution", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CLAIM_AI_CAPABILITY_EXECUTION, $args) };
+    ("claim_ai_local_runner_pairing", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CLAIM_AI_LOCAL_RUNNER_PAIRING, $args) };
     ("claim_ai_metered_dispatch", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CLAIM_AI_METERED_DISPATCH, $args) };
     ("claim_ai_skill_certification", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CLAIM_AI_SKILL_CERTIFICATION, $args) };
     ("claim_hub_with_token", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CLAIM_HUB_WITH_TOKEN, $args) };
@@ -10434,6 +10469,7 @@ macro_rules! reducer_call {
     ("interrupt_ai_run", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::INTERRUPT_AI_RUN, $args) };
     ("invalidate_workflow_human_task", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::INVALIDATE_WORKFLOW_HUMAN_TASK, $args) };
     ("invoice_po_line", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::INVOICE_PO_LINE, $args) };
+    ("issue_ai_local_runner_pairing", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::ISSUE_AI_LOCAL_RUNNER_PAIRING, $args) };
     ("link_device_to_location", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::LINK_DEVICE_TO_LOCATION, $args) };
     ("link_device_to_pos", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::LINK_DEVICE_TO_POS, $args) };
     ("link_device_to_quality_check", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::LINK_DEVICE_TO_QUALITY_CHECK, $args) };
@@ -10672,6 +10708,7 @@ macro_rules! reducer_call {
     ("review_message_batch", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REVIEW_MESSAGE_BATCH, $args) };
     ("review_supplier_intake", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REVIEW_SUPPLIER_INTAKE, $args) };
     ("revise_ai_artifact_component", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REVISE_AI_ARTIFACT_COMPONENT, $args) };
+    ("revoke_ai_local_runner_device", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REVOKE_AI_LOCAL_RUNNER_DEVICE, $args) };
     ("revoke_ai_work_program_recipe", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REVOKE_AI_WORK_PROGRAM_RECIPE, $args) };
     ("revoke_delegated_admin_scope", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REVOKE_DELEGATED_ADMIN_SCOPE, $args) };
     ("revoke_field_permission", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::REVOKE_FIELD_PERMISSION, $args) };
@@ -10999,6 +11036,7 @@ macro_rules! reducer_call {
     ("solve_quality_alert", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::SOLVE_QUALITY_ALERT, $args) };
     ("stage_ai_workflow_node_provenance", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::STAGE_AI_WORKFLOW_NODE_PROVENANCE, $args) };
     ("stage_bank_statement_import", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::STAGE_BANK_STATEMENT_IMPORT, $args) };
+    ("start_ai_local_runner_run", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::START_AI_LOCAL_RUNNER_RUN, $args) };
     ("start_cycle_count_session", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::START_CYCLE_COUNT_SESSION, $args) };
     ("start_manufacturing_order", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::START_MANUFACTURING_ORDER, $args) };
     ("start_offboarding", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::START_OFFBOARDING, $args) };
@@ -11061,6 +11099,7 @@ macro_rules! reducer_call {
     ("update_ai_action_draft_params", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::UPDATE_AI_ACTION_DRAFT_PARAMS, $args) };
     ("update_ai_agent", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::UPDATE_AI_AGENT, $args) };
     ("update_ai_chat_session_title", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::UPDATE_AI_CHAT_SESSION_TITLE, $args) };
+    ("update_ai_local_runner_run", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::UPDATE_AI_LOCAL_RUNNER_RUN, $args) };
     ("update_ai_reducer_allowlist", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::UPDATE_AI_REDUCER_ALLOWLIST, $args) };
     ("update_analytic_account", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::UPDATE_ANALYTIC_ACCOUNT, $args) };
     ("update_analytic_distribution_model", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::UPDATE_ANALYTIC_DISTRIBUTION_MODEL, $args) };
