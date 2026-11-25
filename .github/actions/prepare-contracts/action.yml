@@ -13,8 +13,34 @@ runs:
             echo "ripgrep (rg) is required for source lints; install it before preparing contracts" >&2
             exit 2
           fi
-          sudo apt-get update
-          sudo apt-get install -y ripgrep
+          # Some hosted images only have third-party APT indexes enabled.
+          version=15.1.0
+          case "${RUNNER_ARCH:-}" in
+            X64)
+              target=x86_64-unknown-linux-musl
+              checksum=1c9297be4a084eea7ecaedf93eb03d058d6faae29bbc57ecdaf5063921491599
+              ;;
+            ARM64)
+              target=aarch64-unknown-linux-gnu
+              checksum=2b661c6ef508e902f388e9098d9c4c5aca72c87b55922d94abdba830b4dc885e
+              ;;
+            *)
+              echo "Install ripgrep before preparing contracts on ${RUNNER_ARCH:-unknown} Linux runners" >&2
+              exit 2
+              ;;
+          esac
+          release="ripgrep-${version}-${target}"
+          archive="$(mktemp "${RUNNER_TEMP}/ripgrep.XXXXXX")"
+          trap 'rm -f -- "$archive"' EXIT
+          curl --fail --silent --show-error --location --retry 3 --max-time 30 \
+            "https://github.com/BurntSushi/ripgrep/releases/download/${version}/${release}.tar.gz" \
+            --output "$archive"
+          printf '%s  %s\n' "$checksum" "$archive" | sha256sum --check --status
+          bin_dir="${RUNNER_TEMP}/contracts-ripgrep"
+          mkdir -p "$bin_dir"
+          tar -xzf "$archive" -C "$bin_dir" --strip-components=1 "${release}/rg"
+          export PATH="${bin_dir}:${PATH}"
+          printf '%s\n' "$bin_dir" >> "$GITHUB_PATH"
         fi
         rg --version
 
