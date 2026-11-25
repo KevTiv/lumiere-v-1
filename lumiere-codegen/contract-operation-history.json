@@ -214,57 +214,69 @@
       "name": "ai_knowledge_review_read",
       "shape_fingerprint": "sha256:d4a2365d00592762515fb1e75a8ef12329181bce0c53ed235a3ac7e486cc280b"
     },
+    "erp.ai_local_runner_device_read": {
+      "name": "ai_local_runner_device_read",
+      "shape_fingerprint": "sha256:b96b6d48f6d358e8c7090822336a938df20835346ef3a8b2df25782f45f60cfd"
+    },
+    "erp.ai_local_runner_pairing_read": {
+      "name": "ai_local_runner_pairing_read",
+      "shape_fingerprint": "sha256:4f3548d30dd5c135b2ce24a370532bc20f19230b3d2daba47af4a9c48e559112"
+    },
+    "erp.ai_local_runner_run_read": {
+      "name": "ai_local_runner_run_read",
+      "shape_fingerprint": "sha256:d015ad350024cb21c877e61989785511117105440c3d61d56789e08d0da7f609"
+    },
     "erp.ai_metered_price_read": {
       "name": "ai_metered_price_read",
-      "shape_fingerprint": "sha256:a65c2d26f22064a9443530bd64277655c60c438c60c794373b0a11d13e968f37"
+      "shape_fingerprint": "sha256:9340b9a79e4790cd2ab832a216f63e6c7acf484e3241919bb09a5f56ee3841ec"
     },
     "erp.ai_metered_usage_read": {
       "name": "ai_metered_usage_read",
-      "shape_fingerprint": "sha256:afb60f1cdf3b6142aaff23f5f7ed689648be7c8748a8933310ad1a9d7df89541"
+      "shape_fingerprint": "sha256:35a66581a5dc7eaf9bc2a9b0997505cc37b5afa1d446a5ce80f45f62a53d4345"
     },
     "erp.ai_owner_configuration_read": {
       "name": "ai_owner_configuration_read",
-      "shape_fingerprint": "sha256:44526ffdfac10fe1cccb29b2864b34200eed416fdb6bb650256edc088d361f3b"
+      "shape_fingerprint": "sha256:5180eba542586c0892b8344c083ac9b7de840ced4241cbeb50ed285ad46f1f98"
     },
     "erp.ai_owner_configuration_receipt_read": {
       "name": "ai_owner_configuration_receipt_read",
-      "shape_fingerprint": "sha256:4e49ca11b68606e00096b5529e939491390529d66fae897f8b3637b826d2452d"
+      "shape_fingerprint": "sha256:328594738b5a3309cec3275d3132d9ae63039d50ba54509ef51670c2dd022eb9"
     },
     "erp.ai_provider_attempt_read": {
       "name": "ai_provider_attempt_read",
-      "shape_fingerprint": "sha256:42028015f32ce1af77bb5753396fdffeb92de063e1c8dcf134d68eb442428594"
+      "shape_fingerprint": "sha256:b66aed43be3d800ed3289845a5a46cea392c287342e0b9dfdac2b34b9a478b02"
     },
     "erp.ai_run_budget_park_read": {
       "name": "ai_run_budget_park_read",
-      "shape_fingerprint": "sha256:3e17807d33821d3e98a245397791ba44799996010a4ce698469cfa179915d702"
+      "shape_fingerprint": "sha256:dcd74d87a05f98c94bf71fb749b44b208a2586705cd8804b809d7e07cd0e7b36"
     },
     "erp.ai_run_lifecycle_event_read": {
       "name": "ai_run_lifecycle_event_read",
-      "shape_fingerprint": "sha256:8aa935e4916a7d1302b9e8d40d9caab594b33343fc62d4ba17d4df1c373141c5"
+      "shape_fingerprint": "sha256:6b84db9af0d2265c08b78a268dfa40c308e0bddcd6945704d4cf4f638c7f2b40"
     },
     "erp.ai_run_lifecycle_state_read": {
       "name": "ai_run_lifecycle_state_read",
-      "shape_fingerprint": "sha256:8ed0d29fe776d8574ff03db3239e25e08620f5b0353c5d6d85e85ed1d55bc6b6"
+      "shape_fingerprint": "sha256:7846aa6def420ba00acfe92c03be6e0e68a132301473c65737e03e6d48822535"
     },
     "erp.ai_run_question_read": {
       "name": "ai_run_question_read",
-      "shape_fingerprint": "sha256:81d8a25990b9d95c79532a4af9f703f7d29bc768cd9b044a1642fe52ee406547"
+      "shape_fingerprint": "sha256:89e05b8dcee610ace52952851073712b104df9b67cec18e63853409645a4bc6f"
     },
     "erp.ai_run_queued_input_read": {
       "name": "ai_run_queued_input_read",
-      "shape_fingerprint": "sha256:b2538948082cf2261002faaf073431b72d5bf321fa9ef30ffe59263a84604603"
+      "shape_fingerprint": "sha256:b127709c1ce1dd3437784881d8759dac3c502ce6fd8d1815fc34a8f73506e709"
     },
     "erp.ai_spend_budget_read": {
       "name": "ai_spend_budget_read",
-      "shape_fingerprint": "sha256:40570d23efe18aac8be843454cd291e2915b6197186827434e6543693acfbcc6"
+      "shape_fingerprint": "sha256:5601447f90c85b4967628107732942d07d97a4e850a21700801481eb684b6e9a"
     },
     "erp.ai_spend_price_snapshot_read": {
       "name": "ai_spend_price_snapshot_read",
-      "shape_fingerprint": "sha256:a9001c356bd227398e46a47accfc789932b78efd443db7d2b856bd7a2b9db839"
+      "shape_fingerprint": "sha256:57bd7d489fc9b5d8d04f4be099d0d4e73060f5bf55891a5989c899305e7087df"
     },
     "erp.ai_spend_reservation_read": {
       "name": "ai_spend_reservation_read",
-      "shape_fingerprint": "sha256:5944b8d36dfa821971a82a602bfb1c5839ed4a1ff0a3f9562cfbb4dd5f0a3be6"
+      "shape_fingerprint": "sha256:cc989a567a780f99f61bede5b4a81634b8491fdbe4398d7acda4c3c4b23ddf10"
     },
     "erp.allocate_payment_transaction": {
       "name": "allocate_payment_transaction",
@@ -705,6 +717,10 @@
     "erp.claim_ai_capability_execution": {
       "name": "claim_ai_capability_execution",
       "shape_fingerprint": "sha256:b0258ed27ba5c8ffd1f86c86d0f1611b9dd05d8b6c5ea74d8c9f6ed039d8f093"
+    },
+    "erp.claim_ai_local_runner_pairing": {
+      "name": "claim_ai_local_runner_pairing",
+      "shape_fingerprint": "sha256:1a7ed5f1e8b95507a8f28d367f64a2db2cf41825733a39b82dc2fd0864b77d4c"
     },
     "erp.claim_ai_metered_dispatch": {
       "name": "claim_ai_metered_dispatch",
@@ -2616,7 +2632,7 @@
     },
     "erp.helpdesk_related_record_read": {
       "name": "helpdesk_related_record_read",
-      "shape_fingerprint": "sha256:d72513a17107f761e3b64b5485bc6d307b86447fdb1dd494931eeb9bf8283637"
+      "shape_fingerprint": "sha256:e0b19654ab5a4b1d0d2dbcd3502072ff41e007f6bc70b9c8dc7dcff233aca3bd"
     },
     "erp.hold_supplier_intake": {
       "name": "hold_supplier_intake",
@@ -2910,13 +2926,17 @@
       "name": "invoice_po_line",
       "shape_fingerprint": "sha256:969e2a6e670d59ad96e9823c37704bac647f86ecc0c0c49436c320f1cb2c96b2"
     },
+    "erp.issue_ai_local_runner_pairing": {
+      "name": "issue_ai_local_runner_pairing",
+      "shape_fingerprint": "sha256:9998b0cc6340fd163c1e69b53f509873621c39c9db3afb1ef4e23db4141d9531"
+    },
     "erp.knowledge_guide_actor_profile_read": {
       "name": "knowledge_guide_actor_profile_read",
-      "shape_fingerprint": "sha256:329b639ef39bbca47153a5a752694c3bc6fe6d24163f6f3a59b79c7009590b44"
+      "shape_fingerprint": "sha256:dff428e6fea848c18cbacb0d63a44428cfb3de25ef42170b9aecd767ca8aebd6"
     },
     "erp.knowledge_guide_authority_read": {
       "name": "knowledge_guide_authority_read",
-      "shape_fingerprint": "sha256:7a2321ca445a47e70cc957497900d5cbf8d877c56ba5493798080d7ba8f5b032"
+      "shape_fingerprint": "sha256:25c45b45ed0e6aef2318f42c716d0c8e62139c8f62e891f87828fa90bbace409"
     },
     "erp.link_device_to_location": {
       "name": "link_device_to_location",
@@ -3869,6 +3889,10 @@
     "erp.revise_ai_artifact_component": {
       "name": "revise_ai_artifact_component",
       "shape_fingerprint": "sha256:6dc2e06674980b054f13633eaf7a3276647b51a859157f71c9954fac46c80580"
+    },
+    "erp.revoke_ai_local_runner_device": {
+      "name": "revoke_ai_local_runner_device",
+      "shape_fingerprint": "sha256:a856f9bb5d323d080e9c0c6c76f67d5a381852bcdc85f7f0f6fa8e4cf024685f"
     },
     "erp.revoke_ai_work_program_recipe": {
       "name": "revoke_ai_work_program_recipe",
@@ -5178,6 +5202,10 @@
       "name": "stage_bank_statement_import",
       "shape_fingerprint": "sha256:6435df28987c8203a6ee3392910eb39f32fbd9fff7ed9cf53d7eb14849f49dd2"
     },
+    "erp.start_ai_local_runner_run": {
+      "name": "start_ai_local_runner_run",
+      "shape_fingerprint": "sha256:7966654b0bed441b72e00de62827b782a4bcdc78c04d75f70d6b1b2c84a7cba9"
+    },
     "erp.start_cycle_count_session": {
       "name": "start_cycle_count_session",
       "shape_fingerprint": "sha256:111f67545782212744f110adbc1ee5f7d206a3c4a2f2c1d9cd9b7f4244f6a606"
@@ -5425,6 +5453,10 @@
     "erp.update_ai_chat_session_title": {
       "name": "update_ai_chat_session_title",
       "shape_fingerprint": "sha256:6b9ce2f52ac94855a321e8484c0bc2e91e3aaec289f1223c4358b1f5229dabf4"
+    },
+    "erp.update_ai_local_runner_run": {
+      "name": "update_ai_local_runner_run",
+      "shape_fingerprint": "sha256:9cde6ce7f6b927e043a9d0f72821e0c037ad1c894a8c801016c780d9a54ee210"
     },
     "erp.update_ai_reducer_allowlist": {
       "name": "update_ai_reducer_allowlist",
@@ -6576,6 +6608,14 @@
       "current_operations_fingerprint": "sha256:2f6b5b3529d7866c65be543eecff5f0f91fb081b3d49647bc233e70a4b67a4dc",
       "operation_count": 1534,
       "reason": "PR #458: add the private SpaceTimeDB grounded chat acceptance fixture registry and its native registration reducer."
+    },
+    {
+      "previous_release": "v0.3.186",
+      "previous_ir_sha256": "sha256:24bff7fc7045ad420d3bcce7507939b1d56764c5cce59cc6209921ba3d93a08f",
+      "previous_operations_fingerprint": "sha256:2f6b5b3529d7866c65be543eecff5f0f91fb081b3d49647bc233e70a4b67a4dc",
+      "current_operations_fingerprint": "sha256:6a819f3edeb1b6fe25e2f7610b2a3e11cc128df3f135fa1ab1ba92ae9ff2be6a",
+      "operation_count": 1542,
+      "reason": "release on top of v0.3.186: add ai_local_runner_device_read, ai_local_runner_pairing_read, ai_local_runner_run_read, claim_ai_local_runner_pairing, issue_ai_local_runner_pairing, revoke_ai_local_runner_device, start_ai_local_runner_run, update_ai_local_runner_run; change the shape of ai_metered_price_read, ai_metered_usage_read, ai_owner_configuration_read, ai_owner_configuration_receipt_read, ai_provider_attempt_read, ai_run_budget_park_read, ai_run_lifecycle_event_read, ai_run_lifecycle_state_read, ai_run_question_read, ai_run_queued_input_read, ai_spend_budget_read, ai_spend_price_snapshot_read, ai_spend_reservation_read, helpdesk_related_record_read, knowledge_guide_actor_profile_read, knowledge_guide_authority_read"
     }
   ]
 }

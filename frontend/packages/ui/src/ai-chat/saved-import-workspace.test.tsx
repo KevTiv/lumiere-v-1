@@ -22,6 +22,7 @@ const controls = vi.hoisted(() => ({
   reviewProps: null as {
     allowImport?: boolean
     allowedReviewIds?: string[]
+    selectedId?: string
   } | null,
 }))
 vi.mock("@lumiere/i18n", () => ({
@@ -55,6 +56,7 @@ vi.mock("../../../../web/lib/import-review-workspace", () => ({
   ImportReviewWorkspace: (props: {
     allowImport?: boolean
     allowedReviewIds?: string[]
+    selectedId?: string
     onChanged?: () => void
   }) => {
     controls.reviewProps = props
@@ -188,9 +190,11 @@ function prepared(): ChatImportTask {
 function Harness({
   client,
   inspectionOnly = false,
+  initialReviewId,
 }: {
   client: QueryClient
   inspectionOnly?: boolean
+  initialReviewId?: string
 }) {
   const [view, setView] = useState<ImportTaskView>("sources")
   return (
@@ -200,6 +204,7 @@ function Harness({
         taskId={requestId}
         view={view}
         inspectionOnly={inspectionOnly}
+        initialReviewId={initialReviewId}
         onNavigate={setView}
         onBack={controls.back}
         onTaskChange={vi.fn()}
@@ -269,6 +274,20 @@ it("inspection tasks expose decisions without mounting execution or native impor
   await waitFor(() => expect(controls.reviewProps?.allowImport).toBe(false))
   expect(controls.mounts).toBe(0)
   expect(screen.queryByText("Native draft")).toBeNull()
+})
+
+it("selects the exact review group when the same saved task is reopened", async () => {
+  const task = prepared()
+  controls.task = {
+    ...task,
+    reviews: [...task.reviews, { ...task.reviews[0]!, id: "72" }],
+  }
+  const client = new QueryClient()
+  const view = render(<Harness client={client} initialReviewId="71" />)
+  fireEvent.click(screen.getByRole("tab", { name: "Decisions" }))
+  expect(controls.reviewProps?.selectedId).toBe("71")
+  view.rerender(<Harness client={client} initialReviewId="72" />)
+  await waitFor(() => expect(controls.reviewProps?.selectedId).toBe("72"))
 })
 
 it("shows destination support and required facts before source review starts", async () => {

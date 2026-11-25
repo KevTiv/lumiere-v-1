@@ -1,5 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises'
-import { isDeviceMessage, isGatewayMessage, isRunnerEvent, protocolVersion, providers } from '../protocol/v1.mjs'
+import { devicePaths, isDeviceMessage, isGatewayMessage, isRunnerEvent, protocolVersion, providers } from '../protocol/v1.mjs'
 import { isTerminalEvent, sameAttempt } from './journal.mjs'
 
 const maxMessageBytes = 256 * 1024
@@ -138,6 +138,8 @@ export async function runDaemon({
   let fatalError
   const internal = new AbortController()
   const connectionSignal = signal ? AbortSignal.any([signal, internal.signal]) : internal.signal
+  const pairedMcpUrl = new URL(devicePaths.mcp, url)
+  pairedMcpUrl.protocol = pairedMcpUrl.protocol === 'wss:' ? 'https:' : 'http:'
 
   function append(dispatch, event, options) {
     journal.append(dispatch, event, options)
@@ -163,6 +165,10 @@ export async function runDaemon({
 
   function start(dispatch, status) {
     if (!journal.claim(dispatch)) return
+    if (dispatch.mcp && new URL(dispatch.mcp.url).href !== pairedMcpUrl.href) {
+      append(dispatch, failed('invalid_lease', 'The tool endpoint did not match the paired gateway.'), { emergency: true })
+      return
+    }
     const adapter = adapters[dispatch.provider]
     if (!adapter || status?.state !== 'ready' || (dispatch.mcp && !status.capabilities.includes('mcp'))) {
       append(dispatch, failed('provider_unavailable', 'This provider cannot start the requested turn.'), { emergency: true })

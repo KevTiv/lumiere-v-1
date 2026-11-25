@@ -6300,6 +6300,86 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/core/platform_operator.rs: deployment-compiled caller/scope policy, exact existing bootstrap binding, atomic audited enrollment and no regrant after revocation"
+    },
+    "ai_local_runner_device_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/local_runner.rs: active service identity scopes enrolled devices to its organization."
+    },
+    "ai_local_runner_pairing_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/local_runner.rs: active service identity scopes pairing rows to its organization."
+    },
+    "ai_local_runner_run_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/local_runner.rs: active service identity scopes attempt and replay rows to its organization."
+    },
+    "claim_ai_local_runner_pairing": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/local_runner.rs: atomic claim bound to the original pairing digest and device credential."
+    },
+    "issue_ai_local_runner_pairing": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/local_runner.rs: single-use pairing intent keyed by its digest."
+    },
+    "revoke_ai_local_runner_device": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/local_runner.rs: revocation requires the current scoped device row."
+    },
+    "start_ai_local_runner_run": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/local_runner.rs: one authorized attempt per request key and eligible device."
+    },
+    "update_ai_local_runner_run": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/local_runner.rs: attempt updates require the exact owner, device and current version."
     }
   }
 }

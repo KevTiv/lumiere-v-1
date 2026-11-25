@@ -32,6 +32,9 @@ test('rejects ambient native process controls and insecure MCP destinations', ()
   for (const url of ['https://remote.example/mcp', 'http://127.0.0.1:3000/mcp']) {
     assert.ok(isGatewayMessage({ ...fixture.dispatch, mcp: { url, token: 'fixture' } }))
   }
+  for (const token of ['fixture token', 'fixture\nsecret', '']) {
+    assert.ok(!isGatewayMessage({ ...fixture.dispatch, mcp: { url: 'https://remote.example/mcp', token } }))
+  }
 })
 
 test('usage keeps quota separate from token counts and estimates', () => {

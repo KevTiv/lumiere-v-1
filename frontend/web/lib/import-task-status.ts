@@ -4,8 +4,9 @@ import type {
   ChatImportTaskStatus,
 } from "@lumiere/ui/lib/import-task-status"
 import type { ChatMessageSourceRef } from "@lumiere/ui/lib/ai-chat-types"
-import { importTaskStatusIsCurrent } from "@lumiere/ui/lib/import-task-status"
-import { parseSavedImportTask, type ChatImportScope } from "./chat-import-task"
+import { importTaskHasResults, importTaskNextView, importTaskStatusIsCurrent } from "@lumiere/ui/lib/import-task-status"
+import { parseSavedImportTask, type ChatImportScope, type ChatImportTask } from "./chat-import-task"
+import { importTaskHref, pendingImportReviewId } from "./import-task-navigation"
 import { importAmountUnits, readImportWorkflow, reviewedRecordsSchema, type WorkflowFetch } from "./import-workflow"
 
 const id = z.string().regex(/^[1-9]\d{0,19}$/)
@@ -197,9 +198,37 @@ export async function readChatImportTaskStatus(
   taskId: string,
   signal?: AbortSignal,
 ): Promise<ChatImportTaskStatus> {
+  const read: WorkflowFetch = (url, options) => fetcher(url, { ...options, signal })
+  const task = await readScopedImportTask(read, scope, taskId)
+  return readImportTaskProjection(read, scope, task)
+}
+
+/** Reopen an authorized task at its outstanding review, or at its native next view. */
+export async function readChatImportTaskReviewHref(
+  fetcher: WorkflowFetch,
+  scope: Pick<ChatImportScope, "companyId" | "organizationId">,
+  taskId: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const read: WorkflowFetch = (url, options) => fetcher(url, { ...options, signal })
+  const task = await readScopedImportTask(read, scope, taskId)
+  const reviewId = pendingImportReviewId(task.reviews)
+  if (reviewId) return importTaskHref({ companyId: scope.companyId, taskId, view: "decisions", reviewId })
+  const status = await readImportTaskProjection(read, scope, task)
+  const view = importTaskNextView({
+    ...status,
+    hasPreparedProposal: status.proposals.some((proposal) => proposal.status === "prepared"),
+    hasResults: importTaskHasResults(status),
+  })
+  return importTaskHref({ companyId: scope.companyId, taskId, view })
+}
+
+async function readScopedImportTask(
+  read: WorkflowFetch,
+  scope: Pick<ChatImportScope, "companyId" | "organizationId">,
+  taskId: string,
+) {
   taskIdSchema.parse(taskId)
-  const read: WorkflowFetch = (url, options) =>
-    fetcher(url, { ...options, signal })
   const response = await read(
     `/api/import-tasks/${taskId}?companyId=${scope.companyId}`,
     { cache: "no-store" },
@@ -209,7 +238,15 @@ export async function readChatImportTaskStatus(
   if (body?.organizationId !== String(scope.organizationId)) {
     throw new Error("Saved import organization changed")
   }
-  const task = parseSavedImportTask(body, scope.companyId, taskId)
+  return parseSavedImportTask(body, scope.companyId, taskId)
+}
+
+async function readImportTaskProjection(
+  read: WorkflowFetch,
+  scope: Pick<ChatImportScope, "companyId" | "organizationId">,
+  task: ChatImportTask,
+): Promise<ChatImportTaskStatus> {
+  const taskId = task.requestId
   const workflow = await readImportWorkflow(read, { ...scope, taskId })
   const sourceRows = task.reviews.reduce(
     (sum, review) => ({

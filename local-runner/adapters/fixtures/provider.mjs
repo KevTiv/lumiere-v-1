@@ -52,15 +52,26 @@ function onCodex(message) {
       break
     case 'turn/start': {
       if (scenario === 'disconnect') process.exit(3)
-      if (scenario === 'mcp' && (!process.env.LUMIERE_MCP_TOKEN ||
-          args.join(' ').includes(process.env.LUMIERE_MCP_TOKEN))) process.exit(2)
+      if (scenario === 'mcp') {
+        const config = args.find(argument => argument.startsWith('mcp_servers='))
+        if (!process.env.LUMIERE_MCP_TOKEN || args.join(' ').includes(process.env.LUMIERE_MCP_TOKEN) ||
+            !config?.includes('enabled_tools = ["inventory_low_stock"]') ||
+            params.outputSchema?.type !== 'object' ||
+            params.outputSchema?.properties?.evidenceId?.type !== 'string' ||
+            params.outputSchema?.properties?.productIds?.items?.type !== 'string' ||
+            params.outputSchema?.required?.join(',') !== 'evidenceId,productIds' ||
+            params.outputSchema?.additionalProperties !== false) process.exit(2)
+      } else if (params.outputSchema !== undefined) process.exit(2)
       result(id, { turn: { id: turn } })
       codexUpdate('turn/started', { turn: { id: turn } })
       codexUpdate('item/agentMessage/delta', { threadId: 'wrong-thread', delta: 'private event' })
-      const tool = { type: 'mcpToolCall', id: 'tool-1', server: 'lumiere', tool: 'read', arguments: { secret: 'private' } }
-      codexUpdate('item/started', { item: tool })
       if (scenario === 'cancel') break
-      codexUpdate('item/completed', { item: { ...tool, status: 'completed' } })
+      if (scenario === 'mcp') {
+        const tool = { type: 'mcpToolCall', id: 'tool-1', server: 'lumiere', tool: 'inventory_low_stock', arguments: { secret: 'private' } }
+        codexUpdate('item/started', { item: { ...tool, id: 'ignored-tool', tool: 'other_tool' } })
+        codexUpdate('item/started', { item: tool })
+        codexUpdate('item/completed', { item: { ...tool, status: 'completed' } })
+      }
       codexUpdate('thread/tokenUsage/updated', { tokenUsage: {
         total: { inputTokens: 10, outputTokens: 8, totalTokens: 18 },
         last: { inputTokens: 4, outputTokens: 3, totalTokens: 7 }

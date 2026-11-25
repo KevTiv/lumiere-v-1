@@ -6,7 +6,7 @@
       "provider": "codex",
       "version": "fixture",
       "state": "ready",
-      "capabilities": ["resume", "permission", "usage"],
+      "capabilities": ["resume", "permission", "usage", "mcp"],
       "funding": "unknown"
     }]
   },

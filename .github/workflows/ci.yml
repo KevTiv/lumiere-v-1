@@ -338,7 +338,9 @@ jobs:
         run: cargo test --locked -p ai-gateway --bin gateway
 
       - name: Local runner gateway admission
-        run: python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --lib local_runner
+        run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --lib local_runner
+          python3 scripts/run-required-cargo-tests.py --locked -p ai-gateway --bin gateway routes::runner_dispatch::tests
 
       - uses: actions/setup-node@v4
         with:

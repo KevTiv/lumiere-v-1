@@ -600,6 +600,9 @@
   "AiKnowledgeVersionContent": {
     "nomination_signal": "string"
   },
+  "AiLocalRunnerPairing": {
+    "claimed_device_id": "string"
+  },
   "AiMeteredUsage": {
     "dispatch_claim": "string",
     "actual_units": "u32",

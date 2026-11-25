@@ -600,6 +600,9 @@
   "AiKnowledgeVersionContent": [
     "nomination_signal"
   ],
+  "AiLocalRunnerPairing": [
+    "claimed_device_id"
+  ],
   "AiMeteredUsage": [
     "dispatch_claim",
     "actual_units",

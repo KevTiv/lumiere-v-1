@@ -91,6 +91,7 @@ dependencies = [
  "stdb-config",
  "thiserror 1.0.69",
  "tokio",
+ "tokio-tungstenite 0.24.0",
  "tower-http 0.5.2",
  "tracing",
  "tracing-subscriber",
@@ -2160,7 +2161,7 @@ dependencies = [
 
 [[package]]
 name = "lumiere-contracts"
-version = "0.3.186"
+version = "0.3.187"
 dependencies = [
  "serde_json",
  "sha2 0.10.9",

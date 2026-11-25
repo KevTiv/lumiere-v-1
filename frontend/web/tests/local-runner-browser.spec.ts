@@ -2,6 +2,14 @@ import { expect, test } from '@playwright/test'
 
 const gateway = '/api/ai/local-runner'
 const runId = '9007199254740993'
+const verifiedReply = {
+  seq: 4, type: 'verified', answer: 'The warehouse has verified low stock.',
+  evidence_id: 'c63c8d76-2bce-41f4-a72c-55015f356b82',
+  sources: [{
+    kind: 'live', trust: 'authoritative', entity_type: 'product', entity_id: '42',
+    label: 'Verified product 42', text_snippet: 'Product #42 has 4 units on hand.',
+  }],
+}
 const activity = [
   { seq: 1, type: 'activity', message: 'Checking stock evidence' },
   { seq: 2, type: 'tool', toolId: 'tool-1', name: 'Inventory evidence', status: 'completed' },
@@ -37,7 +45,7 @@ test('local runner reattaches on refresh and shows usage and the verified reply'
     const after = Number(query.get('after'))
     cursors.push(after)
     const events = complete
-      ? [...activity, { seq: 4, type: 'verified', answer: 'The warehouse has verified low stock.' }]
+      ? [...activity, verifiedReply]
       : activity
     return route.fulfill({
       contentType: 'text/event-stream',
@@ -62,6 +70,8 @@ test('local runner reattaches on refresh and shows usage and the verified reply'
   complete = true
   await expect(timeline.getByText('Answer verified')).toBeVisible()
   await expect(page.getByText('The warehouse has verified low stock.')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Verified product 42' }))
+    .toHaveAttribute('href', '/products?tab=products&filter=id%3A42')
   expect(cursors.slice(initialRequests)).toContain(0)
   expect(starts).toBe(1)
 })

@@ -481,6 +481,15 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: include_str!("ai_index_job_expand.sql"),
     },
+    Migration {
+        version: 53,
+        name: "local_runner_private_state",
+        change_set: 42,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0053_durable_projection_delta.sql"
+        ),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

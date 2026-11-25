@@ -47,10 +47,16 @@ type Tool = { type: 'tool'; toolId: string; name: string; status: 'running' | 'c
 type Permission = { type: 'permission'; permissionId: string; label: string }
 type PermissionResolved = { type: 'permissionResolved'; permissionId: string }
 type Usage = { type: 'usage'; scope: keyof typeof usageMetrics; metric: string; value: number; estimated?: boolean }
-type Verified = { type: 'verified'; answer: string; sources?: unknown[]; run_id?: number }
+export type RunnerVerifiedReply = {
+  type: 'verified'
+  answer: string
+  sources?: unknown[]
+  run_id?: number
+  evidence_id?: string
+}
 type Failed = { type: 'failed'; code: string; message: string }
 type Cancelled = { type: 'cancelled' }
-export type RunnerEvent = { seq: number } & (Activity | Tool | Permission | PermissionResolved | Usage | Verified | Failed | Cancelled)
+export type RunnerEvent = { seq: number } & (Activity | Tool | Permission | PermissionResolved | Usage | RunnerVerifiedReply | Failed | Cancelled)
 
 export interface RunnerActivity {
   cursor: number
@@ -59,15 +65,23 @@ export interface RunnerActivity {
   tools: Tool[]
   permissions: Permission[]
   usage: Usage[]
-  terminal?: Verified | Failed | Cancelled
+  terminal?: RunnerVerifiedReply | Failed | Cancelled
 }
 
 const maxTrackedItems = 12
 const maxFrameSize = 256 * 1024
 const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$/
 
-function record(value: unknown) {
-  return value != null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined
+export function isRunnerEvidenceId(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value)
+}
+
+type WireKeys<Shape> = Shape extends object ? keyof Shape : never
+
+function readWireFields<Shape extends object>(value: unknown) {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
+    ? value as { [Key in WireKeys<Shape>]?: unknown }
+    : undefined
 }
 
 function nonempty(value: unknown, limit: number): value is string {
@@ -91,7 +105,7 @@ function funding(value: unknown): value is RunnerFunding {
 }
 
 function parseProvider(value: unknown): ProviderStatus | undefined {
-  const data = record(value)
+  const data = readWireFields<ProviderStatus>(value)
   if (!data || !member(data.provider, runnerProviders) || !member(data.state, providerStates)
     || !Array.isArray(data.capabilities) || data.capabilities.length > 12
     || !data.capabilities.every(capability => nonempty(capability, 64))) return
@@ -102,12 +116,12 @@ function parseProvider(value: unknown): ProviderStatus | undefined {
 }
 
 export function parseRunnerDiscovery(value: unknown): RunnerDiscovery | undefined {
-  const data = record(value)
+  const data = readWireFields<RunnerDiscovery & { version: number }>(value)
   if (data?.version !== 1 || typeof data.enabled !== 'boolean' || !Array.isArray(data.devices) || data.devices.length > 50) return
   if (!data.enabled) return { enabled: false, devices: [] }
   const devices: RunnerDevice[] = []
   for (const raw of data.devices) {
-    const device = record(raw)
+    const device = readWireFields<RunnerDevice>(raw)
     if (!device || !isRunnerId(device.deviceId) || !nonempty(device.label, 128)
       || !member(device.state, ['online', 'offline']) || !Array.isArray(device.providers)
       || device.providers.length > runnerProviders.length || devices.some(existing => existing.deviceId === device.deviceId)) return
@@ -119,13 +133,13 @@ export function parseRunnerDiscovery(value: unknown): RunnerDiscovery | undefine
 }
 
 export function parseRunnerIdentity(value: unknown): RunnerIdentity | undefined {
-  const data = record(value)
+  const data = readWireFields<RunnerIdentity>(value)
   if (data && isRunnerId(data.runId) && isRunnerId(data.attemptId)) return { runId: data.runId, attemptId: data.attemptId }
 }
 
 export function readRunnerReceipt(storage: Storage, scope: string): RunnerReceipt | undefined {
   try {
-    const saved = record(JSON.parse(storage.getItem(scope) ?? 'null'))
+    const saved = readWireFields<RunnerReceipt>(JSON.parse(storage.getItem(scope) ?? 'null'))
     const ids = parseRunnerIdentity(saved)
     if (saved && ids && isRunnerId(saved.turnId) && nonempty(saved.prompt, 8 * 1024) && nonempty(saved.label, 256)) {
       return { ...ids, turnId: saved.turnId, prompt: saved.prompt, label: saved.label,
@@ -165,7 +179,7 @@ export function applyRunnerEvent(state: RunnerActivity, event: RunnerEvent): Run
 }
 
 function parseRunnerEvent(raw: string): RunnerEvent | undefined {
-  const value = record(JSON.parse(raw))
+  const value = readWireFields<RunnerEvent>(JSON.parse(raw))
   const seq = value?.seq
   if (!value || !integer(seq)) return
   const type = value.type
@@ -185,9 +199,16 @@ function parseRunnerEvent(raw: string): RunnerEvent | undefined {
         || (estimated !== undefined && typeof estimated !== 'boolean')) return
       return { seq, type, scope, metric, value: amount, estimated }
     }
-    case 'verified': if (nonempty(value.answer, 32768) && (value.sources === undefined || (Array.isArray(value.sources) && value.sources.length <= 100))) {
-      return { seq, type, answer: value.answer, sources: value.sources, ...(integer(value.run_id) && { run_id: value.run_id }) }
-    } return
+    case 'verified': {
+      if (!nonempty(value.answer, 32768)
+        || (value.sources !== undefined && (!Array.isArray(value.sources) || value.sources.length > 100))
+        || (value.run_id !== undefined && !integer(value.run_id))
+        || (value.evidence_id !== undefined && !isRunnerEvidenceId(value.evidence_id))) return
+      return {
+        seq, type, answer: value.answer, sources: value.sources,
+        run_id: value.run_id, evidence_id: value.evidence_id,
+      }
+    }
     case 'failed': if (isRunnerId(value.code) && nonempty(value.message, 512)) return { seq, type, code: value.code, message: value.message }; return
     case 'cancelled': return { seq, type }
   }

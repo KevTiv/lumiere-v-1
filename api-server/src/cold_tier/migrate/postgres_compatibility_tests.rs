@@ -177,8 +177,11 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
     // Startup upgrades the frozen v13 prefix through the whole current catalog,
     // including history partitions, guide tables, creation receipts and the
     // owner/prepaid tables added by migration 33, metering tables added by 36,
-    // and organization-wide private history added by 37.
+    // organization-wide private history added by 37, and runner state added by 53.
     let expected_new_tables = [
+        "ai_local_runner_device",
+        "ai_local_runner_pairing",
+        "ai_local_runner_run",
         "ai_metered_price",
         "ai_metered_usage",
         "ai_owner_configuration",

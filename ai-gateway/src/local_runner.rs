@@ -23,7 +23,7 @@ pub struct AttemptId {
 }
 
 /// Scope derived from authenticated device enrollment and the acting user.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Deserialize, PartialEq, Eq, Serialize)]
 pub struct DeviceScope {
     pub organization_id: u64,
     pub company_id: u64,
@@ -175,7 +175,7 @@ fn valid_usage(scope: &str, metric: &str, value: f64) -> bool {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum AttemptState {
     PendingDispatch,
     Running,
@@ -198,13 +198,14 @@ impl AttemptState {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum Decision {
     Approve,
     Deny,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Deserialize, Serialize)]
 enum PermissionState {
     Pending,
     Answered(Decision),
@@ -237,8 +238,9 @@ pub enum AdmissionError {
     Permission,
 }
 
-/// An in-memory attempt aggregate. Register attempts and persist transitions
-/// in the same transaction before enabling this on a network transport.
+/// A server-owned attempt aggregate. Persist transitions before acknowledging
+/// them to the runner. Treat the serialized state as private storage.
+#[derive(Deserialize, Serialize)]
 pub struct Attempt {
     id: AttemptId,
     owner: DeviceScope,
@@ -266,6 +268,33 @@ impl Attempt {
 
     pub fn accepts_scope(&self, scope: &DeviceScope) -> bool {
         self.owner == *scope
+    }
+
+    pub fn matches_binding(&self, id: &AttemptId, scope: &DeviceScope, expires_at_ms: u64) -> bool {
+        self.id == *id && self.accepts_scope(scope) && self.lease_expires_at_ms == expires_at_ms
+    }
+
+    pub fn permits_tool_use(&self) -> bool {
+        matches!(
+            self.state,
+            AttemptState::PendingDispatch | AttemptState::Running | AttemptState::WaitingPermission
+        )
+    }
+
+    pub fn candidate_text(&self) -> Option<&str> {
+        match self.events.last()? {
+            RunnerEvent::Candidate { text } => Some(text),
+            _ => None,
+        }
+    }
+
+    pub fn pending_permission_replies(&self) -> impl Iterator<Item = (&str, Decision)> {
+        self.permissions
+            .iter()
+            .filter_map(|(id, state)| match state {
+                PermissionState::Answered(decision) => Some((id.as_str(), *decision)),
+                _ => None,
+            })
     }
 
     pub fn ingest(
@@ -367,8 +396,15 @@ impl Attempt {
     }
 
     pub fn request_cancel(&mut self) -> Result<Apply, AdmissionError> {
-        if self.state == AttemptState::Cancelling {
+        if matches!(
+            self.state,
+            AttemptState::Cancelling | AttemptState::Withheld
+        ) {
             return Ok(Apply::Replayed);
+        }
+        if self.state == AttemptState::Verifying {
+            self.state = AttemptState::Withheld;
+            return Ok(Apply::Applied);
         }
         if !self.state.accepts_runner_events() {
             return Err(AdmissionError::State);
@@ -410,6 +446,7 @@ impl Attempt {
             RunnerEvent::Candidate { .. } if self.has_pending_permission() => {
                 return Err(AdmissionError::InvalidEvent);
             }
+            RunnerEvent::Candidate { .. } if cancelling => AttemptState::Withheld,
             RunnerEvent::Candidate { .. } => AttemptState::Verifying,
             RunnerEvent::Cancelled => AttemptState::Cancelled,
             RunnerEvent::Failed { code, .. } if code == "outcome_unknown" => {

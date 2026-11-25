@@ -61,6 +61,8 @@ for (const provider of ['codex', 'antigravity', 'vibe', 'claude']) {
     assert.ok(events.some(event => event.type === 'session' && event.nativeSessionId === 'fixture-session'))
     assert.ok(events.some(event => event.type === 'usage'))
     if (provider === 'codex') {
+      assert.deepEqual(events.filter(event => event.type === 'tool').map(({ toolId, status }) =>
+        [toolId, status]), [['tool-1', 'running'], ['tool-1', 'completed']])
       assert.deepEqual(events.filter(event => event.type === 'usage').map(({ scope, metric, value }) =>
         [scope, metric, value]), [
         ['account', 'limit_percent', 37],
@@ -97,7 +99,9 @@ for (const provider of ['codex', 'antigravity']) {
   test(`${provider} cancellation waits for the native acknowledgement`, async (testContext) => {
     const adapter = await adapterFor(testContext, provider, 'cancel')
     const events = await turn(adapter, provider, {}, async (event, lease) => {
-      if (event.type === 'tool') assert.equal(await adapter.cancel(lease), true)
+      if (event.type === (provider === 'codex' ? 'activity' : 'tool')) {
+        assert.equal(await adapter.cancel(lease), true)
+      }
     })
     assert.deepEqual(events.at(-1), { type: 'cancelled' })
   })

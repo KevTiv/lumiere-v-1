@@ -2,7 +2,17 @@ import { candidate, failure, textBuffer, usage, wireId } from './adapter.mjs'
 import { AdapterError, deferred, rpcPeer } from './stdio.mjs'
 
 const MCP_NAME = 'lumiere'
+const INVENTORY_TOOL = 'inventory_low_stock'
 const CLIENT_INFO = { name: 'lumiere_runner', title: 'Lumière runner', version: '1.0.0' }
+const inventoryOutputSchema = {
+  type: 'object',
+  properties: {
+    evidenceId: { type: 'string' },
+    productIds: { type: 'array', items: { type: 'string' } }
+  },
+  required: ['evidenceId', 'productIds'],
+  additionalProperties: false
+}
 
 function connect(launch, options, notifications) {
   const args = [
@@ -15,7 +25,7 @@ function connect(launch, options, notifications) {
   const mcp = options.mcp
   const env = mcp ? { LUMIERE_MCP_TOKEN: mcp.token } : undefined
   const mcpConfig = mcp
-    ? `{ ${MCP_NAME} = { url = ${JSON.stringify(mcp.url)}, bearer_token_env_var = "LUMIERE_MCP_TOKEN", required = true } }`
+    ? `{ ${MCP_NAME} = { url = ${JSON.stringify(mcp.url)}, bearer_token_env_var = "LUMIERE_MCP_TOKEN", required = true, enabled_tools = ["${INVENTORY_TOOL}"] } }`
     : '{}'
   args.unshift('-c', `mcp_servers=${mcpConfig}`)
   return launch(args, { signal: options.signal, ...(env ? { env } : {}) })
@@ -147,7 +157,8 @@ export const codexProtocol = {
               typeof item.text === 'string') {
             latestItem = item.id
             answer.set(item.text)
-          } else if (item?.type === 'mcpToolCall' && item.server === MCP_NAME && wireId(item.id)) {
+          } else if (lease.mcp && item?.type === 'mcpToolCall' && item.server === MCP_NAME &&
+              item.tool === INVENTORY_TOOL && wireId(item.id)) {
             emit({
               type: 'tool', toolId: item.id, name: 'Lumière ERP tool',
               status: method === 'item/started' ? 'running' : item.status === 'failed' ? 'failed' : 'completed'
@@ -212,7 +223,8 @@ export const codexProtocol = {
     const start = await peer.request('turn/start', {
       threadId,
       cwd,
-      input: [{ type: 'text', text: lease.prompt }]
+      input: [{ type: 'text', text: lease.prompt }],
+      ...(lease.mcp && { outputSchema: inventoryOutputSchema })
     })
     turnId ??= wireId(start?.turn?.id)
     if (!turnId) throw new AdapterError('outcome_unknown', 'The local CLI did not return a turn.')

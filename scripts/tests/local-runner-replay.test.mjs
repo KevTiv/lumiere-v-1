@@ -170,6 +170,34 @@ test("reconnect replays the original event without starting a second provider tu
   assert.ok(!relay.frames.some(frame => frame.message.event?.type === "verified"));
 });
 
+test("dispatch only passes the tool grant for the paired gateway endpoint to the provider", { timeout: 10_000 }, async t => {
+  const candidate = { type: "candidate", text: '{"evidenceId":"fixture-evidence","productIds":["100"]}' };
+  const startTurn = t.mock.fn(async (_dispatch, { emit }) => emit(candidate));
+  const relay = await startFixture(t, { startTurn });
+  const link = relay.connections[0];
+  const scopedGrant = { url: "https://fixture.invalid/v1/local-runner/mcp", token: "scoped-fixture-bearer" };
+  const invalidUrls = [
+    "https://another.invalid/v1/local-runner/mcp",
+    "https://fixture.invalid/another-route",
+    "https://fixture.invalid/v1/local-runner/mcp?source=unsolicited",
+  ];
+
+  for (const [index, url] of invalidUrls.entries()) {
+    const attemptId = `invalid-attempt-${index}`;
+    link.receive({ ...fixture.dispatch, attemptId, mcp: { ...scopedGrant, url } });
+    const denied = await relay.frame(0, message => message.attemptId === attemptId, "grant rejection");
+    assert.equal(denied.event?.code, "invalid_lease");
+  }
+  assert.equal(startTurn.mock.callCount(), 0);
+
+  link.receive({ ...fixture.dispatch, mcp: scopedGrant });
+  const result = await relay.frame(0, message => message.attemptId === attemptId, "candidate result");
+  assert.deepEqual(result.event, candidate);
+  assert.equal(startTurn.mock.callCount(), 1);
+  assert.deepEqual(startTurn.mock.calls[0].arguments[0].mcp, scopedGrant);
+  assert.ok(!JSON.stringify(relay.frames).includes(scopedGrant.token));
+});
+
 test("repeated cancellation settles the matching provider attempt once", { timeout: 10_000 }, async t => {
   const cancelled = Promise.withResolvers();
   const cancel = t.mock.fn(async () => {

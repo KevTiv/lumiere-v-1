@@ -1,8 +1,5 @@
 //! Streamable HTTP transport for the native runner's scoped inventory read.
 
-// The live runner supplies its durable lease authority when mounting the route.
-#![allow(dead_code)]
-
 use std::sync::Arc;
 
 use async_trait::async_trait;

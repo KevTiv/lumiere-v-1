@@ -5,6 +5,7 @@ import { HttpResponseError, httpResponseError } from "@lumiere/api-client/respon
 import { parseAssistantUiProposals, type AssistantUiProposal } from "./assistant-native-actions"
 import { parseImportTaskStatuses } from "./import-task-status"
 import type { ChatImportTaskStatus } from "@lumiere/ui/lib/import-task-status"
+import { isRunnerEvidenceId, type RunnerVerifiedReply } from "./local-runner-state"
 
 export type TurnFailure = "denied" | "unavailable" | "failed" | "outcome_unknown"
 type SetupFailure = {
@@ -24,6 +25,7 @@ export type AssistantVerification = {
   methods: string[]
   limitations: string[]
   reason?: string | null
+  evidenceId?: string
 }
 type TurnAttempt<T> = { kind: "ready"; value: T } | AssistantTurnFailure
 export type AssistantTurn<A, D> = {
@@ -230,8 +232,12 @@ function assistantVerification(value: unknown): AssistantVerification | undefine
   if (!["admitted", "qualified", "requires_review", "blocked"].includes(raw.outcome ?? "")
     || !Array.isArray(raw.methods) || raw.methods.some(method => typeof method !== "string")
     || !Array.isArray(limitations) || limitations.some(limit => typeof limit !== "string")
-    || (raw.reason != null && typeof raw.reason !== "string")) throw new Error("Invalid assistant verification")
-  return { outcome: raw.outcome as AssistantVerification["outcome"], methods: raw.methods, limitations, reason: raw.reason }
+    || (raw.reason != null && typeof raw.reason !== "string")
+    || (raw.evidenceId !== undefined && !isRunnerEvidenceId(raw.evidenceId))) throw new Error("Invalid assistant verification")
+  return {
+    outcome: raw.outcome as AssistantVerification["outcome"], methods: raw.methods, limitations, reason: raw.reason,
+    ...(raw.evidenceId && { evidenceId: raw.evidenceId }),
+  }
 }
 
 /** Persist the verdict rather than treating a successful transport as an admitted answer.
@@ -295,4 +301,22 @@ export function assistantAnswer(value: unknown) {
   const raw = value as { answer?: unknown }
   if (typeof raw.answer !== "string" || !raw.answer.trim()) throw new Error("Invalid assistant answer")
   return { ...metadata, answer: raw.answer }
+}
+
+export function localRunnerAnswer(reply: RunnerVerifiedReply) {
+  const answer = assistantAnswer({
+    answer: reply.answer,
+    sources: reply.sources ?? [],
+    run_id: reply.run_id,
+    verification: {
+      outcome: "admitted",
+      methods: ["runner_evidence"],
+      limitations: [],
+      evidenceId: reply.evidence_id,
+    },
+  })
+  if (answer.sources.some(source => source.url && !/^https?:\/\//i.test(source.url))) {
+    throw new Error("A local runner source could not be verified.")
+  }
+  return answer
 }

@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { resolveAiSourceHref } from '@lumiere/erp-shared/ai-source-links'
+import { localRunnerAnswer } from '../../../../lib/assistant-turn'
 import { discoverRunners, followRunnerTurn, startRunnerTurn } from '../../../../lib/local-runner-client'
 import { localRunnerOptions, LocalRunnerControls, type RunnerView } from '../../../../lib/local-runner-controls'
 import { readRunnerReceipt, type RunnerDevice, type RunnerReceipt } from '../../../../lib/local-runner-state'
@@ -43,6 +45,8 @@ export default function LocalRunnerFixture() {
   }, [receipt])
 
   const choice = localRunnerOptions(devices)[0]
+  const terminal = view?.activity.terminal
+  const answer = terminal?.type === 'verified' ? localRunnerAnswer(terminal) : undefined
   async function start() {
     if (!choice) return
     try {
@@ -67,7 +71,14 @@ export default function LocalRunnerFixture() {
       <LocalRunnerControls companyId={companyId} devices={devices} refresh={refresh}
         selectedLabel={choice?.label} selectedFunding={choice?.provider.funding} view={view} />
       {choice && !receipt ? <button type="button" onClick={() => void start()}>Start fixture run</button> : null}
-      {view?.activity.terminal?.type === 'verified' ? <p>{view.activity.terminal.answer}</p> : null}
+      {answer ? (
+        <>
+          <p>{answer.answer}</p>
+          {answer.sources.map(source => (
+            <a key={source.entity_id} href={resolveAiSourceHref(source)}>{source.label}</a>
+          ))}
+        </>
+      ) : null}
       {error ? <p role="alert">{error}</p> : null}
     </main>
   )

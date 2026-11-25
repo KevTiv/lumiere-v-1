@@ -5243,6 +5243,31 @@
       "name": "trash_document_folder",
       "exposure": "session",
       "reason": "reviewed document folder lifecycle action; current organization/company, ancestor access, descendant safety and destination checks remain reducer-enforced"
+    },
+    {
+      "name": "claim_ai_local_runner_pairing",
+      "exposure": "denied",
+      "reason": "Private local runner storage operation for the organization-bound runner service identity."
+    },
+    {
+      "name": "issue_ai_local_runner_pairing",
+      "exposure": "denied",
+      "reason": "Private local runner storage operation for the organization-bound runner service identity."
+    },
+    {
+      "name": "revoke_ai_local_runner_device",
+      "exposure": "denied",
+      "reason": "Private local runner storage operation for the organization-bound runner service identity."
+    },
+    {
+      "name": "start_ai_local_runner_run",
+      "exposure": "denied",
+      "reason": "Private local runner storage operation for the organization-bound runner service identity."
+    },
+    {
+      "name": "update_ai_local_runner_run",
+      "exposure": "denied",
+      "reason": "Private local runner storage operation for the organization-bound runner service identity."
     }
   ]
 }

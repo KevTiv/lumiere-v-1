@@ -2,12 +2,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-const EXPECTED_SCHEMA_TABLES: usize = 536;
-
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::cold_tier::schema_ir::LumiereSchemaManifest;
+use crate::cold_tier::schema_ir::{LumiereSchemaManifest, EXPECTED_SCHEMA_TABLES};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

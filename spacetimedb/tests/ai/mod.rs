@@ -6,6 +6,7 @@ pub mod company_defaults_test;
 pub mod decision_events_test;
 pub mod embedding_isolation_test;
 pub mod evidence_provenance_test;
+pub mod local_runner_test;
 pub mod metered_spend_test;
 pub mod owner_configuration_test;
 pub mod platform_defaults_test;
@@ -224,6 +225,7 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_capability_grants_tests(ctx)?;
     run_ai_intelligence_events_tests(ctx)?;
     run_ai_spend_recovery_tests(ctx)?;
+    local_runner_test::test_runner_storage(ctx)?;
     run_ai_prepaid_tests(ctx)?;
     platform_defaults_test::test_platform_defaults(ctx)?;
     company_defaults_test::test_company_defaults(ctx)?;

@@ -79,7 +79,7 @@ for (const width of [390, 1440]) {
       .click()
     await expect(
       page.getByTestId("assistant-native-action").getByRole("alert"),
-    ).toContainText("This action could not be opened")
+    ).toHaveText("You do not currently have access to this action.")
     await expect(
       page.getByTestId("form-modal-assistant-fixture-order"),
     ).toHaveCount(0)
@@ -97,7 +97,9 @@ for (const width of [390, 1440]) {
       .click()
     await expect(
       page.getByTestId("assistant-native-action").getByRole("alert"),
-    ).toContainText("This action could not be opened")
+    ).toHaveText(
+      "The company or signed-in user changed. Ask again in the current workspace.",
+    )
     await expect(
       page.getByTestId("form-modal-assistant-fixture-order"),
     ).toHaveCount(0)

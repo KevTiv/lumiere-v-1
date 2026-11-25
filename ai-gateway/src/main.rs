@@ -275,6 +275,7 @@ async fn main() -> anyhow::Result<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
+    let runner_routers = routes::runner_transport::routers_from_config(&state);
     let v1_routes = Router::new()
         .route(
             "/v1/skills/finance/:skill",
@@ -389,10 +390,6 @@ async fn main() -> anyhow::Result<()> {
             post(routes::run_lifecycle::post_run_lifecycle),
         )
         .route(
-            "/v1/internal/local-runner/devices",
-            get(routes::local_runner::get_devices),
-        )
-        .route(
             "/v1/skills/import-mapping",
             post(routes::harness_skills::post_import_mapping),
         )
@@ -420,6 +417,7 @@ async fn main() -> anyhow::Result<()> {
             "/v1/skills/supplier-discovery",
             post(routes::harness_skills::post_supplier_discovery),
         )
+        .merge(runner_routers.browser)
         .route_layer(middleware::from_fn(trace_ai_request))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
@@ -430,8 +428,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/health", get(routes::health::health))
         .route("/health/ready", get(routes::health::health_ready))
         .merge(v1_routes)
-        .layer(TraceLayer::new_for_http())
         .layer(cors)
+        .merge(runner_routers.native)
+        .layer(TraceLayer::new_for_http())
         .with_state(state);
 
     let addr = format!("0.0.0.0:{}", config.port);
