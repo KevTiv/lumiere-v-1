@@ -78,6 +78,32 @@ export interface ChatImportTaskStatus {
 
 export const IMPORT_TASK_STATUS_MAX_AGE_MS = 5 * 60 * 1000
 
+export function importTaskNextView({
+  preparationStatus,
+  sourceRows,
+  hasPreparedProposal,
+  hasResults,
+}: Pick<ChatImportTaskStatus, "preparationStatus" | "sourceRows"> & {
+  hasPreparedProposal: boolean
+  hasResults: boolean
+}): "sources" | "decisions" | "preview" | "results" {
+  if (preparationStatus === "inspection_ready") {
+    return sourceRows.total ? "decisions" : "sources"
+  }
+  if (preparationStatus !== "needs_review") return "sources"
+  if (hasResults) return "results"
+  if (hasPreparedProposal || (sourceRows.ready > 0 && sourceRows.held === 0)) {
+    return "preview"
+  }
+  return sourceRows.total ? "decisions" : "sources"
+}
+
+export function importTaskHasResults(status: ChatImportTaskStatus): boolean {
+  return (status.reviewedRecords?.counts.verified ?? 0) > 0 ||
+    status.proposals.some(({ status }) => status !== "prepared") ||
+    (status.nativeResults?.length ?? 0) > 0
+}
+
 export function importTaskStatusIsCurrent(
   status: ChatImportTaskStatus,
   companyId: number | undefined,

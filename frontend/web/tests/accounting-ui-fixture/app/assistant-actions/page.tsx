@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useContext, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
@@ -8,7 +8,6 @@ import { LumiereApiProvider } from "@lumiere/api-client"
 import { ErpSessionProvider } from "@lumiere/erp-session"
 import { I18nProvider } from "@lumiere/i18n"
 import { AIChatPanel } from "@lumiere/ui/ai-chat/ai-chat-panel"
-import type { ChatNativeActionOutcome } from "@lumiere/ui/lib/ai-chat-types"
 import { ModuleView } from "@lumiere/ui/pages/module-view"
 import type { ChatMessage } from "@lumiere/ui/lib/ai-chat-types"
 import type { ModuleConfig } from "@lumiere/ui/lib/module-types"
@@ -16,15 +15,13 @@ import type { Role } from "@lumiere/ui/lib/rbac-types"
 import { ThemeProvider } from "@lumiere/ui/components/theme-provider"
 import { RBACProvider, useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { NavigationGuardProvider } from "@lumiere/ui/forms/navigation-guard-provider"
+import { NavigationEditorContext } from "@lumiere/ui/forms/navigation-guard-context"
 import {
   AssistantNativeFormProvider,
   useAssistantNativeFormController,
 } from "@lumiere/ui/components/assistant-native-form-provider"
-import {
-  decodeAssistantAction,
-  getAssistantCapability,
-  type AssistantAction,
-} from "@lumiere/query-hooks/assistant-actions"
+import type { AssistantAction } from "@lumiere/query-hooks/assistant-actions"
+import { dispatchAssistantPresentation } from "../../../../lib/assistant-presentation-dispatcher"
 import { saleOrderHref } from "@lumiere/erp-shared/record-links"
 import { webApi } from "../../../../lib/lumiere-web-http"
 
@@ -129,38 +126,38 @@ function NativeWorkspace({
   const [chatOpen, setChatOpen] = useState(true)
   const [submissions, setSubmissions] = useState(0)
   const [requestCount, setRequestCount] = useState(0)
-  const onNativeAction = (value: AssistantAction) => {
-    const action = decodeAssistantAction(value, scope)
-    const capability = action && getAssistantCapability(action.capabilityKey)
-    const tab = capability && capability.tab
-    if (!action || !capability || !tab)
-      throw new Error("The action belongs to an earlier scope")
-    if (
-      !permissionsReady ||
-      !checkPermission(
-        capability.permission.resource,
-        capability.permission.action,
-      ).allowed
-    )
-      throw new Error("Native creation is unavailable")
-    return new Promise<ChatNativeActionOutcome>((resolve) => {
-      const status = controller.requestForm({
-        requestId: crypto.randomUUID(),
-        scopeKey,
-        moduleId: capability.module,
-        tabId: tab,
-        prompt: action.prompt,
-        onPresentationOutcome: resolve,
-      })
-      if (status !== "pending") {
-        resolve(status)
-        return
-      }
-      setRequestCount((count) => count + 1)
-      // The fixture hosts the real Sales module owner under its isolated route.
-      router.push(`/assistant-actions?tab=${encodeURIComponent(tab)}`)
-    })
+  const navigationGuard = useContext(NavigationEditorContext)
+  const context = useRef({
+    actionScope: scope,
+    scopeKey,
+    checkPermission,
+    permissionsReady,
+    allowedModules: ["sales"],
+  })
+  context.current = {
+    actionScope: scope,
+    scopeKey,
+    checkPermission,
+    permissionsReady,
+    allowedModules: ["sales"],
   }
+  const onNativeAction = (action: AssistantAction) =>
+    dispatchAssistantPresentation(
+      action,
+      {
+        current: () => context.current,
+        navigationGuard,
+        nativeForms: controller,
+        pageComposition: () => null,
+        push: (href) => {
+          setRequestCount((count) => count + 1)
+          // The fixture hosts the Sales module owner under its isolated route.
+          router.push(href.replace(/^\/sales\?/, "/assistant-actions?"))
+        },
+        reveal: () => undefined,
+      },
+      { isCurrent: () => context.current.scopeKey === scopeKey },
+    )
   return (
     <AssistantNativeFormProvider value={controller}>
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">
