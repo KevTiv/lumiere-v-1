@@ -165,6 +165,14 @@ async fn work(state: &AppState, pool: &Pool, job: &Job) -> Result<(),ApiError> {
                 if sql_only(&job.group.adapter) {
                     // Native reducer paths take their own dispatch locks in the
                     // existing task order. SQL-only backfill needs this guard.
+                    tx.query_opt(
+                        "SELECT request_id FROM lumiere_platform.import_task
+                         WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric
+                           AND actor_identity=$3 AND request_id=$4 FOR SHARE",
+                        &[&scope.organization.to_string(), &scope.company.to_string(),
+                          &scope.actor, &job.group.task_id],
+                    ).await.map_err(ApiError::internal)?
+                     .ok_or_else(|| ApiError::NotFound("saved import task unavailable".into()))?;
                     super::super::tasks::handoff::lock_grant(&tx,scope,&authority.actor,&job.group.task_id).await?;
                 }
                 storage::exact_rows(&tx,scope,&job.group.task_id,&job.chunk.rows).await?;
