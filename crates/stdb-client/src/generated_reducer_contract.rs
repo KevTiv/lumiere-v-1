@@ -1340,6 +1340,11 @@ const PARAMS_CREATE_COMPANY: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "params", kind: ScalarKind::Composite, ref_target: Some("CreateCompanyParams") },
 ];
+const PARAMS_CREATE_COMPANY_FLEET_SERVICE_TYPE: &[ReducerParam] = &[
+    ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
+    ReducerParam { name: "name", kind: ScalarKind::String, ref_target: None },
+];
 const PARAMS_CREATE_COMPANY_STOCK_LOCATION: &[ReducerParam] = &[
     ReducerParam { name: "organization_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
     ReducerParam { name: "company_id", kind: ScalarKind::UnsignedInteger, ref_target: None },
@@ -6979,6 +6984,7 @@ pub const REDUCER_CONTRACTS: &[ReducerContract] = &[
     ReducerContract { name: "create_budget_post", contract_operation_id: "erp.create_budget_post", params: PARAMS_CREATE_BUDGET_POST, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "create_calendar_event", contract_operation_id: "erp.create_calendar_event", params: PARAMS_CREATE_CALENDAR_EVENT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
     ReducerContract { name: "create_company", contract_operation_id: "erp.create_company", params: PARAMS_CREATE_COMPANY, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
+    ReducerContract { name: "create_company_fleet_service_type", contract_operation_id: "erp.create_company_fleet_service_type", params: PARAMS_CREATE_COMPANY_FLEET_SERVICE_TYPE, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "create_company_stock_location", contract_operation_id: "erp.create_company_stock_location", params: PARAMS_CREATE_COMPANY_STOCK_LOCATION, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "create_consignment_agreement", contract_operation_id: "erp.create_consignment_agreement", params: PARAMS_CREATE_CONSIGNMENT_AGREEMENT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: Some(1), unscoped_reason: None },
     ReducerContract { name: "create_consolidation_account", contract_operation_id: "erp.create_consolidation_account", params: PARAMS_CREATE_CONSOLIDATION_ACCOUNT, lifecycle: "none", exposure: Exposure::Session, organization_position: Some(0), company_position: None, unscoped_reason: None },
@@ -8502,6 +8508,7 @@ pub mod reducer_names {
     pub const CREATE_BUDGET_POST: ReducerName = ReducerName::new("create_budget_post");
     pub const CREATE_CALENDAR_EVENT: ReducerName = ReducerName::new("create_calendar_event");
     pub const CREATE_COMPANY: ReducerName = ReducerName::new("create_company");
+    pub const CREATE_COMPANY_FLEET_SERVICE_TYPE: ReducerName = ReducerName::new("create_company_fleet_service_type");
     pub const CREATE_COMPANY_STOCK_LOCATION: ReducerName = ReducerName::new("create_company_stock_location");
     pub const CREATE_CONSIGNMENT_AGREEMENT: ReducerName = ReducerName::new("create_consignment_agreement");
     pub const CREATE_CONSOLIDATION_ACCOUNT: ReducerName = ReducerName::new("create_consolidation_account");
@@ -10010,6 +10017,7 @@ macro_rules! reducer_call {
     ("create_budget_post", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_BUDGET_POST, $args) };
     ("create_calendar_event", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_CALENDAR_EVENT, $args) };
     ("create_company", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_COMPANY, $args) };
+    ("create_company_fleet_service_type", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_COMPANY_FLEET_SERVICE_TYPE, $args) };
     ("create_company_stock_location", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_COMPANY_STOCK_LOCATION, $args) };
     ("create_consignment_agreement", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_CONSIGNMENT_AGREEMENT, $args) };
     ("create_consolidation_account", $args:expr $(,)?) => { $crate::ReducerCall::new($crate::reducer_names::CREATE_CONSOLIDATION_ACCOUNT, $args) };
