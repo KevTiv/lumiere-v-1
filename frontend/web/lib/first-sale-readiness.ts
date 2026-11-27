@@ -1,9 +1,34 @@
 import { buildModuleTabHref } from "@lumiere/erp-shared/ai-source-links"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 
-type Row = Readonly<Record<string, unknown>>
+interface ScopedReadRow {
+  id?: unknown
+  organizationId?: unknown
+  organization_id?: unknown
+  companyId?: unknown
+  company_id?: unknown
+}
 
-function field(row: Row, camel: string, snake: string) {
+export interface QuotationCurrencyRow {
+  id?: unknown
+  isActive?: unknown
+  is_active?: unknown
+  active?: unknown
+}
+
+export interface QuotationPricelistRow extends ScopedReadRow {
+  isActive?: unknown
+  is_active?: unknown
+  currencyId?: unknown
+  currency_id?: unknown
+}
+
+interface CustomerLocationRow extends ScopedReadRow {
+  active?: unknown
+  usage?: unknown
+}
+
+function field<T extends object>(row: T, camel: keyof T, snake: keyof T) {
   return Object.hasOwn(row, camel) ? row[camel] : row[snake]
 }
 
@@ -13,9 +38,9 @@ function positiveId(value: unknown) {
 }
 
 /** Only current-company or organization-wide lists with an active currency can price a quotation. */
-export function usableQuotationPricelists<T extends Row>(
+export function usableQuotationPricelists<T extends QuotationPricelistRow>(
   rows: readonly T[],
-  currencies: readonly Row[],
+  currencies: readonly QuotationCurrencyRow[],
   organizationId: bigint,
   companyId: bigint,
 ): T[] {
@@ -46,7 +71,7 @@ export function quotationPricelistSetupHref(companyId: unknown, can: (resource: 
 
 /** The company-scoped stock read cannot prove absence of organization-wide locations. */
 export function companyCustomerDestination(
-  rows: readonly Row[],
+  rows: readonly CustomerLocationRow[],
   organizationId: bigint,
   companyId: bigint,
 ): "present" | "not-listed" | "unknown" {

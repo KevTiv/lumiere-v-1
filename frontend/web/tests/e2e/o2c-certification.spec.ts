@@ -2,12 +2,12 @@ import { expect, test } from "@playwright/test"
 import type { Page } from "@playwright/test"
 import { seedFirstSaleAccounting } from "./first-sale-accounting-fixture"
 import { bootstrapSalesFixture, seedSalesStockFixture } from "./sales-approval-fixture"
-import { id } from "./cov-scheduler-manufacturing-fixtures"
+import { create, id } from "./cov-scheduler-manufacturing-fixtures"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { readFileSync } from "node:fs"
 
 import {
   assertMoveLinesBalanced,
-  callReducerBff,
   chooseSelectOptionByValue,
   fillField,
   openEntityCreate,
@@ -500,12 +500,12 @@ test.describe("Alpha cold-start delivered sale", { tag: ["@p0", "@unauthenticate
     }
     const { warehouse, product } = await seedSalesStockFixture(page, fixtureName, organizationId, companyId)
     const customerName = smokeName("first-customer")
-    await callReducerBff(page, "create_contact", [organizationId, {
-      name: customerName, type: "person", companyId, isCustomer: true, isVendor: false,
-      isEmployee: false, isProspect: false, isPartner: false, customerRank: 1, supplierRank: 0,
-    }])
-    const [customer] = (await rows(page, "contacts")).filter((row) => row.name === customerName)
-    if (!customer) throw new Error("Customer fixture did not persist")
+    const customer = await create(page, "contacts", "create_contact", {
+      params: stdbParamsToJson({
+        name: customerName, type: "contact", companyId, isCustomer: true, isVendor: false,
+        isEmployee: false, isProspect: false, isPartner: false, customerRank: 1, supplierRank: 0,
+      }, "CreateContactParams"),
+    }, (row) => row.name === customerName && scalarQueryId(row.companyId ?? row.company_id) === companyId)
 
     // Keep the first quotation open across native setup in a second tab.
     await openEntityCreate(page, "/sales?tab=orders", "sales", "orders", "new-sale-order")

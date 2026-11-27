@@ -61,9 +61,16 @@ const formField = {
   offsetAccount: "offset_account_id",
 } as const;
 
+interface FleetServiceSelection {
+  service_type_id?: unknown;
+  journal_id?: unknown;
+  expense_account_id?: unknown;
+  offset_account_id?: unknown;
+}
+
 export function canRecordFleetServiceWith(
   choices: ReturnType<typeof fleetServiceChoices>,
-  values: Record<string, unknown>,
+  values: FleetServiceSelection,
 ): boolean {
   return fleetServiceSetupKeys.every((key) => {
     const id = parseStrictU64(values[formField[key]]);
