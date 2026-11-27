@@ -2,6 +2,8 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { pinnedSourceReview } from "@lumiere/query-hooks/hooks/source-review-navigation"
 import { getProductSurfaceForPathname, isFirstOrgRouteAdmitted } from "@lumiere/ui/lib/product-surface-catalog"
+import { i18n } from "../../../../packages/i18n/src/config"
+import { farmPageCursors, farmPageHref } from "./farm-pagination"
 import { farmEventPrefill } from "./farm-assistant-prefill"
 import {
   FarmApiError,
@@ -44,6 +46,7 @@ test("processing summaries preserve zero measured output and omit absent live we
         sellableWeightKg: 0,
       },
       "en",
+      i18n.getFixedT("en"),
     ),
     "7 animals · 0 kg sellable",
   )
@@ -102,4 +105,26 @@ test("farm import and pinned provenance stay inside the admitted Farm Batches pr
   assert.equal(pinnedSourceReview(review.search, "4098"), null)
   assert.equal(farmSourceReviewHref(companyId, { ...source, revision: 0 }), undefined)
   assert.equal(farmSourceReviewHref(companyId, { file: "old.csv", row: 8 }), undefined)
+})
+
+test("list cursors survive a detail round trip and step back to each prior page", () => {
+  const scope = JSON.stringify([12, "4097"])
+  const cursors = ["63", "43", "23"]
+  const detail = new URL(farmPageHref(scope, cursors, "/farm-batches/21"), "https://example.test")
+  detail.searchParams.set("view", "metrics")
+  detail.searchParams.set("asOf", "2026-11-01")
+  const list = new URL(farmPageHref(scope, farmPageCursors(detail.searchParams, scope)), detail)
+  assert.equal(list.pathname, "/farm-batches")
+  assert.equal(list.searchParams.has("view"), false)
+  assert.equal(list.searchParams.has("asOf"), false)
+  for (let length = cursors.length; length > 0; length--) {
+    const current = farmPageCursors(list.searchParams, scope)
+    assert.deepEqual(current, cursors.slice(0, length))
+    list.href = new URL(farmPageHref(scope, current.slice(0, -1)), list).href
+  }
+  assert.equal(list.search, "")
+  assert.deepEqual(farmPageCursors(detail.searchParams, JSON.stringify([12, "4098"])), [])
+  assert.deepEqual(farmPageCursors(detail.searchParams, JSON.stringify([13, "4097"])), [])
+  detail.searchParams.append("beforeId", "../other")
+  assert.deepEqual(farmPageCursors(detail.searchParams, scope), [])
 })

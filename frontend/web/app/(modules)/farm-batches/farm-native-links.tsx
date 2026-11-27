@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from "@lumiere/i18n"
 import { useState } from "react"
 import Link from "next/link"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -25,6 +26,7 @@ import {
   farmRequest,
   farmWrite,
   type FarmBatchDetail,
+  type FarmTranslation,
 } from "./farm-batch-model"
 
 type ProcessingLink = {
@@ -65,16 +67,16 @@ interface NativeLinks {
 }
 
 const costLabels = {
-  vendor_bill: "Vendor bill",
-  expense_report: "Expense report",
-  journal: "Journal entry",
+  vendor_bill: "farmBatches.vendorBill",
+  expense_report: "farmBatches.expenseReport",
+  journal: "farmBatches.journalEntry",
 } as const
 
 const linkClass = "font-medium text-primary underline-offset-4 hover:underline"
 const stockLotHref = (id: string) => moduleTabHref("warehouse", "lots", { id })
-function recordInput(data: FormData, name: string, label: string) {
+function recordInput(data: FormData, name: string, label: string, t: FarmTranslation) {
   const value = fieldValue(data, name)
-  if (!farmRecordId(value)) throw new FarmApiError(`Enter a valid ${label}.`, 400)
+  if (!farmRecordId(value)) throw new FarmApiError(t("farmBatches.invalidRecordId", { label }), 400)
   return value
 }
 
@@ -93,6 +95,7 @@ export function FarmNativeLinks({
   canWrite: boolean
   locale: string
 }) {
+  const { t } = useTranslation()
   const [form, setForm] = useState<"link" | "run" | null>(null)
   const queryClient = useQueryClient()
   const [resumeLink, setResumeLink] = useState<ProcessingLink | undefined>()
@@ -110,13 +113,13 @@ export function FarmNativeLinks({
     retry: false,
   })
   const rows = result.data
-  if (result.isPending) return <Skeleton aria-label="Loading linked records" className="h-36 w-full" />
+  if (result.isPending) return <Skeleton aria-label={t("farmBatches.loadingLinkedRecords")} className="h-36 w-full" />
   if (result.isError || !rows) {
     return (
       <div role="status" className="space-y-3 text-sm">
-        <p>{result.error?.message ?? "Linked records could not be loaded."}</p>
+        <p>{t("farmBatches.linkedRecordsCouldNotBeLoaded")}</p>
         <Button variant="outline" size="sm" onClick={() => void result.refetch()}>
-          Try again
+          {t("farmBatches.tryAgain")}
         </Button>
       </div>
     )
@@ -126,7 +129,7 @@ export function FarmNativeLinks({
   if (access !== "allowed") {
     return (
       <p role="status" className="text-sm text-muted-foreground">
-        Your role does not have access to the related ERP records.
+        {t("farmBatches.yourRoleDoesNotHaveAccessToLabel")}
       </p>
     )
   }
@@ -147,12 +150,12 @@ export function FarmNativeLinks({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className={workspaceStyles.sectionTitle}>
-            {processing ? "Processing runs" : "Posted costs"}
+            {processing ? t("farmBatches.processingRuns") : t("farmBatches.postedCosts")}
           </h2>
           <p className={workspaceStyles.sectionDescription}>
             {processing
-              ? "Connect a measured run with completed stock movements and output lots."
-              : "Connect existing posted costs and record how they were allocated to this batch."}
+              ? t("farmBatches.connectAMeasuredRunWithCompletedStock")
+              : t("farmBatches.connectExistingPostedCostsAndRecordHow")}
           </p>
         </div>
         {canWrite && (!processing || events.length > 0) && (
@@ -166,11 +169,11 @@ export function FarmNativeLinks({
                   setForm("run")
                 }}
               >
-                Run or resume processing
+                {t("farmBatches.runOrResumeProcessing")}
               </Button>
             )}
             <Button type="button" size="sm" variant="outline" onClick={() => setForm("link")}>
-              {processing ? "Link completed run" : "Link posted cost"}
+              {processing ? t("farmBatches.linkCompletedRun") : t("farmBatches.linkPostedCost")}
             </Button>
           </div>
         )}
@@ -191,15 +194,15 @@ export function FarmNativeLinks({
         <CostRows links={rows.costLinks} locale={locale} />
       )}
       {(before || nextPage) && (
-        <nav aria-label="Linked record pages" className="flex flex-wrap gap-2">
+        <nav aria-label={t("farmBatches.linkedRecordPages")} className="flex flex-wrap gap-2">
           {before && (
             <Button type="button" size="sm" variant="outline" onClick={() => setBefore(null)}>
-              First page
+              {t("farmBatches.firstPage")}
             </Button>
           )}
           {nextPage && (
             <Button type="button" size="sm" variant="outline" onClick={() => setBefore(nextPage)}>
-              Next page
+              {t("farmBatches.nextPage")}
             </Button>
           )}
         </nav>
@@ -235,19 +238,20 @@ function ProcessingRows({
   links: ProcessingLink[]
   onResume?: (item: ProcessingLink) => void
 }) {
+  const { t } = useTranslation()
   if (links.length === 0) {
-    return <p className="text-sm text-muted-foreground">No completed processing runs are linked yet.</p>
+    return <p className="text-sm text-muted-foreground">{t("farmBatches.noCompletedProcessingRunsAreLinkedYet")}</p>
   }
   return (
     <div className={workspaceStyles.surface}>
-      <Table viewportLabel="Linked processing runs">
+      <Table viewportLabel={t("farmBatches.linkedProcessingRuns")}>
         <TableHeader>
           <TableRow>
-            <TableHead>Farm event</TableHead>
-            <TableHead>Manufacturing order</TableHead>
-            <TableHead>Input lot</TableHead>
-            <TableHead>Output lots</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead>{t("farmBatches.farmEvent")}</TableHead>
+            <TableHead>{t("farmBatches.manufacturingOrder")}</TableHead>
+            <TableHead>{t("farmBatches.inputLot")}</TableHead>
+            <TableHead>{t("farmBatches.outputLots")}</TableHead>
+            <TableHead>{t("farmBatches.status")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -257,18 +261,18 @@ function ProcessingRows({
               <TableCell>#{item.manufacturingOrderId}</TableCell>
               <TableCell>
                 <Link className={linkClass} href={stockLotHref(item.liveLotId)}>
-                  Lot #{item.liveLotId}
+                  {t("farmBatches.lotIdLabel", { id: item.liveLotId })}
                 </Link>
               </TableCell>
               <TableCell>
                 {item.status === "pending" ? (
-                  "Awaiting completion"
+                  t("farmBatches.awaitingCompletion")
                 ) : (
                   <ul className="space-y-1">
                     {item.outputs.map((output) => (
                       <li key={output.moveId}>
                         <Link className={linkClass} href={stockLotHref(output.lotId)}>
-                          Lot #{output.lotId}
+                          {t("farmBatches.lotIdLabel", { id: output.lotId })}
                         </Link>
                       </li>
                     ))}
@@ -279,13 +283,13 @@ function ProcessingRows({
                 {item.status === "pending" ? (
                   onResume ? (
                     <Button type="button" size="sm" variant="outline" onClick={() => onResume(item)}>
-                      Resume
+                      {t("farmBatches.resume")}
                     </Button>
                   ) : (
-                    "Pending"
+                    t("farmBatches.pending")
                   )
                 ) : (
-                  "Verified"
+                  t("farmBatches.verified")
                 )}
               </TableCell>
             </TableRow>
@@ -297,19 +301,20 @@ function ProcessingRows({
 }
 
 function CostRows({ links, locale }: { links: CostLink[]; locale: string }) {
+  const { t } = useTranslation()
   const currencies = useCurrencies()
   const currencyById = new Map(currencies.data?.map((row) => [String(row.id), row.code]))
   if (links.length === 0)
-    return <p className="text-sm text-muted-foreground">No posted costs are linked yet.</p>
+    return <p className="text-sm text-muted-foreground">{t("farmBatches.noPostedCostsAreLinkedYet")}</p>
   return (
     <div className={workspaceStyles.surface}>
-      <Table viewportLabel="Linked costs">
+      <Table viewportLabel={t("farmBatches.linkedCosts")}>
         <TableHeader>
           <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Source</TableHead>
-            <TableHead>Allocation basis</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
+            <TableHead>{t("farmBatches.date")}</TableHead>
+            <TableHead>{t("farmBatches.source")}</TableHead>
+            <TableHead>{t("farmBatches.allocationBasis")}</TableHead>
+            <TableHead className="text-right">{t("farmBatches.amount")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -317,7 +322,7 @@ function CostRows({ links, locale }: { links: CostLink[]; locale: string }) {
             item.status === "source_unavailable" ? (
               <TableRow key={item.journalLineId}>
                 <TableCell colSpan={4} className="whitespace-normal text-muted-foreground">
-                  Journal line #{item.journalLineId} could not be verified.
+                  {t("farmBatches.unverifiedJournalLine", { id: item.journalLineId })}
                 </TableCell>
               </TableRow>
             ) : (
@@ -332,7 +337,7 @@ function CostRows({ links, locale }: { links: CostLink[]; locale: string }) {
                         : accountMoveHref(item.journalId)
                     }
                   >
-                    {costLabels[item.kind]} #{item.expenseReportId ?? item.journalId}
+                    {t(costLabels[item.kind])} #{item.expenseReportId ?? item.journalId}
                   </Link>
                 </TableCell>
                 <TableCell className="max-w-56 whitespace-normal wrap-anywhere">
@@ -340,7 +345,7 @@ function CostRows({ links, locale }: { links: CostLink[]; locale: string }) {
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {item.amount}{" "}
-                  {String(currencyById.get(item.currencyId) ?? `· currency #${item.currencyId}`)}
+                  {String(currencyById.get(item.currencyId) ?? t("farmBatches.currencyLabel", { id: item.currencyId }))}
                 </TableCell>
               </TableRow>
             ),
@@ -371,62 +376,63 @@ function ProcessingForm({
   resume?: ProcessingLink
   onSaveFailed: () => void
 }) {
+  const { t, i18n } = useTranslation()
   const events = batch.events.filter((event) => event.kind === "processing")
   const options = events.map(
-    (event) => [event.id, `${event.businessDate} · ${event.count} animals · #${event.id}`] as const,
+    (event) => [event.id, `${event.businessDate} · ${t("farmBatches.animals", { countLabel: event.count.toLocaleString(i18n.language) })} · #${event.id}`] as const,
   )
   const [eventId, setEventId] = useState(resume?.eventId ?? options[0]?.[0] ?? "")
   return (
     <FarmForm<ProcessingLink>
-      title={run ? "Run or resume processing" : "Link completed processing"}
+      title={run ? t("farmBatches.runOrResumeProcessing") : t("farmBatches.linkCompletedProcessing")}
       description={
         run
-          ? "Use the measured run, its prepared Manufacturing order, and the exact input and output lots. Confirming can move stock."
-          : "Choose a measured farm event and enter the matching completed Manufacturing and Warehouse records."
+          ? t("farmBatches.useTheMeasuredRunItsPreparedManufacturing")
+          : t("farmBatches.chooseAMeasuredFarmEventAndEnter")
       }
-      submitLabel={run ? "Confirm processing" : "Link processing"}
+      submitLabel={run ? t("farmBatches.confirmProcessing") : t("farmBatches.linkProcessing")}
       onSaved={onSaved}
       onSaveFailed={onSaveFailed}
       onClose={onClose}
       onSave={(data) => {
         const event = events.find((row) => row.id === fieldValue(data, "eventId"))
-        if (!event) throw new FarmApiError("Choose a recorded processing event.", 400)
+        if (!event) throw new FarmApiError(t("farmBatches.chooseARecordedProcessingEvent"), 400)
         return farmRequest(
           farmApiPath(companyId, `/${batch.id}/${run ? "processing-runs" : "processing-links"}`),
           farmWrite("POST", {
             companyId,
             eventId: event.id,
-            manufacturingOrderId: recordInput(data, "manufacturingOrderId", "Manufacturing order ID"),
-            liveLotId: recordInput(data, "liveLotId", "live lot ID"),
-            outputLotId: recordInput(data, "outputLotId", "output lot ID"),
+            manufacturingOrderId: recordInput(data, "manufacturingOrderId", t("farmBatches.manufacturingOrderID"), t),
+            liveLotId: recordInput(data, "liveLotId", t("farmBatches.liveLotID"), t),
+            outputLotId: recordInput(data, "outputLotId", t("farmBatches.primaryOutputLotID"), t),
             ...(run ? { expectedEventRevision: event.revision } : {}),
           }),
         )
       }}
     >
       <FarmSelect
-        label="Processing event"
+        label={t("farmBatches.processingEvent")}
         name="eventId"
         value={eventId}
         options={options}
         onChange={setEventId}
       />
       <FarmField
-        label="Manufacturing order ID"
+        label={t("farmBatches.manufacturingOrderID")}
         name="manufacturingOrderId"
         defaultValue={resume?.manufacturingOrderId}
         inputMode="numeric"
         maxLength={20}
       />
       <FarmField
-        label="Live lot ID"
+        label={t("farmBatches.liveLotID")}
         name="liveLotId"
         defaultValue={resume?.liveLotId}
         inputMode="numeric"
         maxLength={20}
       />
       <FarmField
-        label="Primary output lot ID"
+        label={t("farmBatches.primaryOutputLotID")}
         name="outputLotId"
         defaultValue={resume?.outputLotId}
         inputMode="numeric"
@@ -437,12 +443,13 @@ function ProcessingForm({
 }
 
 function CostForm({ batch, companyId, onSaved, onClose }: LinkFormProps) {
+  const { t } = useTranslation()
   const [kind, setKind] = useState<CostKind>("vendor_bill")
   return (
     <FarmForm<CostProof>
-      title="Link posted cost"
-      description="Use the posted journal line that carries this batch’s allocated cost."
-      submitLabel="Link cost"
+      title={t("farmBatches.linkPostedCost")}
+      description={t("farmBatches.useThePostedJournalLineThatCarries")}
+      submitLabel={t("farmBatches.linkCost")}
       onSaved={onSaved}
       onClose={onClose}
       onSave={(data) =>
@@ -451,40 +458,40 @@ function CostForm({ batch, companyId, onSaved, onClose }: LinkFormProps) {
           farmWrite("POST", {
             companyId,
             kind,
-            journalLineId: recordInput(data, "journalLineId", "journal line ID"),
+            journalLineId: recordInput(data, "journalLineId", t("farmBatches.postedJournalLineID"), t),
             allocationBasis: fieldValue(data, "allocationBasis"),
             ...(kind === "expense_report"
-              ? { expenseReportId: recordInput(data, "expenseReportId", "expense report ID") }
+              ? { expenseReportId: recordInput(data, "expenseReportId", t("farmBatches.expenseReportID"), t) }
               : {}),
           }),
         )
       }
     >
       <FarmSelect
-        label="Cost source"
+        label={t("farmBatches.costSource")}
         name="kind"
         value={kind}
-        options={Object.entries(costLabels)}
+        options={Object.entries(costLabels).map(([value, label]) => [value, t(label)])}
         onChange={(value) => {
           if (value === "vendor_bill" || value === "expense_report" || value === "journal")
             setKind(value)
         }}
       />
       <FarmField
-        label="Posted journal line ID"
+        label={t("farmBatches.postedJournalLineID")}
         name="journalLineId"
         inputMode="numeric"
         maxLength={20}
       />
       {kind === "expense_report" && (
         <FarmField
-          label="Expense report ID"
+          label={t("farmBatches.expenseReportID")}
           name="expenseReportId"
           inputMode="numeric"
           maxLength={20}
         />
       )}
-      <FarmField label="Allocation basis" name="allocationBasis" maxLength={500} />
+      <FarmField label={t("farmBatches.allocationBasis")} name="allocationBasis" maxLength={500} />
     </FarmForm>
   )
 }

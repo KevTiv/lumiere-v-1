@@ -1,3 +1,4 @@
+import type { useTranslation } from "@lumiere/i18n"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { sourceReviewHistoryHref } from "@lumiere/query-hooks/hooks/source-review-navigation"
 
@@ -35,17 +36,19 @@ export function farmRecordId(value: unknown): value is string {
 }
 
 export const farmEventLabels = {
-  intake: "Intake",
-  weighIn: "Weigh-in",
-  feedUsage: "Feed consumption",
-  feedCoverage: "Feed records complete",
-  mortality: "Mortality",
-  transferIn: "Transfer in",
-  transferOut: "Transfer out",
-  internalTransfer: "Internal transfer",
-  liveSale: "Live sale",
-  processing: "Processing observation",
+  intake: "farmBatches.intake",
+  weighIn: "farmBatches.weighIn",
+  feedUsage: "farmBatches.feedUsage",
+  feedCoverage: "farmBatches.feedCoverage",
+  mortality: "farmBatches.mortality",
+  transferIn: "farmBatches.transferIn",
+  transferOut: "farmBatches.transferOut",
+  internalTransfer: "farmBatches.internalTransfer",
+  liveSale: "farmBatches.liveSale",
+  processing: "farmBatches.processingObservation",
 } as const
+
+export type FarmTranslation = ReturnType<typeof useTranslation>["t"]
 
 export type FarmEventKind = keyof typeof farmEventLabels
 type CountEventKind = Exclude<FarmEventKind, "weighIn" | "feedUsage" | "feedCoverage" | "processing">
@@ -184,24 +187,28 @@ export async function farmRequest<T>(path: string, init?: RequestInit): Promise<
   return (await farmResponse<{ data: T }>(path, init)).data
 }
 
-export function eventSummary(event: FarmEvent, locale: string) {
-  const format = (number: number) => number.toLocaleString(locale, { maximumFractionDigits: 3 })
+
+export function eventSummary(event: FarmEvent, locale: string, t: FarmTranslation) {
+  const format = new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format
   switch (event.kind) {
     case "weighIn":
-      return `${format(event.sampleCount)} weighed · ${format(event.totalWeightKg / event.sampleCount)} kg average`
+      return t("farmBatches.weighedSummary", {
+        sample: format(event.sampleCount),
+        mean: format(event.totalWeightKg / event.sampleCount),
+      })
     case "feedUsage":
       return `${format(event.quantityKg)} kg · ${event.feedProduct}`
     case "feedCoverage":
-      return `After ${farmDateLabel(event.fromExclusive, locale)}`
+      return t("farmBatches.afterDate", { date: farmDateLabel(event.fromExclusive, locale) })
     case "processing":
       return [
-        `${format(event.count)} animals`,
-        event.liveWeightKg == null ? null : `${format(event.liveWeightKg)} kg live`,
-        event.sellableWeightKg == null ? null : `${format(event.sellableWeightKg)} kg sellable`,
+        t("farmBatches.animals", { countLabel: format(event.count) }),
+        event.liveWeightKg == null ? null : t("farmBatches.liveKg", { value: format(event.liveWeightKg) }),
+        event.sellableWeightKg == null ? null : t("farmBatches.sellableKg", { value: format(event.sellableWeightKg) }),
       ]
         .filter(Boolean)
         .join(" · ")
     default:
-      return `${format(event.count)} animals`
+      return t("farmBatches.animals", { countLabel: format(event.count) })
   }
 }

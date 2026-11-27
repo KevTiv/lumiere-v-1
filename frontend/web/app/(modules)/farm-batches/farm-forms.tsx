@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from "@lumiere/i18n"
 import { useContext, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react"
 import { Button } from "@lumiere/ui/components/button"
 import {
@@ -124,6 +125,7 @@ export function FarmForm<T>({
   onSaveFailed?: () => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const editor = useContext(NavigationEditorContext)
   const state = useRef({ dirty: false, pending: false })
   const request = useRef<{ signature: string; save: () => Promise<T> } | null>(null)
@@ -159,8 +161,8 @@ export function FarmForm<T>({
       const unknown = !(caught instanceof FarmApiError) || caught.status >= 500
       setUncertain(unknown)
       if (!unknown) request.current = null
-      const message = caught instanceof Error ? caught.message : "The operation could not complete."
-      setError(unknown ? `${message} Retry to check the same operation.` : message)
+      const message = caught instanceof Error ? caught.message : t("farmBatches.theOperationCouldNotComplete")
+      setError(unknown ? t("farmBatches.retrySameOperation", { message }) : message)
       onSaveFailed?.()
     } finally {
       state.current.pending = false
@@ -208,10 +210,10 @@ export function FarmForm<T>({
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="outline" disabled={pending} onClick={close}>
-              Cancel
+              {t("farmBatches.cancel")}
             </Button>
             <Button type="submit" disabled={pending}>
-              {pending ? "Saving…" : uncertain ? "Check by retrying" : submitLabel}
+              {pending ? t("farmBatches.saving") : uncertain ? t("farmBatches.checkByRetrying") : submitLabel}
             </Button>
           </DialogFooter>
         </form>
@@ -229,11 +231,12 @@ export function CreateFarmBatchForm({
   onSaved: (result: FarmBatch) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <FarmForm<FarmBatch>
-      title="New farm batch"
-      description="Add the batch first, then record its intake."
-      submitLabel="Create batch"
+      title={t("farmBatches.newFarmBatch")}
+      description={t("farmBatches.addTheBatchFirstThenRecordIts")}
+      submitLabel={t("farmBatches.createBatch")}
       onClose={onClose}
       onSaved={onSaved}
       onSave={(data, requestKey) => {
@@ -249,10 +252,10 @@ export function CreateFarmBatchForm({
         )
       }}
     >
-      <FarmField label="Batch reference" name="reference" maxLength={120} />
-      <FarmField label="Species" name="species" defaultValue="poultry" maxLength={80} />
-      <FarmField label="Start date" name="startDate" type="date" />
-      <FarmField label="Farm or house" name="location" maxLength={160} />
+      <FarmField label={t("farmBatches.batchReference")} name="reference" maxLength={120} />
+      <FarmField label={t("farmBatches.species")} name="species" defaultValue="poultry" maxLength={80} />
+      <FarmField label={t("farmBatches.startDate")} name="startDate" type="date" />
+      <FarmField label={t("farmBatches.farmOrHouse")} name="location" maxLength={160} />
     </FarmForm>
   )
 }
@@ -306,19 +309,20 @@ export function FarmEventForm({
   onClose: () => void
   onSaved: (event: FarmEvent) => void
 }) {
+  const { t } = useTranslation()
   const [kind, setKind] = useState(existing?.kind ?? initialKind)
   const expectedRevision = useRef(batch.revision).current
   const selected = existing?.kind === kind ? existing : undefined
   const suggested = kind === initialKind && !existing ? prefill : undefined
   return (
     <FarmForm<FarmEvent>
-      title={existing ? "Correct farm event" : "Record farm event"}
+      title={existing ? t("farmBatches.correctFarmEvent") : t("farmBatches.recordFarmEvent")}
       description={
         kind === "processing"
-          ? "Enter the measured run. Link its completed Warehouse and Manufacturing records on the Processing tab."
+          ? t("farmBatches.enterTheMeasuredRunLinkItsCompleted")
           : undefined
       }
-      submitLabel={existing ? "Save correction" : "Save event"}
+      submitLabel={existing ? t("farmBatches.saveCorrection") : t("farmBatches.saveEvent")}
       onClose={onClose}
       onSaved={onSaved}
       onSave={(data, requestKey) =>
@@ -335,18 +339,18 @@ export function FarmEventForm({
       }
     >
       {existing ? (
-        <p className="text-sm font-medium">{farmEventLabels[kind]}</p>
+        <p className="text-sm font-medium">{t(farmEventLabels[kind])}</p>
       ) : (
         <FarmSelect
-          label="Event"
+          label={t("farmBatches.event")}
           name="kind"
           value={kind}
-          options={Object.entries(farmEventLabels)}
+          options={Object.entries(farmEventLabels).map(([value, label]) => [value, t(label)])}
           onChange={(value) => setKind(selectedFarmEventKind(value))}
         />
       )}
       <FarmField
-        label={kind === "feedCoverage" ? "Complete through" : "Business date"}
+        label={kind === "feedCoverage" ? t("farmBatches.completeThrough") : t("farmBatches.businessDate")}
         name="businessDate"
         type="date"
         min={batch.startDate}
@@ -355,7 +359,7 @@ export function FarmEventForm({
       {kind === "weighIn" && (
         <>
           <FarmField
-            label="Animals weighed"
+            label={t("farmBatches.animalsWeighed")}
             name="sampleCount"
             type="number"
             min={1}
@@ -363,7 +367,7 @@ export function FarmEventForm({
             defaultValue={selected?.kind === kind ? selected.sampleCount : suggested?.sampleCount}
           />
           <FarmField
-            label="Total sampled weight (kg)"
+            label={t("farmBatches.totalSampledWeightKg")}
             name="totalWeightKg"
             type="number"
             min={0.0001}
@@ -375,13 +379,13 @@ export function FarmEventForm({
       {kind === "feedUsage" && (
         <>
           <FarmField
-            label="Feed product"
+            label={t("farmBatches.feedProduct")}
             name="feedProduct"
             maxLength={120}
             defaultValue={selected?.kind === kind ? selected.feedProduct : suggested?.feedProduct}
           />
           <FarmField
-            label="Feed consumed (kg)"
+            label={t("farmBatches.feedConsumedKg")}
             name="quantityKg"
             type="number"
             min={0.0001}
@@ -392,7 +396,7 @@ export function FarmEventForm({
       )}
       {kind === "feedCoverage" && (
         <FarmField
-          label="Complete after (exclusive)"
+          label={t("farmBatches.completeAfterExclusive")}
           name="fromExclusive"
           type="date"
           defaultValue={selected?.kind === kind ? selected.fromExclusive : undefined}
@@ -400,7 +404,7 @@ export function FarmEventForm({
       )}
       {kind !== "weighIn" && kind !== "feedUsage" && kind !== "feedCoverage" && (
         <FarmField
-          label="Animal count"
+          label={t("farmBatches.animalCount")}
           name="count"
           type="number"
           min={1}
@@ -411,7 +415,7 @@ export function FarmEventForm({
       {kind === "processing" && (
         <>
           <FarmField
-            label="Live input weight (kg)"
+            label={t("farmBatches.liveInputWeightKg")}
             name="liveWeightKg"
             required={false}
             type="number"
@@ -420,7 +424,7 @@ export function FarmEventForm({
             defaultValue={selected?.kind === kind ? selected.liveWeightKg : suggested?.liveWeightKg}
           />
           <FarmField
-            label="Sellable output weight (kg)"
+            label={t("farmBatches.sellableOutputWeightKg")}
             name="sellableWeightKg"
             required={false}
             type="number"
@@ -432,7 +436,7 @@ export function FarmEventForm({
           />
         </>
       )}
-      {existing && <FarmField label="Reason for correction" name="reason" maxLength={360} />}
+      {existing && <FarmField label={t("farmBatches.reasonForCorrection")} name="reason" maxLength={360} />}
     </FarmForm>
   )
 }
