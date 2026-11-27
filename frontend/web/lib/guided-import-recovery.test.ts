@@ -92,3 +92,12 @@ test("recovery retains the exact origin admission and refuses substituting anoth
   assert.throws(() => readImportRecovery(corrupted, scope))
   assert.equal(readImportRecovery(local, { ...scope, companyId: 9002 }), null)
 })
+
+
+test("recovery preserves the same saved-review task on native retries", () => {
+  const local = storage()
+  const reviewed = { ...request, reviewTaskId: "d".repeat(32) }
+  retainImportRequest(local, scope, reviewed)
+  assert.deepEqual(readImportRecovery(local, scope)?.request, reviewed)
+  assert.throws(() => retainImportRequest(local, scope, { ...reviewed, reviewTaskId: "e".repeat(32) }), /retained import result/)
+})

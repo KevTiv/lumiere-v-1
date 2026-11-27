@@ -5,7 +5,7 @@ use super::super::StorageScope;
 use super::model::*;
 use crate::error::ApiError;
 
-const COLUMNS: &str = "id,request_key,revision,proposal_sha256,definition_json,state,execution_json,verification_json,last_error,created_at::text,approved_at::text";
+const COLUMNS: &str = "id,request_key,revision,proposal_sha256,definition_json,state,execution_json,verification_json,last_error,created_at::text,approved_at::text,prepared_by,approved_by,dispatched_by";
 
 pub(super) struct SavedProposal {
     pub id: i64,
@@ -19,6 +19,9 @@ pub(super) struct SavedProposal {
     pub last_error: Option<String>,
     pub created_at: String,
     pub approved_at: Option<String>,
+    pub prepared_by: Option<String>,
+    pub approved_by: Option<String>,
+    pub dispatched_by: Option<String>,
 }
 
 impl SavedProposal {
@@ -41,12 +44,16 @@ impl SavedProposal {
             last_error: row.get("last_error"),
             created_at: row.get("created_at"),
             approved_at: row.get("approved_at"),
+            prepared_by: row.get("prepared_by"),
+            approved_by: row.get("approved_by"),
+            dispatched_by: row.get("dispatched_by"),
         })
     }
 
     pub fn view(&self) -> Value {
         json!({"id":self.id.to_string(),"requestKey":self.request_key,"revision":self.revision,"digest":self.digest,
             "kind":self.definition.kind,"status":self.state,"createdAt":self.created_at,"approvedAt":self.approved_at,
+            "preparedBy":self.prepared_by,"approvedBy":self.approved_by,"dispatchedBy":self.dispatched_by,
             "summary":self.definition.summary,"sources":self.definition.sources,"entries":self.definition.entries,
             "issues":self.definition.issues,"configuration":self.definition.configuration,"execution":self.execution,
             "result":self.result,"lastError":self.last_error})
@@ -377,6 +384,36 @@ pub(super) async fn save_progress(
         .transpose()
         .map_err(ApiError::internal)?;
     tx.execute("UPDATE lumiere_platform.import_workflow_proposal SET state=$2,execution_json=$3,verification_json=$4,last_error=$5,verified_at=CASE WHEN $4::jsonb IS NULL THEN NULL ELSE now() END WHERE id=$1", &[&proposal.id, &proposal.state, &execution, &result, &proposal.last_error]).await.map_err(ApiError::internal)?;
+    Ok(())
+}
+
+pub(super) async fn bind_executor(
+    tx: &Transaction<'_>,
+    scope: StorageScope<'_>,
+    task: &str,
+    id: i64,
+    action: &ActionBody,
+    actor: &str,
+) -> Result<(), ApiError> {
+    super::super::tasks::handoff::lock_grant(tx, scope, actor, task).await?;
+    let proposal = load(tx, scope, task, id).await?;
+    proposal.require_approval(action, scope.company)?;
+    if proposal.approved_at.is_none() {
+        return Err(ApiError::Conflict(
+            "approve this exact proposal before executing it".into(),
+        ));
+    }
+    // An older deployment could have dispatched through the immutable creator
+    // without saving a PostgreSQL receipt. Keep that actor for legacy approvals.
+    let actor = if proposal.approved_by.is_some() {
+        actor
+    } else {
+        scope.actor
+    };
+    tx.execute(
+        "UPDATE lumiere_platform.import_workflow_proposal SET dispatched_by=$2 WHERE id=$1 AND dispatched_by IS NULL",
+        &[&id,&actor],
+    ).await.map_err(ApiError::internal)?;
     Ok(())
 }
 

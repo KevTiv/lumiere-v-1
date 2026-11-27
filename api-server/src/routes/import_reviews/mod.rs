@@ -16,6 +16,7 @@ mod tasks;
 mod workflow;
 
 pub(crate) use import_binding::{read_review_binding, record_review_binding};
+pub(crate) use native_requests::lock_review_dispatch;
 pub(crate) use workflow::read_workflow_binding;
 
 use axum::{

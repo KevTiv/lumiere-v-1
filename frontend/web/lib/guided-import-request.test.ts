@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { csvImportRequestBody } from "@lumiere/query-hooks/hooks/csv-import-request"
-import { guidedImportRequest } from "./guided-import-request"
+import { buildGuidedImportCsv, guidedImportRequest } from "./guided-import-request"
 
 test("a product request uses the exact operating company's currency and a tracking id", () => {
   const request=guidedImportRequest({organizationId:7n,companyId:22,entity:"product",csv:"name,sale_price,cost_price\nHistoric product,4800,3000",fileName:"reviewed.csv",companies:[{id:11,currencyId:840},{id:22,currencyId:646}]})
@@ -35,4 +35,14 @@ test("guided mapping produces a reviewed derivative linked to its admitted origi
   const request = guidedImportRequest({ organizationId: 7n, companyId: 22, entity: "product", csv: "name,sale_price,cost_price\nReviewed name,10,5", fileName: "original.xlsx", sourceAdmissionId, companies: [{ id: 22, currencyId: 646 }] })
   assert.equal(request.sourceAdmissionId, sourceAdmissionId)
   assert.equal(JSON.parse(csvImportRequestBody(request)).sourceAdmissionId, sourceAdmissionId)
+})
+
+
+test("saved native adapters keep exact review IDs through mapping and skip decisions", () => {
+  const task = "b".repeat(32)
+  const headers = ["name", "_review_item_id", "_review_revision"]
+  const rows = [["Coffee", "80", "3"], ["Tea", "81", "2"]]
+  const csv = buildGuidedImportCsv(headers, rows, { name: "_review_item_id", _review_item_id: "name", _review_revision: "__skip__" }, new Set([1]), task)
+  assert.equal(csv, "_review_item_id,_review_revision\n80,3")
+  assert.throws(() => buildGuidedImportCsv(["name"], [["Coffee"]], { name: "name" }, new Set(), task), /row evidence/)
 })

@@ -488,6 +488,13 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: include_str!("import_task_handoff_expand.sql"),
     },
+    Migration {
+        version: 54,
+        name: "import_workflow_actors",
+        change_set: 43,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("import_workflow_actors_expand.sql"),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

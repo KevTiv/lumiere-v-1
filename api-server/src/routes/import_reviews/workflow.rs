@@ -25,7 +25,10 @@ use crate::{
     cold_tier::pg_pool,
     error::ApiError,
     routes::farm_batches::{authorize as authorize_farm, FarmAccess},
-    routes::import::{read_workflow_import, submit_workflow_import, WorkflowImportRequest},
+    routes::import::{
+        read_workflow_import, read_workflow_import_for_actor, submit_workflow_import,
+        WorkflowImportRequest,
+    },
     session::ApiSession,
     state::AppState,
     trusted_context::TrustedOperationContext,
@@ -51,11 +54,7 @@ async fn read(
     };
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
-    let proposals = if scoped.actor == viewer.actor {
-        storage::list(&tx, scoped, &task).await?
-    } else {
-        Vec::new()
-    };
+    let proposals = storage::list(&tx, scoped, &task).await?;
     let backfilled_records = super::module_backfill::task_results(&tx, scoped, &task).await?;
     let reviewed_records = super::module_backfill::workflow_results(&tx, scoped, &task).await?;
     let farm_enabled =
@@ -148,11 +147,18 @@ async fn prepare(
 ) -> Result<Json<Value>, ApiError> {
     body.validate()?;
     let context = scope(&state, &session, body.company_id).await?;
-    let scoped = storage_scope(&context, body.company_id);
+    let viewer = storage_scope(&context, body.company_id);
     let request_hash = hash(&serde_json::to_vec(&body).map_err(ApiError::internal)?);
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let (creator, _) = super::tasks::handoff::read_for(&pool, &context, viewer, &task).await?;
+    let scoped = StorageScope {
+        actor: &creator,
+        ..viewer
+    };
+
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
+    super::tasks::handoff::lock_grant(&tx, scoped, viewer.actor, &task).await?;
     storage::require_task(&tx, scoped, &task, true).await?;
     if let Some(existing) =
         storage::replay(&tx, scoped, &task, &body.request_key, &request_hash).await?
@@ -164,7 +170,11 @@ async fn prepare(
     let rows = storage::reviews(&tx, scoped, &task, &body.rows).await?;
     let mut definition = build_definition(&rows, &body.configuration, decimals)?;
     overlap::hold_candidates(&tx, scoped, &mut definition, None).await?;
-    let proposal = storage::insert(&tx, scoped, &task, &body, &request_hash, &definition).await?;
+    let mut proposal =
+        storage::insert(&tx, scoped, &task, &body, &request_hash, &definition).await?;
+    tx.execute("UPDATE lumiere_platform.import_workflow_proposal SET prepared_by=$2 WHERE id=$1 AND prepared_by IS NULL",
+       &[&proposal.id,&viewer.actor]).await.map_err(ApiError::internal)?;
+    proposal.prepared_by = Some(viewer.actor.to_owned());
     // Reject a group that cannot pass the existing native byte admission before
     // the operator approves it. No native operation is dispatched here.
     native::header_request(scoped, &task, &proposal)?;
@@ -180,10 +190,17 @@ async fn read_request(
     Query(query): Query<Scope>,
 ) -> Result<Json<Value>, ApiError> {
     let context = scope(&state, &session, query.company_id).await?;
-    let scoped = storage_scope(&context, query.company_id);
+    let viewer = storage_scope(&context, query.company_id);
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let (creator, _) = super::tasks::handoff::read_for(&pool, &context, viewer, &task).await?;
+    let scoped = StorageScope {
+        actor: &creator,
+        ..viewer
+    };
+
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
+    super::tasks::handoff::lock_grant(&tx, scoped, viewer.actor, &task).await?;
     let proposal = storage::read_request(&tx, scoped, &task, &request).await?;
     tx.commit().await.map_err(ApiError::internal)?;
     Ok(Json(proposal.view()))
@@ -205,10 +222,17 @@ async fn read_posting_status(
             "verified journal entry receipt not found".into(),
         ));
     }
-    let scoped = storage_scope(&context, query.company_id);
+    let viewer = storage_scope(&context, query.company_id);
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let (creator, _) = super::tasks::handoff::read_for(&pool, &context, viewer, &task).await?;
+    let scoped = StorageScope {
+        actor: &creator,
+        ..viewer
+    };
+
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
+    super::tasks::handoff::lock_grant(&tx, scoped, viewer.actor, &task).await?;
     storage::require_task(&tx, scoped, &task, false).await?;
     let proposal = storage::read_proposal(&tx, scoped, &task, id, false).await?;
     tx.commit().await.map_err(ApiError::internal)?;
@@ -231,10 +255,17 @@ async fn approve(
     Json(body): Json<ActionBody>,
 ) -> Result<Json<Value>, ApiError> {
     let context = scope(&state, &session, body.company_id).await?;
-    let scoped = storage_scope(&context, body.company_id);
+    let viewer = storage_scope(&context, body.company_id);
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let (creator, _) = super::tasks::handoff::read_for(&pool, &context, viewer, &task).await?;
+    let scoped = StorageScope {
+        actor: &creator,
+        ..viewer
+    };
+
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
+    super::tasks::handoff::lock_grant(&tx, scoped, viewer.actor, &task).await?;
     overlap::lock_company(&tx, scoped).await?;
     let mut proposal = storage::load(&tx, scoped, &task, id).await?;
     proposal.require_approval(&body, scoped.company)?;
@@ -251,6 +282,13 @@ async fn approve(
         storage::require_claims(&tx, scoped, &proposal).await?;
     } else {
         storage::approve(&tx, scoped, &task, &mut proposal, decimals).await?;
+        tx.execute(
+            "UPDATE lumiere_platform.import_workflow_proposal SET approved_by=$2 WHERE id=$1",
+            &[&proposal.id, &viewer.actor],
+        )
+        .await
+        .map_err(ApiError::internal)?;
+        proposal.approved_by = Some(viewer.actor.to_owned());
     }
     let view = proposal.view();
     tx.commit().await.map_err(ApiError::internal)?;
@@ -296,10 +334,25 @@ async fn run(
     allow_write: bool,
 ) -> Result<Value, ApiError> {
     let context = scope(state, session, body.company_id).await?;
-    let scoped = storage_scope(&context, body.company_id);
+    let viewer = storage_scope(&context, body.company_id);
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let (creator, _) = super::tasks::handoff::read_for(&pool, &context, viewer, task).await?;
+    let scoped = StorageScope {
+        actor: &creator,
+        ..viewer
+    };
+    if allow_write {
+        // Commit the actor reservation before any reducer can mutate. A lost
+        // response must never cause another actor to reissue the same phase.
+        let mut client = pool.get().await.map_err(ApiError::internal)?;
+        let reservation = client.transaction().await.map_err(ApiError::internal)?;
+        storage::bind_executor(&reservation, scoped, task, id, body, viewer.actor).await?;
+        reservation.commit().await.map_err(ApiError::internal)?;
+    }
+
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
+    super::tasks::handoff::lock_grant(&tx, scoped, viewer.actor, task).await?;
     // Serialize callers for this proposal and retain shared source-row locks
     // through dispatch. A concurrent reviewer cannot change the approved facts
     // between the freshness check and a native write. A process crash releases
@@ -375,10 +428,14 @@ async fn execute_steps(
     proposal: &mut SavedProposal,
     allow_write: bool,
 ) -> Result<VerifiedResult, ApiError> {
+    let executor = proposal
+        .dispatched_by
+        .clone()
+        .unwrap_or_else(|| scoped.actor.to_owned());
     let headers = native::header_request(scoped, task, proposal)?;
     proposal.execution.phase = Phase::Headers;
     proposal.execution.parent_request_id = Some(headers.request_id.clone());
-    let parent = resolve_native(state, session, context, &headers, allow_write).await?;
+    let parent = resolve_native(state, session, context, &executor, &headers, allow_write).await?;
     proposal.execution.parent_job_id = parent["jobId"].as_str().map(str::to_owned);
     storage::record_receipt(
         tx,
@@ -403,7 +460,8 @@ async fn execute_steps(
     let lines = native::line_request(scoped, task, proposal, &header_ids)?;
     proposal.execution.phase = Phase::Lines;
     proposal.execution.line_request_id = Some(lines.request_id.clone());
-    let line_receipt = resolve_native(state, session, context, &lines, allow_write).await?;
+    let line_receipt =
+        resolve_native(state, session, context, &executor, &lines, allow_write).await?;
     proposal.execution.line_job_id = line_receipt["jobId"].as_str().map(str::to_owned);
     storage::record_receipt(
         tx,
@@ -451,12 +509,22 @@ async fn resolve_native(
     state: &AppState,
     session: &ApiSession,
     context: &TrustedOperationContext,
+    executor: &str,
     request: &WorkflowImportRequest,
     allow_write: bool,
 ) -> Result<Value, ApiError> {
-    match read_workflow_import(context,request,&hash(request.csv.as_bytes())).await {
+    let content = hash(request.csv.as_bytes());
+    let outcome = if context.actor_identity() == executor {
+        read_workflow_import(context, request, &content).await
+    } else {
+        read_workflow_import_for_actor(context, &state.stdb, executor, request, &content).await
+    };
+    match outcome {
         Ok(receipt) => Ok(receipt),
-        Err(ApiError::NotFound(_)) if allow_write => submit_workflow_import(state,session,request).await,
+        Err(ApiError::NotFound(_)) if allow_write && executor == context.actor_identity() =>
+            submit_workflow_import(state,session,request).await,
+        Err(ApiError::NotFound(_)) if allow_write =>
+            Err(ApiError::Conflict("this native execution has a different saved submitter; check its existing results".into())),
         Err(ApiError::NotFound(_)) => Err(ApiError::Conflict("this stage has no native receipt yet; resume the approved import to create the remaining drafts".into())),
         Err(error) => Err(error),
     }

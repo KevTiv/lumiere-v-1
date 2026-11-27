@@ -21,6 +21,23 @@ use super::super::{full_administrator, task_company_scope};
 
 type Pool = deadpool_postgres::Pool;
 
+pub(super) async fn lock_task_alias(
+    tx: &tokio_postgres::Transaction<'_>,
+    organization: u64,
+    company: u64,
+    actor: &str,
+    request: &str,
+) -> Result<(), ApiError> {
+    let key = format!("import-task-alias/v1:{organization}:{company}:{actor}:{request}");
+    tx.query_one(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        &[&key],
+    )
+    .await
+    .map_err(ApiError::internal)?;
+    Ok(())
+}
+
 pub(super) async fn creator_for(
     pool: &Pool,
     scope: StorageScope<'_>,
@@ -53,6 +70,36 @@ pub(super) async fn creator_for(
         }
     }
     Ok(scope.actor.to_owned())
+}
+
+pub(in crate::routes::import_reviews) async fn lock_grant(
+    tx: &tokio_postgres::Transaction<'_>,
+    scope: StorageScope<'_>,
+    viewer: &str,
+    request: &str,
+) -> Result<(), ApiError> {
+    if scope.actor == viewer {
+        return Ok(());
+    }
+    let granted = tx
+        .query_opt(
+            "SELECT revision FROM lumiere_platform.import_task_handoff
+          WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric
+            AND actor_identity=$3 AND request_id=$4 AND recipient_identity=$5 FOR SHARE",
+            &[
+                &scope.organization.to_string(),
+                &scope.company.to_string(),
+                &scope.actor,
+                &request,
+                &viewer,
+            ],
+        )
+        .await
+        .map_err(ApiError::internal)?;
+    if granted.is_none() {
+        return Err(ApiError::NotFound("import task not found".into()));
+    }
+    Ok(())
 }
 
 pub(super) async fn find_incoming_document_task(
@@ -427,13 +474,16 @@ pub(super) async fn save(
 ) -> Result<Value, ApiError> {
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
+    if let Some(recipient) = body.recipient.as_deref() {
+        lock_task_alias(&tx, scope.organization, scope.company, recipient, request).await?;
+    }
     let org = scope.organization.to_string();
     let company = scope.company.to_string();
     let keys: &[&(dyn tokio_postgres::types::ToSql + Sync)] =
         &[&org, &company, &scope.actor, &request];
     tx.query_opt(
         "SELECT request_id FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric
-          AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 FOR UPDATE",
+          AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 FOR NO KEY UPDATE",
         keys,
     ).await.map_err(ApiError::internal)?.ok_or_else(|| ApiError::NotFound("import task not found".into()))?;
     let row = tx.query_opt(
