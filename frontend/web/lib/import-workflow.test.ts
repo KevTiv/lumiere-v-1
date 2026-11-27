@@ -10,6 +10,8 @@ import {
   parseImportProposal,
   prepareImportProposal,
   readImportWorkflow,
+  readNativeReceiptPage,
+  readNativeReceiptRows,
   transitionImportProposal,
   type ImportProposal,
   type PrepareImportProposal,
@@ -592,4 +594,36 @@ test("destination links stay within the ERP", () => {
       false,
     )
   }
+})
+
+test("receipt history retains the saved scope and rejects repeated or foreign pages", async () => {
+  const before = "b".repeat(32)
+  const next = "c".repeat(32)
+  const envelope = { organizationId: "1", companyId: "3", taskId: scope.taskId }
+  const result = { requestId: next, entity: "contact", contentSha256: "a".repeat(64), fileName: null,
+    reviewItemCount: 1, reviewIds: ["9"], submittedAt: "2026-11-07", state: "awaiting_receipt",
+    verification: "native_receipt_only", receipt: null }
+  const page = await readNativeReceiptPage(async (url) => {
+    assert.match(String(url), new RegExp(`companyId=3&before=${before}$`))
+    return Response.json({ ...envelope, results: [result], next })
+  }, scope, before)
+  assert.equal(page.results[0]?.requestId, next)
+  await assert.rejects(readNativeReceiptPage(async () => Response.json({ ...envelope, results: [result, result], next }), scope, before))
+  await assert.rejects(readNativeReceiptPage(async () => Response.json({ ...envelope, companyId: "4", results: [], next: null }), scope, before))
+})
+
+test("later source rows carry destinations only when the evidence is verified", async () => {
+  const request = { requestId: "b".repeat(32), entity: "product" as const }
+  const envelope = { organizationId: "1", companyId: "3", taskId: scope.taskId, ...request }
+  const row = { importRow: 22, sourceFile: "items.csv", sourceRow: 7, batchId: "2", itemId: "10",
+    revision: 4, state: "verified", recordId: "9007199254740993" }
+  const page = await readNativeReceiptRows(async (url) => {
+    assert.match(String(url), /companyId=3&after=21$/)
+    return Response.json({ ...envelope, rows: [row], nextRow: null })
+  }, scope, request, 21)
+  assert.equal(page.rows[0]?.recordId, row.recordId)
+  for (const patch of [{ state: "unverified" }, { state: "failed" }, { recordId: null }, { importRow: 21 }]) {
+    await assert.rejects(readNativeReceiptRows(async () => Response.json({ ...envelope, rows: [{ ...row, ...patch }], nextRow: null }), scope, request, 21))
+  }
+  await assert.rejects(readNativeReceiptRows(async () => Response.json({ ...envelope, entity: "contact", rows: [row], nextRow: null }), scope, request, 21))
 })

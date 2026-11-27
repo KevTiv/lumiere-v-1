@@ -34,6 +34,7 @@ use crate::workflow_reads::bounded_windows::{BoundedIdReader, ID_WINDOW};
 
 mod general;
 mod sources;
+pub(super) use sources::verified_import_destination;
 #[cfg(test)]
 mod tests;
 

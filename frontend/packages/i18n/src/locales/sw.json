@@ -4530,6 +4530,22 @@
     }
   },
   "settings": {
+    "importWorkflow": {
+      "nativeReceiptBoundary": "Risiti zinahusu safu zilizowasilishwa. Safu zinazosubiri ukaguzi hazijajumuishwa. Kiungo cha rekodi huonekana tu baada ya kuthibitisha ushahidi wa uingizaji na ruhusa ya sasa ya kufikia rekodi.",
+      "receiptHistoryUnavailable": "Risiti za awali hazikuweza kupakiwa. Jaribu tena.",
+      "receiptHistoryMore": "Pakia risiti za awali",
+      "receiptRows": "Angalia safu za chanzo na matokeo",
+      "receiptRowsUnavailable": "Ushahidi wa safu za risiti hii haukuweza kupakiwa.",
+      "receiptRowVerified": "Imethibitishwa",
+      "receiptRowFailed": "Imeshindwa",
+      "receiptRowRolledBack": "Imerudishwa nyuma",
+      "receiptRowUnverified": "Haijathibitishwa",
+      "receiptSourceRow": "{{file}} · safu ya chanzo {{row}}",
+      "receiptExportRow": "Safu {{row}} ya CSV iliyowasilishwa",
+      "receiptOpenSource": "Fungua ukaguzi wa chanzo",
+      "receiptOpenRecord": "Fungua rekodi iliyohifadhiwa #{{id}}",
+      "receiptMoreRows": "Pakia safu zaidi"
+    },
     "importReview": {
       "grouped": {
         "rowStatus": "Hali ya safu mlalo",

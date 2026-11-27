@@ -244,6 +244,7 @@ export interface ImportWorkflow {
   proposals: ImportProposal[]
   nativeResults: ImportNativeResult[]
   nativeResultsMore: boolean
+  nativeResultsNext?: string | null
   reviewedRecords?: ChatImportReviewedRecords
   backfilledRecords?: Array<{ module: "sales" | "shop_sales" | "warehouse"; count: number }>
   farmResults?: Array<{ batchId: string; count: number }>
@@ -418,6 +419,71 @@ async function responseBody(response: Response): Promise<unknown> {
   return body
 }
 
+const nativeReceiptScope = z.object({
+  organizationId: positiveId,
+  companyId: positiveId,
+  taskId: requestId,
+})
+
+function checkNativeReceiptScope(body: z.infer<typeof nativeReceiptScope>, scope: WorkflowScope) {
+  if (body.organizationId !== String(scope.organizationId)
+    || body.companyId !== String(scope.companyId) || body.taskId !== scope.taskId) {
+    throw new Error("This receipt belongs to another import or company.")
+  }
+}
+
+export async function readNativeReceiptPage(fetcher: WorkflowFetch, scope: WorkflowScope, before: string) {
+  const params = new URLSearchParams({ companyId: String(scope.companyId), before: requestId.parse(before) })
+  const page = nativeReceiptScope.extend({
+    results: z.array(nativeResultSchema).max(20),
+    next: requestId.nullable(),
+  }).parse(await responseBody(await fetcher(
+    `${workflowPath(scope)}/native-receipts?${params}`, { cache: "no-store" },
+  )))
+  checkNativeReceiptScope(page, scope)
+  const ids = page.results.map(row => row.requestId)
+  if (ids.includes(before) || new Set(ids).size !== ids.length || (page.next != null && page.next !== ids.at(-1))) {
+    throw new Error("The receipt page has an invalid cursor.")
+  }
+  return page
+}
+
+const nativeRowSchema = z.object({
+  importRow: z.number().int().min(2).max(1001),
+  sourceFile: z.string().nullable(),
+  sourceRow: z.number().int().positive().nullable(),
+  batchId: positiveId.nullable(),
+  itemId: positiveId.nullable(),
+  revision: z.number().int().min(1).max(2_147_483_647).nullable(),
+  state: z.enum(["verified", "failed", "rolled_back", "unverified"]),
+  recordId: positiveId.nullable(),
+})
+
+export async function readNativeReceiptRows(
+  fetcher: WorkflowFetch,
+  scope: WorkflowScope,
+  result: Pick<ImportNativeResult, "requestId" | "entity">,
+  after: number,
+) {
+  const params = new URLSearchParams({ companyId: String(scope.companyId), after: String(after) })
+  const request = requestId.parse(result.requestId)
+  const page = nativeReceiptScope.extend({
+    requestId,
+    entity: z.enum(["product", "contact", "stock_location"]),
+    rows: z.array(nativeRowSchema).max(20),
+    nextRow: z.number().int().min(2).max(1001).nullable(),
+  }).parse(await responseBody(await fetcher(
+    `${workflowPath(scope)}/native-receipts/${request}?${params}`, { cache: "no-store" },
+  )))
+  checkNativeReceiptScope(page, scope)
+  if (page.requestId !== request || page.entity !== result.entity || page.rows.some((row, index) =>
+    row.importRow <= (page.rows[index - 1]?.importRow ?? after) || (row.recordId != null) !== (row.state === "verified"))
+    || (page.nextRow != null && page.nextRow !== page.rows.at(-1)?.importRow)) {
+    throw new Error("The receipt row page has invalid evidence.")
+  }
+  return page
+}
+
 export async function readImportWorkflow(
   fetcher: WorkflowFetch,
   scope: WorkflowScope,
@@ -437,6 +503,7 @@ export async function readImportWorkflow(
       proposals: z.array(z.unknown()),
       nativeResults: z.array(nativeResultSchema).max(20).default([]),
       nativeResultsMore: z.boolean().default(false),
+      nativeResultsNext: requestId.nullable().optional(),
       reviewedRecords: reviewedRecordsSchema.optional(),
       backfilledRecords: z.array(z.object({ module: recordModule, count })).optional(),
       farmResults: z.array(z.object({ batchId: positiveId, count })).max(20).optional(),
