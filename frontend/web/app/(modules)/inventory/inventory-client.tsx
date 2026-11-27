@@ -980,7 +980,7 @@ function InventoryClientLoaded({
       sections: form.sections.map(section => ({
         ...section,
         fields: section.fields.map(field => {
-          if (field.name === 'active') return { ...field, defaultValue: true };
+          if (field.type === 'checkbox' && field.name === 'active') return { ...field, defaultValue: true };
           if (field.type !== 'select' || field.name !== 'templateWarehouseId') return field;
           return {
             ...field,
