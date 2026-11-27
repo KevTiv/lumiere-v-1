@@ -4573,7 +4573,8 @@
       "all": "Ibyinjizwa byose byabitswe",
       "noInQueue": "Nta byinjizwa byagenzuwe muri iki gice.",
       "checkingResult": "Turimo kugenzura ibyabitswe…",
-      "sourceVersion": "Verisiyo y’isoko nº {{id}}"
+      "sourceVersion": "Verisiyo y’isoko nº {{id}}",
+      "latestRunExceptions": "Igikorwa giheruka · {{failed}} byananiranye · {{held}} bitegereje"
     },
     "importHandoff": {
       "title": "Guhereza iyinjiza ry’amakuru ngo risuzumwe",

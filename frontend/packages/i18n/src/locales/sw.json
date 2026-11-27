@@ -4578,7 +4578,8 @@
       "all": "Uingizaji wote uliohifadhiwa",
       "noInQueue": "Hakuna uingizaji uliokaguliwa katika mwonekano huu.",
       "checkingResult": "Inakagua matokeo yaliyohifadhiwa…",
-      "sourceVersion": "Toleo la chanzo #{{id}}"
+      "sourceVersion": "Toleo la chanzo #{{id}}",
+      "latestRunExceptions": "Uendeshaji wa mwisho · {{failed}} zimeshindwa · {{held}} zinasubiri"
     },
     "importWorkflow": {
       "pendingSourceTitle": "Safu za chanzo zinazohitaji ukaguzi",

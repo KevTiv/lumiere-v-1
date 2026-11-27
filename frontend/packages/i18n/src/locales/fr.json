@@ -4625,7 +4625,8 @@
       "all": "Tous les imports enregistrés",
       "noInQueue": "Aucun import vérifié dans cette vue.",
       "checkingResult": "Vérification du résultat enregistré…",
-      "sourceVersion": "Version source nº {{id}}"
+      "sourceVersion": "Version source nº {{id}}",
+      "latestRunExceptions": "Dernière exécution · {{failed}} en échec · {{held}} en attente"
     },
     "importHandoff": {
       "title": "Transmission pour examen",

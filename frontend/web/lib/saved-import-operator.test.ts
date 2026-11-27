@@ -65,3 +65,12 @@ test("foreign and inconsistent run coverage cannot certify completion", () => {
   assert.throws(() => parseSavedImportRuns({ ...complete, runs: [] }, taskId))
   assert.throws(() => parseSavedImportRuns({ ...complete, coverage: { ...complete.coverage, verifiedRowCount: 1 } }, taskId))
 })
+
+test("explicit exclusions close verified work and older run evidence may exceed the latest list", () => {
+  const payload = run("verified", 4)
+  const excluded = parseSavedImportRuns({
+    ...payload, more: true,
+    coverage: { reviewRowCount: 21, verifiedRowCount: 20, excludedRowCount: 1, complete: true },
+  }, taskId)
+  assert.equal(savedImportOperatorState({ task, progress: excluded }).queue, "done")
+})

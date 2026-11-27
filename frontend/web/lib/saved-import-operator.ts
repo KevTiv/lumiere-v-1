@@ -13,11 +13,18 @@ const projection = z.object({
     status,
     rowCount: count,
     verifiedRowCount: count,
-  }).refine(run => run.verifiedRowCount <= run.rowCount)),
+    failedRows: count.default(0),
+    heldRows: count.default(0),
+  }).refine(run => run.verifiedRowCount + run.failedRows + run.heldRows <= run.rowCount)),
+  more: z.boolean().default(false),
   coverage: z.object({
-    reviewRowCount: count, verifiedRowCount: count, complete: z.boolean(),
-  }).refine(({ reviewRowCount, verifiedRowCount, complete }) =>
-    verifiedRowCount <= reviewRowCount && (!complete || (reviewRowCount > 0 && verifiedRowCount === reviewRowCount))),
+    reviewRowCount: count,
+    verifiedRowCount: count,
+    excludedRowCount: count.default(0),
+    complete: z.boolean(),
+  }).refine(({ reviewRowCount, verifiedRowCount, excludedRowCount, complete }) =>
+    verifiedRowCount + excludedRowCount <= reviewRowCount
+    && (!complete || (verifiedRowCount > 0 && verifiedRowCount + excludedRowCount === reviewRowCount))),
 })
 export type SavedImportRuns = z.infer<typeof projection>
 export const savedImportQueues = ["needs-me", "with-reviewer", "running", "done"] as const
@@ -26,9 +33,9 @@ export type SavedImportAction = ImportTaskView | "check" | "handoff" | "prepare"
 
 export function parseSavedImportRuns(payload: unknown, taskId: string): SavedImportRuns {
   const result = projection.parse(payload)
-  const { runs, coverage } = result
+  const { runs, coverage, more } = result
   if (runs.some(run => run.taskId !== taskId) || new Set(runs.map(run => run.id)).size !== runs.length ||
-      coverage.verifiedRowCount > runs.reduce((sum, run) => sum + run.verifiedRowCount, 0)) {
+      (!more && coverage.verifiedRowCount > runs.reduce((sum, run) => sum + run.verifiedRowCount, 0))) {
     throw new Error("The saved runs did not match this import.")
   }
   return result

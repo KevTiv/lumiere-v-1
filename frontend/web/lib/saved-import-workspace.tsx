@@ -336,6 +336,7 @@ export function SavedImportWorkspace({
     }
   }
   const verifiedRows = runProgress?.coverage.verifiedRowCount ?? 0
+  const latestRun = runProgress?.runs[0]
 
   return (
     <section
@@ -417,6 +418,9 @@ export function SavedImportWorkspace({
         </div>
       )}
       {verifiedRows > 0 && <p className="text-sm" role="status">{t("settings.importOperator.verifiedSourceRows", { rows: verifiedRows })}</p>}
+      {latestRun && (latestRun.failedRows > 0 || latestRun.heldRows > 0) && (
+        <p className="text-sm text-muted-foreground" role="status">{t("settings.importOperator.latestRunExceptions", { failed: latestRun.failedRows, held: latestRun.heldRows })}</p>
+      )}
       {queue === "running" && <p className="text-sm text-muted-foreground" role="status">{t("settings.importOperator.serverRunning")}</p>}
       {runs.isError && <p className="text-sm text-muted-foreground" role="status">{t("settings.importOperator.runUnavailable")}</p>}
       {queue === "needs-me" && runProgress?.runs.some(run => ["partial", "failed", "blocked"].includes(run.status)) && (

@@ -15565,7 +15565,8 @@
       "all": "All saved imports",
       "noInQueue": "No checked imports in this view.",
       "checkingResult": "Checking saved result…",
-      "sourceVersion": "Source version #{{id}}"
+      "sourceVersion": "Source version #{{id}}",
+      "latestRunExceptions": "Latest run · {{failed}} failed · {{held}} held"
     },
     "importHandoff": {
       "title": "Import review handoff",
