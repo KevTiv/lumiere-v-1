@@ -16544,6 +16544,15 @@
       "loadMoreErrors": "Load more row errors"
     },
     "importReview": {
+      "checkpoint": {
+        "save": "Save my place",
+        "resume": "Resume saved issue",
+        "saved": "Review position saved.",
+        "stale": "The saved issue has changed. Choose a current issue to continue.",
+        "failed": "The review position could not be verified.",
+        "conflict": "The review or saved position changed. Check the latest position before saving again.",
+        "boundary": "This saves your review position. Unsaved corrections stay in this tab."
+      },
       "sourceMeaning": "Interpret source notes",
       "historicalFacts": "Confirm the source values you know, even when other facts remain unresolved. Confirmed facts are available in source history. Business documents and current balances require their own complete import.",
       "viewHistoricalFacts": "View confirmed historical facts",

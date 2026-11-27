@@ -4591,6 +4591,15 @@
       "decisionActor": "Toleo {{revision}} · {{actor}}"
     },
     "importReview": {
+      "checkpoint": {
+        "save": "Hifadhi nilipoishia",
+        "resume": "Endelea na suala lililohifadhiwa",
+        "saved": "Mahali ulipoishia katika ukaguzi pamehifadhiwa.",
+        "stale": "Suala lililohifadhiwa limebadilika. Chagua suala la sasa ili uendelee.",
+        "failed": "Mahali ulipoishia katika ukaguzi hapakuweza kuthibitishwa.",
+        "conflict": "Ukaguzi au mahali ulipoishia pamebadilika. Angalia mahali pa hivi karibuni kabla ya kuhifadhi tena.",
+        "boundary": "Hii huhifadhi mahali ulipoishia. Marekebisho ambayo hayajahifadhiwa hubaki kwenye kichupo hiki."
+      },
       "grouped": {
         "rowStatus": "Hali ya safu mlalo",
         "fieldConfirmation": "Uthibitisho wa {{field}}",

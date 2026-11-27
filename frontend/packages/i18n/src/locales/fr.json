@@ -4670,6 +4670,15 @@
       "openCompanySetup": "Ouvrir les paramètres de la société dans un nouvel onglet"
     },
     "importReview": {
+      "checkpoint": {
+        "save": "Enregistrer ma position",
+        "resume": "Reprendre le point à examiner",
+        "saved": "Position de révision enregistrée.",
+        "stale": "Le point enregistré a changé. Choisissez un point actuel pour continuer.",
+        "failed": "Impossible de vérifier la position de révision.",
+        "conflict": "La révision ou la position enregistrée a changé. Vérifiez la dernière position avant de réessayer.",
+        "boundary": "Votre position de révision est enregistrée. Les corrections non enregistrées restent dans cet onglet."
+      },
       "blankCell": "Cellule source vide",
       "initialProposal": "Valeur préparée · {{value}}",
       "saleMismatch": "Résolvez l’écart entre le montant enregistré et le montant calculé avant de confirmer la ligne.",
