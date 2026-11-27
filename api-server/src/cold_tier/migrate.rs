@@ -495,6 +495,13 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: include_str!("import_workflow_actors_expand.sql"),
     },
+    Migration {
+        version: 55,
+        name: "import_durable_runs",
+        change_set: 44,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("import_durable_runs_expand.sql"),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
