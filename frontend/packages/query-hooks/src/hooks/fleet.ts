@@ -12,12 +12,14 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch, fetchQueryList, rqBigIntKey, type QueryRows } from "../http"
+import { dispatchNamedOperation } from "../operation-dispatch"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import type { FleetVehicle } from "@lumiere/stdb/types"
 import {
   AmbiguousOperationEffectError,
   executeOperationWithCanonicalReadback,
   requireResolvedOperationEffect,
+  resolveUniqueEffect,
   type CanonicalRecordRef,
   type ResolvedOperationEffectOutcome,
 } from "./operation-effect"
@@ -96,6 +98,45 @@ function optionalNumber(value?: number) {
 }
 
 // ── Mutations ────────────────────────────────────────────────────────────────
+
+export function useCreateCompanyFleetServiceType(organizationId: bigint, companyId?: bigint) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (rawName: string) => {
+      const scopedCompanyId = requireCompany(companyId, "create a fleet service type")
+      const name = rawName.trim()
+      if (!name) throw new Error("A fleet service type name is required")
+      const outcome = await executeOperationWithCanonicalReadback({
+        dispatch: () => dispatchNamedOperation(
+          "create_company_fleet_service_type",
+          { companyId: scopedCompanyId, name },
+          "Failed to create fleet service type",
+        ),
+        resolveEffect: async () => {
+          const rows = await fetchQueryList(
+            fleetHistoryPath("fleet-service-types"),
+            "Failed to read fleet service types",
+          )
+          return resolveUniqueEffect(
+            rows,
+            (row) => parseStrictU64(row.organizationId ?? row.organization_id) === organizationId &&
+              parseStrictU64(row.companyId ?? row.company_id) === scopedCompanyId &&
+              (row.isActive ?? row.is_active) === true &&
+              typeof row.name === "string" && row.name.trim() === name &&
+              (parseStrictU64(row.id) ?? 0n) > 0n,
+            (row) => ({ resource: "fleet-service-types", id: String(row.id) }),
+          )
+        },
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
+    },
+    onSuccess: () => queryClient.invalidateQueries({
+      queryKey: ["fleet-service-types", rqBigIntKey(organizationId)],
+    }),
+  })
+}
 
 export type CreateFleetVehicleInput = {
   name: string

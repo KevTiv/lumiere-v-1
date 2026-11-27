@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { Sparkles } from "lucide-react";
 import { useErpSession } from "@lumiere/erp-session";
-import { useSearchParams } from "next/navigation";
 import { useTranslation } from "@lumiere/i18n";
 import { buildEntitySelection } from "@lumiere/query-hooks/ai-ui-context";
 import {
@@ -13,7 +12,6 @@ import {
   type EntityRow,
   type ModuleConfig,
 } from "@lumiere/ui";
-import { useRBAC } from "@lumiere/ui/lib/rbac-context";
 import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice";
 import { mergeModuleStates } from "@lumiere/ui/lib/module-data-state";
 import { fleetModuleConfig } from "@/lib/module-dashboard-configs";
@@ -30,6 +28,7 @@ import { fleetVehicleRecordHref } from "./fleet-record";
 import { useFleetActions } from "./fleet-actions";
 import { useFleetWorkspace } from "./use-fleet-workspace";
 import { FleetRecoveryNotice } from "./fleet-recovery-notice";
+import { canRecordFleetServiceWith } from "./fleet-service-setup";
 import { FleetServiceSetupNotice } from "./fleet-service-setup-notice";
 
 interface FleetClientProps {
@@ -42,8 +41,6 @@ function FleetClientLoaded({
   organizationId,
 }: FleetClientProps & { organizationId: number }) {
   const { t } = useTranslation();
-  const { checkPermission, permissionsReady } = useRBAC();
-  const searchParams = useSearchParams();
   const openErpAiChat = useOpenErpAiChat();
   useFleetModuleSubscription();
   const workspace = useFleetWorkspace(organizationId, initialVehicles);
@@ -55,14 +52,8 @@ function FleetClientLoaded({
   const {
     vehicles,
     employeeChoices: employees,
-    activeServiceTypes,
-    journals,
-    accounts,
+    serviceChoices,
   } = workspace;
-  const serviceTab = searchParams.get("tab") === "fleet-service-records";
-  const canWrite =
-    permissionsReady !== false &&
-    checkPermission("fleet_vehicle", "write").allowed;
   const options = (rows: EntityRow[]) =>
     rows.map((row) => ({
       value: String(row.id),
@@ -75,9 +66,10 @@ function FleetClientLoaded({
     const base = fleetModuleConfig(t, {
       vehicles: vehicles.map((row) => ({ value: String(row.id), label: fleetVehicleChoiceLabel(row) })),
       employees: options(employees),
-      serviceTypes: options(activeServiceTypes),
-      journals: accountJournalRowsToSelectOptions(journals),
-      accounts: accountAccountRowsToSelectOptions(accounts),
+      serviceTypes: options(serviceChoices.serviceType),
+      journals: accountJournalRowsToSelectOptions(serviceChoices.journal),
+      expenseAccounts: accountAccountRowsToSelectOptions(serviceChoices.expenseAccount),
+      offsetAccounts: accountAccountRowsToSelectOptions(serviceChoices.offsetAccount),
     });
     return {
       ...base,
@@ -114,7 +106,7 @@ function FleetClientLoaded({
             : tab.id === "fleet-driver-assignment"
               ? workspace.assignmentReady
               : tab.id === "fleet-service-records"
-                ? workspace.serviceReady
+                ? workspace.serviceFormReady
                 : workspace.inspectionReady;
         return {
           ...tab,
@@ -178,12 +170,10 @@ function FleetClientLoaded({
     t,
     vehicles,
     employees,
-    activeServiceTypes,
-    journals,
-    accounts,
+    serviceChoices,
     workspace.states.vehicles.status,
     workspace.assignmentReady,
-    workspace.serviceReady,
+    workspace.serviceFormReady,
     workspace.inspectionReady,
     workspace.scopeState.status,
     openErpAiChat,
@@ -202,9 +192,6 @@ function FleetClientLoaded({
         key={`${organizationId}:${workspace.company}`}
         actions={fleetActions}
       />
-      {serviceTab && canWrite ? (
-        <FleetServiceSetupNotice workspace={workspace} />
-      ) : null}
       <ModuleView
         key={`${organizationId}:${workspace.company}`}
         config={config}
@@ -226,8 +213,14 @@ function FleetClientLoaded({
             workspace.states.vehicles,
           ]),
         }}
+        renderCreatePreview={(tabId) => tabId === "fleet-service-records" && workspace.needsServiceSetup
+          ? <FleetServiceSetupNotice workspace={workspace} />
+          : null}
         isPending={fleetActions.isPending}
         onFormSubmit={async (_tabId, action, formData) => {
+          if (action === "recordFleetService" && (!workspace.serviceLookupsReady || !canRecordFleetServiceWith(serviceChoices, formData))) {
+            throw new Error(t("fleet.workspace.recovery.choicesChanged"));
+          }
           await fleetActions.submit(action, formData);
         }}
       />

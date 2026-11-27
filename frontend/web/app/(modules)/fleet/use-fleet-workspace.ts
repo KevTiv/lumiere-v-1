@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import { useErpSession } from "@lumiere/erp-session";
 import { useTranslation } from "@lumiere/i18n";
 import {
@@ -21,6 +22,7 @@ import {
   moduleCollection,
   type ModuleDataState,
 } from "@lumiere/ui/lib/module-data-state";
+import { fleetServiceChoices, missingFleetServiceSetup } from "./fleet-service-setup";
 import {
   fleetCompanyRows,
   fleetHistoryRows,
@@ -41,11 +43,14 @@ export function useFleetWorkspace(
     useFleetVehicles(orgId, initialVehicles),
   );
   const employeesRead = moduleCollection(useEmployees(orgId));
-  const serviceTypesRead = moduleCollection(useFleetServiceTypes(orgId));
+  const serviceTypesQuery = useFleetServiceTypes(orgId);
+  const serviceTypesRead = moduleCollection(serviceTypesQuery);
   const serviceRead = moduleCollection(useFleetServiceRecords(orgId));
   const inspectionsRead = moduleCollection(useFleetInspections(orgId));
-  const journalsRead = moduleCollection(useAccountJournals(orgId));
-  const accountsRead = moduleCollection(useAccountAccounts(orgId));
+  const journalsQuery = useAccountJournals(orgId);
+  const journalsRead = moduleCollection(journalsQuery);
+  const accountsQuery = useAccountAccounts(orgId);
+  const accountsRead = moduleCollection(accountsQuery);
   const currenciesRead = moduleCollection(useCurrencies());
   const scoped = (rows: readonly EntityRow[], organizationWide = false) =>
     fleetCompanyRows(rows, orgId, company, organizationWide);
@@ -56,11 +61,26 @@ export function useFleetWorkspace(
   const employeeChoices =
     employeesRead.state.status === "ready" ? employees : [];
   const serviceTypes = scoped(serviceTypesRead.rows, true);
-  const activeServiceTypes = serviceTypes.filter(
-    (row) => (row.is_active ?? row.isActive) === true,
+  const serviceChoices = fleetServiceChoices({
+    serviceTypes: serviceTypesRead.rows,
+    journals: journalsRead.rows as unknown as EntityRow[],
+    accounts: accountsRead.rows as unknown as EntityRow[],
+  }, orgId, company);
+  const setupStates = {
+    serviceType: serviceTypesRead.state,
+    journal: journalsRead.state,
+    expenseAccount: accountsRead.state,
+    offsetAccount: accountsRead.state,
+  };
+  const missingServiceSetup = missingFleetServiceSetup(serviceChoices).filter(
+    (key) => setupStates[key].status === "ready",
   );
-  const journals = scoped(journalsRead.rows as unknown as EntityRow[]);
-  const accounts = scoped(accountsRead.rows as unknown as EntityRow[]);
+  const { refetch: refreshTypes } = serviceTypesQuery;
+  const { refetch: refreshJournals } = journalsQuery;
+  const { refetch: refreshAccounts } = accountsQuery;
+  const refreshServiceSetup = useCallback(async () => {
+    await Promise.all([refreshTypes(), refreshJournals(), refreshAccounts()]);
+  }, [refreshTypes, refreshJournals, refreshAccounts]);
   const lookups = {
     vehicles,
     serviceTypes,
@@ -87,19 +107,12 @@ export function useFleetWorkspace(
   // not require HR access. Non-empty employee choices require a ready HR read.
   const assignmentReady = ready(vehiclesRead.state);
   const inspectionReady = ready(vehiclesRead.state, inspectionsRead.state);
+  const serviceFormReady = ready(vehiclesRead.state, serviceRead.state);
   const serviceLookupsReady = ready(
-    vehiclesRead.state,
-    serviceRead.state,
     serviceTypesRead.state,
     journalsRead.state,
     accountsRead.state,
   );
-  const serviceReady =
-    serviceLookupsReady &&
-    activeServiceTypes.length > 0 &&
-    journals.length > 0 &&
-    accounts.length >= 2;
-
   return {
     orgId,
     company,
@@ -108,15 +121,16 @@ export function useFleetWorkspace(
     employees,
     employeeChoices,
     serviceTypes,
-    activeServiceTypes,
-    journals,
-    accounts,
+    serviceChoices,
+    missingServiceSetup,
+    refreshServiceSetup,
     serviceRecords,
     inspections,
     assignmentReady,
     inspectionReady,
-    serviceReady,
+    serviceFormReady,
     serviceLookupsReady,
+    needsServiceSetup: !serviceLookupsReady || missingServiceSetup.length > 0,
     states: {
       vehicles: vehiclesRead.state,
       employees: employeesRead.state,

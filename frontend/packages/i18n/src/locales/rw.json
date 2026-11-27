@@ -5577,5 +5577,25 @@
     "unverifiedJournalLine": "Umurongo w’ibaruramari nimero {{id}} ntiwashoboye kugenzurwa.",
     "loadBatchListFailed": "Amatsinda y’amatungo ntiyashoboye gufunguka.",
     "loadRevisionsFailed": "Verisiyo z’icyabaye ntizashoboye gufunguka."
+  },
+  "fleet": {
+    "workspace": {
+      "loadingSetup": "Amahitamo ya serivisi n’ibaruramari arimo gufunguka…",
+      "setupTitle": "Tegura uburyo bwo kwandika ikiguzi cya serivisi",
+      "recovery": {
+        "serviceType": "Nta bwoko bwa serivisi bukora buboneka kuri iki kigo.",
+        "journal": "Nta gitabo rusange cy’ibaruramari gikora kiboneka kuri iki kigo.",
+        "expenseAccount": "Nta konti y’ibisohoka ikora iboneka kuri iki kigo.",
+        "offsetAccount": "Nta konti ikora y’umutungo cyangwa imyenda iboneka yo kwandika uruhande rwa kabiri.",
+        "typeName": "Izina ry’ubwoko bwa serivisi",
+        "createType": "Kora ubwoko bwa serivisi",
+        "createTypeFailed": "Ubwoko bwa serivisi ntibwashoboye kwemezwa. Reba amahitamo cyangwa wongere ugerageze ukoresheje izina rimwe.",
+        "openJournals": "Fungura ibitabo by’ibaruramari mu gice gishya",
+        "openAccounts": "Fungura urutonde rwa konti mu gice gishya",
+        "askAdmin": "Saba umuyobozi ufite uburenganzira bwo gutegura serivisi yongereho iri hitamo.",
+        "refresh": "Ongera urebe amahitamo",
+        "choicesChanged": "Mbere yo kubika, hitamo ubwoko bwa serivisi, igitabo cy’ibaruramari, konti y’ibisohoka na konti y’uruhande rwa kabiri biboneka."
+      }
+    }
   }
 }
