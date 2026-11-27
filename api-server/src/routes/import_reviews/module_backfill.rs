@@ -13,7 +13,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
+mod durable;
 mod reconciliation;
+
+pub(super) use durable::{execute_chunk, validate_durable_group};
 
 #[cfg(test)]
 pub(super) use reconciliation::exercise_persistence;
@@ -546,8 +549,57 @@ async fn write_reviewed(
     body: WriteBody,
 ) -> Result<Json<Value>, ApiError> {
     let ctx = scope(&state, &session, body.company_id).await?;
-    let org = ctx.organization_id();
+    Ok(Json(
+        write_reviewed_rows(&state, &ctx, batch, body, None).await?,
+    ))
+}
+
+struct PreparedTask<'a> {
+    actor: &'a str,
+    request: &'a str,
+}
+
+async fn write_reviewed_rows(
+    state: &AppState,
+    ctx: &TrustedOperationContext,
+    batch: i64,
+    body: WriteBody,
+    task: Option<PreparedTask<'_>>,
+) -> Result<Value, ApiError> {
     let company = body.company_id;
+    ctx.require_company_scope(&[company])?;
+    let contacts = match body.module {
+        Module::Sales => load_customers(state, ctx, company).await?,
+        Module::ShopSales | Module::Warehouse => Vec::new(),
+    };
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let mut client = pool.get().await.map_err(ApiError::internal)?;
+    let tx = client.transaction().await.map_err(ApiError::internal)?;
+    let result = apply_reviewed_rows(
+        &tx,
+        super::StorageScope {
+            organization: ctx.organization_id(),
+            company,
+            actor: ctx.actor_identity(),
+        },
+        batch,
+        body,
+        task,
+        &contacts,
+    )
+    .await?;
+    tx.commit().await.map_err(ApiError::internal)?;
+    Ok(result)
+}
+
+async fn apply_reviewed_rows(
+    tx: &tokio_postgres::Transaction<'_>,
+    scope: super::StorageScope<'_>,
+    batch: i64,
+    body: WriteBody,
+    task: Option<PreparedTask<'_>>,
+    contacts: &[Value],
+) -> Result<Value, ApiError> {
     if batch <= 0 || body.rows.is_empty() || body.rows.len() > 200 {
         return Err(ApiError::BadRequest("select 1–200 reviewed rows".into()));
     }
@@ -567,20 +619,31 @@ async fn write_reviewed(
     if selected.len() != body.rows.len() {
         return Err(ApiError::BadRequest("duplicate reviewed row IDs".into()));
     }
-    let contacts = match body.module {
-        Module::Sales => load_customers(&state, &ctx, company).await?,
-        Module::ShopSales | Module::Warehouse => Vec::new(),
-    };
-    let org = org.to_string();
-    let company = company.to_string();
+    let org = scope.organization.to_string();
+    let company = scope.company.to_string();
     let ids: Vec<_> = selected.keys().copied().collect();
-    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
-    let mut client = pool.get().await.map_err(ApiError::internal)?;
-    let tx = client.transaction().await.map_err(ApiError::internal)?;
+    let durable = task.is_some();
     if matches!(body.module, Module::ShopSales) && !body.preview {
-        reconciliation::lock_shop_sales(&tx, &org, &company).await?;
+        reconciliation::lock_shop_sales(tx, &org, &company).await?;
     }
-    let eligible: bool = tx
+    // Preserve the native approval scope through the write.
+    let eligible = if let Some(task) = task {
+        tx.query_opt(
+            "SELECT 1 FROM lumiere_platform.import_task_review link
+             JOIN lumiere_platform.import_task task USING
+                 (organization_id, company_id, actor_identity, request_id)
+             WHERE link.organization_id=$1::text::numeric
+               AND link.company_id=$2::text::numeric AND link.batch_id=$3
+               AND link.actor_identity=$4 AND link.request_id=$5 AND NOT link.from_inspection
+               AND task.approved_mode='prepare_import' AND task.state='needs_review'
+             LIMIT 1 FOR SHARE OF link, task",
+            &[&org, &company, &batch, &task.actor, &task.request],
+        )
+        .await
+        .map_err(ApiError::internal)?
+        .is_some()
+    } else {
+        tx
         .query_one(
             "WITH links AS (
                  SELECT link.from_inspection, task.approved_mode, task.state
@@ -597,7 +660,8 @@ async fn write_reviewed(
         )
         .await
         .map_err(ApiError::internal)?
-        .get(0);
+        .get(0)
+    };
     if !eligible {
         return Err(ApiError::Conflict(
             "Prepare the import before previewing or saving ERP records.".into(),
@@ -648,7 +712,7 @@ async fn write_reviewed(
         let (start, end, facts) = match prepare(
             body.module,
             reviewed,
-            &contacts,
+            contacts,
             selection.customer_id.as_deref(),
         ) {
             Ok(ready) => ready,
@@ -678,14 +742,22 @@ async fn write_reviewed(
             continue;
         }
         let key = row.business_key()?;
-        let mut existing = row.existing(&tx, &key).await?;
+        let mut existing = row.existing(tx, &key).await?;
         let mut saved_id = None;
         if !body.preview && matches!(existing, Existing::None) {
             saved_id = row
-                .save(&tx, batch, id, revision, ctx.actor_identity(), &key)
+                .save(tx, batch, id, revision, scope.actor, &key)
                 .await?;
             if saved_id.is_none() {
-                existing = row.existing(&tx, &key).await?;
+                existing = row.existing(tx, &key).await?;
+            } else if durable
+                && !matches!(
+                    row.existing(tx, &key).await?,
+                    Existing::Matched(record)
+                        if Some(record.id) == saved_id && record.item == id && record.revision == revision
+                )
+            {
+                return Err(ApiError::Conflict("saved backfill could not be verified".into()));
             }
         }
         let saved = match existing {
@@ -720,7 +792,11 @@ async fn write_reviewed(
                 .await
                 .map_err(ApiError::internal)?;
             }
-            ("matched", saved.id)
+            let same_source = (saved.item, saved.revision) == (id, revision);
+            (
+                if durable && same_source { "saved" } else { "matched" },
+                saved.id,
+            )
         } else {
             return Err(ApiError::Conflict(
                 "The saved import changed. Preview the affected row again.".into(),
@@ -730,8 +806,7 @@ async fn write_reviewed(
             json!({"itemId":id.to_string(),"status":status,"recordId":record_id.to_string()}),
         );
     }
-    tx.commit().await.map_err(ApiError::internal)?;
-    Ok(Json(json!({"module":body.module,"results":results})))
+    Ok(json!({"module":body.module,"results":results}))
 }
 
 pub(super) async fn task_results(
