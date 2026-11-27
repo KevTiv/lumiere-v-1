@@ -10,7 +10,6 @@ import {
   type HistoryPeriod,
 } from '@lumiere/erp-shared/history-period'
 import { formattingLocale, useTranslation } from '@lumiere/i18n'
-import { useOperatingCompanyId } from '@lumiere/query-hooks/hooks/use-operating-company'
 import { sourceReviewHistoryHref } from '@lumiere/query-hooks/hooks/source-review-navigation'
 import { Button } from '@lumiere/ui/components/button'
 import { HistoryPeriodSelect } from '@lumiere/ui/components/history-period-select'
@@ -36,6 +35,7 @@ import { apiFetch } from '@/lib/api-fetch'
 import {
   isModuleBackfillRecordId,
   moduleBackfillRecordHref,
+  moduleBackfillReadScope,
   type BackfillModule,
 } from '@/lib/module-backfill-navigation'
 import {
@@ -63,10 +63,14 @@ async function loadRecords(
   return response.json()
 }
 
-export function useCanReadModuleBackfill(organizationId: number) {
-  const { organizationId: activeOrganization } = useErpSession()
+function useModuleBackfillReadScope(organizationId: number) {
+  const session = useErpSession()
   const { isAdmin, permissionsReady } = useRBAC()
-  return permissionsReady && isAdmin() && activeOrganization === organizationId
+  return moduleBackfillReadScope(session, organizationId, permissionsReady === true && isAdmin())
+}
+
+export function useCanReadModuleBackfill(organizationId: number) {
+  return useModuleBackfillReadScope(organizationId) !== null
 }
 
 export function ModuleBackfillRecords({
@@ -76,10 +80,9 @@ export function ModuleBackfillRecords({
   organizationId: number
   module: BackfillModule
 }) {
-  const companyId = useOperatingCompanyId(organizationId)
-  const { identity, activeCompanyReady } = useErpSession()
-  const allowed = useCanReadModuleBackfill(organizationId)
-  if (!allowed || !activeCompanyReady || !identity || !companyId) return null
+  const scope = useModuleBackfillReadScope(organizationId)
+  if (!scope) return null
+  const { companyId, identity } = scope
 
   return (
     <Records

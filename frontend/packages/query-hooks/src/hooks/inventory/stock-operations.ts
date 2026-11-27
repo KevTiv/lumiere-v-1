@@ -481,14 +481,15 @@ export function useUnreserveStockQuant(
 }
 
 
-export function useCreateStockLocation(organizationId: bigint) {
+export function useCreateStockLocation(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient();
   return useMutation<void, Error, CreateStockLocationParams>({
     mutationFn: async (params) => {
       const merged = mergeReducerParams(CREATE_STOCK_LOCATION_DEFAULTS, params);
-      const { urlPath, init } = stdbBffCommandPost('create_stock_location', {
-        params: stdbParamsToJson(merged as object, 'CreateStockLocationParams'),
-      });
+      const paramsJson = stdbParamsToJson(merged as object, 'CreateStockLocationParams');
+      const { urlPath, init } = companyId == null
+        ? stdbBffCommandPost('create_stock_location', { params: paramsJson })
+        : stdbBffCommandPost('create_company_stock_location', { companyId, params: paramsJson });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock location');
     },

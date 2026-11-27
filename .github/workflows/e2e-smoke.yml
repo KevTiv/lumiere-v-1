@@ -594,6 +594,8 @@ jobs:
           E2E_WORKERS: '1'
           E2E_PARTITION: ${{ matrix.config.shard || '1/1' }}
           E2E_BROWSER_READY: '1'
+          # This job provisions its own loopback seed and first-org personas.
+          E2E_ALPHA_FIRST_SALE_CI_FIXTURE: ${{ github.event_name == 'pull_request' && '1' || '0' }}
           PLAYWRIGHT_TIMINGS_OUTPUT: playwright-timings.json
           # One bounded certification run for the COV-06 scheduler stack; only
           # shard 1 pays for the heavyweight aggregate reducer.

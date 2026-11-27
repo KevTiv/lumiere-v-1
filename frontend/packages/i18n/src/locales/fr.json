@@ -18,6 +18,15 @@
     "unverified": "Impossible de vérifier le paramètre enregistré des opérations d’élevage. Consultez le paramètre actuel avant de réessayer.",
     "recheck": "Vérifier à nouveau"
   },
+  "activation": {
+    "checks": {
+      "warehouse": "Entrepôt actif dans cette société"
+    },
+    "warehouse": {
+      "setup": "Configurez un entrepôt actif dans cette société avant de préparer un devis.",
+      "ask": "Demandez à un administrateur de configurer un entrepôt actif dans cette société avant de préparer un devis."
+    }
+  },
   "aiChat": {
     "followUp": {
       "using": "Utilise : {{label}} de votre dernière question",
@@ -43,6 +52,10 @@
     "emptyShopSales": "Aucune vente en boutique enregistrée.",
     "sales": "Récapitulatifs des ventes clients",
     "warehouse": "Comptages enregistrés",
+    "browseCustomerSales": "Consulter les récapitulatifs des ventes clients",
+    "customerSalesEmptyOrdersHint": "Retrouvez les récapitulatifs datés et leurs références aux sources d’origine.",
+    "browseRecordedCounts": "Consulter les comptages enregistrés",
+    "recordedCountsEmptyStockHint": "Retrouvez les comptages physiques datés et leurs références aux sources d’origine.",
     "period": "Période de vente",
     "countDate": "Date du comptage",
     "customer": "Client",
@@ -5403,6 +5416,21 @@
   "pageComposition": {
     "addBelow": "Ajouter un widget en dessous",
     "addBelowNamed": "Ajouter un widget sous {{title}}"
+  },
+  "inventory": {
+    "warehouseSetup": {
+      "title": "Configuration des entrepôts",
+      "denied": "Vous ne pouvez pas consulter les entrepôts ou les emplacements nécessaires à la configuration.",
+      "first-warehouse": "Créez un entrepôt avec un emplacement de stock interne actif de cette société.",
+      "stockLocation": "Emplacement de stock interne",
+      "customerLocation": "Les livraisons nécessitent aussi un emplacement de stock actif de type Client. Ajoutez-le pour cette société dans Emplacements.",
+      "locationPermission": "Demandez à votre administrateur de créer l’emplacement de stock requis.",
+      "choiceLoading": "Vérification des entrepôts de cette société…",
+      "choiceDenied": "Vous ne pouvez pas consulter les entrepôts. Demandez cet accès à votre administrateur.",
+      "choiceFailed": "Impossible de vérifier les entrepôts. Réessayez sans quitter ce formulaire.",
+      "choiceEmptyManager": "Aucun entrepôt actif pour cette société. Ouvrez la configuration des entrepôts, puis revenez sélectionner l’entrepôt enregistré. Vos saisies restent ici.",
+      "choiceEmptyOperator": "Aucun entrepôt actif pour cette société. Demandez à votre administrateur de terminer la configuration, puis revenez ici."
+    }
   },
   "farmBatches": {
     "farmBatches": "Lots d’élevage",

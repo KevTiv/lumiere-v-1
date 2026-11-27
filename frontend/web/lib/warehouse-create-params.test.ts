@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCreateWarehouseParamsFromTemplate } from './warehouse-create-params';
+import { buildCreateWarehouseParamsFromTemplate, buildFirstWarehouseParams } from './warehouse-create-params';
 
 const template = {
   lotStockId: '9007199254740997', inTypeId: 1, outTypeId: 2, intTypeId: 3, packTypeId: 4, pickTypeId: 5,
@@ -23,4 +23,15 @@ test('invalid or unsafe template references reject rather than rounding or subst
   }
   assert.throws(() => buildCreateWarehouseParamsFromTemplate({ ...template, resupplyWhIds: ['bad'] }, options));
   assert.throws(() => buildCreateWarehouseParamsFromTemplate({ ...template, whInputStockLocId: 'bad' }, options));
+});
+
+test('first warehouse uses the native single-step preset and an actual internal location', () => {
+  const result = buildFirstWarehouseParams('9007199254740997', options);
+  assert.equal(result.lotStockId, 9007199254740997n);
+  assert.deepEqual([result.inTypeId, result.outTypeId, result.intTypeId, result.packTypeId, result.pickTypeId], [1n, 1n, 1n, 1n, 1n]);
+  assert.equal(result.active, true);
+  assert.equal(result.receptionSteps, 'one_step');
+  assert.equal(result.deliverySteps, 'ship_only');
+  assert.equal(result.manufactureSteps, 'mrp_one_step');
+  assert.throws(() => buildFirstWarehouseParams(0, options));
 });

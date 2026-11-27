@@ -3,8 +3,11 @@ import test from "node:test"
 import {
   isModuleBackfillRecordId,
   moduleBackfillHref,
+  moduleBackfillEmptyHref,
   moduleBackfillRecordHref,
+  moduleBackfillReadScope,
 } from "./module-backfill-navigation"
+import { resolveModuleHistoryFilter } from "@lumiere/ui/lib/module-history-filter"
 import { moduleBackfillSavedFields } from "./module-backfill-record"
 import { moduleTabDestination } from "./module-tab-navigation"
 
@@ -164,4 +167,32 @@ test("shop sale receipts open an exact Sales record with its stored shop and pri
   }, (key) => key)
   assert.deepEqual(fields.map(({ id }) => id), ["shop", "product", "quantity", "unit", "unitPrice", "amount", "currency"])
   assert.deepEqual(fields.find(({ id }) => id === "unitPrice")?.after, { kind: "value", value: "5000.000" })
+})
+
+test("historical navigation requires the active company's scoped read grant", () => {
+  const session = { identity: "admin", organizationId: 4, activeCompanyId: 7, activeCompanyReady: true, companyIds: [6, 7] }
+  assert.deepEqual(moduleBackfillReadScope(session, 4, true), { identity: "admin", companyId: 7 })
+  assert.deepEqual(moduleBackfillReadScope({ ...session, activeCompanyId: 6 }, 4, true), { identity: "admin", companyId: 6 })
+  assert.equal(moduleBackfillReadScope(session, 4, false), null)
+  assert.equal(moduleBackfillReadScope(session, 5, true), null)
+  for (const change of [{ activeCompanyReady: false }, { activeCompanyId: 9 }, { activeCompanyId: null }, { identity: null }, { companyIds: undefined }]) {
+    assert.equal(moduleBackfillReadScope({ ...session, ...change }, 4, true), null)
+  }
+})
+
+test("contextual history links require genuinely empty, ready native collections", () => {
+  const context = { canRead: true, status: "ready", nativeRowCount: 0 } as const
+  for (const period of [null, "all"]) {
+    const history = resolveModuleHistoryFilter("sales", "orders", period)
+    assert.equal(moduleBackfillEmptyHref("sales", { ...context, history }), "/sales?tab=customer-sales")
+  }
+  assert.equal(moduleBackfillEmptyHref("warehouse", context), "/warehouse?tab=recorded-counts")
+  assert.equal(moduleBackfillEmptyHref("sales", { ...context, canRead: false }), undefined)
+  assert.equal(moduleBackfillEmptyHref("sales", { ...context, status: "loading" }), undefined)
+  assert.equal(moduleBackfillEmptyHref("warehouse", { ...context, status: "denied" }), undefined)
+  assert.equal(moduleBackfillEmptyHref("warehouse", { ...context, nativeRowCount: 1 }), undefined)
+  for (const period of ["custom:2024-01-01:2024-01-31", "invalid"]) {
+    const history = resolveModuleHistoryFilter("sales", "orders", period)
+    assert.equal(moduleBackfillEmptyHref("sales", { ...context, history }), undefined)
+  }
 })

@@ -26,6 +26,10 @@
     "emptyShopSales": "No shop sales have been saved.",
     "sales": "Customer sales summaries",
     "warehouse": "Recorded counts",
+    "browseCustomerSales": "Browse customer sales summaries",
+    "customerSalesEmptyOrdersHint": "Review dated sales summaries with their original source references.",
+    "browseRecordedCounts": "Browse recorded counts",
+    "recordedCountsEmptyStockHint": "Review dated physical counts with their original source references.",
     "period": "Sales period",
     "countDate": "Count date",
     "customer": "Customer",
@@ -82,7 +86,12 @@
       "currency": "Company base currency assigned",
       "fiscal": "Company fiscal year-end recorded",
       "contact": "Saved contact in this company",
-      "customer": "Saved customer in this company"
+      "customer": "Saved customer in this company",
+      "warehouse": "Active warehouse in this company"
+    },
+    "warehouse": {
+      "setup": "Set up an active warehouse in this company before preparing a quotation.",
+      "ask": "Ask an administrator to set up an active warehouse in this company before preparing a quotation."
     },
     "title": "Getting started",
     "description": "Choose a first task and check your company setup before starting.",
@@ -6081,7 +6090,17 @@
       "assisted-setup": "The first warehouse needs assisted setup. New warehouse creation becomes available once an active warehouse with usable stock locations and operation types is configured for this company.",
       "managerNext": "Complete the initial setup with your alpha support contact, then refresh this workspace. New warehouse creation copies the operational configuration of an available warehouse.",
       "operatorNext": "Ask your organization administrator to complete warehouse setup for the selected company.",
-      "locations": "Open locations"
+      "locations": "Open locations",
+      "denied": "You do not have access to the warehouse or stock location records needed for setup.",
+      "first-warehouse": "Create a warehouse using an active internal stock location in this company.",
+      "stockLocation": "Internal stock location",
+      "customerLocation": "Stock deliveries also need an active stock location with Customer usage. Use Locations to add one for this company.",
+      "locationPermission": "Ask your organization administrator to create the required stock location.",
+      "choiceLoading": "Checking warehouses for this company…",
+      "choiceDenied": "You do not have permission to view warehouses. Ask your administrator for warehouse access.",
+      "choiceFailed": "Warehouses could not be verified. Retry without leaving this form.",
+      "choiceEmptyManager": "No active warehouse is available for this company. Open Warehouse setup, then return to select the saved warehouse. Your entries stay here.",
+      "choiceEmptyOperator": "No active warehouse is available for this company. Ask your administrator to complete Warehouse setup, then return here."
     },
     "warehouseWorkspace": {
       "transferTask": "Task",

@@ -15,7 +15,6 @@ const SSR_RESOURCES = [
   "pos-loyalty-programs",
   "pos-loyalty-cards",
   "contacts",
-  "warehouses",
   "stock-pickings",
   "return-orders",
   "return-order-lines",
@@ -40,7 +39,6 @@ export default async function SalesPage() {
     loyaltyPrograms,
     loyaltyCards,
     contacts,
-    warehouses,
     stockPickings,
     returnOrders,
     returnOrderLines,
@@ -60,7 +58,6 @@ export default async function SalesPage() {
       initialLoyaltyPrograms={loyaltyPrograms}
       initialLoyaltyCards={loyaltyCards}
       initialContacts={contacts}
-      initialWarehouses={warehouses}
       initialStockPickings={stockPickings}
       initialReturnOrders={returnOrders}
       initialReturnOrderLines={returnOrderLines}

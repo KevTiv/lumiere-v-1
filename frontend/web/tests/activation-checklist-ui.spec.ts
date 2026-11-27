@@ -74,3 +74,57 @@ for (const width of [320, 390, 768, 1440]) {
     await page.screenshot({ path: testInfo.outputPath(`activation-${width}.png`), fullPage: true })
   })
 }
+
+test("quotation checks active company warehouses and only links allowed setup after an empty read", async ({ page }) => {
+  await page.route("**/api/query/companies", route => route.fulfill({ json: { data: [
+    { id: "2", organizationId: "1", currencyId: "4", fiscalYearEndMonth: 12, fiscalYearEndDay: 31 },
+    { id: "3", organizationId: "1", currencyId: "4", fiscalYearEndMonth: 12, fiscalYearEndDay: 31 },
+  ] } }))
+  await page.route("**/api/query/contacts", route => route.fulfill({ json: { data: [] } }))
+  let requests = 0
+  let releaseLookup: (() => void) | undefined
+  const pendingLookup = new Promise<void>(resolve => { releaseLookup = resolve })
+  await page.route("**/api/query/warehouses?companyId=2", async route => {
+    requests += 1
+    await pendingLookup
+    await route.fulfill({ json: { data: [{ id: "7", companyId: "2", organizationId: "1", active: true }] } })
+  })
+  let denied = false
+  await page.route("**/api/query/warehouses?companyId=3", route => denied
+    ? route.fulfill({ status: 403, json: { error: "Denied" } })
+    : route.fulfill({ json: { data: [
+      { id: "7", companyId: "2", organizationId: "1", active: true },
+      { id: "8", companyId: "3", organizationId: "1", active: false },
+    ] } }))
+  await page.goto("/activation")
+  const panel = page.getByTestId("activation-checklist")
+  const warehouse = panel.locator('[data-check="warehouse"]')
+  const setup = panel.getByRole("link", { name: "Warehouse setup", exact: true })
+  await expect(panel.locator('[data-check="company"]')).toHaveAttribute("data-state", "ready")
+  await expect(warehouse).toHaveCount(0)
+  expect(requests).toBe(0)
+
+  try {
+    await panel.getByRole("radio", { name: "Prepare a quotation", exact: true }).check()
+    await expect(warehouse).toHaveAttribute("data-state", "loading")
+    await expect(setup).toHaveCount(0)
+  } finally {
+    releaseLookup?.()
+  }
+  await expect(warehouse).toHaveAttribute("data-state", "ready")
+
+  await page.getByRole("button", { name: "Company 3", exact: true }).click()
+  await expect(warehouse).toHaveAttribute("data-state", "missing")
+  await expect(setup).toHaveAttribute("href", "/warehouse?tab=warehouses&companyId=3")
+  await expect(panel.getByRole("button", { name: "Prepare a quotation", exact: true })).toBeDisabled()
+  await page.getByRole("button", { name: "Toggle warehouse setup permission" }).click()
+  await expect(setup).toHaveCount(0)
+  await expect(panel).toContainText("Ask an administrator to set up an active warehouse")
+  await page.getByRole("button", { name: "Toggle warehouse setup permission" }).click()
+  await expect(setup).toBeVisible()
+
+  denied = true
+  await panel.getByRole("button", { name: "Refresh checks" }).click()
+  await expect(warehouse).toHaveAttribute("data-state", "unavailable")
+  await expect(setup).toHaveCount(0)
+})

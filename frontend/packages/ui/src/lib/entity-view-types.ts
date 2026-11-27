@@ -235,6 +235,8 @@ export interface EntityTableConfig {
     secondaryActionId?: string
     /** A short "why this matters" or "learn how" line under the CTAs. */
     learnHint?: string
+    /** A read-only destination for an alternative record collection. */
+    relatedLink?: { href: string; label: string; description: string }
     /** Shown instead of the CTA when the user may not create records. */
     readOnlyMessage?: string
   }

@@ -39,6 +39,27 @@ export function u64ArrayFromRow(
   return v.map(value => u64FromRow({ value }, 'value', 'value'))
 }
 
+/**
+ * The single-step preset uses the same operation code as the native Sales
+ * warehouse fixture. These codes are not target-company record IDs.
+ */
+export function buildFirstWarehouseParams(
+  locationId: unknown,
+  input: { name: string; code: string; active: boolean; sequence: number },
+) {
+  return buildCreateWarehouseParamsFromTemplate({
+    lotStockId: locationId,
+    inTypeId: 1n,
+    outTypeId: 1n,
+    intTypeId: 1n,
+    packTypeId: 1n,
+    pickTypeId: 1n,
+    receptionSteps: "one_step",
+    deliverySteps: "ship_only",
+    manufactureSteps: "mrp_one_step",
+  }, input)
+}
+
 export function buildCreateWarehouseParamsFromTemplate(
   template: Record<string, unknown>,
   opts: {
@@ -58,16 +79,21 @@ export function buildCreateWarehouseParamsFromTemplate(
   }
 
   const optId = (camel: string, snake: string) => optU64FromRow(template, camel, snake)
+  const operationType = (camel: string, snake: string) => {
+    const value = parseStrictU64(template[camel] ?? template[snake])
+    if (value == null) throw new Error(`warehouse field '${camel}' must be a u64`)
+    return value
+  }
 
   return {
     name,
     code,
     lotStockId: u64FromRow(template, "lotStockId", "lot_stock_id"),
-    inTypeId: u64FromRow(template, "inTypeId", "in_type_id"),
-    outTypeId: u64FromRow(template, "outTypeId", "out_type_id"),
-    intTypeId: u64FromRow(template, "intTypeId", "int_type_id"),
-    packTypeId: u64FromRow(template, "packTypeId", "pack_type_id"),
-    pickTypeId: u64FromRow(template, "pickTypeId", "pick_type_id"),
+    inTypeId: operationType("inTypeId", "in_type_id"),
+    outTypeId: operationType("outTypeId", "out_type_id"),
+    intTypeId: operationType("intTypeId", "int_type_id"),
+    packTypeId: operationType("packTypeId", "pack_type_id"),
+    pickTypeId: operationType("pickTypeId", "pick_type_id"),
     receptionSteps: String(template.receptionSteps ?? template.reception_steps ?? "one_step"),
     deliverySteps: String(template.deliverySteps ?? template.delivery_steps ?? "ship"),
     manufactureSteps: String(

@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState, useMemo, useEffect, useLayoutEffect, useRef, type MouseEvent } from "react"
 import { useTableDensity } from "../hooks/use-table-density"
 import { TableDensityControl } from "../composed/table-density-control"
@@ -1136,7 +1137,17 @@ export function EntityTable({
                         description={config.emptyState?.description}
                         primaryAction={ctaFromAction(emptyCtas.primary, "entity-empty-cta")}
                         secondaryAction={ctaFromAction(emptyCtas.secondary, "entity-empty-secondary-cta")}
-                        hint={config.emptyState?.learnHint}
+                        hint={config.emptyState?.relatedLink ? (
+                          <>
+                            {config.emptyState.learnHint}
+                            <span className="block">
+                              {config.emptyState.relatedLink.description}{" "}
+                              <Link href={config.emptyState.relatedLink.href} className="font-medium text-primary underline underline-offset-4">
+                                {config.emptyState.relatedLink.label}
+                              </Link>
+                            </span>
+                          </>
+                        ) : config.emptyState?.learnHint}
                         readOnlyMessage={
                           emptyCtas.readOnly
                             ? (config.emptyState?.readOnlyMessage ??

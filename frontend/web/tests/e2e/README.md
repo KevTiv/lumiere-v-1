@@ -45,6 +45,20 @@ These Playwright tests exercise the current high-value ERP web flows:
 | `expenses-wave-lifecycle.spec.ts` | Expenses capture/ops panels, allocations form, conflict outbox, card statement create (`@expenses` `@p0`) |
 | `phase-5-workforce-smoke.spec.ts` | HR/Projects/Expenses/Calendar shell smoke (`@phase-5`) |
 
+## Native first-sale rehearsal
+
+The disposable PR browser job runs this case when it selects the order-to-cash spec. For a remote rehearsal, opt in on a dedicated, already-running stack with a single seeded fixture company. It needs the seeded Acme customer, an in-stock Wireless Ergonomic Mouse, active sales and bank journals, an open accounting period, and provisioned native Sales, Warehouse and Accounting actions. Each invocation uses a new reference and consumes one fixture stock unit. Use the operator login for the expected organization and company, and inject the password through your secret manager.
+
+```bash
+export PLAYWRIGHT_BASE_URL=https://your-isolated-fixture-host
+export E2E_TEST_EMAIL=your-fixture-operator@example.test
+export E2E_ALPHA_FIRST_SALE=1 E2E_ALPHA_FIRST_SALE_ISOLATED_ACK=1
+export E2E_ALPHA_FIRST_SALE_ORG_ID="fixture-org-id" E2E_ALPHA_FIRST_SALE_COMPANY_ID="fixture-company-id"
+make e2e-single-remote E2E_SPEC=o2c-certification.spec.ts E2E_GREP="Alpha native first-sale rehearsal" E2E_WORKERS=1
+```
+
+The scenario saves a native quotation, validates its delivery in Warehouse, posts the order's invoice and settles it after simulating a lost response. It verifies the exact linked records, the payment replay, nonzero balanced invoice and payment ledger moves, zero residual and the owner views after reload. The report attaches the canonical record IDs. If a run stops after a write, inspect the Playwright steps and the fixture's records before starting a fresh run. The rehearsal covers the native entry path.
+
 ## Local Setup
 
 E2E uses a **dedicated local module** (`lumiere-v1-local-e2e` by default), not the maincloud module name in `spacetime.local.json`. Override with `E2E_STDB_MODULE=my-local-db`.

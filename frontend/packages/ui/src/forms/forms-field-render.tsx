@@ -486,6 +486,11 @@ export function FormFieldRenderer({
       {field.recoveryHelp && (
         <div id={recoveryId} className="space-y-1 text-xs leading-5 text-muted-foreground">
           <p>{field.recoveryHelp.message}</p>
+          {field.recoveryHelp.retry && (
+            <button type="button" onClick={field.recoveryHelp.retry.onRetry} className="inline-block font-medium text-primary underline underline-offset-4">
+              {field.recoveryHelp.retry.label}
+            </button>
+          )}
           {field.recoveryHelp.action && (
             <a
               href={field.recoveryHelp.action.href}
