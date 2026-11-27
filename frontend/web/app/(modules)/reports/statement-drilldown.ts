@@ -2,13 +2,12 @@ import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { stbTimestampMicros } from "@lumiere/erp-shared/stb-timestamp"
 import { variantTag } from "@lumiere/erp-workflows"
 
-export interface StatementReportProjection {
+import { reportAccountingBasis, reportPeriodBounds, type ReportContextProjection } from "./report-workspace-model"
+
+export interface StatementReportProjection extends ReportContextProjection {
   id?: unknown
   organizationId?: unknown; organization_id?: unknown
   companyId?: unknown; company_id?: unknown
-  dateFrom?: unknown; date_from?: unknown
-  dateTo?: unknown; date_to?: unknown
-  targetMove?: unknown; target_move?: unknown
   filterAccountIds?: unknown; filter_account_ids?: unknown
   filterAnalyticAccountIds?: unknown; filter_analytic_account_ids?: unknown
   filterPartnerIds?: unknown; filter_partner_ids?: unknown
@@ -52,11 +51,10 @@ export function statementReturnHref(raw: string): string | null {
 function reportScope(report: StatementReportProjection) {
   const reportId = positiveId(report.id)
   const companyId = positiveId(report.companyId ?? report.company_id)
-  const from = stbTimestampMicros(report.dateFrom ?? report.date_from)
-  const to = stbTimestampMicros(report.dateTo ?? report.date_to)
-  const basis = report.targetMove ?? report.target_move
+  const { from, to } = reportPeriodBounds(report)
+  const basis = reportAccountingBasis(report)
   return reportId && companyId && from != null && to != null && from > 0n && to >= from
-    && (basis === "posted" || basis === "all")
+    && basis
     ? { reportId, companyId, fromMicros: String(from), toMicros: String(to), basis } : null
 }
 

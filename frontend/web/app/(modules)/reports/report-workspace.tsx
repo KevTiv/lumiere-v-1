@@ -5,7 +5,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
 import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
 import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state"
-import { reportDate, reportTag, reportDisplayName, type ReportRow } from "./report-workspace-model"
+import { reportBasisKey, reportPeriod, reportTag, reportDisplayName, type ReportRow } from "./report-workspace-model"
 
 export const REPORT_CHOICES = ["trialBalance", "profitAndLoss", "balanceSheet", "cashFlow", "generalLedger"] as const
 
@@ -59,9 +59,9 @@ export function ReportResult({ report, sourceState, companyLabel, currencyLabel,
       <dl className="grid gap-4 border-b pb-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
         {[
           [t("reports.workspace.company"), companyLabel],
-          [t("reports.workspace.period"), `${reportDate(report.dateFrom ?? report.date_from, i18n.language)} – ${reportDate(report.dateTo ?? report.date_to, i18n.language)}`],
+          [t("reports.workspace.period"), reportPeriod(report, i18n.language) ?? t("reports.workspace.unknown")],
           [t("reports.workspace.currency"), currencyLabel],
-          [t("reports.workspace.basis"), reportTag(report.targetMove) === "posted" ? t("reports.workspace.posted") : reportTag(report.targetMove) === "all" ? t("reports.workspace.allEntries") : t("reports.workspace.unknown")],
+          [t("reports.workspace.basis"), t(reportBasisKey(report))],
           [t("reports.workspace.comparison"), t(`reports.forms.generateReport.fields.comparisonOptions.${({ none: "none", previousperiod: "previousPeriod", previousyear: "previousYear" } as Record<string, string>)[reportTag(report.comparisonMode)] ?? "unknown"}`, { defaultValue: t("reports.workspace.unknown") })],
         ].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 break-words font-medium">{value}</dd></div>)}
       </dl>

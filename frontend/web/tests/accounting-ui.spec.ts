@@ -1,3 +1,4 @@
+import { mobileAccountingQueuePicker, selectAccountingQueue } from "./accounting-queue-picker"
 import { reviewInvoiceAccountingChoices } from "./invoice-accounting-choices"
 import { test, expect, type Page } from "@playwright/test"
 
@@ -122,15 +123,64 @@ for (const viewport of [{ width: 320, height: 844 }, { width: 390, height: 844 }
       await expect(overview.getByRole("link", { name: /INV\/2026\/0102/ }).first()).toHaveAttribute("href", "/accounting/invoices/102")
       await expect(overview).toContainText("EUR")
       await expect(overview).toContainText("USD")
-      await page.getByTestId("accountant-queue-unlinked-payments").click()
+      await selectAccountingQueue(page, "unlinked-payments")
       await expect(page.getByRole("region", { name: "Payments with funds to allocate", exact: true })).toContainText("Access restricted")
       await expect(page.getByRole("region", { name: "Payments with funds to allocate", exact: true })).not.toContainText("Nothing waiting")
-      await page.getByTestId("accountant-queue-bank-lines").click()
+      await selectAccountingQueue(page, "bank-lines")
       await overview.getByRole("button", { name: /Incoming Acme transfer/ }).click()
       await expect(page.getByText("Synthetic bank selection: statement 201, line 301", { exact: true })).toBeVisible()
       await expectNoHorizontalOverflow(page)
       await page.screenshot({ path: testInfo.outputPath(`accounting-queue-${viewport.width}.png`), fullPage: true })
     })
+
+    if (viewport.width === 390 || viewport.width === 1440) {
+      test("queue picker keeps selected records next to the controls at each layout", async ({ page }) => {
+        const picker = mobileAccountingQueuePicker(page)
+        const controls = page.getByRole("region", { name: "Needs attention", exact: true })
+        const records = page.locator("#accountant-queue-records")
+        const [controlsBox, recordsBox] = await Promise.all([controls.boundingBox(), records.boundingBox()])
+
+        if (viewport.width === 390) {
+          await expect(picker).toBeVisible()
+          await expect(picker).toHaveAccessibleDescription("Records: 2")
+          await expect(controls.getByRole("button")).toHaveCount(0)
+          const pickerBox = (await picker.boundingBox())!
+          const firstRow = (await records.getByRole("link", { name: /INV\/2026\/0101/ }).boundingBox())!
+          expect(pickerBox.height).toBeGreaterThanOrEqual(44)
+          expect(controlsBox!.x).toBeCloseTo(recordsBox!.x, 0)
+          expect(recordsBox!.y - controlsBox!.y - controlsBox!.height).toBeCloseTo(12, 0)
+          expect(firstRow.y - pickerBox.y).toBeLessThan(180)
+        } else {
+          await expect(picker).toBeHidden()
+          await expect(controls.getByRole("button")).toHaveCount(8)
+          expect(controlsBox!.y).toBeCloseTo(recordsBox!.y, 0)
+          expect(recordsBox!.x).toBeGreaterThan(controlsBox!.x + controlsBox!.width)
+        }
+
+        for (const [key, label] of [
+          ["bills-due", "Bills due soon"],
+          ["draft-invoices", "Draft customer invoices"],
+          ["draft-bills", "Draft vendor bills"],
+          ["bank-lines", "Unreconciled bank lines"],
+          ["unlinked-payments", "Payments with funds to allocate"],
+          ["deadlines", "Tax deadlines"],
+          ["periods", "Open accounting periods"],
+          ["overdue", "Overdue receivables"],
+        ] as const) {
+          await selectAccountingQueue(page, key)
+          await expect(records.getByRole("heading", { name: label, exact: true })).toBeVisible()
+          if (key === "bank-lines" && viewport.width === 390) {
+            await expect(picker).toHaveAccessibleDescription("Records: 1")
+          }
+          if (key === "unlinked-payments") {
+            await expect(records.getByRole("status")).toHaveText("Access restricted")
+            if (viewport.width === 390) await expect(picker).toHaveAccessibleDescription("Access restricted")
+          }
+        }
+
+        await expectNoHorizontalOverflow(page)
+      })
+    }
 
     test("invoice composer updates its document preview and captures a synthetic draft", async ({ page }, testInfo) => {
       await page.getByRole("button", { name: "New invoice", exact: true }).click()

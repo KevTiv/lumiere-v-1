@@ -17940,7 +17940,7 @@
     "drilldown": {
       "scopeUnavailable": "The saved report scope could not be verified. Return to the report and open its journal items again.",
       "title": "Statement journal items",
-      "scope": "Report #{{report}} · company {{company}} · account {{account}} · {{from}} to {{to}} · {{basis}} entries",
+      "scope": "Report #{{report}} · company {{company}} · account {{account}} · {{period}} · {{basis}}",
       "currentRows": "These are current authorized journal items in the saved report's scope. Later edits, opening balances, currency translation and cash-flow classification can explain differences from a saved statement.",
       "return": "Return to saved report",
       "invalid": "This report link is incomplete or invalid. No broader ledger has been displayed. Open the saved report and try its journal-items link again."

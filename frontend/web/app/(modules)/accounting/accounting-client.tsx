@@ -6,6 +6,7 @@ import { useTaxGroupAdministration } from "./features/use-tax-group-administrati
 import { useTaxJurisdictionAdministration } from "./features/use-tax-jurisdiction-administration"
 import { useTaxScheduleAdministration } from "./features/use-tax-schedule-administration"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
+import { reportBasisKey, reportPeriod } from "../reports/report-workspace-model"
 import { filterStatementJournalItems, parseStatementDrilldown } from "../reports/statement-drilldown"
 import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
 import { useCurrencyFormat } from "@lumiere/ui"
@@ -693,7 +694,7 @@ function AccountingClientReady({
     const query = params.toString()
     router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false })
   }, [clearModuleFilter, pathname, router, searchParams])
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const explainError = useExplainErpError()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { askForm: showForm, cancelForm, formDialog } = useFormDialog()
@@ -5680,8 +5681,16 @@ function AccountingClientReady({
       /> : <p role="status" className="rounded-lg border p-4 text-sm">Select an active company to continue. Original pending operations have been retained.</p>}
       {accountingActiveTab === "move-lines" && statementDrilldown.status !== "none" ? <section className="mb-4 space-y-2 rounded-lg border p-4 text-sm" aria-label={t("reports.drilldown.title", { defaultValue: "Statement journal items" })}>
         {statementDrilldown.status === "ready" ? <>
-          <p>{t("reports.drilldown.scope", { defaultValue: "Report #{{report}} · company {{company}} · account {{account}} · {{from}} to {{to}} · {{basis}} entries", report: statementDrilldown.context.reportId, company: statementDrilldown.context.companyId, account: statementDrilldown.context.accountId,
-            from: new Date(Number(BigInt(statementDrilldown.context.fromMicros) / 1000n)).toLocaleDateString(undefined, { timeZone: "UTC" }), to: new Date(Number(BigInt(statementDrilldown.context.toMicros) / 1000n)).toLocaleDateString(undefined, { timeZone: "UTC" }), basis: statementDrilldown.context.basis })}</p>
+          <p>{t("reports.drilldown.scope", {
+            report: statementDrilldown.context.reportId,
+            company: statementDrilldown.context.companyId,
+            account: statementDrilldown.context.accountId,
+            period: reportPeriod({
+              dateFrom: { microsSinceUnixEpoch: statementDrilldown.context.fromMicros },
+              dateTo: { microsSinceUnixEpoch: statementDrilldown.context.toMicros },
+            }, i18n.language) ?? t("reports.workspace.unknown"),
+            basis: t(reportBasisKey({ targetMove: statementDrilldown.context.basis })),
+          })}</p>
           <p className="text-muted-foreground">{t("reports.drilldown.currentRows", { defaultValue: "These are current authorized journal items in the saved report's scope. Later edits, opening balances, currency translation and cash-flow classification can explain differences from a saved statement." })}</p>
           <a className="inline-block font-medium text-primary underline" href={statementDrilldown.context.returnHref}>{t("reports.drilldown.return", { defaultValue: "Return to saved report" })}</a>
         </> : <p role="alert">{t("reports.drilldown.invalid", { defaultValue: "This report link is incomplete or invalid. No broader ledger has been displayed. Open the saved report and try its journal-items link again." })}</p>}

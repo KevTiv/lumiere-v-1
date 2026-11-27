@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { reportDisplayName, reportDate, reportWorkspaceHref, reportCanDownload, reportTag, scopedReports, selectedReport } from "./report-workspace-model"
+import { reportAccountingBasis, reportBasisKey, reportDisplayName, reportPeriod, reportWorkspaceHref, reportCanDownload, reportTag, scopedReports, selectedReport } from "./report-workspace-model"
 
 const report = { id: "9007199254740993", organizationId: "7", companyId: "8", state: { tag: "Generated" } }
 
@@ -33,13 +33,30 @@ test("state encodings permit downloads again after the first export", () => {
   assert.equal(reportTag({ tag: "ProfitAndLoss" }), "profitandloss")
 })
 
-test("report dates retain their UTC accounting day and missing values remain unknown", () => {
-  assert.equal(reportDate("2026-10-01T00:00:00Z", "en-US"), "Oct 1, 2026")
-  assert.equal(reportDate({ microsSinceUnixEpoch: "1790812800000000" }, "en-US"), "Oct 1, 2026")
-  assert.equal(reportDate(undefined, "en-US"), "—")
-  assert.equal(reportDate("not-a-date", "en-US"), "—")
+test("report periods use the UTC accounting day across timestamp projections", () => {
+  const report = {
+    date_from: { microsSinceUnixEpoch: "1790812800000000" },
+    date_to: "2026-10-31T20:00:00-05:00",
+  }
+  assert.equal(reportPeriod(report, "en-US"), "Oct 1, 2026 – Nov 1, 2026")
+  assert.equal(reportPeriod({ ...report, date_to: "invalid" }, "en-US"), "Oct 1, 2026 – —")
+  assert.equal(reportPeriod({ dateTo: "2026-10-31" }, "en-US"), "— – Oct 31, 2026")
+  assert.equal(reportPeriod({ dateFrom: "2026-11-01", dateTo: "2026-10-01" }, "en-US"), null)
+  assert.equal(reportPeriod({}, "en-US"), null)
 })
 
+test("accounting basis recognizes exact tags and leaves missing or unsupported values unavailable", () => {
+  for (const targetMove of ["posted", { tag: "Posted" }, { posted: [] }]) {
+    assert.equal(reportAccountingBasis({ targetMove }), "posted")
+    assert.equal(reportBasisKey({ targetMove }), "reports.workspace.posted")
+  }
+  assert.equal(reportAccountingBasis({ target_move: { tag: "All" } }), "all")
+  assert.equal(reportBasisKey({ target_move: { all: {} } }), "reports.workspace.allEntries")
+  for (const targetMove of [null, undefined, "allow", "posted-only", { tag: "Unknown" }]) {
+    assert.equal(reportAccountingBasis({ targetMove }), null)
+    assert.equal(reportBasisKey({ targetMove }), "reports.workspace.unknown")
+  }
+})
 
 test("report identity and metadata never expose object coercion or invented identifiers", () => {
   assert.equal(reportDisplayName({ name: { some: "October accounts" } }, "Unavailable"), "October accounts")

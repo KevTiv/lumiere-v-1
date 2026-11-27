@@ -1,3 +1,4 @@
+import { mobileAccountingQueuePicker, selectAccountingQueue } from "./accounting-queue-picker"
 import { splitCsvRow } from "@lumiere/erp-shared/csv-import-safety"
 import { chooseSelectOptionByTriggerValue } from "./e2e/helpers-legacy"
 import { expect, test, type Page } from "@playwright/test"
@@ -54,10 +55,10 @@ for (const width of [320, 390, 768, 1440]) {
       await expect(page.getByTestId("insight-budgets")).toContainText("Select the company currency (EUR)")
       await expect(page.getByTestId("insight-budgets").getByRole("button", { name: /Export/ })).toHaveCount(0)
       await expect(insights).not.toContainText("OTHER COMPANY MUST STAY HIDDEN")
-      await page.getByTestId("accountant-queue-bank-lines").click()
+      await selectAccountingQueue(page, "bank-lines")
       await page.getByRole("button", { name: /Incoming Acme transfer/ }).click()
       await expect(page.getByTestId("insights-fixture-action")).toContainText("Synthetic bank line: 301")
-      await page.getByTestId("accountant-queue-draft-invoices").click()
+      await selectAccountingQueue(page, "draft-invoices")
       await expect(page.getByRole("link", { name: /Draft customer invoice/ }).first()).toHaveAttribute("href", "/accounting/invoices/103")
       expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1)
       for (const control of [page.getByLabel("Analysis currency", { exact: true }), page.getByLabel("Analysis period", { exact: true })]) expect(await control.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44)
@@ -93,6 +94,10 @@ for (const width of [320, 390, 768, 1440]) {
       expect(agingProvenance.endMs).toBeUndefined()
       for (const state of ["loading", "denied", "error", "partial"]) {
         await page.getByLabel("Synthetic document source", { exact: true }).selectOption(state)
+        if (state === "partial" && width < 1280) {
+          await expect(mobileAccountingQueuePicker(page)).toHaveAccessibleDescription("Complete data unavailable")
+          await expect(page.getByRole("region", { name: "Overdue receivables", exact: true })).not.toContainText("INV/2026/0101")
+        }
         await expect(trend.locator(".recharts-wrapper")).toHaveCount(0)
         await expect(trend.getByRole("button", { name: /Export/ })).toHaveCount(0)
         await expect(page.getByTestId("insight-open-invoices")).not.toContainText("1,200.00")
@@ -112,7 +117,8 @@ for (const width of [320, 390, 768, 1440]) {
       await expect(page.getByTestId("accountant-overview").getByRole("alert")).toContainText("invalid date range")
       await expect(page.getByTestId("accountant-insights")).toHaveCount(0)
       await expect(page.locator("#accountant-activity-title")).toHaveCount(0)
-      await expect(page.getByTestId("accountant-queue-bank-lines")).toBeVisible()
+      await selectAccountingQueue(page, "bank-lines")
+      await expect(page.getByRole("region", { name: "Unreconciled bank lines", exact: true })).toBeVisible()
       await page.getByRole("button", { name: "Clear date range", exact: true }).click()
       await expect(page).toHaveURL(/period=all/)
       await expect(page.getByTestId("accountant-insights")).toBeVisible()

@@ -1,3 +1,4 @@
+import { selectAccountingQueue } from "./accounting-queue-picker"
 import { test, expect } from "@playwright/test"
 
 for (const viewport of [{ width: 390, height: 600 }, { width: 1440, height: 900 }]) {
@@ -67,9 +68,9 @@ test("accounting desk puts task queues before charts and preserves exact queue d
   await expect(queue).toBeVisible()
   const positions = await page.evaluate(() => ({ queues: document.getElementById("accountant-attention-title")!.getBoundingClientRect().top, insights: document.getElementById("financial-overview-title")!.getBoundingClientRect().top }))
   expect(positions.queues).toBeLessThan(positions.insights)
-  await page.getByTestId("accountant-queue-draft-invoices").click()
+  await selectAccountingQueue(page, "draft-invoices")
   await expect(page.getByRole("link", { name: "Open filtered list" })).toHaveAttribute("href", "/accounting?tab=invoices&filter=status%3ADraft")
-  await page.getByTestId("accountant-queue-bills-due").click()
+  await selectAccountingQueue(page, "bills-due")
   await expect(page.getByRole("region", { name: "Bills due soon", exact: true })).toContainText("next seven days")
   await page.screenshot({ path: testInfo.outputPath("accounting-desk.png"), fullPage: true })
 })
