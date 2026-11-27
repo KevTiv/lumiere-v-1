@@ -5716,7 +5716,7 @@
       "setupTitle": "Configurer l’enregistrement des coûts de service",
       "recovery": {
         "serviceType": "Aucun type de service actif n’est disponible pour cette entreprise.",
-        "journal": "Aucun journal général actif n’est disponible pour cette entreprise.",
+        "journal": "Aucun journal actif n’est disponible pour cette entreprise.",
         "expenseAccount": "Aucun compte de charges actif n’est disponible pour cette entreprise.",
         "offsetAccount": "Aucun compte d’actif ou de passif actif n’est disponible pour la contrepartie.",
         "typeName": "Nom du type de service",

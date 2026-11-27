@@ -15214,7 +15214,7 @@
       "setupTitle": "Set up service cost recording",
       "recovery": {
         "serviceType": "No active service type is available for this company.",
-        "journal": "No active general journal is available for this company.",
+        "journal": "No active journal is available for this company.",
         "expenseAccount": "No active expense account is available for this company.",
         "offsetAccount": "No active asset or liability account is available for the offset.",
         "typeName": "Service type name",
