@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useErpSession } from "@lumiere/erp-session"
-import { useTranslation } from "@lumiere/i18n"
+import { formattingLocale, useTranslation } from "@lumiere/i18n"
 import { useErpAiSelectionReporter } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { DashboardHeader, RecordPage } from "@lumiere/ui"
@@ -69,7 +69,7 @@ export function FarmBatchesWorkspace({
   const { identity, activeCompanyReady } = useErpSession()
   const company = useOperatingCompanyId(organizationId)
   const { t, i18n } = useTranslation()
-  const locale = i18n.resolvedLanguage ?? i18n.language
+  const locale = formattingLocale(i18n.language)
   if (!activeCompanyReady) return <FarmLoading />
   if (company == null)
     return <FarmNotice message={t("farmBatches.selectAnOperatingCompanyToViewIts")} />

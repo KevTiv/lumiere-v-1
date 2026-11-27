@@ -1,6 +1,6 @@
 "use client"
 
-import { useTranslation } from "@lumiere/i18n"
+import { formattingLocale, useTranslation } from "@lumiere/i18n"
 import { useState } from "react"
 import Link from "next/link"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -21,6 +21,7 @@ import { FarmField, FarmForm, FarmSelect, fieldValue } from "./farm-forms"
 import {
   FarmApiError,
   farmApiPath,
+  farmDateLabel,
   farmDateLabel,
   farmRecordId,
   farmRequest,
@@ -377,9 +378,10 @@ function ProcessingForm({
   onSaveFailed: () => void
 }) {
   const { t, i18n } = useTranslation()
+  const locale = formattingLocale(i18n.language)
   const events = batch.events.filter((event) => event.kind === "processing")
   const options = events.map(
-    (event) => [event.id, `${event.businessDate} · ${t("farmBatches.animals", { countLabel: event.count.toLocaleString(i18n.language) })} · #${event.id}`] as const,
+    (event) => [event.id, `${farmDateLabel(event.businessDate, locale)} · ${t("farmBatches.animals", { countLabel: event.count.toLocaleString(locale) })} · #${event.id}`] as const,
   )
   const [eventId, setEventId] = useState(resume?.eventId ?? options[0]?.[0] ?? "")
   return (
