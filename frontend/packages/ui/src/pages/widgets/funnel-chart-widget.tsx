@@ -31,7 +31,7 @@ export function FunnelChartWidget({ data }: { data: FunnelChartWidgetType["data"
             </div>
             <div className="relative flex-1">
               <div
-                className="flex h-8 items-center justify-end rounded px-2 text-xs font-medium text-primary-foreground transition-all"
+                className="flex h-8 items-center justify-end rounded px-2 text-xs font-medium text-primary-foreground transition-[width] duration-300"
                 style={{
                   width: `${Math.max(widthPercent, 8)}%`,
                   backgroundColor: color,

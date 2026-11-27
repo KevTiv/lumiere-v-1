@@ -31,6 +31,16 @@ export interface BaseField {
   label?: string
   placeholder?: string
   description?: string
+  /** Optional contextual explanation popover rendered next to the field label. */
+  help?:
+    | string
+    | {
+        title?: string
+        description: string
+        formula?: string
+        learnMoreHref?: string
+        learnMoreLabel?: string
+      }
   /** Owner-supplied prerequisite guidance, kept apart from runtime field descriptions. */
   recoveryHelp?: {
     message: string

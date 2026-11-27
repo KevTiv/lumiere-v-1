@@ -33,6 +33,8 @@ export interface InsightPeriodRange { startMs: number; endMs: number }
 interface ModuleInsightsProps {
   input: ModuleInsightInput
   sections?: DashboardSection[]
+  /** Vetted, currency-guarded domain chart sections to render beneath the shared trend/state charts. */
+  domainSections?: DashboardSection[]
   now?: Date
   onPeriodRangeChange?: (range: InsightPeriodRange) => void
   actionReadback?: ReactNode
@@ -46,12 +48,12 @@ export function CompanyModuleInsights(props: ModuleInsightsProps) {
   return <ModuleInsights {...props} input={{ ...input, companyCurrencyId: input.companyCurrencyId ?? companyCurrencyId }} />
 }
 
-export function ModuleInsights({ input, sections = [], now, onPeriodRangeChange, actionReadback }: ModuleInsightsProps) {
+export function ModuleInsights({ input, sections = [], domainSections = [], now, onPeriodRangeChange, actionReadback }: ModuleInsightsProps) {
   // A company switch remounts controls instead of retaining an old company's currency or queue.
-  return <ScopedModuleInsights key={`${input.module}:${input.organizationId}:${input.companyId}`} input={input} sections={sections} now={now} onPeriodRangeChange={onPeriodRangeChange} actionReadback={actionReadback} />
+  return <ScopedModuleInsights key={`${input.module}:${input.organizationId}:${input.companyId}`} input={input} sections={sections} domainSections={domainSections} now={now} onPeriodRangeChange={onPeriodRangeChange} actionReadback={actionReadback} />
 }
 
-function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange, actionReadback }: ModuleInsightsProps) {
+function ScopedModuleInsights({ input, sections = [], domainSections = [], now, onPeriodRangeChange, actionReadback }: ModuleInsightsProps) {
   const { t } = useTranslation()
   const [period, setPeriod, invalidPeriod] = useHistoryPeriod()
   const [currencyId, setCurrencyId] = useState<string>()
@@ -66,6 +68,7 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange, 
   const unit = model.monetary ? `${model.currency?.label ?? t("moduleInsights.unknownCurrency")} (#${model.selectedId || "—"})` : t("moduleInsights.records")
   const sectionId = (key: string) => `${input.module}-insights-${key}`
   const quickSections = sections.map((section) => ({ ...section, widgets: section.widgets.filter((widget) => widget.type === "quick-actions") })).filter((section) => section.widgets.length)
+  const curatedDomainSections = domainSections.filter((section) => section.widgets.length > 0)
   const hasCompanyForecast = quickSections.some((section) => section.widgets.some((widget) => widget.type === "quick-actions" && widget.data.actions.some((action) => action.id === "create_forecast_snapshot")))
   const selectedQueue = model.queues.value?.find((queue) => queue.key === queueKey)
   const shownQueue = selectedQueue ?? model.queues.value?.[0]
@@ -81,11 +84,11 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange, 
     <p className="mb-3 text-xs leading-5 text-muted-foreground">{hint}</p>
     {state.status === "ready" ? <>
       <DashboardWidgetRenderer widget={widget} widthClass="min-w-0" emptyMessage={t("moduleInsights.zero")} exportProvenance={reportExportSourceProvenance({ organizationId: input.organizationId, companyId: input.companyId, dashboardId: `${input.module}-overview`, widgetId: widget.id, model: model.definition.model, domain: JSON.stringify({ currencyId: model.monetary ? model.selectedId : null, basis: current ? "current-record-states" : "current-eligible-records-by-creation-or-order-date", eligibleStates: current ? model.definition.states : model.definition.eligible, dateField: current ? null : model.definition.dateField, measure: current || !model.monetary ? "count" : input.module === "crm" ? "expectedRevenue" : input.module === "expenses" ? "totalAmount" : "amountTotal" }), groupBy: current ? "state" : model.period.value?.months[0]?.unit, timeZone: model.timeZone, period: current ? undefined : serializeHistoryPeriod(period), dateField: current ? undefined : model.definition.dateField, endExclusive: !current, startMs: current ? model.asOfMs : model.bounds.startMs ?? undefined, endMs: current ? model.asOfMs : model.bounds.endMs ?? undefined })} />
-      <details><summary className="flex min-h-11 w-fit cursor-pointer items-center rounded-sm text-xs font-medium focus-visible:outline-2 focus-visible:outline-ring">{t("moduleInsights.viewData")}</summary><div className="max-h-80 overflow-auto"><table className="w-full min-w-72 text-xs tabular-nums"><caption className="sr-only">{widget.title}</caption>{table}</table></div></details>
+      <details><summary className="flex pointer-coarse:min-h-11 w-fit cursor-pointer items-center rounded-sm text-xs font-medium focus-visible:outline-2 focus-visible:outline-ring">{t("moduleInsights.viewData")}</summary><div className="max-h-80 overflow-auto"><table className="w-full min-w-72 text-xs tabular-nums"><caption className="sr-only">{widget.title}</caption>{table}</table></div></details>
     </> : <><h3 className={`${workspaceStyles.sectionTitle} mb-3`}>{widget.title}</h3><SourceNotice state={state} /></>}
   </section>
   const browseHref = `/${input.module}?tab=${insightDefinitions[input.module].tab}&period=${encodeURIComponent(serializeHistoryPeriod(period))}&periodTimeZone=${encodeURIComponent(model.timeZone)}&filter=${encodeURIComponent(`companyId:${String(input.companyId)}`)}${model.monetary && model.selectedId ? `&filter=${encodeURIComponent(`${input.module === "crm" ? "companyCurrencyId" : "currencyId"}:${model.selectedId}`)}` : ""}`
-  const linkClass = "inline-flex min-h-11 items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+  const linkClass = "inline-flex pointer-coarse:min-h-11 items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
   const metricCards = [
     { key: "currentValue", content: metric("currentValue", model.totals.state, model.totals.value?.amount, <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.currentHint")}</p>, true) },
     { key: "currentCount", content: metric("currentCount", model.counts.state, model.counts.value?.current, <p className="text-xs leading-5 text-muted-foreground">{t("moduleInsights.currentHint")}</p>) },
@@ -99,7 +102,7 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange, 
         <div className={`${workspaceStyles.surface} space-y-2 p-4`} aria-label={shownQueue ? status(shownQueue.key) : t("moduleInsights.actions")} data-testid={sectionId("queue-records")}><p className="text-xs text-muted-foreground">{t("moduleInsights.firstFive")}</p>{shownQueue?.records.length ? shownQueue.records.slice(0, 5).map((record) => <Link key={record.id} className={`${linkClass} w-full`} href={insightRecordHref(input.module, record.id)}><span className="min-w-0 break-words">{record.name}</span><ArrowUpRight className="size-4 shrink-0" aria-hidden="true" /></Link>) : <p className="py-3 text-sm text-muted-foreground">{t("moduleInsights.queueEmpty")}</p>}</div>
       </> : <SourceNotice state={model.queues.state} />}
       <div className="flex flex-wrap gap-2"><Link className={linkClass} href={browseHref}>{model.monetary && !model.selectedId ? t("moduleInsights.browseRecords") : label("browse")}<ArrowUpRight className="size-4" aria-hidden="true" /></Link>{model.definition.more.map((tab) => <Link key={tab} className={linkClass} href={`/${input.module}?tab=${tab}`}>{t(`moduleInsights.workspaces.${tab === "operations" && input.module === "expenses" ? "captureReceipt" : tab}`)}<ArrowUpRight className="size-4" aria-hidden="true" /></Link>)}</div>
-      {input.module === "sales" && <details><summary className="flex min-h-11 w-fit cursor-pointer items-center rounded-sm text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">{t("moduleInsights.moreQueues")}</summary><nav aria-label={t("moduleInsights.moreQueues")} className="flex flex-wrap gap-2 pt-2">{[
+      {input.module === "sales" && <details><summary className="flex pointer-coarse:min-h-11 w-fit cursor-pointer items-center rounded-sm text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring">{t("moduleInsights.moreQueues")}</summary><nav aria-label={t("moduleInsights.moreQueues")} className="flex flex-wrap gap-2 pt-2">{[
         ["credit_holds", "creditHolds"], ["returns_receive", "returnsToReceive"], ["open_deliveries", "openDeliveries"],
         ["commissions_to_accrue", "commissionsToAccrue"], ["commissions_accrued", "commissionsAccrued"], ["commissions_settled", "commissionsSettled"],
       ].map(([queue, key]) => <Link key={queue} className={linkClass} href={`/sales?tab=ops&queue=${queue}`}>{t(`sales.dashboard.queues.${key}`)}<ArrowUpRight aria-hidden="true" className="size-4" /></Link>)}</nav></details>}
@@ -107,15 +110,16 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange, 
       {quickSections.length > 0 && <DashboardGrid sections={quickSections} />}
       {actionReadback}
     </section>
-  const recentContent = <section aria-labelledby={sectionId("recent")} className={`${workspaceStyles.surface} min-w-0 space-y-3 p-4 sm:p-5`}><h2 id={sectionId("recent")} className={workspaceStyles.sectionTitle}>{t("moduleInsights.recent")}</h2><p className="text-xs text-muted-foreground">{t("moduleInsights.recentHint")}</p>{model.recent.value ? <ul className="divide-y">{model.recent.value.length ? model.recent.value.map((record) => <li key={record.id}><Link className="flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-sm py-3 text-sm hover:text-primary focus-visible:outline-2 focus-visible:outline-ring" href={insightRecordHref(input.module, record.id)}><span className="min-w-0 break-words">{record.name}</span><span className="text-xs text-muted-foreground">{status(record.status)} · {date(record.time)}</span></Link></li>) : <li className="py-3 text-sm text-muted-foreground">{t("moduleInsights.queueEmpty")}</li>}</ul> : <SourceNotice state={model.recent.state} />}</section>
+  const recentContent = <section aria-labelledby={sectionId("recent")} className={`${workspaceStyles.surface} min-w-0 space-y-3 p-4 sm:p-5`}><h2 id={sectionId("recent")} className={workspaceStyles.sectionTitle}>{t("moduleInsights.recent")}</h2><p className="text-xs text-muted-foreground">{t("moduleInsights.recentHint")}</p>{model.recent.value ? <ul className="divide-y">{model.recent.value.length ? model.recent.value.map((record) => <li key={record.id}><Link className="flex pointer-coarse:min-h-11 flex-wrap items-center justify-between gap-2 rounded-sm py-3 text-sm hover:text-primary focus-visible:outline-2 focus-visible:outline-ring" href={insightRecordHref(input.module, record.id)}><span className="min-w-0 break-words">{record.name}</span><span className="text-xs text-muted-foreground">{status(record.status)} · {date(record.time)}</span></Link></li>) : <li className="py-3 text-sm text-muted-foreground">{t("moduleInsights.queueEmpty")}</li>}</ul> : <SourceNotice state={model.recent.state} />}</section>
   const compositionSections: DashboardSection[] = [
     ...metricCards.map(({ key, content }) => createPageContentSection({ id: sectionId(key), title: label(key), content: <div className={workspaceStyles.surface}>{content}</div>, width: "1/4" })),
     createPageContentSection({ id: sectionId("trend"), title: trend.title, content: trendContent, width: "1/2" }),
     createPageContentSection({ id: sectionId("states"), title: breakdown.title, content: breakdownContent, width: "1/2" }),
+    ...curatedDomainSections,
     createPageContentSection({ id: sectionId("actions"), title: t("moduleInsights.actions"), content: actionsContent }),
     createPageContentSection({ id: sectionId("recent"), title: t("moduleInsights.recent"), content: recentContent }),
   ]
-  return <div className="min-w-0 space-y-6 [&_button]:min-h-11 [&_button]:min-w-11" data-testid={`module-insights-${input.module}`}>
+  return <div className="min-w-0 space-y-6 [&_button]:pointer-coarse:min-h-11 [&_button]:pointer-coarse:min-w-11" data-testid={`module-insights-${input.module}`}>
     <section aria-labelledby={sectionId("overview")} className="space-y-4">
       <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end"><div className="space-y-1"><h2 id={sectionId("overview")} className="flex scroll-mt-24 items-center gap-2 text-lg font-semibold tracking-tight"><ChartNoAxesCombined aria-hidden="true" className="size-5 text-primary" />{label("title")}</h2><p className={workspaceStyles.sectionDescription}>{label("description")}</p></div>
         <div className={`grid min-w-0 gap-3 ${model.monetary ? "sm:grid-cols-2" : "sm:min-w-56"}`}>{model.monetary && <label className="min-w-0 space-y-1 text-xs font-medium"><span>{t("moduleInsights.currency")}</span><Select
@@ -171,6 +175,7 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange, 
         <section aria-labelledby={sectionId("insights")} className="space-y-4">
           <h2 id={sectionId("insights")} className="scroll-mt-24 text-lg font-semibold tracking-tight">{t("moduleInsights.insights")}</h2>
           <div className="grid min-w-0 gap-5 xl:grid-cols-2">{trendContent}{breakdownContent}</div>
+          {curatedDomainSections.length > 0 && <DashboardGrid sections={curatedDomainSections} />}
         </section>
         {actionsContent}
         {recentContent}

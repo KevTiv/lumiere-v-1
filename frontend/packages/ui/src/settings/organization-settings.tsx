@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import { Building, Save, Loader2, Cloud, MessageCircle, ExternalLink, Upload, Trash2 } from "lucide-react"
 import { useUpdateGoogleDriveCredentials, useUpdateWhatsappCredentials, useDelegatedAdminScopes, useGrantDelegatedAdminScope, useRevokeDelegatedAdminScope } from "@lumiere/query-hooks/hooks/auth"
 import { useOrgMasterCsvImportMutations } from "@lumiere/query-hooks/hooks/org-master-csv-imports"
@@ -91,7 +91,6 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
   const { t } = useTranslation()
   const workspaceProfile = useWorkspaceProfile()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
-  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const { organizationId, activeCompanyId, activeCompanyReady } = useErpSession()
   const [csvKind, setCsvKind] = useState<OrgMasterCsvKind | null>(null)
@@ -352,10 +351,8 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
 
   const handleSave = async () => {
     if (!orgReady) {
-      toast({
-        title: t("settings.organization.saveError"),
+      toast.error(t("settings.organization.saveError"), {
         description: t("settings.organization.saveErrorDescription"),
-        variant: "destructive",
       })
       return
     }
@@ -363,15 +360,12 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
     try {
       await upsertOrganizationSettings.mutateAsync(settings)
 
-      toast({
-        title: t("settings.organization.saveSuccess"),
+      toast.success(t("settings.organization.saveSuccess"), {
         description: t("settings.organization.saveSuccessDescription"),
       })
     } catch (error) {
-      toast({
-        title: t("settings.organization.saveError"),
+      toast.error(t("settings.organization.saveError"), {
         description: error instanceof Error ? error.message : t("settings.organization.saveErrorDescription"),
-        variant: "destructive",
       })
     } finally {
       setIsLoading(false)
@@ -380,10 +374,8 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
 
   const handleUpdateOrganization = async () => {
     if (!orgReady) {
-      toast({
-        title: t("settings.organization.updateError"),
+      toast.error(t("settings.organization.updateError"), {
         description: t("settings.organization.updateErrorDescription"),
-        variant: "destructive",
       })
       return
     }
@@ -394,15 +386,12 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
         description: settings.description,
       })
 
-      toast({
-        title: t("settings.organization.updateSuccess"),
+      toast.success(t("settings.organization.updateSuccess"), {
         description: t("settings.organization.updateSuccessDescription"),
       })
     } catch (error) {
-      toast({
-        title: t("settings.organization.updateError"),
+      toast.error(t("settings.organization.updateError"), {
         description: error instanceof Error ? error.message : t("settings.organization.updateErrorDescription"),
-        variant: "destructive",
       })
     } finally {
       setIsLoading(false)
@@ -510,7 +499,7 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                         organizationId: orgId,
                         params: { name },
                       })
-                      toast({ title: t("settings.organization.company.saveNameSuccess") })
+                      toast.success(t("settings.organization.company.saveNameSuccess"))
                     }}
                   />
                 </div>
@@ -542,7 +531,7 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                           organizationId: orgId,
                           params,
                         })
-                        toast({ title: t("settings.organization.company.saveHierarchySuccess") })
+                        toast.success(t("settings.organization.company.saveHierarchySuccess"))
                       }}
                     />
                   </div>
@@ -579,7 +568,7 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                         )
                         if (!params) return
                         await createCompany.mutateAsync(params)
-                        toast({ title: t("settings.organization.company.createSuccess") })
+                        toast.success(t("settings.organization.company.createSuccess"))
                       }}
                     />
                   </div>
@@ -601,12 +590,10 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                             companyId: BigInt(selectedCompanyId),
                             organizationId: orgId,
                           })
-                          .then(() => toast({ title: t("settings.organization.company.deleteSuccess") }))
+                          .then(() => toast.success(t("settings.organization.company.deleteSuccess")))
                           .catch((e) =>
-                            toast({
-                              title: t("settings.organization.company.saveError"),
+                            toast.error(t("settings.organization.company.saveError"), {
                               description: e instanceof Error ? e.message : String(e),
-                              variant: "destructive",
                             }),
                           )
                       }}
@@ -666,7 +653,7 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                       country,
                     },
                   }))
-                  toast({ title: t("settings.organization.company.saveAddressSuccess") })
+                  toast.success(t("settings.organization.company.saveAddressSuccess"))
                 }}
               />
             </div>
@@ -722,7 +709,7 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                     taxId,
                     registrationNumber: companyRegistry,
                   }))
-                  toast({ title: t("settings.organization.company.saveBusinessSuccess") })
+                  toast.success(t("settings.organization.company.saveBusinessSuccess"))
                 }}
               />
             </div>
@@ -747,12 +734,10 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                 packKey,
                 enabled,
               })
-              toast({ title: t("settings.organization.countryPacks.toggleSuccess") })
+              toast.success(t("settings.organization.countryPacks.toggleSuccess"))
             } catch (e) {
-              toast({
-                title: t("settings.organization.countryPacks.toggleError"),
+              toast.error(t("settings.organization.countryPacks.toggleError"), {
                 description: e instanceof Error ? e.message : String(e),
-                variant: "destructive",
               })
             }
           }}
@@ -786,12 +771,10 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                     metadata: undefined,
                   })
                   setPrivacyDcFormKey((k) => k + 1)
-                  toast({ title: t("settings.organization.privacy.classificationSuccess") })
+                  toast.success(t("settings.organization.privacy.classificationSuccess"))
                 } catch (e) {
-                  toast({
-                    title: t("settings.organization.company.saveError"),
+                  toast.error(t("settings.organization.company.saveError"), {
                     description: e instanceof Error ? e.message : String(e),
-                    variant: "destructive",
                   })
                 }
               }}
@@ -833,12 +816,10 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                         metadata: undefined,
                       })
                       setPrivacyRuleFormKey((k) => k + 1)
-                      toast({ title: t("settings.organization.privacy.ruleSuccess") })
+                      toast.success(t("settings.organization.privacy.ruleSuccess"))
                     } catch (e) {
-                      toast({
-                        title: t("settings.organization.company.saveError"),
+                      toast.error(t("settings.organization.company.saveError"), {
                         description: e instanceof Error ? e.message : String(e),
-                        variant: "destructive",
                       })
                     }
                   }}
@@ -917,7 +898,7 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                         .then(() => {
                           setDelegatedAdminIdentity("")
                           void refetchDelegatedAdminScopes()
-                          toast({ title: t("settings.organization.privacy.delegatedAdminGrantSuccess") })
+                          toast.success(t("settings.organization.privacy.delegatedAdminGrantSuccess"))
                         })
                         .catch((error) => {
                           setDelegatedAdminError(error instanceof Error ? error.message : String(error))
@@ -963,13 +944,11 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                                   .mutateAsync(scopeId)
                                   .then(() => {
                                     void refetchDelegatedAdminScopes()
-                                    toast({ title: t("settings.organization.privacy.delegatedAdminRevokeSuccess") })
+                                    toast.success(t("settings.organization.privacy.delegatedAdminRevokeSuccess"))
                                   })
                                   .catch((error) => {
-                                    toast({
-                                      title: t("settings.organization.privacy.delegatedAdminRevokeError"),
+                                    toast.error(t("settings.organization.privacy.delegatedAdminRevokeError"), {
                                       description: error instanceof Error ? error.message : String(error),
-                                      variant: "destructive",
                                     })
                                   })
                               }}
@@ -998,13 +977,11 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                       void executeRetentionPurge
                         .mutateAsync()
                         .then(() => {
-                          toast({ title: t("settings.organization.privacy.retentionPurgeSuccess") })
+                          toast.success(t("settings.organization.privacy.retentionPurgeSuccess"))
                         })
                         .catch((error) => {
-                          toast({
-                            title: t("settings.organization.privacy.retentionPurgeError"),
+                          toast.error(t("settings.organization.privacy.retentionPurgeError"), {
                             description: error instanceof Error ? error.message : String(error),
-                            variant: "destructive",
                           })
                         })
                     }}
@@ -1181,10 +1158,8 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
               onClick={async () => {
                 const token = (document.getElementById('gdrive-token') as HTMLInputElement)?.value
                 if (!token) {
-                  toast({
-                    title: t("settings.organization.integrations.error"),
+                  toast.error(t("settings.organization.integrations.error"), {
                     description: t("settings.organization.integrations.tokenRequired"),
-                    variant: "destructive",
                   })
                   return
                 }
@@ -1194,15 +1169,12 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                     userId: organizationId.toString(),
                     credentials: { accessToken: token },
                   })
-                  toast({
-                    title: t("settings.organization.integrations.success"),
+                  toast.success(t("settings.organization.integrations.success"), {
                     description: t("settings.organization.integrations.googleDrive.saved"),
                   })
                 } catch (error) {
-                  toast({
-                    title: t("settings.organization.integrations.error"),
+                  toast.error(t("settings.organization.integrations.error"), {
                     description: error instanceof Error ? error.message : t("settings.organization.integrations.saveError"),
-                    variant: "destructive",
                   })
                 }
               }}
@@ -1246,10 +1218,8 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
               onClick={async () => {
                 const apiKey = (document.getElementById('wa-api-key') as HTMLInputElement)?.value
                 if (!apiKey) {
-                  toast({
-                    title: t("settings.organization.integrations.error"),
+                  toast.error(t("settings.organization.integrations.error"), {
                     description: t("settings.organization.integrations.apiKeyRequired"),
-                    variant: "destructive",
                   })
                   return
                 }
@@ -1259,15 +1229,12 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                     userId: organizationId.toString(),
                     credentials: { apiKey },
                   })
-                  toast({
-                    title: t("settings.organization.integrations.success"),
+                  toast.success(t("settings.organization.integrations.success"), {
                     description: t("settings.organization.integrations.whatsapp.saved"),
                   })
                 } catch (error) {
-                  toast({
-                    title: t("settings.organization.integrations.error"),
+                  toast.error(t("settings.organization.integrations.error"), {
                     description: error instanceof Error ? error.message : t("settings.organization.integrations.saveError"),
-                    variant: "destructive",
                   })
                 }
               }}
@@ -1321,8 +1288,7 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
             else if (csvKind === "company") await csvImports.importCompany.mutateAsync(text)
             else if (csvKind === "role") await csvImports.importRole.mutateAsync(text)
             else await csvImports.importAiAgent.mutateAsync(text)
-            toast({
-              title: t("settings.organization.csvImport.successTitle"),
+            toast.success(t("settings.organization.csvImport.successTitle"), {
               description: t("settings.organization.csvImport.successDescription"),
             })
           }}
@@ -1374,9 +1340,7 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                   },
                 })
               }
-              toast({
-                title: t("settings.adminOps.success"),
-              })
+              toast.success(t("settings.adminOps.success"))
               setReferenceModal(null)
             } catch (e) {
               setReferenceError(e instanceof Error ? e.message : String(e))

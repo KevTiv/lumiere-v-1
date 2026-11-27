@@ -30,7 +30,11 @@ interface InlineEditFieldProps {
 /** True when focus moved into a popup the editor opened (e.g. the rich editor's link popover). */
 function focusInPopup(): boolean {
   const active = typeof document === "undefined" ? null : document.activeElement
-  return Boolean(active?.closest("[data-radix-popper-content-wrapper]"))
+  return Boolean(
+    active?.closest(
+      '[data-radix-popper-content-wrapper], [data-slot="popover-content"], [data-slot="select-content"], [data-slot="dropdown-menu-content"], [data-slot="combobox-content"]',
+    ),
+  )
 }
 
 /**

@@ -410,7 +410,7 @@ import {
   currencyOptionsFromRows,
 } from "@/lib/form-lookup"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { useWorkflowSurface } from "@/hooks/use-workflow-surface"
 import { useInvoiceToPaymentWorkflow } from "@lumiere/query-hooks/hooks/accounting/invoice-workflow"
@@ -696,7 +696,6 @@ function AccountingClientReady({
   const { t } = useTranslation()
   const explainError = useExplainErpError()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
-  const { toast } = useToast()
   const { askForm: showForm, cancelForm, formDialog } = useFormDialog()
   const [promptWorkspace, setPromptWorkspace] = useState<string | null>(null)
   const [moduleFormWorkspace, setModuleFormWorkspace] = useState<string | null>(null)
@@ -1259,14 +1258,12 @@ function AccountingClientReady({
         return
       }
       const first = readiness.blockingItems[0]
-      toast({
-        variant: "destructive",
-        title: `${first?.label ?? "Accounting setup"} is required`,
+      toast.error(`${first?.label ?? "Accounting setup"} is required`, {
         description:
           first?.reason ?? "Complete the accounting setup requirements shown above first.",
       })
     },
-    [readinessByAction, toast],
+    [readinessByAction],
   )
 
   const requestAccountingAction = useCallback(
@@ -1320,11 +1317,9 @@ function AccountingClientReady({
         return
       }
       if (item.id === "base-currency") {
-        toast({
-          title: "Base currency needs administrator repair",
+        toast.error("Base currency needs administrator repair", {
           description:
             "This operating company has no valid base currency. Keep this company selected and repair its company record before posting or importing accounting history.",
-          variant: "destructive",
         })
         return
       }
@@ -1335,7 +1330,7 @@ function AccountingClientReady({
       } else if (item.id.endsWith("-account")) setAccountingActiveTab("accounts")
       else setAccountingActiveTab("taxes")
     },
-    [setAccountingActiveTab, toast],
+    [setAccountingActiveTab],
   )
 
   const partnerSelectOptions = useMemo(() => {
@@ -3791,15 +3786,13 @@ function AccountingClientReady({
       setInvoiceDocBusy("download")
       await downloadDocumentPdf("account-move", Number(target.id))
     } catch (e) {
-      toast({
-        variant: "destructive",
-        title: t("accounting.invoices.invoiceActions.download"),
+      toast.error(t("accounting.invoices.invoiceActions.download"), {
         description: e instanceof Error ? e.message : String(e),
       })
     } finally {
       setInvoiceDocBusy(null)
     }
-  }, [selectedInvoice, toast, t])
+  }, [selectedInvoice, t])
 
   const handleInvoiceArchivePdf = useCallback(async () => {
     if (!selectedInvoice?.id) return
@@ -3811,20 +3804,17 @@ function AccountingClientReady({
         saveGenerated: documentUploads.submitGenerated,
         name: String(selectedInvoice.name ?? `Invoice ${selectedInvoice.id}`),
       })
-      toast({
-        title: "Archived to Documents",
+      toast.success("Archived to Documents", {
         description: "PDF stored as a linked document version.",
       })
     } catch (e) {
-      toast({
-        variant: "destructive",
-        title: "Archive PDF",
+      toast.error("Archive PDF", {
         description: e instanceof Error ? e.message : String(e),
       })
     } finally {
       setInvoiceDocBusy(null)
     }
-  }, [selectedInvoice, documentUploads, toast])
+  }, [selectedInvoice, documentUploads])
 
   const handleInvoiceSendEmail = useCallback((move?: { id?: unknown }) => {
     const id = optionalBigIntU64(move?.id ?? selectedInvoice?.id)
@@ -5189,25 +5179,25 @@ function AccountingClientReady({
                       const params = toRunFxRevaluationParamsFromForm(formData)
                       if (!params) throw new Error(t("accounting.fxRevaluation.invalidForm"))
                       await runFxRevaluation.mutateAsync(params)
-                      toast({ title: t("accounting.fxRevaluation.runSuccess") })
+                      toast.success(t("accounting.fxRevaluation.runSuccess"))
                     }}
                     onRunFxRevaluationBatch={async (formData) => {
                       const params = toRunFxRevaluationBatchParamsFromForm(formData)
                       if (!params) throw new Error(t("accounting.fxRevaluation.invalidBatchForm"))
                       await runFxRevaluationBatch.mutateAsync(params)
-                      toast({ title: t("accounting.fxRevaluation.batchSuccess") })
+                      toast.success(t("accounting.fxRevaluation.batchSuccess"))
                     }}
                     onPostRealizedFx={async (formData) => {
                       const params = toPostRealizedFxParamsFromForm(formData)
                       if (!params) throw new Error(t("accounting.fxRevaluation.invalidRealizedForm"))
                       await postRealizedFxGainLoss.mutateAsync(params)
-                      toast({ title: t("accounting.fxRevaluation.realizedSuccess") })
+                      toast.success(t("accounting.fxRevaluation.realizedSuccess"))
                     }}
                     onCreateCurrencyRate={async (formData) => {
                       const params = toCreateCurrencyRateParamsFromForm(formData)
                       if (!params) throw new Error(t("accounting.fxRevaluation.invalidForm"))
                       await createCurrencyRate.mutateAsync(params)
-                      toast({ title: t("accounting.fxRevaluation.rateSuccess") })
+                      toast.success(t("accounting.fxRevaluation.rateSuccess"))
                     }}
                   />
                 ),
@@ -5230,13 +5220,13 @@ function AccountingClientReady({
                       const params = toUpsertPartnerCreditControlParamsFromForm(formData)
                       if (!params) throw new Error(t("accounting.creditControl.invalidForm"))
                       await upsertPartnerCreditControl.mutateAsync(params)
-                      toast({ title: t("accounting.creditControl.upsertSuccess") })
+                      toast.success(t("accounting.creditControl.upsertSuccess"))
                     }}
                     onCreateBadDebtWriteOff={async (formData) => {
                       const params = toCreateBadDebtWriteOffParamsFromForm(formData)
                       if (!params) throw new Error(t("accounting.creditControl.invalidWriteOffForm"))
                       await createBadDebtWriteOff.mutateAsync(params)
-                      toast({ title: t("accounting.creditControl.writeOffSuccess") })
+                      toast.success(t("accounting.creditControl.writeOffSuccess"))
                     }}
                   />
                 ),
@@ -5259,11 +5249,11 @@ function AccountingClientReady({
                       const params = toCreateAmortizationScheduleParamsFromForm(formData)
                       if (!params) throw new Error(t("accounting.amortization.invalidForm"))
                       await createAmortizationSchedule.mutateAsync(params)
-                      toast({ title: t("accounting.amortization.createSuccess") })
+                      toast.success(t("accounting.amortization.createSuccess"))
                     }}
                     onRecognizeLine={async ({ lineId, params }) => {
                       await recognizeAmortizationLine.mutateAsync({ lineId, params })
-                      toast({ title: t("accounting.amortization.recognizeSuccess") })
+                      toast.success(t("accounting.amortization.recognizeSuccess"))
                     }}
                   />
                 ),
@@ -6060,8 +6050,7 @@ function AccountingClientReady({
               invoiceId: BigInt(String(creditNoteSource.id)),
               params: toCreateCreditNoteParams(data),
             })
-            toast({
-              title: t("accounting.forms.createCreditNote.title"),
+            toast.success(t("accounting.forms.createCreditNote.title"), {
               description: t("accounting.forms.createCreditNote.description"),
             })
             setCreditNoteSource(null)
@@ -6137,9 +6126,7 @@ function AccountingClientReady({
             await handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           } catch (e) {
-            toast({
-              variant: "destructive",
-              title: t("common.error.title"),
+            toast.error(t("common.error.title"), {
               description: e instanceof Error ? e.message : String(e),
             })
           }

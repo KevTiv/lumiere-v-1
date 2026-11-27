@@ -15,7 +15,7 @@ export function MetricsWidget({ data }: { data: MetricsWidgetType["data"] }) {
             </div>
             <div className="h-2 bg-secondary rounded-full overflow-hidden">
               <div
-                className="h-full rounded-full transition-all duration-500"
+                className="h-full rounded-full transition-[width] duration-500"
                 style={{
                   width: `${percentage}%`,
                   backgroundColor: metric.color || "hsl(var(--primary))"

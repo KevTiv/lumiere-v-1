@@ -48,6 +48,13 @@
   --sidebar-accent-foreground: 176 60% 22%;
   --sidebar-border: 40 12% 83%;
   --sidebar-ring: 176 62% 29%;
+
+  --duration-instant: 90ms;
+  --duration-fast: 140ms;
+  --duration-base: 200ms;
+  --duration-slow: 280ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
 /* Compact tables retain control sizes and keyboard targets while reducing row whitespace. */

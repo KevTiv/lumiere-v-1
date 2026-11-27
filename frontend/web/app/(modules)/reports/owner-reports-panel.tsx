@@ -68,7 +68,7 @@ import {
   companyRowsToSelectOptions,
   type CompanyLookupRow,
 } from "@/lib/form-lookup"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import {
   createMarginSupplyDashboard,
   DEFAULT_MARGIN_SUPPLY_SCENARIO_DRAFT,
@@ -122,7 +122,6 @@ export function OwnerReportsPanel({
   defaultCompanyId,
 }: OwnerReportsPanelProps) {
   const { t } = useTranslation()
-  const { toast } = useToast()
   const catalog = useReportCatalog(organizationId)
   const preview = useReportPreview(organizationId)
   const pdf = useReportPdf()
@@ -188,24 +187,20 @@ export function OwnerReportsPanel({
 
   useEffect(() => {
     if (!preview.error) return
-    toast({
-      title: t("reports.ownerReports.previewErrorTitle"),
+    toast.error(t("reports.ownerReports.previewErrorTitle"), {
       description:
         preview.error instanceof Error
           ? preview.error.message
           : t("reports.ownerReports.previewErrorDescription"),
-      variant: "destructive",
     })
-  }, [preview.error, t, toast])
+  }, [preview.error, t])
 
   const handlePreview = async (entry: ReportCatalogEntry) => {
     setActivePreview(null)
     const companyId = Number(selectedCompanyId)
     if (!Number.isFinite(companyId) || companyId <= 0) {
-      toast({
-        title: t("reports.ownerReports.noCompanyTitle"),
+      toast.error(t("reports.ownerReports.noCompanyTitle"), {
         description: t("reports.ownerReports.noCompanyDescription"),
-        variant: "destructive",
       })
       return
     }
@@ -217,10 +212,8 @@ export function OwnerReportsPanel({
           importedScenario?.provenance ?? { source: "manual" },
         )
       } catch (cause) {
-        toast({
-          title: "Review the scenario assumptions",
+        toast.error("Review the scenario assumptions", {
           description: cause instanceof Error ? cause.message : String(cause),
-          variant: "destructive",
         })
         return
       }
@@ -255,7 +248,7 @@ export function OwnerReportsPanel({
   const handleCreateSchedule = async () => {
     const companyId = Number(selectedCompanyId)
     if (!Number.isFinite(companyId) || companyId <= 0 || !scheduledReportKey || scheduledRecipients.length === 0) {
-      toast({ title: "Choose a report and at least one active recipient", variant: "destructive" })
+      toast.error("Choose a report and at least one active recipient")
       return
     }
     if (!validScheduleTime || !schedulePreview.isSuccess) return
@@ -271,7 +264,7 @@ export function OwnerReportsPanel({
       })
       await schedules.refetch()
     } catch {
-      toast({ title: "Could not create the report schedule", variant: "destructive" })
+      toast.error("Could not create the report schedule")
     }
   }
 

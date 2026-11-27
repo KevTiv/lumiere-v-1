@@ -196,7 +196,7 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
             return (
               <Card
                 key={module.id}
-                className="cursor-pointer transition-all hover:border-primary/50"
+                className="cursor-pointer transition-[border-color,opacity] hover:border-primary/50"
                 data-testid={`form-config-module-${module.id}`}
                 onClick={() => handleModuleSelect(module.id)}
               >
@@ -251,7 +251,7 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
             return (
               <Card
                 key={form.formId}
-                className="cursor-pointer transition-all hover:border-primary/50"
+                className="cursor-pointer transition-[border-color,opacity] hover:border-primary/50"
                 data-testid={`form-config-form-${form.formId}`}
                 onClick={() => { handleFormSelect(form); setIsViewingSettings(true) }}
               >
@@ -851,7 +851,7 @@ function FieldConfigCard({
   }
 
   return (
-    <Card className={cn("transition-all", !field.isEnabled && "opacity-50")} data-testid={`form-config-field-row-${field.fieldId}`}>
+    <Card className={cn("transition-[border-color,opacity]", !field.isEnabled && "opacity-50")} data-testid={`form-config-field-row-${field.fieldId}`}>
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           <div className="mt-1 cursor-move">

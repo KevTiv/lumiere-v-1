@@ -17,6 +17,7 @@ import { phCapture } from '@/lib/posthog-browser';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { canUseModuleData, mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { nullableBigIntU64 } from '@lumiere/erp-shared/form-coercion';
 import { useTranslation } from '@lumiere/i18n';
 import { useErpSession } from '@lumiere/erp-session';
@@ -1556,7 +1557,7 @@ function SalesClientLoaded({
                 void applySaleOrderOptions
                   .mutateAsync(r.id as string | number | bigint)
                   .catch((e: unknown) => {
-                    window.alert(e instanceof Error ? e.message : String(e));
+                    toast.error(e instanceof Error ? e.message : String(e));
                   });
               }
             },
@@ -2001,17 +2002,17 @@ function SalesClientLoaded({
             view_pipeline: () => router.push('/crm'),
             create_commission_plan: () => {
               void promptCreateCommissionPlan().catch((e: unknown) => {
-                window.alert(e instanceof Error ? e.message : String(e));
+                toast.error(e instanceof Error ? e.message : String(e));
               });
             },
             create_sale_contract: () => {
               void promptCreateSaleContract().catch((e: unknown) => {
-                window.alert(e instanceof Error ? e.message : String(e));
+                toast.error(e instanceof Error ? e.message : String(e));
               });
             },
             create_integration_intent: () => {
               void promptCreateIntegrationIntent().catch((e: unknown) => {
-                window.alert(e instanceof Error ? e.message : String(e));
+                toast.error(e instanceof Error ? e.message : String(e));
               });
             },
           };

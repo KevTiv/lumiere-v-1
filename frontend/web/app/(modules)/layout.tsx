@@ -6,6 +6,7 @@ import {
   isFirstTestOrganization,
   sessionIsOrganizationAdmin,
 } from '@/lib/first-org-exposure'
+import { isWorkspaceHrefVisible } from '@lumiere/ui/lib/workspace-profile'
 import ModulesShell from './modules-shell'
 
 function normalizeCallbackPath(value: string | null) {
@@ -38,13 +39,15 @@ export default async function ModulesLayout({
     redirect('/onboarding')
   }
 
+  const pathname = headersList.get('x-lumiere-pathname')
   const firstOrgProfile = isFirstTestOrganization(session.organizationId)
   if (firstOrgProfile) {
-    const pathname = headersList.get('x-lumiere-pathname')
     if (pathname === '/overview') redirect('/accounting')
     if (!pathname || !isFirstOrgPathAdmitted(pathname, sessionIsOrganizationAdmin(session))) {
       redirect('/first-org-unavailable')
     }
+  } else if (pathname && !isWorkspaceHrefVisible('finance-alpha', pathname)) {
+    redirect('/first-org-unavailable')
   }
 
   return <ModulesShell firstOrgProfile={firstOrgProfile}>{children}</ModulesShell>

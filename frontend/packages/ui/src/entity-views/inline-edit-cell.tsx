@@ -41,12 +41,23 @@ export function InlineEditCell({ edit, row, columnKey, label, value, children }:
   if (!editing) {
     return (
       <span
-        className="block cursor-text rounded-sm hover:bg-muted/50"
-        title="Double-click to edit"
+        role="button"
+        tabIndex={0}
+        aria-label={`Edit ${label}`}
+        className="block cursor-text rounded-sm px-0.5 transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        title="Double-click or press Enter to edit"
         data-testid={`entity-inline-${columnKey}`}
         onDoubleClick={(event) => {
           event.stopPropagation()
           start()
+        }}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return
+          if (event.key === "Enter" || event.key === " " || event.key === "F2") {
+            event.preventDefault()
+            event.stopPropagation()
+            start()
+          }
         }}
       >
         {children}

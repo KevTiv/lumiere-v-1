@@ -93,12 +93,17 @@ export default async function RootLayout({
     }
   }
 
+  const themeInitScript = `(function(){try{var d=document.documentElement,s=window.localStorage;var t=s.getItem("lumiere-theme");var r=t==="light"||t==="dark"?t:(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");d.classList.remove("light","dark");d.classList.add(r);var p=s.getItem("lumiere-palette");d.dataset.palette=p==="ocean"?"ocean":"default";var sh=s.getItem("lumiere-shell");d.dataset.shell=sh==="css-art"?"css-art":"default";var dn=s.getItem("lumiere-density");d.dataset.density=dn==="compact"?"compact":"comfortable";}catch(_){}})();`
+
   return (
     <html
       lang="en"
       className={`${GeistSans.variable} ${GeistMono.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="font-sans antialiased">
         <AuthModeProvider enabled={isWorkOsEnabled()}>
         <Providers

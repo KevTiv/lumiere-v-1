@@ -41,10 +41,10 @@ export function InvoiceWorkflowGuide({ stage, isBill, amountDue, primaryAction, 
     {primaryAction?.blockedReason ? <p role="status" className="text-sm" data-testid="invoice-next-step-blocked">{primaryAction.blockedReason}</p> : null}
     {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
     <div className="flex flex-wrap items-center gap-2">
-      {error && onRefresh ? <Button variant="outline" className="min-h-11" onClick={onRefresh}>{tr("refresh", "Refresh saved record")}</Button> : null}
-      {primaryAction ? <Button className="min-h-11 h-auto whitespace-normal" disabled={!!primaryAction.blockedReason || primaryAction.pending} onClick={primaryAction.onClick} data-testid="invoice-next-step-action">{primaryAction.pending ? tr("pending", "Confirming action…") : primaryAction.label}</Button> : null}
-      {stage === "draft" ? <Button variant="outline" className="min-h-11" onClick={onReviewLines}>{tr("reviewLines", "Review line items")}</Button> : null}
-      {stage === "paid" && onViewPayments ? <Button className="min-h-11" onClick={onViewPayments}>{tr("viewPayments", "View linked payments")}</Button> : stage === "posted" || stage === "paid" ? <a href={paymentsHref} className="inline-flex min-h-11 items-center rounded-md border px-3 text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring">{stage === "paid" ? tr("viewPayments", "View linked payments") : tr("openPayments", "Open Payments")}</a> : null}
+      {error && onRefresh ? <Button variant="outline" className="pointer-coarse:min-h-11" onClick={onRefresh}>{tr("refresh", "Refresh saved record")}</Button> : null}
+      {primaryAction ? <Button className="pointer-coarse:min-h-11 h-auto whitespace-normal" disabled={!!primaryAction.blockedReason || primaryAction.pending} onClick={primaryAction.onClick} data-testid="invoice-next-step-action">{primaryAction.pending ? tr("pending", "Confirming action…") : primaryAction.label}</Button> : null}
+      {stage === "draft" ? <Button variant="outline" className="pointer-coarse:min-h-11" onClick={onReviewLines}>{tr("reviewLines", "Review line items")}</Button> : null}
+      {stage === "paid" && onViewPayments ? <Button className="pointer-coarse:min-h-11" onClick={onViewPayments}>{tr("viewPayments", "View linked payments")}</Button> : stage === "posted" || stage === "paid" ? <a href={paymentsHref} className="inline-flex pointer-coarse:min-h-11 items-center rounded-md border px-3 text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring">{stage === "paid" ? tr("viewPayments", "View linked payments") : tr("openPayments", "Open Payments")}</a> : null}
     </div>
   </section>
 }

@@ -59,14 +59,14 @@ export function CollectionsWorkspace({ invoices, scope, currencyOptions = [], da
     <ModuleDataNotice state={dataState} />
     {dataState.status === 'loading' ? <p role="status">Loading overdue invoices…</p> : null}
     {ready ? <>
-      <div className="flex flex-wrap gap-3"><Input aria-label="Search collections" placeholder="Search invoice or customer" className="min-h-11 sm:max-w-sm" value={search} onChange={(event) => setSearch(event.target.value)} /><Select
+      <div className="flex flex-wrap gap-3"><Input aria-label="Search collections" placeholder="Search invoice or customer" className="pointer-coarse:min-h-11 sm:max-w-sm" value={search} onChange={(event) => setSearch(event.target.value)} /><Select
         value={String(age ?? "")}
         onValueChange={(nextValue) => setAge(nextValue as CollectionsAge)}
       >
         {" "}
         <SelectTrigger
           aria-label="Days overdue"
-          className="min-h-11 rounded-md border bg-background px-3 text-sm"
+          className="pointer-coarse:min-h-11 rounded-md border bg-background px-3 text-sm"
         >
           <SelectValue />
         </SelectTrigger>{" "}
@@ -81,7 +81,7 @@ export function CollectionsWorkspace({ invoices, scope, currencyOptions = [], da
       <div className="flex flex-wrap gap-3" aria-label="Overdue balance by currency">{summaries.map((group) => <div key={group.key} className="rounded-lg border p-3 text-sm"><p className="text-muted-foreground">{group.label}</p><p className="mt-1 font-medium">{group.residual === null ? 'Balance unavailable' : formatInvoiceMoney(group.residual, group.currency)} outstanding</p></div>)}</div>
       <p className="text-sm text-muted-foreground">{visible.length} overdue invoice{visible.length === 1 ? '' : 's'}. Balances remain separate by currency.</p>
       {!canReview ? <p role="status" className="text-sm">Invoice and email review access is required to prepare reminders.</p> : null}
-      {visible.length === 0 ? <p className="rounded-lg border p-5 text-sm">No overdue invoices match this view.</p> : <ul className="space-y-3">{visible.map(({ invoice, daysOverdue, dueDate }) => <li key={String(invoice.id)} className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4"><div className="min-w-0"><p className="font-medium break-words">{invoice.name || `Invoice #${invoice.id}`}</p><p className="break-words text-sm text-muted-foreground">{invoice.invoicePartnerDisplayName || 'Customer unavailable'}</p><p className="mt-1 text-sm">Due {dueDate} · {daysOverdue} day{daysOverdue === 1 ? '' : 's'} overdue · {accountingListMoney(invoice.amountResidual, invoice, currencyOptions)} outstanding</p></div><Button variant="outline" className="min-h-11" disabled={!canReview} onClick={() => onReviewReminder(invoice)}>Review reminder<span className="sr-only"> for {invoice.name || `invoice ${invoice.id}`}</span></Button></li>)}</ul>}
+      {visible.length === 0 ? <p className="rounded-lg border p-5 text-sm">No overdue invoices match this view.</p> : <ul className="space-y-3">{visible.map(({ invoice, daysOverdue, dueDate }) => <li key={String(invoice.id)} className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4"><div className="min-w-0"><p className="font-medium break-words">{invoice.name || `Invoice #${invoice.id}`}</p><p className="break-words text-sm text-muted-foreground">{invoice.invoicePartnerDisplayName || 'Customer unavailable'}</p><p className="mt-1 text-sm">Due {dueDate} · {daysOverdue} day{daysOverdue === 1 ? '' : 's'} overdue · {accountingListMoney(invoice.amountResidual, invoice, currencyOptions)} outstanding</p></div><Button variant="outline" className="pointer-coarse:min-h-11" disabled={!canReview} onClick={() => onReviewReminder(invoice)}>Review reminder<span className="sr-only"> for {invoice.name || `invoice ${invoice.id}`}</span></Button></li>)}</ul>}
     </> : null}
   </section>;
 }

@@ -1,11 +1,19 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   BookOpen,
   Sparkles,
   BookMarked,
+  Clock,
+  FilePlus2,
+  Moon,
+  Plus,
+  Receipt,
+  Rows3,
+  ShoppingCart,
+  Sun,
 } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
@@ -17,6 +25,7 @@ import { RecordSearchResults, type RecordSearchSummary } from "./erp-command-pal
 import { useWorkspaceProfile } from "../lib/workspace-profile-context"
 import { isWorkspaceSurfaceVisible } from "../lib/workspace-profile"
 import { isFirstOrgSurfaceAdmitted } from "../lib/product-surface-catalog"
+import { useOptionalTheme } from "../components/theme-provider"
 import {
   Command,
   CommandDialog,
@@ -26,7 +35,45 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
+  CommandShortcut,
 } from "../components/command"
+
+const RECENT_STORAGE_KEY = "lumiere-recent-commands"
+const MAX_RECENT_ITEMS = 5
+
+interface RecentCommandItem {
+  label: string
+  href: string
+}
+
+function readRecentCommands(): RecentCommandItem[] {
+  if (typeof window === "undefined") return []
+  try {
+    const raw = window.localStorage.getItem(RECENT_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter(
+        (item): item is RecentCommandItem =>
+          item && typeof item.label === "string" && typeof item.href === "string" && item.href.startsWith("/"),
+      )
+      .slice(0, MAX_RECENT_ITEMS)
+  } catch {
+    return []
+  }
+}
+
+function pushRecentCommand(item: RecentCommandItem): RecentCommandItem[] {
+  const existing = readRecentCommands().filter((entry) => entry.href !== item.href)
+  const next = [item, ...existing].slice(0, MAX_RECENT_ITEMS)
+  try {
+    window.localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(next))
+  } catch {
+    // ignore storage failures
+  }
+  return next
+}
 
 export interface ErpCommandPaletteProps {
   open?: boolean
@@ -54,8 +101,11 @@ export function ErpCommandPalette({
   const [internalOpen, setOpenState] = useState(false)
   const open = controlledOpen ?? internalOpen
   const [search, setSearch] = useState("")
+  const deferredSearch = useDeferredValue(search)
+  const [recentItems, setRecentItems] = useState<RecentCommandItem[]>([])
   const [recordSummary, setRecordSummary] = useState<RecordSearchSummary | null>(null)
   const { organizationId } = useErpSession()
+  const themeCtx = useOptionalTheme()
   const setOpen = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
     const value = typeof next === "function" ? next(open) : next
     setOpenState(value)
@@ -67,6 +117,11 @@ export function ErpCommandPalette({
   const router = useRouter()
   const { checkPermission, isAdmin } = useRBAC()
   const { t } = useTranslation()
+
+  // Load recent items when palette opens.
+  useEffect(() => {
+    if (open) setRecentItems(readRecentCommands())
+  }, [open])
 
   const workspaceProfile = useWorkspaceProfile()
   const userIsAdmin = isAdmin()
@@ -92,10 +147,9 @@ export function ErpCommandPalette({
     [checkPermission, navGroups],
   )
 
-  // Record reads start only while the palette is open and the query is long enough, and only
-  // for modules the user can read (the same gate as the module list above).
+  // Record reads start only while the palette is open and the query is long enough.
   const recordSearchActive =
-    open && organizationId != null && organizationId > 0 && isRecordSearchQuery(search)
+    open && organizationId != null && organizationId > 0 && isRecordSearchQuery(deferredSearch)
   const allowedResourceKey = accessibleNavGroups
     .flatMap((group) => group.items.map((item) => item.resource))
     .sort()
@@ -125,7 +179,10 @@ export function ErpCommandPalette({
   }, [setOpen])
 
   const navigate = useCallback(
-    (href: string) => {
+    (href: string, label?: string) => {
+      if (label) {
+        setRecentItems(pushRecentCommand({ label, href }))
+      }
       setOpen(false)
       router.push(href)
     },
@@ -134,7 +191,7 @@ export function ErpCommandPalette({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "k" && (event.metaKey || event.ctrlKey)) {
+      if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
         event.preventDefault()
         setOpen((prev) => !prev)
       }
@@ -148,6 +205,23 @@ export function ErpCommandPalette({
   const visibleNotebook = quickActionIsVisible("notebook") ? onOpenNotebook : undefined
   const visibleJournal = quickActionIsVisible("journal") ? onOpenJournal : undefined
   const hasQuickActions = visibleAiChat || visibleNotebook || visibleJournal
+
+  const quickCreates = useMemo(() => {
+    const items: Array<{ label: string; href: string; keywords: string; icon: typeof Plus }> = []
+    if (allowedSurfaceIds.has("accounting") && checkPermission("module:accounting", "create").allowed) {
+      items.push(
+        { label: t("commandPalette.quickCreate.invoice", { defaultValue: "New customer invoice" }), href: "/accounting?tab=invoices&create=1", keywords: "create invoice ar billing", icon: FilePlus2 },
+        { label: t("commandPalette.quickCreate.bill", { defaultValue: "New vendor bill" }), href: "/accounting?tab=bills&create=1", keywords: "create bill ap payable", icon: FilePlus2 },
+      )
+    }
+    if (allowedSurfaceIds.has("expenses") && checkPermission("module:expenses", "create").allowed) {
+      items.push({ label: t("commandPalette.quickCreate.expense", { defaultValue: "New expense" }), href: "/expenses?tab=expenses&create=1", keywords: "create expense receipt spend", icon: Receipt })
+    }
+    if (allowedSurfaceIds.has("sales") && checkPermission("module:sales", "create").allowed) {
+      items.push({ label: t("commandPalette.quickCreate.salesOrder", { defaultValue: "New sales order" }), href: "/sales?tab=orders&create=1", keywords: "create quote order sales", icon: ShoppingCart })
+    }
+    return items
+  }, [allowedSurfaceIds, checkPermission, t])
 
   return (
     <CommandDialog
@@ -166,14 +240,32 @@ export function ErpCommandPalette({
         <CommandList>
           {showEmpty ? <CommandEmpty>No results found.</CommandEmpty> : null}
 
+          {!search.trim() && recentItems.length > 0 ? (
+            <>
+              <CommandGroup heading={t("commandPalette.recent.heading", { defaultValue: "Recent" })}>
+                {recentItems.map((item) => (
+                  <CommandItem
+                    key={item.href}
+                    value={`recent ${item.label} ${item.href}`}
+                    onSelect={() => navigate(item.href, item.label)}
+                  >
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    {item.label}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+              <CommandSeparator />
+            </>
+          ) : null}
+
           {recordSearchActive && organizationId != null ? (
             <RecordSearchResults
               organizationId={BigInt(organizationId)}
-              query={search}
+              query={deferredSearch}
               allowedResources={allowedResources}
               allowedSurfaceIds={allowedSurfaceIds}
               recordHref={resolveRecordHref}
-              onNavigate={navigate}
+              onNavigate={(href) => navigate(href)}
               onSummary={setRecordSummary}
             />
           ) : null}
@@ -186,7 +278,7 @@ export function ErpCommandPalette({
                   <CommandItem
                     key={item.href}
                     value={`${item.label} ${item.href} ${item.keywords}`}
-                    onSelect={() => navigate(item.href)}
+                    onSelect={() => navigate(item.href, item.label)}
                   >
                     <Icon className="h-4 w-4" />
                     {item.label}
@@ -194,6 +286,27 @@ export function ErpCommandPalette({
                 )
               })}
             </CommandGroup>
+          ) : null}
+
+          {quickCreates.length > 0 ? (
+            <>
+              <CommandGroup heading={t("commandPalette.quickCreate.heading", { defaultValue: "Quick Create" })}>
+                {quickCreates.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <CommandItem
+                      key={item.href}
+                      value={`${item.label} ${item.keywords}`}
+                      onSelect={() => navigate(item.href, item.label)}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </CommandItem>
+                  )
+                })}
+              </CommandGroup>
+              <CommandSeparator />
+            </>
           ) : null}
 
           {hasQuickActions ? (
@@ -242,7 +355,7 @@ export function ErpCommandPalette({
                   <CommandItem
                     key={item.href}
                     value={`${item.label} ${item.href}`}
-                    onSelect={() => navigate(item.href)}
+                    onSelect={() => navigate(item.href, item.label)}
                   >
                     <Icon className="h-4 w-4" />
                     {item.label}
@@ -251,6 +364,34 @@ export function ErpCommandPalette({
               })}
             </CommandGroup>
           ))}
+
+          {themeCtx ? (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading={t("commandPalette.preferences.heading", { defaultValue: "Preferences" })}>
+                <CommandItem
+                  value="toggle theme dark mode light mode appearance"
+                  onSelect={() => runAction(() => themeCtx.setTheme(themeCtx.resolvedTheme === "dark" ? "light" : "dark"))}
+                >
+                  {themeCtx.resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  {themeCtx.resolvedTheme === "dark"
+                    ? t("commandPalette.preferences.lightMode", { defaultValue: "Switch to light mode" })
+                    : t("commandPalette.preferences.darkMode", { defaultValue: "Switch to dark mode" })}
+                  <CommandShortcut>{themeCtx.resolvedTheme === "dark" ? "Light" : "Dark"}</CommandShortcut>
+                </CommandItem>
+                <CommandItem
+                  value="toggle density compact comfortable table spacing"
+                  onSelect={() => runAction(() => themeCtx.setDensity(themeCtx.density === "compact" ? "comfortable" : "compact"))}
+                >
+                  <Rows3 className="h-4 w-4" />
+                  {themeCtx.density === "compact"
+                    ? t("commandPalette.preferences.comfortableDensity", { defaultValue: "Switch to comfortable density" })
+                    : t("commandPalette.preferences.compactDensity", { defaultValue: "Switch to compact density" })}
+                  <CommandShortcut>{themeCtx.density === "compact" ? "Comfortable" : "Compact"}</CommandShortcut>
+                </CommandItem>
+              </CommandGroup>
+            </>
+          ) : null}
         </CommandList>
       </Command>
     </CommandDialog>

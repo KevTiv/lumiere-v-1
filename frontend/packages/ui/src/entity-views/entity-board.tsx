@@ -92,7 +92,7 @@ export function EntityBoardView({
                       }
                       className={cn(
                         "bg-card border border-border rounded-lg p-3",
-                        open && "cursor-pointer hover:border-primary/50 hover:shadow-md transition-all",
+                        open && "cursor-pointer hover:border-primary/50 hover:shadow-md transition-[border-color,box-shadow] duration-150",
                       )}
                     >
                       <EntityBoardCard row={row} card={config.card} />

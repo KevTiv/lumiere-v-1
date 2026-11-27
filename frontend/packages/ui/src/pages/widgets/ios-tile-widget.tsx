@@ -53,7 +53,7 @@ function RingProgress({
         strokeLinecap="round"
         strokeDasharray={circumference}
         strokeDashoffset={offset}
-        className={cn("transition-all duration-500", color)}
+        className={cn("transition-colors duration-500", color)}
       />
     </svg>
   )
@@ -81,7 +81,7 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         points={points}
-        className={cn("transition-all duration-300", color)}
+        className={cn("transition-colors duration-300", color)}
       />
     </svg>
   )

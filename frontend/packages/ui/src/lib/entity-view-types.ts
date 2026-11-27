@@ -98,6 +98,14 @@ export interface EntityColumn extends EntityPermissioned {
   sensitive?: boolean
   /** Override rendering entirely */
   render?: (value: unknown, row: EntityRow) => ReactNode
+  /** Optional contextual explanation popover rendered next to the column header label. */
+  help?:
+    | string
+    | {
+        title?: string
+        description: string
+        formula?: string
+      }
   /** Makes the cell editable in place (double-click). The caller owns the write. */
   inlineEdit?: EntityInlineEdit
 }

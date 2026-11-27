@@ -10,7 +10,7 @@ import {
   useProfitLossLines,
 } from "@lumiere/query-hooks/hooks/bff-company-rows"
 import { statementKindForReportType, type StatementKind } from "@lumiere/query-hooks/hooks/read-ui-rows"
-import { Button, downloadCsv, resolveCurrencyCode, rowsToCsv } from "@lumiere/ui"
+import { Button, ReportContextBar, downloadCsv, resolveCurrencyCode, rowsToCsv } from "@lumiere/ui"
 import { ChevronDown, ChevronRight, FileSpreadsheet, Printer } from "lucide-react"
 import {
   Table,
@@ -197,9 +197,41 @@ export function StatementsPanel({ organizationId, financialReports, hideSelector
       </div>
 
       {selected ? (
-        <h2 className="hidden text-lg font-semibold print:block">
-          {typeof selected.row.name === "string" && selected.row.name !== "" ? selected.row.name : `#${selected.id}`}
-        </h2>
+        <>
+          <h2 className="hidden text-lg font-semibold print:block">
+            {typeof selected.row.name === "string" && selected.row.name !== "" ? selected.row.name : `#${selected.id}`}
+          </h2>
+          <ReportContextBar
+            className="print:hidden"
+            period={(() => {
+              const from = selected.row.dateFrom ?? selected.row.date_from
+              const to = selected.row.dateTo ?? selected.row.date_to
+              if (typeof from === "string" && typeof to === "string" && from && to) return `${from} – ${to}`
+              if (typeof to === "string" && to) return `As of ${to}`
+              return null
+            })()}
+            currency={currency}
+            basis={(() => {
+              const raw = selected.row.targetMove ?? selected.row.target_move
+              const normalized = typeof raw === "string" ? raw.toLowerCase() : ""
+              if (normalized.includes("all")) return t("reports.statements.basisAll", { defaultValue: "Posted & draft entries" })
+              return t("reports.statements.basisPosted", { defaultValue: "Posted entries only" })
+            })()}
+            basisExplanation={t("reports.statements.basisExplanation", {
+              defaultValue:
+                "Figures are aggregated from the saved statement lines for this report scope. Click any account line to inspect its underlying journal items.",
+            })}
+            readiness={
+              query.isLoading
+                ? undefined
+                : query.isError
+                  ? { tone: "blocked", label: t("reports.statements.statusError", { defaultValue: "Load failed" }) }
+                  : rows.length > 0
+                    ? { tone: "ready", label: t("reports.statements.statusReady", { defaultValue: `${rows.length} lines` }) }
+                    : { tone: "partial", label: t("reports.statements.statusEmpty", { defaultValue: "No lines" }) }
+            }
+          />
+        </>
       ) : null}
 
       {query.isLoading ? (
@@ -252,6 +284,13 @@ export function StatementsPanel({ organizationId, financialReports, hideSelector
                 const bold = r.kind !== "line"
                 const variance = statementVariance(r)
                 const isCollapsed = r.kind === "section" && collapsed.has(r.key)
+                const invertPolarity = /\b(expense|expenses|cost|costs|cogs|overhead|liability|liabilities|payable|tax|depreciation)\b/i.test(r.label)
+                const varianceToneClass =
+                  !variance || variance.amount === 0
+                    ? ""
+                    : (invertPolarity ? variance.amount < 0 : variance.amount > 0)
+                      ? "text-emerald-700 dark:text-emerald-400"
+                      : "text-destructive"
                 return (
                   <TableRow
                     key={r.key}
@@ -297,10 +336,10 @@ export function StatementsPanel({ organizationId, financialReports, hideSelector
                         <TableCell className={`text-right tabular-nums ${bold ? "font-semibold" : ""}`}>
                           {r.comparisonAmount == null ? "" : formatStatementAmount(r.comparisonAmount, locale, currency)}
                         </TableCell>
-                        <TableCell className={`text-right tabular-nums ${bold ? "font-semibold" : ""} ${variance && variance.amount < 0 ? "text-destructive" : ""}`}>
+                        <TableCell className={`text-right tabular-nums ${bold ? "font-semibold" : ""} ${varianceToneClass}`}>
                           {variance ? formatStatementAmount(variance.amount, locale, currency) : ""}
                         </TableCell>
-                        <TableCell className={`text-right tabular-nums ${bold ? "font-semibold" : ""} ${variance?.percent != null && variance.percent < 0 ? "text-destructive" : ""}`}>
+                        <TableCell className={`text-right tabular-nums ${bold ? "font-semibold" : ""} ${varianceToneClass}`}>
                           {variance ? formatStatementPercent(variance.percent, locale) : ""}
                         </TableCell>
                       </>

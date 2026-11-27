@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import type { ModuleDataState } from '@lumiere/ui/lib/module-data-state'
 import { useErpSession } from '@lumiere/erp-session'
 import { useTranslation } from '@lumiere/i18n'
@@ -202,6 +204,7 @@ export function SalesOpsPanel({
   onOpenReturns,
 }: SalesOpsPanelProps) {
   const { t } = useTranslation()
+  const router = useRouter()
   const { organizationId, identity } = useErpSession()
   const orgId =
     organizationId != null && organizationId > 0 ? organizationId : 0
@@ -627,9 +630,7 @@ export function SalesOpsPanel({
                       const msg =
                         e instanceof Error ? e.message : String(e)
                       setActionError(msg)
-                      if (typeof window !== 'undefined') {
-                        window.alert(msg)
-                      }
+                      toast.error(msg)
                     }
                   })()
                 }}
@@ -694,9 +695,7 @@ export function SalesOpsPanel({
                       const msg =
                         e instanceof Error ? e.message : String(e)
                       setActionError(msg)
-                      if (typeof window !== 'undefined') {
-                        window.alert(msg)
-                      }
+                      toast.error(msg)
                     }
                   })()
                 }}
@@ -709,8 +708,8 @@ export function SalesOpsPanel({
                 data-testid="sales-ops-open-approvals"
                 disabled={!approvalResolution.task}
                 onClick={() => {
-                  if (typeof window !== 'undefined' && approvalResolution.task) {
-                    window.location.href = approvalResolution.task.href
+                  if (approvalResolution.task) {
+                    router.push(approvalResolution.task.href)
                   }
                 }}
               >

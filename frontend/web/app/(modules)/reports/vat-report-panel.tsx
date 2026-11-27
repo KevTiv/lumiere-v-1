@@ -18,7 +18,7 @@ import {
 import type { EntityTableConfig } from "@lumiere/ui"
 import { Archive, FileDown, FileSpreadsheet, PlayCircle } from "lucide-react"
 import { reportStateTag } from "@/lib/reports-create-params"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import { currencyOptionsFromRows } from "@/lib/form-lookup"
 import type { PeriodReportContext } from "@lumiere/ui/lib/period-report-context"
 import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state"
@@ -73,7 +73,6 @@ function mutationErrorMessage(error: unknown, fallback: string): string {
 
 export function VatReportPanel({ organizationId, companyId, financialReports, periodContext, sourceState }: VatReportPanelProps) {
   const { t } = useTranslation()
-  const { toast } = useToast()
   const generateEuVatReport = useGenerateEuVatReport(organizationId, companyId)
   const exportFinancialReport = useExportFinancialReport(organizationId, companyId)
   const archiveFinancialReport = useArchiveFinancialReport(organizationId, companyId)
@@ -129,9 +128,7 @@ export function VatReportPanel({ organizationId, companyId, financialReports, pe
           onClick: (rows) => {
             for (const r of rows) {
               if (!vatRowIsExportable(r)) {
-                toast({
-                  variant: "destructive",
-                  title: t("reports.vat.errors.exportBlocked"),
+                toast.error(t("reports.vat.errors.exportBlocked"), {
                   description: t("reports.vat.errors.exportRequiresGenerated"),
                 })
                 continue
@@ -142,9 +139,7 @@ export function VatReportPanel({ organizationId, companyId, financialReports, pe
                   exportFormat: "pdf",
                 })
                 .catch((e) => {
-                  toast({
-                    variant: "destructive",
-                    title: t("reports.vat.errors.exportFailed"),
+                  toast.error(t("reports.vat.errors.exportFailed"), {
                     description: mutationErrorMessage(e, t("common.error.generic")),
                   })
                 })
@@ -161,9 +156,7 @@ export function VatReportPanel({ organizationId, companyId, financialReports, pe
           onClick: (rows) => {
             for (const r of rows) {
               if (!vatRowIsExportable(r)) {
-                toast({
-                  variant: "destructive",
-                  title: t("reports.vat.errors.exportBlocked"),
+                toast.error(t("reports.vat.errors.exportBlocked"), {
                   description: t("reports.vat.errors.exportRequiresGenerated"),
                 })
                 continue
@@ -174,9 +167,7 @@ export function VatReportPanel({ organizationId, companyId, financialReports, pe
                   exportFormat: "xlsx",
                 })
                 .catch((e) => {
-                  toast({
-                    variant: "destructive",
-                    title: t("reports.vat.errors.exportFailed"),
+                  toast.error(t("reports.vat.errors.exportFailed"), {
                     description: mutationErrorMessage(e, t("common.error.generic")),
                   })
                 })
@@ -194,17 +185,13 @@ export function VatReportPanel({ organizationId, companyId, financialReports, pe
             for (const r of rows) {
               const st = reportStateTag(r.state)
               if (st === "archived") {
-                toast({
-                  variant: "destructive",
-                  title: t("reports.vat.errors.archiveBlocked"),
+                toast.error(t("reports.vat.errors.archiveBlocked"), {
                   description: t("reports.vat.errors.alreadyArchived"),
                 })
                 continue
               }
               if (!vatRowIsArchivable(r)) {
-                toast({
-                  variant: "destructive",
-                  title: t("reports.vat.errors.archiveBlocked"),
+                toast.error(t("reports.vat.errors.archiveBlocked"), {
                   description: t("reports.vat.errors.archiveRequiresExported"),
                 })
                 continue
@@ -212,9 +199,7 @@ export function VatReportPanel({ organizationId, companyId, financialReports, pe
               void archiveFinancialReport
                 .mutateAsync(r.id as string | number | bigint)
                 .catch((e) => {
-                  toast({
-                    variant: "destructive",
-                    title: t("reports.vat.errors.archiveFailed"),
+                  toast.error(t("reports.vat.errors.archiveFailed"), {
                     description: mutationErrorMessage(e, t("common.error.generic")),
                   })
                 })
@@ -223,7 +208,7 @@ export function VatReportPanel({ organizationId, companyId, financialReports, pe
         },
       ],
     }
-  }, [t, exportFinancialReport, archiveFinancialReport, toast])
+  }, [t, exportFinancialReport, archiveFinancialReport])
 
   return (
     <div className="space-y-6 p-4">
@@ -277,9 +262,7 @@ export function VatReportPanel({ organizationId, companyId, financialReports, pe
               locale,
             })
             .catch((e) => {
-              toast({
-                variant: "destructive",
-                title: t("reports.vat.errors.generateFailed"),
+              toast.error(t("reports.vat.errors.generateFailed"), {
                 description: mutationErrorMessage(e, t("common.error.generic")),
               })
             })

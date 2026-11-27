@@ -52,6 +52,8 @@ import { Checkbox } from "../components/checkbox"
 import { showWorkflowToast } from "../lib/workflow-toast"
 import { commitRecordListFor, rememberRecordList } from "../lib/record-list-context"
 import { TooltipProvider } from "../components/tooltip"
+import { ExplainPopover } from "../components/contextual-help"
+import { Kbd } from "../components/kbd"
 import { Search, ArrowUp, ArrowDown, ArrowUpDown, Bookmark, Columns3, FileDown, Trash2, X, Inbox, SearchX, Loader2, MoreHorizontal } from "lucide-react"
 import {
   DropdownMenu,
@@ -163,10 +165,35 @@ export function EntityTable({
   const currencyFormat = useCurrencyFormat()
   const { checkPermission } = useRBAC()
   const [search, setSearch] = useState("")
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [persistedFilters, setPersistedFilters] = useState<Record<string, string>>({})
   const [loadedListViewKey, setLoadedListViewKey] = useState<string | null>(null)
   const [pendingActionIds, setPendingActionIds] = useState<ReadonlySet<string>>(new Set())
   const [pageSize, setPageSize] = useState<number>(PAGE_SIZE)
+
+  useEffect(() => {
+    if (!config.searchable) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+      if (searchInputRef.current) {
+        event.preventDefault()
+        searchInputRef.current.focus()
+        searchInputRef.current.select()
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [config.searchable])
   const persistedFilterKeys = useMemo(
     () => new Set(config.filters?.map((filter) => filter.key) ?? []),
     [config.filters],
@@ -644,14 +671,32 @@ export function EntityTable({
             {config.searchable && (
               <ListToolbarField label={t("common.search", { defaultValue: "Search" })}>
                 <div className="relative min-w-0">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  aria-label="Search records"
-                  placeholder={config.searchPlaceholder ?? "Search…"}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="min-h-11 pl-9"
-                />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    ref={searchInputRef}
+                    aria-label="Search records"
+                    placeholder={config.searchPlaceholder ?? "Search…"}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pointer-coarse:min-h-11 pl-9 pr-8"
+                  />
+                  {search ? (
+                    <button
+                      type="button"
+                      aria-label={t("common.clearSearch", { defaultValue: "Clear search" })}
+                      onClick={() => {
+                        setSearch("")
+                        searchInputRef.current?.focus()
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  ) : (
+                    <Kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 sm:inline-flex">
+                      /
+                    </Kbd>
+                  )}
                 </div>
               </ListToolbarField>
             )}
@@ -975,6 +1020,13 @@ export function EntityTable({
                     col.label
                   )
 
+                  const helpConfig =
+                    typeof col.help === "string"
+                      ? { title: col.label, description: col.help }
+                      : col.help
+                        ? { title: col.help.title || col.label, ...col.help }
+                        : null
+
                   return (
                     <TableHead
                       key={col.key}
@@ -990,7 +1042,33 @@ export function EntityTable({
                         col.sortable && "select-none",
                       )}
                     >
-                      {col.sortable ? (
+                      {helpConfig ? (
+                        <div
+                          className={cn(
+                            "inline-flex max-w-full items-center gap-1",
+                            col.align === "right" && "ml-auto justify-end",
+                            col.align === "center" && "mx-auto justify-center",
+                          )}
+                        >
+                          {col.sortable ? (
+                            <button
+                              type="button"
+                              className="inline-flex max-w-full items-center font-medium [&>svg]:shrink-0"
+                              onClick={() => handleSort(col.key, col.sortable)}
+                            >
+                              {label}
+                              {getSortIcon(col.key, col.sortable)}
+                            </button>
+                          ) : (
+                            label
+                          )}
+                          <ExplainPopover
+                            title={helpConfig.title}
+                            description={helpConfig.description}
+                            formula={helpConfig.formula}
+                          />
+                        </div>
+                      ) : col.sortable ? (
                         <button
                           type="button"
                           className={cn(

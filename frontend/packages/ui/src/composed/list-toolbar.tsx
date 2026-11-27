@@ -10,7 +10,7 @@ import { workspaceStyles } from "../lib/workspace-styles"
 
 /** Presentation only: lists retain their own filtering, selection and persistence. */
 export function ListToolbar({ className, ...props }: Omit<ComponentProps<typeof Collapsible>, "className"> & { className?: string }) {
-  return <Collapsible className={cn("flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-3 shadow-xs [overflow-wrap:anywhere] [&_button]:min-h-11 [&_input]:min-h-11", className)} {...props} />
+  return <Collapsible className={cn("flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-3 shadow-xs [overflow-wrap:anywhere] [&_button]:pointer-coarse:min-h-11 [&_input]:pointer-coarse:min-h-11", className)} {...props} />
 }
 
 export function ListToolbarFields({ className, ...props }: ComponentProps<"div">) {
@@ -30,7 +30,7 @@ export function ListToolbarActions({ className, ...props }: ComponentProps<"div"
 
 export function ListToolbarSettingsTrigger() {
   const { t } = useTranslation()
-  return <CollapsibleTrigger render={<Button variant="outline" className="min-h-11 max-w-full whitespace-normal" />}>
+  return <CollapsibleTrigger render={<Button variant="outline" className="pointer-coarse:min-h-11 max-w-full whitespace-normal" />}>
     {t("common.listToolbar.viewSettings", { defaultValue: "View settings" })}
     <ChevronDown data-icon="inline-end" aria-hidden />
   </CollapsibleTrigger>
