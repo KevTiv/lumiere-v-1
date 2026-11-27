@@ -99,8 +99,19 @@ function optionalNumber(value?: number) {
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
+interface FleetServiceTypeReadbackRow {
+  id?: unknown
+  name?: unknown
+  organizationId?: unknown
+  organization_id?: unknown
+  companyId?: unknown
+  company_id?: unknown
+  isActive?: unknown
+  is_active?: unknown
+}
+
 export function resolveFleetServiceTypeEffect(
-  rows: readonly Record<string, unknown>[],
+  rows: readonly FleetServiceTypeReadbackRow[],
   organizationId: bigint,
   companyId: bigint,
   name: string,

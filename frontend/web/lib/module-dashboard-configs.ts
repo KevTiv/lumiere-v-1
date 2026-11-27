@@ -836,6 +836,7 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newPricelistForm(t),
       createLabel: "New Pricelist",
       createAction: "createPricelist",
+      createPermission: { resource: "pricelist", action: "create" },
     },
     {
       id: "pricelist-items",
