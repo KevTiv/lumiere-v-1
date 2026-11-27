@@ -1,4 +1,4 @@
-import { quotationPricelistSetupHref, usableQuotationPricelists } from "@/lib/first-sale-readiness"
+import { quotationPricelistSetupHref, usableQuotationPricelists, type QuotationCurrencyRow, type QuotationPricelistRow } from "@/lib/first-sale-readiness"
 import { companyWarehouseOptions } from "@/lib/warehouse-choice"
 import { onboardingFiscalYearEnd } from "@/lib/onboarding-config"
 import { decodeQueryListResponse } from "@lumiere/api-client"
@@ -160,13 +160,12 @@ export function activationWarehouseState(input: {
   return input.warehouses.isFetching ? "loading" : "missing"
 }
 
-type ActivationPriceRow = Readonly<Record<string, unknown>>
-type ActivationPricelistRead = ActivationRead<ActivationPriceRow> & { isFetching?: boolean }
+type ActivationPriceRead<Row> = ActivationRead<Row> & { isFetching?: boolean }
 
-export function decodeActivationPricelists(payload: unknown): ActivationPriceRow[] {
+export function decodeActivationPricelists(payload: unknown): QuotationPricelistRow[] {
   return decodeQueryListResponse(payload, (row) => {
     if (!row || typeof row !== "object" || Array.isArray(row)) throw new Error("Invalid price list row")
-    return row as ActivationPriceRow
+    return row as QuotationPricelistRow
   })
 }
 
@@ -174,8 +173,8 @@ export function activationPricelistState(input: {
   organizationId: Id
   companyId: Id | null
   companyState: ActivationCheckState
-  pricelists?: ActivationPricelistRead
-  currencies?: ActivationPricelistRead
+  pricelists?: ActivationPriceRead<QuotationPricelistRow>
+  currencies?: ActivationPriceRead<QuotationCurrencyRow>
 }): ActivationCheckState {
   if (input.companyState !== "ready") return input.companyState === "missing" ? "unavailable" : input.companyState
   const { pricelists, currencies } = input
@@ -186,7 +185,7 @@ export function activationPricelistState(input: {
   if (!organizationId || !companyId || !pricelists.data || !currencies.data) return "unavailable"
 
   // A masked or malformed projection cannot prove setup is missing.
-  const valid: ActivationPriceRow[] = []
+  const valid: QuotationPricelistRow[] = []
   let masked = false
   for (const row of pricelists.data) {
     const organization = parseStrictU64(row.organizationId ?? row.organization_id)
