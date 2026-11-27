@@ -1400,7 +1400,7 @@ function ModulesContent({
         onSignOut={performSignOut}
         userProfile={currentUserProfile.data}
         headerTools={<>{firstOrgProfile && <RealtimeStatus />}<ModuleActivity /></>}
-        notifications={orgReady ? <HeaderNotificationBell organizationId={orgId} /> : null}
+        notifications={orgReady && messagesVisible ? <HeaderNotificationBell organizationId={orgId} /> : null}
         sidebar={(collapsed) => (
           <DashboardSidebar
             firstOrgProfile={firstOrgProfile}
