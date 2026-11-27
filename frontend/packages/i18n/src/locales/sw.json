@@ -4552,6 +4552,17 @@
     }
   },
   "settings": {
+    "importTask": {
+      "start": "Anza uingizaji unaohifadhiwa",
+      "startHint": "Hifadhi faili asili za CSV au Excel, kisha uchague ukaguzi au maandalizi ya uingizaji. Unaweza kuendelea na kazi hiyo kwenye kifaa chochote.",
+      "chooseFiles": "Chagua faili za chanzo",
+      "uploadLimits": "Hadi faili 20, MB 5 kila moja na MB 20 kwa jumla. Faili asili hubaki kwenye kazi iliyohifadhiwa.",
+      "saving": "Inahifadhi faili au kuthibitisha risiti iliyohifadhiwa…",
+      "shortcuts": "Njia za mkato za uingizaji data",
+      "startShortcut": "Anza uingizaji",
+      "continueShortcut": "Endelea na uingizaji uliohifadhiwa",
+      "guidedShortcut": "Uingizaji unaoongozwa na ukaguzi"
+    },
     "importWorkflow": {
       "pendingSourceTitle": "Safu za chanzo zinazohitaji ukaguzi",
       "openPendingSource": "{{title}} · kagua safu ambazo hazijatatuliwa ({{rows}})",

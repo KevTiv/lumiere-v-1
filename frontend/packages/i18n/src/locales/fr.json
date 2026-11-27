@@ -4620,6 +4620,15 @@
       "decisionActor": "Révision {{revision}} · {{actor}}"
     },
     "importTask": {
+      "start": "Démarrer un import enregistré",
+      "startHint": "Enregistrez vos fichiers CSV ou Excel d’origine, puis choisissez de les inspecter ou de préparer l’import. Vous pouvez reprendre la même tâche sur n’importe quel appareil.",
+      "chooseFiles": "Choisir les fichiers sources",
+      "uploadLimits": "Jusqu’à 20 fichiers, 5 Mo chacun et 20 Mo au total. Les fichiers d’origine restent associés à la tâche.",
+      "saving": "Enregistrement des fichiers ou vérification du reçu…",
+      "shortcuts": "Raccourcis d’import de données",
+      "startShortcut": "Démarrer un import",
+      "continueShortcut": "Reprendre un import enregistré",
+      "guidedShortcut": "Import guidé et révision",
       "progressVerifiedRecordCounts": "{{records}} enregistrements historiques vérifiés · {{drafts}} brouillons vérifiés affichés · {{receipts}} reçus d’import",
       "cardSourceCounts": "{{total}} lignes sources · {{ready}} confirmées · {{held}} à décider · {{excluded}} exclues",
       "cardReviewPreview": "Examiner l’aperçu ERP",
