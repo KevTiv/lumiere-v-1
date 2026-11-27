@@ -3,293 +3,783 @@
     "id": "sale_order",
     "module": "sales",
     "entryPoints": [
-      {"surface": "sales", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/sales/sales-client.tsx", "marker": "setCsvKind('order')"},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"sale_order\""}
+      {
+        "surface": "sales",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/sales/sales-client.tsx",
+        "marker": "setCsvKind('order')"
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"sale_order\""
+      }
     ],
-    "native": {"kind": "csv", "target": "sale_order", "scope": "company"},
-    "savedTask": {"state": "evidence_only", "capability": "sales_history", "reason": "Historical prices, references and order dependencies are not resolved by a saved-task adapter.", "recovery": "Use the native Sales import for a reviewed CSV."},
+    "native": {
+      "kind": "csv",
+      "target": "sale_order",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "sales_history",
+      "reason": "Historical prices, references and order dependencies are not resolved by a saved-task adapter.",
+      "recovery": "Use the native Sales import for a reviewed CSV."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"sale_order\""},
-      {"path": "frontend/web/app/(modules)/sales/sales-client.tsx", "marker": "importBundle={SALE_ORDER_IMPORT_BUNDLE}"},
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"sales_history\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"sale_order\""
+      },
+      {
+        "path": "frontend/web/app/(modules)/sales/sales-client.tsx",
+        "marker": "importBundle={SALE_ORDER_IMPORT_BUNDLE}"
+      },
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"sales_history\""
+      }
     ]
   },
   {
     "id": "sale_order_line",
     "module": "sales",
     "entryPoints": [
-      {"surface": "sales", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/sales/sales-client.tsx", "marker": "setCsvKind('orderLine')"},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"sale_order_line\""}
+      {
+        "surface": "sales",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/sales/sales-client.tsx",
+        "marker": "setCsvKind('orderLine')"
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"sale_order_line\""
+      }
     ],
-    "native": {"kind": "csv", "target": "sale_order_line", "scope": "company"},
-    "savedTask": {"state": "evidence_only", "capability": "sales_history", "reason": "Historical prices, references and order dependencies are not resolved by a saved-task adapter.", "recovery": "Use the native Sales import for a reviewed CSV."},
+    "native": {
+      "kind": "csv",
+      "target": "sale_order_line",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "sales_history",
+      "reason": "Historical prices, references and order dependencies are not resolved by a saved-task adapter.",
+      "recovery": "Use the native Sales import for a reviewed CSV."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"sale_order_line\""},
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"sales_history\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"sale_order_line\""
+      },
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"sales_history\""
+      }
     ]
   },
   {
     "id": "customer_sales_backfill",
     "module": "sales",
     "entryPoints": [
-      {"surface": "sales", "format": "saved_task", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/sales/sales-client.tsx", "marker": "moduleBackfillTabs.sales"}
+      {
+        "surface": "sales",
+        "format": "saved_task",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/sales/sales-client.tsx",
+        "marker": "moduleBackfillTabs.sales"
+      }
     ],
-    "native": {"kind": "specialized", "scope": "company", "anchor": {"path": "api-server/src/routes/import_reviews/mod.rs", "marker": "\"/import-reviews/:id/module-backfill\""}},
-    "savedTask": {"state": "reviewed_records", "capability": "customer_sales_backfill"},
+    "native": {
+      "kind": "specialized",
+      "scope": "company",
+      "anchor": {
+        "path": "api-server/src/routes/import_reviews/mod.rs",
+        "marker": "\"/import-reviews/:id/module-backfill\""
+      }
+    },
+    "savedTask": {
+      "state": "reviewed_records",
+      "capability": "customer_sales_backfill"
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"customer_sales_backfill\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"customer_sales_backfill\""
+      }
     ]
   },
   {
     "id": "shop_sales_backfill",
     "module": "sales",
     "entryPoints": [
-      {"surface": "sales", "format": "saved_task", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/sales/sales-client.tsx", "marker": "moduleBackfillTabs.shop_sales"}
+      {
+        "surface": "sales",
+        "format": "saved_task",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/sales/sales-client.tsx",
+        "marker": "moduleBackfillTabs.shop_sales"
+      }
     ],
-    "native": {"kind": "specialized", "scope": "company", "anchor": {"path": "api-server/src/routes/import_reviews/mod.rs", "marker": "\"/import-reviews/:id/module-backfill\""}},
-    "savedTask": {"state": "reviewed_records", "capability": "shop_sales_backfill"},
+    "native": {
+      "kind": "specialized",
+      "scope": "company",
+      "anchor": {
+        "path": "api-server/src/routes/import_reviews/mod.rs",
+        "marker": "\"/import-reviews/:id/module-backfill\""
+      }
+    },
+    "savedTask": {
+      "state": "reviewed_records",
+      "capability": "shop_sales_backfill"
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"shop_sales_backfill\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"shop_sales_backfill\""
+      }
     ]
   },
   {
     "id": "inventory_count_backfill",
     "module": "warehouse",
     "entryPoints": [
-      {"surface": "warehouse", "format": "saved_task", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx", "marker": "moduleBackfillTabs.warehouse"}
+      {
+        "surface": "warehouse",
+        "format": "saved_task",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx",
+        "marker": "moduleBackfillTabs.warehouse"
+      }
     ],
-    "native": {"kind": "specialized", "scope": "company", "anchor": {"path": "api-server/src/routes/import_reviews/mod.rs", "marker": "\"/import-reviews/:id/module-backfill\""}},
-    "savedTask": {"state": "reviewed_records", "capability": "inventory_count_backfill"},
+    "native": {
+      "kind": "specialized",
+      "scope": "company",
+      "anchor": {
+        "path": "api-server/src/routes/import_reviews/mod.rs",
+        "marker": "\"/import-reviews/:id/module-backfill\""
+      }
+    },
+    "savedTask": {
+      "state": "reviewed_records",
+      "capability": "inventory_count_backfill"
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"inventory_count_backfill\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"inventory_count_backfill\""
+      }
     ]
   },
   {
     "id": "contact",
     "module": "crm",
     "entryPoints": [
-      {"surface": "crm", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/crm/crm-client.tsx", "marker": "setCsvKind(\"contact\")"},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"contact\""},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"vendor\""}
+      {
+        "surface": "crm",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/crm/crm-client.tsx",
+        "marker": "setCsvKind(\"contact\")"
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"contact\""
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"vendor\""
+      }
     ],
-    "native": {"kind": "csv", "target": "contact", "scope": "organization", "gate": {"path": "api-server/src/routes/import.rs", "marker": "LUMIERE_ENABLE_CRM_CSV_IMPORT"}},
-    "savedTask": {"state": "native_preview", "capability": "contacts"},
+    "native": {
+      "kind": "csv",
+      "target": "contact",
+      "scope": "organization",
+      "gate": {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "LUMIERE_ENABLE_CRM_CSV_IMPORT"
+      }
+    },
+    "savedTask": {
+      "state": "native_preview",
+      "capability": "contacts"
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"contact\""},
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"contacts\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"contact\""
+      },
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"contacts\""
+      }
     ]
   },
   {
     "id": "lead",
     "module": "crm",
     "entryPoints": [
-      {"surface": "crm", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/crm/crm-client.tsx", "marker": "setCsvKind(\"lead\")"},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"lead\""}
+      {
+        "surface": "crm",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/crm/crm-client.tsx",
+        "marker": "setCsvKind(\"lead\")"
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"lead\""
+      }
     ],
-    "native": {"kind": "csv", "target": "lead", "scope": "organization", "gate": {"path": "api-server/src/routes/import.rs", "marker": "LUMIERE_ENABLE_CRM_CSV_IMPORT"}},
-    "savedTask": {"state": "evidence_only", "capability": "crm_history", "reason": "There is no saved-task CRM history adapter. The native CRM opt-in is still required.", "recovery": "Enable the authorized CRM rollout before using the native import."},
+    "native": {
+      "kind": "csv",
+      "target": "lead",
+      "scope": "organization",
+      "gate": {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "LUMIERE_ENABLE_CRM_CSV_IMPORT"
+      }
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "crm_history",
+      "reason": "There is no saved-task CRM history adapter. The native CRM opt-in is still required.",
+      "recovery": "Enable the authorized CRM rollout before using the native import."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"lead\""},
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"crm_history\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"lead\""
+      },
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"crm_history\""
+      }
     ]
   },
   {
     "id": "opportunity",
     "module": "crm",
     "entryPoints": [
-      {"surface": "crm", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/crm/crm-client.tsx", "marker": "setCsvKind(\"opportunity\")"},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"opportunity\""}
+      {
+        "surface": "crm",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/crm/crm-client.tsx",
+        "marker": "setCsvKind(\"opportunity\")"
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"opportunity\""
+      }
     ],
-    "native": {"kind": "csv", "target": "opportunity", "scope": "organization", "gate": {"path": "api-server/src/routes/import.rs", "marker": "LUMIERE_ENABLE_CRM_CSV_IMPORT"}},
-    "savedTask": {"state": "evidence_only", "capability": "crm_history", "reason": "There is no saved-task CRM history adapter. The native CRM opt-in is still required.", "recovery": "Enable the authorized CRM rollout before using the native import."},
+    "native": {
+      "kind": "csv",
+      "target": "opportunity",
+      "scope": "organization",
+      "gate": {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "LUMIERE_ENABLE_CRM_CSV_IMPORT"
+      }
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "crm_history",
+      "reason": "There is no saved-task CRM history adapter. The native CRM opt-in is still required.",
+      "recovery": "Enable the authorized CRM rollout before using the native import."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"opportunity\""},
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"crm_history\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"opportunity\""
+      },
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"crm_history\""
+      }
     ]
   },
   {
     "id": "purchase_order",
     "module": "purchasing",
     "entryPoints": [
-      {"surface": "purchasing", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/purchasing/purchasing-client.tsx", "marker": "setCsvKind(\"order\")"},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"purchase_order\""}
+      {
+        "surface": "purchasing",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/purchasing/purchasing-client.tsx",
+        "marker": "setCsvKind(\"order\")"
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"purchase_order\""
+      }
     ],
-    "native": {"kind": "csv", "target": "purchase_order", "scope": "company"},
-    "savedTask": {"state": "evidence_only", "capability": "purchasing_history", "reason": "Saved tasks do not resolve purchase document and line dependencies.", "recovery": "Use the native Purchasing import after reviewing the supplier, products and parent order."},
+    "native": {
+      "kind": "csv",
+      "target": "purchase_order",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "purchasing_history",
+      "reason": "Saved tasks do not resolve purchase document and line dependencies.",
+      "recovery": "Use the native Purchasing import after reviewing the supplier, products and parent order."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"purchase_order\""},
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"purchasing_history\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"purchase_order\""
+      },
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"purchasing_history\""
+      }
     ]
   },
   {
     "id": "purchase_order_line",
     "module": "purchasing",
     "entryPoints": [
-      {"surface": "purchasing", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/purchasing/purchasing-client.tsx", "marker": "setCsvKind(\"orderLine\")"},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"purchase_order_line\""}
+      {
+        "surface": "purchasing",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/purchasing/purchasing-client.tsx",
+        "marker": "setCsvKind(\"orderLine\")"
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"purchase_order_line\""
+      }
     ],
-    "native": {"kind": "csv", "target": "purchase_order_line", "scope": "company"},
-    "savedTask": {"state": "evidence_only", "capability": "purchasing_history", "reason": "Saved tasks do not resolve purchase document and line dependencies.", "recovery": "Use the native Purchasing import after reviewing the supplier, products and parent order."},
+    "native": {
+      "kind": "csv",
+      "target": "purchase_order_line",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "purchasing_history",
+      "reason": "Saved tasks do not resolve purchase document and line dependencies.",
+      "recovery": "Use the native Purchasing import after reviewing the supplier, products and parent order."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"purchase_order_line\""},
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"purchasing_history\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"purchase_order_line\""
+      },
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"purchasing_history\""
+      }
     ]
   },
   {
     "id": "supplier_info",
     "module": "purchasing",
     "entryPoints": [
-      {"surface": "purchasing", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/purchasing/purchasing-client.tsx", "marker": "setCsvKind(\"supplierInfo\")"},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"supplier_info\""}
+      {
+        "surface": "purchasing",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/purchasing/purchasing-client.tsx",
+        "marker": "setCsvKind(\"supplierInfo\")"
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"supplier_info\""
+      }
     ],
-    "native": {"kind": "csv", "target": "supplier_info", "scope": "organization"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "supplier_info",
+      "scope": "organization"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"supplier_info\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"supplier_info\""
+      }
     ]
   },
   {
     "id": "account",
     "module": "accounting",
     "entryPoints": [
-      {"surface": "accounting", "format": "csv_xlsx", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx", "marker": "setCsvKind(\"account\")"},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"account\""}
+      {
+        "surface": "accounting",
+        "format": "csv_xlsx",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx",
+        "marker": "setCsvKind(\"account\")"
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"account\""
+      }
     ],
-    "native": {"kind": "csv", "target": "account", "scope": "company"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "account",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"account\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"account\""
+      }
     ]
   },
   {
     "id": "analytic_account",
     "module": "accounting",
     "entryPoints": [
-      {"surface": "accounting", "format": "csv_xlsx", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx", "marker": "setCsvKind(\"analytic\")"}
+      {
+        "surface": "accounting",
+        "format": "csv_xlsx",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx",
+        "marker": "setCsvKind(\"analytic\")"
+      }
     ],
-    "native": {"kind": "csv", "target": "analytic_account", "scope": "company"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "analytic_account",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"analytic_account\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"analytic_account\""
+      }
     ]
   },
   {
     "id": "tax_rate",
     "module": "accounting",
     "entryPoints": [
-      {"surface": "accounting", "format": "csv_xlsx", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx", "marker": "setCsvKind(\"tax\")"},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"tax_rate\""}
+      {
+        "surface": "accounting",
+        "format": "csv_xlsx",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx",
+        "marker": "setCsvKind(\"tax\")"
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"tax_rate\""
+      }
     ],
-    "native": {"kind": "csv", "target": "tax_rate", "scope": "company"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "tax_rate",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"tax_rate\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"tax_rate\""
+      }
     ]
   },
   {
     "id": "budget",
     "module": "accounting",
     "entryPoints": [
-      {"surface": "accounting", "format": "csv_xlsx", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx", "marker": "setCsvKind(\"budget\")"},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"budget\""}
+      {
+        "surface": "accounting",
+        "format": "csv_xlsx",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx",
+        "marker": "setCsvKind(\"budget\")"
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"budget\""
+      }
     ],
-    "native": {"kind": "csv", "target": "budget", "scope": "company"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "budget",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"budget\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"budget\""
+      }
     ]
   },
   {
     "id": "budget_line",
     "module": "accounting",
     "entryPoints": [
-      {"surface": "accounting", "format": "csv_xlsx", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx", "marker": "setCsvKind(\"budgetLine\")"}
+      {
+        "surface": "accounting",
+        "format": "csv_xlsx",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx",
+        "marker": "setCsvKind(\"budgetLine\")"
+      }
     ],
-    "native": {"kind": "csv", "target": "budget_line", "scope": "company"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "budget_line",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"budget_line\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"budget_line\""
+      }
     ]
   },
   {
     "id": "account_move_line",
     "module": "accounting",
     "entryPoints": [
-      {"surface": "accounting", "format": "csv_xlsx", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx", "marker": "setCsvKind(\"accountMoveLine\")"}
+      {
+        "surface": "accounting",
+        "format": "csv_xlsx",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx",
+        "marker": "setCsvKind(\"accountMoveLine\")"
+      }
     ],
-    "native": {"kind": "csv", "target": "account_move_line", "scope": "company"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "account_move_line",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"account_move_line\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"account_move_line\""
+      }
     ]
   },
   {
     "id": "account_move",
     "module": "accounting",
     "entryPoints": [
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"account_move\""}
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"account_move\""
+      }
     ],
-    "native": {"kind": "csv", "target": "account_move", "scope": "company"},
-    "savedTask": {"state": "not_connected", "reason": "The Settings journal target is a generic native CSV path.", "recovery": "Use the authorized native import for journal headers. For historical expense evidence use the separate saved draft workflow."},
+    "native": {
+      "kind": "csv",
+      "target": "account_move",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "The Settings journal target is a generic native CSV path.",
+      "recovery": "Use the authorized native import for journal headers. For historical expense evidence use the separate saved draft workflow."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"account_move\""},
-      {"path": "frontend/web/lib/import-entities.ts", "marker": "wizardKey: \"account_move\", tableName: \"account_move\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"account_move\""
+      },
+      {
+        "path": "frontend/web/lib/import-entities.ts",
+        "marker": "wizardKey: \"account_move\", tableName: \"account_move\""
+      }
     ]
   },
   {
     "id": "journal_bundle",
     "module": "accounting",
     "entryPoints": [
-      {"surface": "accounting", "format": "csv_xlsx", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx", "marker": "setCsvKind(\"accountMove\")"}
+      {
+        "surface": "accounting",
+        "format": "csv_xlsx",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx",
+        "marker": "setCsvKind(\"accountMove\")"
+      }
     ],
-    "native": {"kind": "specialized", "scope": "company", "anchor": {"path": "frontend/web/app/(modules)/accounting/accounting-client.tsx", "marker": "await importAccountMoveBundle(text)"}},
-    "savedTask": {"state": "not_connected", "reason": "The standalone journal CSV and its header/line bundle are separate from the saved historical expense workflow.", "recovery": "Use Accounting’s existing journal import for this shape."},
+    "native": {
+      "kind": "specialized",
+      "scope": "company",
+      "anchor": {
+        "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx",
+        "marker": "await importAccountMoveBundle(text)"
+      }
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "The standalone journal CSV and its header/line bundle are separate from the saved historical expense workflow.",
+      "recovery": "Use Accounting’s existing journal import for this shape."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"account_move\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"account_move\""
+      }
     ]
   },
   {
     "id": "historical_expense_journals",
     "module": "accounting",
     "entryPoints": [
-      {"surface": "settings", "format": "saved_task", "availability": "workspace_authority", "path": "frontend/web/lib/data-import-workspace.tsx", "marker": "SavedImportWorkspace"}
+      {
+        "surface": "settings",
+        "format": "saved_task",
+        "availability": "workspace_authority",
+        "path": "frontend/web/lib/data-import-workspace.tsx",
+        "marker": "SavedImportWorkspace"
+      }
     ],
-    "native": {"kind": "specialized", "scope": "company", "anchor": {"path": "api-server/src/routes/import_reviews/workflow.rs", "marker": "\"/import-tasks/:task/workflow/proposals/:proposal/execute\""}},
-    "savedTask": {"state": "task_execution", "capability": "historical_expense_journals"},
+    "native": {
+      "kind": "specialized",
+      "scope": "company",
+      "anchor": {
+        "path": "api-server/src/routes/import_reviews/workflow.rs",
+        "marker": "\"/import-tasks/:task/workflow/proposals/:proposal/execute\""
+      }
+    },
+    "savedTask": {
+      "state": "task_execution",
+      "capability": "historical_expense_journals"
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"historical_expense_journals\""},
-      {"path": "frontend/web/lib/saved-import-workspace.tsx", "marker": "ImportTaskExecutionPanel"},
-      {"path": "api-server/src/routes/import_reviews/workflow.rs", "marker": "\"/import-tasks/:task/workflow/proposals/:proposal/verify\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"historical_expense_journals\""
+      },
+      {
+        "path": "frontend/web/lib/saved-import-workspace.tsx",
+        "marker": "ImportTaskExecutionPanel"
+      },
+      {
+        "path": "api-server/src/routes/import_reviews/workflow.rs",
+        "marker": "\"/import-tasks/:task/workflow/proposals/:proposal/verify\""
+      }
     ]
   },
   {
     "id": "outstanding_documents",
     "module": "accounting",
     "entryPoints": [
-      {"surface": "accounting", "format": "csv_xlsx", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx", "marker": "setCsvKind(\"outstandingDocuments\")"}
+      {
+        "surface": "accounting",
+        "format": "csv_xlsx",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx",
+        "marker": "setCsvKind(\"outstandingDocuments\")"
+      }
     ],
-    "native": {"kind": "specialized", "scope": "company", "anchor": {"path": "frontend/web/app/(modules)/accounting/accounting-client.tsx", "marker": "await importOutstandingDocuments(text, \"cutover_open_residual\")"}},
-    "savedTask": {"state": "not_connected", "reason": "This Accounting review flow is not a saved-task adapter.", "recovery": "Review the original document balances and use the owning Accounting workflow."},
+    "native": {
+      "kind": "specialized",
+      "scope": "company",
+      "anchor": {
+        "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx",
+        "marker": "await importOutstandingDocuments(text, \"cutover_open_residual\")"
+      }
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "This Accounting review flow is not a saved-task adapter.",
+      "recovery": "Review the original document balances and use the owning Accounting workflow."
+    },
     "served": "unverified",
     "evidence": []
   },
@@ -297,10 +787,31 @@
     "id": "historical_documents_for_payment_replay",
     "module": "accounting",
     "entryPoints": [
-      {"surface": "accounting", "format": "csv_xlsx", "availability": "historical_payment_contract", "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx", "marker": "setCsvKind(\"historicalDocumentsForPaymentReplay\")"}
+      {
+        "surface": "accounting",
+        "format": "csv_xlsx",
+        "availability": "historical_payment_contract",
+        "path": "frontend/web/app/(modules)/accounting/accounting-client.tsx",
+        "marker": "setCsvKind(\"historicalDocumentsForPaymentReplay\")"
+      }
     ],
-    "native": {"kind": "specialized", "scope": "company", "anchor": {"path": "api-server/src/routes/accounting.rs", "marker": "\"/accounting/historical-payment-allocations\""}, "gate": {"path": "frontend/web/app/(modules)/accounting/historical-payment-replay-capability.ts", "marker": "historicalPaymentReplayIsCallable"}},
-    "savedTask": {"state": "not_connected", "reason": "This Accounting review flow is not a saved-task adapter.", "recovery": "Review the original document balances and use the owning Accounting workflow."},
+    "native": {
+      "kind": "specialized",
+      "scope": "company",
+      "anchor": {
+        "path": "api-server/src/routes/accounting.rs",
+        "marker": "\"/accounting/historical-payment-allocations\""
+      },
+      "gate": {
+        "path": "frontend/web/app/(modules)/accounting/historical-payment-replay-capability.ts",
+        "marker": "historicalPaymentReplayIsCallable"
+      }
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "This Accounting review flow is not a saved-task adapter.",
+      "recovery": "Review the original document balances and use the owning Accounting workflow."
+    },
     "served": "unverified",
     "evidence": []
   },
@@ -308,467 +819,1087 @@
     "id": "bank_statement_staging",
     "module": "accounting",
     "entryPoints": [
-      {"surface": "accounting", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/accounting/payment-operations-panel.tsx", "marker": "setStatementImportDialogOpen(true)"}
+      {
+        "surface": "accounting",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/accounting/payment-operations-panel.tsx",
+        "marker": "setStatementImportDialogOpen(true)"
+      }
     ],
-    "native": {"kind": "specialized", "scope": "company", "anchor": {"path": "frontend/web/app/(modules)/accounting/payment-operations-panel.tsx", "marker": "stageStatementImport.mutateAsync"}},
-    "savedTask": {"state": "not_connected", "reason": "The statement has a specialized inspection, staging and approval workflow outside saved tasks.", "recovery": "Use Accounting Payment Operations to inspect balances and stage the statement before reconciliation."},
+    "native": {
+      "kind": "specialized",
+      "scope": "company",
+      "anchor": {
+        "path": "frontend/web/app/(modules)/accounting/payment-operations-panel.tsx",
+        "marker": "stageStatementImport.mutateAsync"
+      }
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "The statement has a specialized inspection, staging and approval workflow outside saved tasks.",
+      "recovery": "Use Accounting Payment Operations to inspect balances and stage the statement before reconciliation."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/statement_imports.rs", "marker": "\"/accounting/bank-statement-imports/:company_id\""},
-      {"path": "frontend/web/app/(modules)/accounting/payment-operations-panel.tsx", "marker": "approveStatementImport.mutateAsync"}
+      {
+        "path": "api-server/src/routes/statement_imports.rs",
+        "marker": "\"/accounting/bank-statement-imports/:company_id\""
+      },
+      {
+        "path": "frontend/web/app/(modules)/accounting/payment-operations-panel.tsx",
+        "marker": "approveStatementImport.mutateAsync"
+      }
     ]
   },
   {
     "id": "opening_balances",
     "module": "accounting",
     "entryPoints": [],
-    "native": {"kind": "none"},
-    "savedTask": {"state": "evidence_only", "capability": "opening_balances", "reason": "Opening entries require cutover date, account, balancing, and currency decisions.", "recovery": "Use the existing Accounting workflow to verify the exact effect."},
+    "native": {
+      "kind": "none"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "opening_balances",
+      "reason": "Opening entries require cutover date, account, balancing, and currency decisions.",
+      "recovery": "Use the existing Accounting workflow to verify the exact effect."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"opening_balances\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"opening_balances\""
+      }
     ]
   },
   {
     "id": "historical_payments",
     "module": "accounting",
     "entryPoints": [],
-    "native": {"kind": "none"},
-    "savedTask": {"state": "evidence_only", "capability": "historical_payments", "reason": "No generic historical payment CSV flow is admitted in the saved task. Payment replay authority and verified settlement are separate.", "recovery": "Use the existing Accounting workflow to verify the exact effect."},
+    "native": {
+      "kind": "none"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "historical_payments",
+      "reason": "No generic historical payment CSV flow is admitted in the saved task. Payment replay authority and verified settlement are separate.",
+      "recovery": "Use the existing Accounting workflow to verify the exact effect."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"historical_payments\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"historical_payments\""
+      }
     ]
   },
   {
     "id": "uom_category",
     "module": "products",
     "entryPoints": [
-      {"surface": "products", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx", "marker": "setCsvKind('uomCategory')"}
+      {
+        "surface": "products",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx",
+        "marker": "setCsvKind('uomCategory')"
+      }
     ],
-    "native": {"kind": "csv", "target": "uom_category", "scope": "organization"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "uom_category",
+      "scope": "organization"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"uom_category\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"uom_category\""
+      }
     ]
   },
   {
     "id": "uom",
     "module": "products",
     "entryPoints": [
-      {"surface": "products", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx", "marker": "setCsvKind('uom')"}
+      {
+        "surface": "products",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx",
+        "marker": "setCsvKind('uom')"
+      }
     ],
-    "native": {"kind": "csv", "target": "uom", "scope": "organization"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "uom",
+      "scope": "organization"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"uom\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"uom\""
+      }
     ]
   },
   {
     "id": "product_category",
     "module": "products",
     "entryPoints": [
-      {"surface": "products", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx", "marker": "setCsvKind('productCategory')"},
-      {"surface": "inventory", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx", "marker": "toolbarProductCategories"}
+      {
+        "surface": "products",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx",
+        "marker": "setCsvKind('productCategory')"
+      },
+      {
+        "surface": "inventory",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx",
+        "marker": "toolbarProductCategories"
+      }
     ],
-    "native": {"kind": "csv", "target": "product_category", "scope": "organization"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "product_category",
+      "scope": "organization"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"product_category\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"product_category\""
+      }
     ]
   },
   {
     "id": "product",
     "module": "products",
     "entryPoints": [
-      {"surface": "products", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx", "marker": "setCsvKind('product')"},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"product\""}
+      {
+        "surface": "products",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx",
+        "marker": "setCsvKind('product')"
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"product\""
+      },
+      {
+        "surface": "products",
+        "format": "saved_task",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx",
+        "marker": "savedImportIntakeHref('product')"
+      }
     ],
-    "native": {"kind": "csv", "target": "product", "scope": "organization_currency"},
-    "savedTask": {"state": "native_preview", "capability": "products"},
+    "native": {
+      "kind": "csv",
+      "target": "product",
+      "scope": "organization_currency"
+    },
+    "savedTask": {
+      "state": "native_preview",
+      "capability": "products"
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"product\""},
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"products\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"product\""
+      },
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"products\""
+      }
     ]
   },
   {
     "id": "product_variant",
     "module": "products",
     "entryPoints": [
-      {"surface": "products", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx", "marker": "setCsvKind('productVariant')"}
+      {
+        "surface": "products",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx",
+        "marker": "setCsvKind('productVariant')"
+      }
     ],
-    "native": {"kind": "csv", "target": "product_variant", "scope": "organization"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "product_variant",
+      "scope": "organization"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"product_variant\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"product_variant\""
+      }
     ]
   },
   {
     "id": "warehouse",
     "module": "warehouse",
     "entryPoints": [
-      {"surface": "warehouse", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx", "marker": "setCsvKind('warehouse')"}
+      {
+        "surface": "warehouse",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx",
+        "marker": "setCsvKind('warehouse')"
+      }
     ],
-    "native": {"kind": "csv", "target": "warehouse", "scope": "company"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "warehouse",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"warehouse\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"warehouse\""
+      }
     ]
   },
   {
     "id": "stock_location",
     "module": "warehouse",
     "entryPoints": [
-      {"surface": "warehouse", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx", "marker": "setCsvKind('stockLocation')"},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"stock_location\""}
+      {
+        "surface": "warehouse",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx",
+        "marker": "setCsvKind('stockLocation')"
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"stock_location\""
+      },
+      {
+        "surface": "warehouse",
+        "format": "saved_task",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx",
+        "marker": "savedImportIntakeHref('stock_location')"
+      }
     ],
-    "native": {"kind": "csv", "target": "stock_location", "scope": "company"},
-    "savedTask": {"state": "native_preview", "capability": "warehouse_locations"},
+    "native": {
+      "kind": "csv",
+      "target": "stock_location",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "native_preview",
+      "capability": "warehouse_locations"
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"stock_location\""},
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"warehouse_locations\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"stock_location\""
+      },
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"warehouse_locations\""
+      }
     ]
   },
   {
     "id": "stock_quant",
     "module": "inventory",
     "entryPoints": [
-      {"surface": "inventory", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx", "marker": "setCsvKind('stockQuant')"}
+      {
+        "surface": "inventory",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx",
+        "marker": "setCsvKind('stockQuant')"
+      }
     ],
-    "native": {"kind": "csv", "target": "stock_quant", "scope": "company"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "stock_quant",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"stock_quant\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"stock_quant\""
+      }
     ]
   },
   {
     "id": "lot",
     "module": "inventory",
     "entryPoints": [],
-    "native": {"kind": "csv", "target": "lot", "scope": "company"},
-    "savedTask": {"state": "not_connected", "reason": "A native lot CSV handler exists, but no Finance Alpha action opens that handler.", "recovery": "Verify the intended lot scope before connecting an entry point."},
+    "native": {
+      "kind": "csv",
+      "target": "lot",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "A native lot CSV handler exists, but no Finance Alpha action opens that handler.",
+      "recovery": "Verify the intended lot scope before connecting an entry point."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"lot\""},
-      {"path": "frontend/web/app/(modules)/inventory/inventory-client.tsx", "marker": "csvKind === 'lot'"}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"lot\""
+      },
+      {
+        "path": "frontend/web/app/(modules)/inventory/inventory-client.tsx",
+        "marker": "csvKind === 'lot'"
+      }
     ]
   },
   {
     "id": "stock_counts",
     "module": "warehouse",
     "entryPoints": [],
-    "native": {"kind": "none"},
-    "savedTask": {"state": "evidence_only", "capability": "stock_counts", "reason": "Dated observations do not change stock; cycle-count application is a separate operation.", "recovery": "Keep the rows as evidence or use the existing Warehouse operation."},
+    "native": {
+      "kind": "none"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "stock_counts",
+      "reason": "Dated observations do not change stock; cycle-count application is a separate operation.",
+      "recovery": "Keep the rows as evidence or use the existing Warehouse operation."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"stock_counts\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"stock_counts\""
+      }
     ]
   },
   {
     "id": "stock_history",
     "module": "warehouse",
     "entryPoints": [],
-    "native": {"kind": "none"},
-    "savedTask": {"state": "evidence_only", "capability": "stock_history", "reason": "Dated movement, opening stock and transfers need their own effects and valuation readback.", "recovery": "Keep the rows as evidence or use the existing Warehouse operation."},
+    "native": {
+      "kind": "none"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "stock_history",
+      "reason": "Dated movement, opening stock and transfers need their own effects and valuation readback.",
+      "recovery": "Keep the rows as evidence or use the existing Warehouse operation."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"stock_history\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"stock_history\""
+      }
     ]
   },
   {
     "id": "hr_employee",
     "module": "settings",
     "entryPoints": [
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"hr_employee\""}
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"hr_employee\""
+      }
     ],
-    "native": {"kind": "csv", "target": "hr_employee", "scope": "organization"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "hr_employee",
+      "scope": "organization"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"hr_employee\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"hr_employee\""
+      }
     ]
   },
   {
     "id": "hr_department",
     "module": "settings",
     "entryPoints": [
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"hr_department\""}
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"hr_department\""
+      }
     ],
-    "native": {"kind": "csv", "target": "hr_department", "scope": "organization"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "hr_department",
+      "scope": "organization"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"hr_department\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"hr_department\""
+      }
     ]
   },
   {
     "id": "expense",
     "module": "expenses",
     "entryPoints": [
-      {"surface": "expenses", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/expenses/expenses-client.tsx", "marker": "setCsvKind(\"expense\")"},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"expense\""}
+      {
+        "surface": "expenses",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/expenses/expenses-client.tsx",
+        "marker": "setCsvKind(\"expense\")"
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"expense\""
+      }
     ],
-    "native": {"kind": "csv", "target": "expense", "scope": "organization"},
-    "savedTask": {"state": "evidence_only", "capability": "employee_expenses", "reason": "Employee claims and sheets need their native policy and settlement workflow.", "recovery": "Use the existing Expenses import for claims. Route supported historical operating costs separately to Accounting."},
+    "native": {
+      "kind": "csv",
+      "target": "expense",
+      "scope": "organization"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "employee_expenses",
+      "reason": "Employee claims and sheets need their native policy and settlement workflow.",
+      "recovery": "Use the existing Expenses import for claims. Route supported historical operating costs separately to Accounting."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"expense\""},
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"employee_expenses\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"expense\""
+      },
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"employee_expenses\""
+      }
     ]
   },
   {
     "id": "expense_sheet",
     "module": "expenses",
     "entryPoints": [
-      {"surface": "expenses", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/expenses/expenses-client.tsx", "marker": "setCsvKind(\"sheet\")"}
+      {
+        "surface": "expenses",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/expenses/expenses-client.tsx",
+        "marker": "setCsvKind(\"sheet\")"
+      }
     ],
-    "native": {"kind": "csv", "target": "expense_sheet", "scope": "organization"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "expense_sheet",
+      "scope": "organization"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"expense_sheet\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"expense_sheet\""
+      }
     ]
   },
   {
     "id": "subscription_plan",
     "module": "subscriptions",
     "entryPoints": [
-      {"surface": "subscriptions", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/subscriptions/subscriptions-client.tsx", "marker": "action: \"importPlanCsv\""}
+      {
+        "surface": "subscriptions",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/subscriptions/subscriptions-client.tsx",
+        "marker": "action: \"importPlanCsv\""
+      }
     ],
-    "native": {"kind": "csv", "target": "subscription_plan", "scope": "company"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "subscription_plan",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"subscription_plan\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"subscription_plan\""
+      }
     ]
   },
   {
     "id": "subscription",
     "module": "subscriptions",
     "entryPoints": [
-      {"surface": "subscriptions", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/subscriptions/subscriptions-client.tsx", "marker": "action: \"importSubscriptionCsv\""},
-      {"surface": "settings", "format": "csv_xlsx", "availability": "wizard_profile", "path": "frontend/packages/ui/src/lib/workspace-profile.ts", "marker": "\"subscription\""}
+      {
+        "surface": "subscriptions",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/subscriptions/subscriptions-client.tsx",
+        "marker": "action: \"importSubscriptionCsv\""
+      },
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "wizard_profile",
+        "path": "frontend/packages/ui/src/lib/workspace-profile.ts",
+        "marker": "\"subscription\""
+      }
     ],
-    "native": {"kind": "csv", "target": "subscription", "scope": "company"},
-    "savedTask": {"state": "evidence_only", "capability": "subscriptions", "reason": "Recurring terms, opening balances and cutover require review before this operation joins saved tasks.", "recovery": "Use the existing subscription CSV form and check its effective dates."},
+    "native": {
+      "kind": "csv",
+      "target": "subscription",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "subscriptions",
+      "reason": "Recurring terms, opening balances and cutover require review before this operation joins saved tasks.",
+      "recovery": "Use the existing subscription CSV form and check its effective dates."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"subscription\""},
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"subscriptions\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"subscription\""
+      },
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"subscriptions\""
+      }
     ]
   },
   {
     "id": "report_template",
     "module": "reports",
     "entryPoints": [
-      {"surface": "reports", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/reports/reports-client.tsx", "marker": "setCsvKind(\"report_template\")"}
+      {
+        "surface": "reports",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/reports/reports-client.tsx",
+        "marker": "setCsvKind(\"report_template\")"
+      }
     ],
-    "native": {"kind": "csv", "target": "report_template", "scope": "organization"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "report_template",
+      "scope": "organization"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"report_template\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"report_template\""
+      }
     ]
   },
   {
     "id": "analytics_metric",
     "module": "reports",
     "entryPoints": [
-      {"surface": "reports", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/reports/reports-client.tsx", "marker": "setCsvKind(\"analytics_metric\")"}
+      {
+        "surface": "reports",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/reports/reports-client.tsx",
+        "marker": "setCsvKind(\"analytics_metric\")"
+      }
     ],
-    "native": {"kind": "csv", "target": "analytics_metric", "scope": "organization"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "analytics_metric",
+      "scope": "organization"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"analytics_metric\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"analytics_metric\""
+      }
     ]
   },
   {
     "id": "knowledge_category",
     "module": "documents",
     "entryPoints": [
-      {"surface": "documents", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/documents/documents-client.tsx", "marker": "setCsvKind(\"knowledge_category\")"}
+      {
+        "surface": "documents",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/documents/documents-client.tsx",
+        "marker": "setCsvKind(\"knowledge_category\")"
+      }
     ],
-    "native": {"kind": "csv", "target": "knowledge_category", "scope": "organization"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "knowledge_category",
+      "scope": "organization"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"knowledge_category\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"knowledge_category\""
+      }
     ]
   },
   {
     "id": "knowledge_article",
     "module": "documents",
     "entryPoints": [
-      {"surface": "documents", "format": "csv_file_or_paste", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/documents/documents-client.tsx", "marker": "setCsvKind(\"knowledge_article\")"}
+      {
+        "surface": "documents",
+        "format": "csv_file_or_paste",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/documents/documents-client.tsx",
+        "marker": "setCsvKind(\"knowledge_article\")"
+      }
     ],
-    "native": {"kind": "csv", "target": "knowledge_article", "scope": "organization"},
-    "savedTask": {"state": "not_connected", "reason": "No saved-task execution path is registered for this import.", "recovery": "Use the existing authorized native import and verify its saved result."},
+    "native": {
+      "kind": "csv",
+      "target": "knowledge_article",
+      "scope": "organization"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "No saved-task execution path is registered for this import.",
+      "recovery": "Use the existing authorized native import and verify its saved result."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"knowledge_article\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"knowledge_article\""
+      }
     ]
   },
   {
     "id": "historical_farm_events",
     "module": "farm-batches",
     "entryPoints": [
-      {"surface": "farm-batches", "format": "csv_xlsx", "availability": "company_farm_pack", "path": "frontend/web/app/(modules)/farm-batches/import/farm-import-workspace.tsx", "marker": "preparationTarget=\"farm_event\""}
+      {
+        "surface": "farm-batches",
+        "format": "csv_xlsx",
+        "availability": "company_farm_pack",
+        "path": "frontend/web/app/(modules)/farm-batches/import/farm-import-workspace.tsx",
+        "marker": "preparationTarget=\"farm_event\""
+      }
     ],
-    "native": {"kind": "specialized", "scope": "company", "anchor": {"path": "api-server/src/routes/import_reviews/mod.rs", "marker": "\"/import-reviews/:batch/farm-events\""}, "gate": {"path": "frontend/web/app/(modules)/farm-batches/farm-operations-gate.tsx", "marker": "useFarmOperationsAvailability"}},
-    "savedTask": {"state": "task_execution", "capability": "historical_farm_events"},
+    "native": {
+      "kind": "specialized",
+      "scope": "company",
+      "anchor": {
+        "path": "api-server/src/routes/import_reviews/mod.rs",
+        "marker": "\"/import-reviews/:batch/farm-events\""
+      },
+      "gate": {
+        "path": "frontend/web/app/(modules)/farm-batches/farm-operations-gate.tsx",
+        "marker": "useFarmOperationsAvailability"
+      }
+    },
+    "savedTask": {
+      "state": "task_execution",
+      "capability": "historical_farm_events"
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"historical_farm_events\""},
-      {"path": "frontend/web/lib/use-farm-operations-enabled.ts", "marker": "useFarmOperationsAvailability"}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"historical_farm_events\""
+      },
+      {
+        "path": "frontend/web/lib/use-farm-operations-enabled.ts",
+        "marker": "useFarmOperationsAvailability"
+      }
     ]
   },
   {
     "id": "fleet_history",
     "module": "fleet",
     "entryPoints": [],
-    "native": {"kind": "none"},
-    "savedTask": {"state": "evidence_only", "capability": "fleet_history", "reason": "The catalog keeps fleet source evidence; no Fleet CSV action or native Fleet CSV handler is registered.", "recovery": "Keep vehicle, odometer and service evidence until the native operation can verify dates and costs."},
+    "native": {
+      "kind": "none"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "fleet_history",
+      "reason": "The catalog keeps fleet source evidence; no Fleet CSV action or native Fleet CSV handler is registered.",
+      "recovery": "Keep vehicle, odometer and service evidence until the native operation can verify dates and costs."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"fleet_history\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"fleet_history\""
+      }
     ]
   },
   {
     "id": "historical_reports",
     "module": "reports",
     "entryPoints": [],
-    "native": {"kind": "none"},
-    "savedTask": {"state": "evidence_only", "capability": "historical_reports", "reason": "Report source evidence does not create ERP transactions.", "recovery": "Use the saved task for the original and Reports for verified financial output."},
+    "native": {
+      "kind": "none"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "historical_reports",
+      "reason": "Report source evidence does not create ERP transactions.",
+      "recovery": "Use the saved task for the original and Reports for verified financial output."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"historical_reports\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"historical_reports\""
+      }
     ]
   },
   {
     "id": "overview",
     "module": "overview",
     "entryPoints": [],
-    "native": {"kind": "none"},
-    "savedTask": {"state": "evidence_only", "capability": "overview", "reason": "Overview is a derived view without an independent CSV import.", "recovery": "Verify the owning module’s results before using Overview totals."},
+    "native": {
+      "kind": "none"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "overview",
+      "reason": "Overview is a derived view without an independent CSV import.",
+      "recovery": "Verify the owning module’s results before using Overview totals."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"overview\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"overview\""
+      }
     ]
   },
   {
     "id": "tasks",
     "module": "tasks",
     "entryPoints": [],
-    "native": {"kind": "csv", "target": "task", "scope": "company"},
-    "savedTask": {"state": "evidence_only", "capability": "tasks", "reason": "The wider product has a task CSV reducer, but Finance Alpha exposes no standalone Tasks CSV action.", "recovery": "Resume the open import question in its saved task."},
+    "native": {
+      "kind": "csv",
+      "target": "task",
+      "scope": "company"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "tasks",
+      "reason": "The wider product has a task CSV reducer, but Finance Alpha exposes no standalone Tasks CSV action.",
+      "recovery": "Resume the open import question in its saved task."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import.rs", "marker": "table_name: \"task\""},
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"tasks\""}
+      {
+        "path": "api-server/src/routes/import.rs",
+        "marker": "table_name: \"task\""
+      },
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"tasks\""
+      }
     ]
   },
   {
     "id": "approvals",
     "module": "approvals",
     "entryPoints": [],
-    "native": {"kind": "none"},
-    "savedTask": {"state": "evidence_only", "capability": "approvals", "reason": "Source text does not constitute an approval or create one.", "recovery": "Open the exact saved proposal and use the owning approval operation."},
+    "native": {
+      "kind": "none"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "approvals",
+      "reason": "Source text does not constitute an approval or create one.",
+      "recovery": "Open the exact saved proposal and use the owning approval operation."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"approvals\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"approvals\""
+      }
     ]
   },
   {
     "id": "calendar",
     "module": "calendar",
     "entryPoints": [],
-    "native": {"kind": "none"},
-    "savedTask": {"state": "evidence_only", "capability": "calendar", "reason": "Dates in an import do not create calendar events.", "recovery": "Choose any follow-up explicitly in Calendar."},
+    "native": {
+      "kind": "none"
+    },
+    "savedTask": {
+      "state": "evidence_only",
+      "capability": "calendar",
+      "reason": "Dates in an import do not create calendar events.",
+      "recovery": "Choose any follow-up explicitly in Calendar."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"calendar\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"calendar\""
+      }
     ]
   },
   {
     "id": "managed_document_intake",
     "module": "documents",
     "entryPoints": [
-      {"surface": "documents", "format": "csv_xlsx", "availability": "workspace_authority", "path": "frontend/web/components/document-import-button.tsx", "marker": "openDocumentImportTask("}
+      {
+        "surface": "documents",
+        "format": "csv_xlsx",
+        "availability": "workspace_authority",
+        "path": "frontend/web/components/document-import-button.tsx",
+        "marker": "openDocumentImportTask("
+      }
     ],
-    "native": {"kind": "intake", "scope": "company", "anchor": {"path": "api-server/src/routes/import_reviews/tasks.rs", "marker": "\"/import-tasks/from-document\""}},
-    "savedTask": {"state": "intake_or_support", "capability": "documents", "reason": "This entry point saves or resumes the source and chosen task. It does not itself write destination records."},
+    "native": {
+      "kind": "intake",
+      "scope": "company",
+      "anchor": {
+        "path": "api-server/src/routes/import_reviews/tasks.rs",
+        "marker": "\"/import-tasks/from-document\""
+      }
+    },
+    "savedTask": {
+      "state": "intake_or_support",
+      "capability": "documents",
+      "reason": "This entry point saves or resumes the source and chosen task. It does not itself write destination records."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"documents\""},
-      {"path": "frontend/web/app/(modules)/documents/[id]/document-page-client.tsx", "marker": "<DocumentImportButton"}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"documents\""
+      },
+      {
+        "path": "frontend/web/app/(modules)/documents/[id]/document-page-client.tsx",
+        "marker": "<DocumentImportButton"
+      }
     ]
   },
   {
     "id": "settings_task_intake",
     "module": "settings",
     "entryPoints": [
-      {"surface": "settings", "format": "csv_xlsx", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/settings/data-import-section.tsx", "marker": "DataImportWorkspace"}
+      {
+        "surface": "settings",
+        "format": "csv_xlsx",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/settings/data-import-section.tsx",
+        "marker": "DataImportWorkspace"
+      }
     ],
-    "native": {"kind": "intake", "scope": "company", "anchor": {"path": "api-server/src/routes/import_reviews/tasks.rs", "marker": "\"/import-tasks\""}},
-    "savedTask": {"state": "intake_or_support", "capability": "settings", "reason": "This entry point saves or resumes the source and chosen task. It does not itself write destination records."},
+    "native": {
+      "kind": "intake",
+      "scope": "company",
+      "anchor": {
+        "path": "api-server/src/routes/import_reviews/tasks.rs",
+        "marker": "\"/import-tasks\""
+      }
+    },
+    "savedTask": {
+      "state": "intake_or_support",
+      "capability": "settings",
+      "reason": "This entry point saves or resumes the source and chosen task. It does not itself write destination records."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"settings\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"settings\""
+      }
     ]
   },
   {
     "id": "assistant_task_intake",
     "module": "ai-assistant",
     "entryPoints": [
-      {"surface": "ai-assistant", "format": "csv_xlsx", "availability": "workspace_authority", "path": "frontend/web/app/(modules)/modules-shell.tsx", "marker": "useChatImportTasks("}
+      {
+        "surface": "ai-assistant",
+        "format": "csv_xlsx",
+        "availability": "workspace_authority",
+        "path": "frontend/web/app/(modules)/modules-shell.tsx",
+        "marker": "useChatImportTasks("
+      }
     ],
-    "native": {"kind": "intake", "scope": "company", "anchor": {"path": "api-server/src/routes/import_reviews/tasks.rs", "marker": "\"/import-tasks\""}},
-    "savedTask": {"state": "intake_or_support", "capability": "ai_assistant", "reason": "This entry point saves or resumes the source and chosen task. It does not itself write destination records."},
+    "native": {
+      "kind": "intake",
+      "scope": "company",
+      "anchor": {
+        "path": "api-server/src/routes/import_reviews/tasks.rs",
+        "marker": "\"/import-tasks\""
+      }
+    },
+    "savedTask": {
+      "state": "intake_or_support",
+      "capability": "ai_assistant",
+      "reason": "This entry point saves or resumes the source and chosen task. It does not itself write destination records."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "api-server/src/routes/import_reviews/capabilities.rs", "marker": "\"ai_assistant\""}
+      {
+        "path": "api-server/src/routes/import_reviews/capabilities.rs",
+        "marker": "\"ai_assistant\""
+      }
     ]
   },
   {
     "id": "purchasing_receipts",
     "module": "purchasing",
     "entryPoints": [],
-    "native": {"kind": "none"},
-    "savedTask": {"state": "not_connected", "reason": "Supplier receipts require reviewed quantities and a parent order.", "recovery": "Use the existing authorized Purchasing operation. Do not infer receipt, return or billing from a purchase order import."},
+    "native": {
+      "kind": "none"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "Supplier receipts require reviewed quantities and a parent order.",
+      "recovery": "Use the existing authorized Purchasing operation. Do not infer receipt, return or billing from a purchase order import."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "frontend/web/app/(modules)/purchasing/purchasing-client.tsx", "marker": "const receiveLineOptions"}
+      {
+        "path": "frontend/web/app/(modules)/purchasing/purchasing-client.tsx",
+        "marker": "const receiveLineOptions"
+      }
     ]
   },
   {
     "id": "purchasing_returns",
     "module": "purchasing",
     "entryPoints": [],
-    "native": {"kind": "none"},
-    "savedTask": {"state": "not_connected", "reason": "Returns require an existing receipt and a separate native effect.", "recovery": "Use the existing authorized Purchasing operation. Do not infer receipt, return or billing from a purchase order import."},
+    "native": {
+      "kind": "none"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "Returns require an existing receipt and a separate native effect.",
+      "recovery": "Use the existing authorized Purchasing operation. Do not infer receipt, return or billing from a purchase order import."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "frontend/web/app/(modules)/purchasing/purchasing-client.tsx", "marker": "openCreatePurchaseReturn"}
+      {
+        "path": "frontend/web/app/(modules)/purchasing/purchasing-client.tsx",
+        "marker": "openCreatePurchaseReturn"
+      }
     ]
   },
   {
     "id": "purchasing_bill_links",
     "module": "purchasing",
     "entryPoints": [],
-    "native": {"kind": "none"},
-    "savedTask": {"state": "not_connected", "reason": "Supplier bill links require matching the order, receipts and bill.", "recovery": "Use the existing authorized Purchasing operation. Do not infer receipt, return or billing from a purchase order import."},
+    "native": {
+      "kind": "none"
+    },
+    "savedTask": {
+      "state": "not_connected",
+      "reason": "Supplier bill links require matching the order, receipts and bill.",
+      "recovery": "Use the existing authorized Purchasing operation. Do not infer receipt, return or billing from a purchase order import."
+    },
     "served": "unverified",
     "evidence": [
-      {"path": "frontend/web/app/(modules)/purchasing/purchasing-client.tsx", "marker": "const billOrder"}
+      {
+        "path": "frontend/web/app/(modules)/purchasing/purchasing-client.tsx",
+        "marker": "const billOrder"
+      }
     ]
   }
 ]

@@ -23,6 +23,7 @@ import {
   useSavedImportTaskList,
 } from "./saved-import-task-picker"
 import { SavedImportTaskIntake } from "./saved-import-task-intake"
+import { readSavedImportGoal } from "./saved-import-intake-navigation"
 import {
   readImportTaskLocation,
   withImportTaskLocation,
@@ -105,6 +106,7 @@ function ScopedWorkspace({
     [identity, organizationId, companyId],
   )
   const [resumeSavedTask, setResumeSavedTask] = useState(resumeAtNextStep)
+  const [intakeGoal, setIntakeGoal] = useState(() => syncUrl && !taskId ? readSavedImportGoal(urlSearch ?? "") : undefined)
   const [location, setLocation] = useState<ImportTaskLocation | null>(() => {
     if (taskId)
       return {
@@ -119,25 +121,25 @@ function ScopedWorkspace({
   })
   useEffect(() => {
     if (!syncUrl || taskId) return
-    if (urlSearch !== undefined) {
-      setLocation(readImportTaskLocation(urlSearch, companyId))
-      return
+    const restore = () => {
+      const search = urlSearch ?? window.location.search
+      setLocation(readImportTaskLocation(search, companyId))
+      setIntakeGoal(readSavedImportGoal(search))
     }
-    const restore = () =>
-      setLocation(readImportTaskLocation(window.location.search, companyId))
     restore()
+    if (urlSearch !== undefined) return
     window.addEventListener("popstate", restore)
     return () => window.removeEventListener("popstate", restore)
   }, [companyId, taskId, syncUrl, urlSearch])
   const navigate = useCallback(
-    (next: ImportTaskLocation) => {
+    (next: ImportTaskLocation, clearIntakeGoal = false) => {
       setLocation(next)
-      if (syncUrl)
-        window.history.replaceState(
-          window.history.state,
-          "",
-          withImportTaskLocation(new URL(window.location.href), next),
-        )
+      if (clearIntakeGoal) setIntakeGoal(undefined)
+      if (syncUrl) {
+        const url = withImportTaskLocation(new URL(window.location.href), next)
+        if (clearIntakeGoal) url.searchParams.delete("importGoal")
+        window.history.replaceState(window.history.state, "", url)
+      }
     },
     [syncUrl],
   )
@@ -169,7 +171,7 @@ function ScopedWorkspace({
         <SavedImportWorkspace
           key={location.taskId}
           scope={scope}
-          preparationTarget={preparationTarget}
+          preparationTarget={preparationTarget ?? intakeGoal}
           taskId={location.taskId}
           view={location.view}
           resumeAtNextStep={resumeSavedTask}
@@ -257,7 +259,7 @@ function ScopedWorkspace({
           }}
           onSelect={(id) => {
             setResumeSavedTask(true)
-            navigate({ taskId: id, companyId, view: "sources" })
+            navigate({ taskId: id, companyId, view: "sources" }, true)
           }}
         />
       ) : null}

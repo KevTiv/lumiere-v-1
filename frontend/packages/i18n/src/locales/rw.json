@@ -4616,7 +4616,16 @@
       "shopSalesPreviewCounts": "Isuzuma · {{newCount}} bishya · {{existingCount}} bisanzwe birimo · {{heldCount}} birategereje",
       "shopSalesPreviewAmounts": "{{currency}} {{newAmount}} azandikwa · {{currency}} {{existingAmount}} asanzwe yanditswe",
       "importsPaused": "Kwinjiza amakuru byahagaritswe kubera ivugurura",
-      "importsPausedResume": "Ibyo winjije byabitswe birabitswe. Ongera ugerageze igihe kwinjiza bizaba byasubukuwe; imirongo yamaze kubikwa ntizongera kwandikwa."
+      "importsPausedResume": "Ibyo winjije byabitswe birabitswe. Ongera ugerageze igihe kwinjiza bizaba byasubukuwe; imirongo yamaze kubikwa ntizongera kwandikwa.",
+      "start": "Tangira iyinjiza ribikwa",
+      "startHint": "Bika amadosiye yawe y’umwimerere ya CSV cyangwa Excel, uhitemo kuyagenzura cyangwa gutegura iyinjiza. Ushobora gusubira ku gikorwa kimwe ukoresheje ikindi gikoresho.",
+      "chooseFiles": "Hitamo amadosiye y’inkomoko",
+      "uploadLimits": "Amadosiye agera kuri 20, buri rimwe ritageze kuri MB 5 n’ayo yose atarengeje MB 20. Amadosiye y’umwimerere akomeza kuguma ku gikorwa cyabitswe.",
+      "saving": "Amadosiye ari kubikwa cyangwa inyemezabwishyu iri kugenzurwa…",
+      "shortcuts": "Amahinanzira yo kwinjiza amakuru",
+      "startShortcut": "Tangira iyinjiza",
+      "continueShortcut": "Komeza iyinjiza ryabitswe",
+      "guidedShortcut": "Iyinjiza riyobowe n’isuzuma"
     },
     "importWorkflow": {
       "pendingSourceTitle": "Imirongo y’inkomoko igikeneye gusuzumwa",
