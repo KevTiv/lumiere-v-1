@@ -671,6 +671,7 @@ test("Fleet journal recovery opens Accounting separately and refreshes the same 
   context,
 }) => {
   test.setTimeout(120_000);
+  await page.setViewportSize({ width: 390, height: 844 });
   const fixture = await fleetRecoveryFixture(page, "journal");
   await context.route("**/accounting?tab=account-journals", (route) =>
     route.fulfill({ contentType: "text/html", body: "<title>Accounting journal fixture</title>" }),
