@@ -13,13 +13,20 @@ const initialModeSchema = z.enum(CHAT_IMPORT_INITIAL_MODES)
 const decisionOption = z.enum(["prepare_import", "inspect_only", "other"])
 const decisionReceiptSchema = z.object({
   decisionId: requestId, optionId: decisionOption, otherText: z.string().nullable(),
-  revision: z.number().int().positive(), createdAt: z.string(),
+  revision: z.number().int().positive(), createdAt: z.string(), actor: z.string().optional(),
 })
 const taskSchema = z.object({
   requestId,
   companyId: positiveId,
   conversationKey: z.string().min(1).max(150),
   managedDocument: z.object({ documentId: positiveId, versionId: positiveId }).optional(),
+  handoff: z.object({
+    creator: z.string().min(1),
+    recipient: z.string().min(1).nullable(),
+    revision: z.number().int().nonnegative(),
+    canManage: z.boolean(),
+    canReview: z.boolean(),
+  }).optional(),
   status: z.enum(["awaiting_decision", "saved", "needs_review", "inspection_ready", "failed"]),
   decision: z.object({
     id: z.string().min(1).max(200), revision: z.number().int().positive(), status: z.enum(["pending", "approved"]),

@@ -42,11 +42,20 @@ async fn read(
     Query(query): Query<Scope>,
 ) -> Result<Json<Value>, ApiError> {
     let context = scope(&state, &session, query.company_id).await?;
-    let scoped = storage_scope(&context, query.company_id);
+    let viewer = storage_scope(&context, query.company_id);
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let (creator, _) = super::tasks::handoff::read_for(&pool, &context, viewer, &task).await?;
+    let scoped = StorageScope {
+        actor: &creator,
+        ..viewer
+    };
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
-    let proposals = storage::list(&tx, scoped, &task).await?;
+    let proposals = if scoped.actor == viewer.actor {
+        storage::list(&tx, scoped, &task).await?
+    } else {
+        Vec::new()
+    };
     let backfilled_records = super::module_backfill::task_results(&tx, scoped, &task).await?;
     let reviewed_records = super::module_backfill::workflow_results(&tx, scoped, &task).await?;
     let farm_enabled =

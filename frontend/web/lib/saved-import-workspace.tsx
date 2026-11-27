@@ -43,6 +43,7 @@ import {
   type ChatImportTask,
 } from "./chat-import-task"
 import { DocumentViewerDialog } from "../components/document-viewer-dialog"
+import { ImportTaskHandoff } from "./import-task-handoff"
 import { ImportPreparationPanel } from "./import-preparation-panel"
 import type { ImportPreparationSection } from "./import-preparation"
 
@@ -82,7 +83,8 @@ export function SavedImportWorkspace({
     companyId: scope.companyId,
     taskId,
   }
-  const workflow = useImportWorkflow(scope.identity, workflowScope, !!task)
+  const canReview = task?.handoff?.canReview ?? true
+  const workflow = useImportWorkflow(scope.identity, workflowScope, !!task && canReview)
   const workflowData = workflow.isError ? undefined : workflow.data
   useEffect(() => {
     if (task) onTaskFocus?.(task)
@@ -156,10 +158,10 @@ export function SavedImportWorkspace({
       ),
     [reviews],
   )
-  const allowImport =
-    !inspectionOnly &&
+  const preparationApproved =
     task?.decision.status === "approved" &&
     task.decision.selectedOptionId === "prepare_import"
+  const allowImport = !inspectionOnly && canReview && preparationApproved
   const nextView = importTaskNextView({
     preparationStatus:
       inspectionOnly && task?.status === "needs_review"
@@ -196,7 +198,7 @@ export function SavedImportWorkspace({
       workflow.isFetching
     )
       return
-    if (!allowImport && (nextView === "preview" || nextView === "results"))
+    if (!canReview || (!allowImport && (nextView === "preview" || nextView === "results")))
       return
     onNavigate(nextView, nextReviewId)
   }, [
@@ -206,6 +208,7 @@ export function SavedImportWorkspace({
     workflow.isPending,
     workflow.isFetching,
     allowImport,
+    canReview,
     nextView,
     nextReviewId,
     onNavigate,
@@ -367,7 +370,7 @@ export function SavedImportWorkspace({
                 defaultValue: "Approve preparation",
               })}
             </Button>
-          ) : (
+          ) : canReview ? (
             <Button
               type="button"
               disabled={saved.busy}
@@ -375,16 +378,26 @@ export function SavedImportWorkspace({
             >
               {nextLabel}
             </Button>
-          )}
+          ) : null}
         </div>
       </header>
-      <ImportTaskProgress
+      {task.handoff && (
+        <ImportTaskHandoff
+          key={`${scope.identity}:${scope.companyId}:${taskId}:${task.handoff.revision}`}
+          scope={scope}
+          taskId={taskId}
+          handoff={task.handoff}
+          disabled={saved.busy}
+          onChange={() => void saved.reload()}
+        />
+      )}
+      {canReview && <ImportTaskProgress
         files={task.files.length}
         rows={counts}
         workflow={workflowData}
         resultsAvailable={allowImport}
         onNavigate={(next) => navigate(next, selectedReviewId, true)}
-      />
+      />}
       {saved.busy ? (
         <p role="status" className="text-sm">
           {t("settings.importTask.checking", {
@@ -394,7 +407,7 @@ export function SavedImportWorkspace({
       ) : null}
       <Tabs
         value={
-          !allowImport && (view === "preview" || view === "results")
+          !canReview || (!allowImport && (view === "preview" || view === "results"))
             ? "sources"
             : view
         }
@@ -411,7 +424,7 @@ export function SavedImportWorkspace({
           <TabsTrigger value="sources">
             {t("settings.importTask.sources", { defaultValue: "Sources" })}
           </TabsTrigger>
-          <TabsTrigger value="decisions">
+          <TabsTrigger value="decisions" disabled={!canReview}>
             {t("settings.importTask.decisions", { defaultValue: "Decisions" })}
           </TabsTrigger>
           <TabsTrigger value="preview" disabled={!allowImport}>
@@ -422,11 +435,11 @@ export function SavedImportWorkspace({
           </TabsTrigger>
         </TabsList>
         <TabsContent value="sources" keepMounted className="space-y-4">
-          <ImportDestinationSupport
+          {canReview && <ImportDestinationSupport
             capabilities={workflowData?.capabilities}
             failed={workflow.isError}
             onRetry={() => void workflow.refetch()}
-          />
+          />}
           {managedDocument && (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <p>
@@ -444,7 +457,7 @@ export function SavedImportWorkspace({
                       defaultValue: "Source saved from Documents",
                     })}
               </p>
-              <Button
+              {(task.handoff?.canManage ?? true) && <Button
                 type="button"
                 variant="outline"
                 size="sm"
@@ -458,7 +471,7 @@ export function SavedImportWorkspace({
                 {t("documents.viewer.openSourceVersion", {
                   defaultValue: "Open source version",
                 })}
-              </Button>
+              </Button>}
             </div>
           )}
           {sourcePreview &&
@@ -611,7 +624,7 @@ export function SavedImportWorkspace({
             />
           ) : (
             <p className="text-sm text-muted-foreground">
-              {allowImport
+              {preparationApproved
                 ? t("aiChat.import.preparationApproved", {
                     defaultValue:
                       "You approved import preparation. Creating business records still requires a separate review and confirmation.",
@@ -621,6 +634,18 @@ export function SavedImportWorkspace({
                       "You approved inspection only. No business-record import was authorized.",
                   })}
             </p>
+          )}
+          {task.handoff && task.decisionHistory.some((answer) => answer.actor) && (
+            <details className="text-sm">
+              <summary className="cursor-pointer">{t("settings.importHandoff.decisionActors")}</summary>
+              <ul className="mt-2 space-y-1">
+                {task.decisionHistory.filter((answer) => answer.actor).map((answer) => (
+                  <li key={answer.decisionId} className="break-all">
+                    {t("settings.importHandoff.decisionActor", { revision: answer.revision, actor: answer.actor })}
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
           {task.decisionHistory.some(
             (answer) => answer.optionId === "other",
@@ -646,7 +671,7 @@ export function SavedImportWorkspace({
                 void saved.resume().catch(() => undefined)
               }}
             >
-              {allowImport
+              {preparationApproved
                 ? t("aiChat.import.resume", {
                     defaultValue: "Resume preparation",
                   })
@@ -655,7 +680,7 @@ export function SavedImportWorkspace({
                   })}
             </Button>
           ) : null}
-          {allowImport && !managedSelection ? (
+          {allowImport && !managedSelection && task.handoff?.canManage !== false ? (
             <ImportPreparationPanel
               task={task}
               defaultDestination={preparationTarget}
@@ -666,7 +691,7 @@ export function SavedImportWorkspace({
           ) : null}
         </TabsContent>
         <TabsContent value="decisions" keepMounted>
-          {selectedReviewId ? (
+          {canReview && selectedReviewId ? (
             <ImportReviewWorkspace
               key={`${selectedReviewId}:${reviewFilter ?? ""}`}
               organizationId={scope.organizationId}
@@ -749,18 +774,22 @@ export function SavedImportWorkspace({
                   </ul>
                 </section>
               )}
-              <ImportTaskExecutionPanel
-                organizationId={scope.organizationId}
-                companyId={scope.companyId}
-                taskId={taskId}
-                reviewId={selectedReviewId}
-                view={executionView}
-                onReviewSource={(id) => {
-                  if (allowedReviewIds.includes(id))
-                    navigate("decisions", id, true)
-                }}
-                onChanged={refreshTask}
-              />
+              {executionView === "results" || task.handoff?.canManage !== false ? (
+                <ImportTaskExecutionPanel
+                  organizationId={scope.organizationId}
+                  companyId={scope.companyId}
+                  taskId={taskId}
+                  reviewId={selectedReviewId}
+                  view={executionView}
+                  onReviewSource={(id) => {
+                    if (allowedReviewIds.includes(id))
+                      navigate("decisions", id, true)
+                  }}
+                  onChanged={refreshTask}
+                />
+              ) : !nativePreview ? (
+                <p className="text-sm text-muted-foreground">{t("settings.importHandoff.continueFromReview")}</p>
+              ) : null}
               <div
                 hidden={!nativePreview && continuationBlock !== "unresolved"}
               >

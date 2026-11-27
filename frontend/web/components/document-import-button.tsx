@@ -14,9 +14,11 @@ import { importTaskHref } from "../lib/import-task-navigation"
 export function DocumentImportButton({
   companyId,
   source,
+  onOpenTask,
 }: {
   companyId: number
   source: DocumentImportSource
+  onOpenTask?: (requestId: string) => void
 }) {
   const { t } = useTranslation()
   const router = useRouter()
@@ -39,6 +41,10 @@ export function DocumentImportButton({
         controller.signal,
       )
       if (!controller.signal.aborted) {
+        if (onOpenTask) {
+          onOpenTask(task.requestId)
+          return
+        }
         router.push(
           importTaskHref({
             companyId,

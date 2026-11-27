@@ -112,13 +112,22 @@ async fn scope(
     session: &crate::session::ApiSession,
     company: u64,
 ) -> Result<TrustedOperationContext, ApiError> {
-    let context = TrustedOperationContext::for_resource_read(state, session)?;
-    context.require_current_placement(&state.organization_placements)?;
+    let context = task_company_scope(state, session, company).await?;
     if !full_administrator(context.field_access()) {
         return Err(ApiError::Forbidden(
             "Full organization administration access is required for source review".into(),
         ));
     }
+    Ok(context)
+}
+
+async fn task_company_scope(
+    state: &AppState,
+    session: &crate::session::ApiSession,
+    company: u64,
+) -> Result<TrustedOperationContext, ApiError> {
+    let context = TrustedOperationContext::for_resource_read(state, session)?;
+    context.require_current_placement(&state.organization_placements)?;
     let company = resolve_membership_company_id(
         context.client(),
         context.organization_id(),

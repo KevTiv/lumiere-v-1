@@ -273,6 +273,11 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
                 "../../../cold_tier/import_task_inspection_expand.sql"
             ))
             .await?;
+        client
+            .batch_execute(include_str!(
+                "../../../cold_tier/import_task_handoff_expand.sql"
+            ))
+            .await?;
     }
     let scoped = StorageScope {
         organization: 8001,
@@ -677,7 +682,86 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
     ensure!(fresh_task["reviews"][0]["id"] != task["reviews"][0]["id"]);
     ensure!(fresh_task["reviews"][0]["pending"] == 1 && fresh_task["reviews"][0]["confirmed"] == 0);
     ensure!(read_task(pool, scoped, &body.request_id).await?["reviews"][0]["confirmed"] == 1);
+    exercise_handoff(pool, scoped).await?;
     exercise_managed_document_lookup(pool, scoped).await?;
+    Ok(())
+}
+
+async fn exercise_handoff(pool: &deadpool_postgres::Pool, clerk: StorageScope<'_>) -> Result<()> {
+    let mut body = submission();
+    body.request_id = "4".repeat(32);
+    let (originals, hash) = decode_submission(&body)?;
+    accept(pool, clerk, &body, &originals, &hash).await?;
+    let owner = StorageScope {
+        actor: "owner",
+        ..clerk
+    };
+    let request = body.request_id.as_str();
+    let grant = |recipient: Option<&str>, expected_revision| handoff::HandoffBody {
+        company_id: clerk.company,
+        recipient: recipient.map(str::to_owned),
+        expected_revision,
+    };
+    let clerk_answer = decision('4', 1, "other", Some("Please verify the source"));
+    let clerk_receipt = save_decision(pool, clerk, request, &clerk_answer).await?;
+    let answer = decision('5', 2, "prepare_import", None);
+    assert!(save_decision_as(pool, clerk, request, &answer, owner.actor)
+        .await
+        .is_err());
+    assert_eq!(
+        handoff::creator_for(pool, owner, request, true).await?,
+        owner.actor
+    );
+    let first = handoff::save(pool, clerk, request, grant(Some(owner.actor), 0)).await?;
+    assert_eq!(
+        handoff::save(pool, clerk, request, grant(Some(owner.actor), 0)).await?,
+        first
+    );
+    assert_eq!(
+        handoff::creator_for(pool, owner, request, true).await?,
+        clerk.actor
+    );
+    assert_eq!(
+        handoff::creator_for(pool, owner, request, false).await?,
+        owner.actor
+    );
+    for other in [
+        StorageScope {
+            actor: "other",
+            ..owner
+        },
+        StorageScope {
+            company: clerk.company + 1,
+            ..owner
+        },
+        StorageScope {
+            organization: clerk.organization + 1,
+            ..owner
+        },
+    ] {
+        assert_eq!(
+            handoff::creator_for(pool, other, request, true).await?,
+            other.actor
+        );
+    }
+    let receipt = save_decision_as(pool, clerk, request, &answer, owner.actor).await?;
+    assert_eq!(receipt["actor"], owner.actor);
+    assert_eq!(clerk_receipt["actor"], clerk.actor);
+    let reloaded = read_task(pool, clerk, request).await?;
+    assert_eq!(reloaded["decisionHistory"], json!([receipt, clerk_receipt]));
+    handoff::save(pool, clerk, request, grant(None, 1)).await?;
+    assert!(
+        handoff::save(pool, clerk, request, grant(Some(owner.actor), 0))
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        handoff::creator_for(pool, owner, request, true).await?,
+        owner.actor
+    );
+    assert!(save_decision_as(pool, clerk, request, &answer, owner.actor)
+        .await
+        .is_err());
     Ok(())
 }
 

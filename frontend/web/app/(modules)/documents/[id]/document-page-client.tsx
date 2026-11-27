@@ -80,6 +80,8 @@ import { firstFileFromFormValue } from '@/lib/document-blob-upload';
 import { useManagedDocumentUpload } from '@/lib/use-managed-document-upload';
 import { DocumentUploadReceipts } from '../../../../components/document-upload-receipts';
 import { DocumentViewerDialog } from '../../../../components/document-viewer-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@lumiere/ui/components/dialog';
+import { DataImportWorkspace } from '@/lib/data-import-workspace';
 import { DocumentImportButton } from '../../../../components/document-import-button';
 import { documentImportSource } from '@/lib/document-import-source';
 import { documentViewerCompanyId } from '@/lib/document-viewer';
@@ -267,6 +269,8 @@ function DocumentPageLoaded({
   const [formAction, setFormAction] = useState<FormAction | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const importScopeKey = `${session.identity}:${organizationId}:${operatingCompanyId}:${documentId}`;
+  const [documentImport, setDocumentImport] = useState<{ scope: string; taskId: string } | null>(null);
   const [preview, setPreview] = useState<{ versionId?: string } | null>(null);
 
   const document = useMemo(
@@ -386,8 +390,9 @@ function DocumentPageLoaded({
   const importScope = !isDeleted && !documentsQuery.isError && permissionsReady &&
     session.organizationId === organizationId && session.activeCompanyReady &&
     operatingCompanyId > 0n && session.activeCompanyId === Number(operatingCompanyId) &&
-    Boolean(session.identity) && currentUser?.id === session.identity && isAdmin() &&
-    checkPermission('document', 'read').allowed
+    Boolean(session.identity) && currentUser?.id === session.identity &&
+    checkPermission('document', 'read').allowed &&
+    (isAdmin() || checkPermission('document_version', 'read').allowed)
       ? { organizationId: orgId, companyId: operatingCompanyId }
       : null;
   const importButton = (version?: Row) => {
@@ -403,6 +408,7 @@ function DocumentPageLoaded({
         key={`${session.identity}:${orgId}:${operatingCompanyId}:${documentId}:${source.versionId}:${source.checksum}`}
         companyId={Number(operatingCompanyId)}
         source={source}
+        onOpenTask={isAdmin() ? undefined : (taskId) => setDocumentImport({ scope: importScopeKey, taskId })}
       />
     ) : null;
   };
@@ -570,6 +576,16 @@ function DocumentPageLoaded({
   return (
     <>
       <DocumentUploadReceipts rows={versionReceipts} error={uploads.error} onResume={uploads.resume} />
+      {documentImport?.scope === importScopeKey && importScope ? (
+        <Dialog open onOpenChange={(open) => { if (!open) setDocumentImport(null); }}>
+          <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>{t('documents.page.openImport')}</DialogTitle>
+            </DialogHeader>
+            <DataImportWorkspace organizationId={organizationId} taskId={documentImport.taskId} syncUrl={false} />
+          </DialogContent>
+        </Dialog>
+      ) : null}
       <DocumentViewerDialog organizationId={orgId} documentId={preview ? documentId : null} documentCompanyId={documentViewerCompanyId(document)} versionId={preview?.versionId} onOpenChange={(open) => { if (!open) setPreview(null); }} />
       <RecordPage
         testIdPrefix="document"

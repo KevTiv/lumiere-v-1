@@ -1,6 +1,6 @@
 //! Chat uploads prepare durable source review; only the existing import routes
 //! may create business records after the operator reviews the result.
-use super::{model::Dataset, scope, StorageScope};
+use super::{model::Dataset, scope, task_company_scope, StorageScope};
 use axum::{
     extract::{DefaultBodyLimit, Path, Query, State},
     http::{header, HeaderValue},
@@ -22,6 +22,7 @@ use tokio_postgres::Transaction;
 
 use crate::{cold_tier::pg_pool, error::ApiError, state::AppState, web_session::OrgSession};
 
+pub(super) mod handoff;
 mod managed_source;
 mod manifest;
 #[cfg(test)]
@@ -236,6 +237,7 @@ async fn accept(
                 &body.request_id,
                 hash,
                 &decision,
+                scope.actor,
                 &DecisionBody {
                     company_id: scope.company,
                     decision_id,
@@ -295,7 +297,7 @@ fn validate_decision(body: &DecisionBody, company: u64) -> Result<(), ApiError> 
 }
 
 fn decision_receipt(row: &tokio_postgres::Row) -> Value {
-    json!({"decisionId":row.get::<_,String>("decision_id"),"optionId":row.get::<_,String>("option_id"),"otherText":row.get::<_,Option<String>>("other_text"),"revision":row.get::<_,i32>("revision"),"createdAt":row.get::<_,String>("created_at")})
+    json!({"decisionId":row.get::<_,String>("decision_id"),"optionId":row.get::<_,String>("option_id"),"otherText":row.get::<_,Option<String>>("other_text"),"revision":row.get::<_,i32>("revision"),"createdAt":row.get::<_,String>("created_at"),"actor":row.get::<_,String>("decided_by")})
 }
 
 fn decision_request(request: &str, revision: i32, approved: bool, latest: &Value) -> Value {
@@ -328,16 +330,40 @@ async fn save_decision(
     request: &str,
     body: &DecisionBody,
 ) -> Result<Value, ApiError> {
+    save_decision_as(pool, scope, request, body, scope.actor).await
+}
+
+async fn save_decision_as(
+    pool: &deadpool_postgres::Pool,
+    scope: StorageScope<'_>,
+    request: &str,
+    body: &DecisionBody,
+    deciding_actor: &str,
+) -> Result<Value, ApiError> {
     validate_decision(body, scope.company)?;
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
     let org = scope.organization.to_string();
     let company = scope.company.to_string();
     let task=tx.query_opt("SELECT state,decision_revision,request_sha256,decision_request FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 FOR UPDATE",&[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?.ok_or_else(||ApiError::NotFound("import task not found".into()))?;
+    if deciding_actor != scope.actor {
+        let granted = tx
+            .query_opt(
+                "SELECT revision FROM lumiere_platform.import_task_handoff
+              WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric
+                AND actor_identity=$3 AND request_id=$4 AND recipient_identity=$5",
+                &[&org, &company, &scope.actor, &request, &deciding_actor],
+            )
+            .await
+            .map_err(ApiError::internal)?;
+        if granted.is_none() {
+            return Err(ApiError::NotFound("import task not found".into()));
+        }
+    }
     let source_hash: String = task.get("request_sha256");
-    if let Some(replay)=tx.query_opt("SELECT request_id,company_id::text,payload_sha256,question_json,decision_id,option_id,other_text,revision,created_at::text FROM lumiere_platform.import_task_decision WHERE organization_id=$1::text::numeric AND actor_identity=$2 AND decision_id=$3",&[&org,&scope.actor,&body.decision_id]).await.map_err(ApiError::internal)? {
+    if let Some(replay)=tx.query_opt("SELECT request_id,company_id::text,payload_sha256,question_json,decision_id,option_id,other_text,revision,created_at::text,COALESCE(decided_by,actor_identity) AS decided_by FROM lumiere_platform.import_task_decision WHERE organization_id=$1::text::numeric AND actor_identity=$2 AND decision_id=$3",&[&org,&scope.actor,&body.decision_id]).await.map_err(ApiError::internal)? {
         let payload_hash=decision_payload_hash(request,&source_hash,&replay.get::<_,Value>("question_json"),body)?;
-        if replay.get::<_,String>("request_id")!=request || replay.get::<_,String>("company_id")!=company || replay.get::<_,String>("payload_sha256")!=payload_hash {
+        if replay.get::<_,String>("decided_by")!=deciding_actor || replay.get::<_,String>("request_id")!=request || replay.get::<_,String>("company_id")!=company || replay.get::<_,String>("payload_sha256")!=payload_hash {
             return Err(ApiError::Conflict("this decision identity belongs to a different task, revision or answer".into()));
         }
         let receipt=decision_receipt(&replay);
@@ -360,6 +386,7 @@ async fn save_decision(
         request,
         &source_hash,
         &question,
+        deciding_actor,
         body,
         promotes_inspection,
     )
@@ -374,6 +401,7 @@ async fn append_decision(
     request: &str,
     source_hash: &str,
     question: &Value,
+    deciding_actor: &str,
     body: &DecisionBody,
     promotes_inspection: bool,
 ) -> Result<Value, ApiError> {
@@ -381,7 +409,7 @@ async fn append_decision(
     let company = scope.company.to_string();
     let revision = body.expected_revision + 1;
     let payload_hash = decision_payload_hash(request, source_hash, question, body)?;
-    let row=tx.query_opt("INSERT INTO lumiere_platform.import_task_decision (organization_id,company_id,actor_identity,request_id,decision_id,revision,request_sha256,payload_sha256,option_id,other_text,question_json) VALUES ($1::text::numeric,$2::text::numeric,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT DO NOTHING RETURNING decision_id,option_id,other_text,revision,created_at::text",&[&org,&company,&scope.actor,&request,&body.decision_id,&revision,&source_hash,&payload_hash,&body.option_id,&body.other_text,&question]).await.map_err(ApiError::internal)?.ok_or_else(||ApiError::Conflict("this decision identity was already used for a different task or answer".into()))?;
+    let row=tx.query_opt("INSERT INTO lumiere_platform.import_task_decision (organization_id,company_id,actor_identity,request_id,decision_id,revision,request_sha256,payload_sha256,option_id,other_text,question_json,decided_by) VALUES ($1::text::numeric,$2::text::numeric,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT DO NOTHING RETURNING decision_id,option_id,other_text,revision,created_at::text,decided_by",&[&org,&company,&scope.actor,&request,&body.decision_id,&revision,&source_hash,&payload_hash,&body.option_id,&body.other_text,&question,&deciding_actor]).await.map_err(ApiError::internal)?.ok_or_else(||ApiError::Conflict("this decision identity was already used for a different task or answer".into()))?;
     let mode = ProcessingMode::from_str(&body.option_id).map(ProcessingMode::as_str);
     let state = if mode.is_some() {
         "saved"
@@ -424,7 +452,7 @@ async fn read_decision(
         return Err(ApiError::BadRequest("invalid decision identity".into()));
     }
     let client = pool.get().await.map_err(ApiError::internal)?;
-    let row=client.query_opt("SELECT decision_id,option_id,other_text,revision,created_at::text FROM lumiere_platform.import_task_decision WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 AND decision_id=$5",&[&scope.organization.to_string(),&scope.company.to_string(),&scope.actor,&request,&decision]).await.map_err(ApiError::internal)?.ok_or_else(||ApiError::NotFound("file decision receipt not found".into()))?;
+    let row=client.query_opt("SELECT decision_id,option_id,other_text,revision,created_at::text,COALESCE(decided_by,actor_identity) AS decided_by FROM lumiere_platform.import_task_decision WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 AND decision_id=$5",&[&scope.organization.to_string(),&scope.company.to_string(),&scope.actor,&request,&decision]).await.map_err(ApiError::internal)?.ok_or_else(||ApiError::NotFound("file decision receipt not found".into()))?;
     Ok(decision_receipt(&row))
 }
 
@@ -599,6 +627,12 @@ async fn finish(
     let org = scope.organization.to_string();
     let company = scope.company.to_string();
     let task = tx.query_one("SELECT state,approved_mode,decision_revision FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 FOR UPDATE", &[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?;
+    let decision_actor = tx.query_opt(
+        "SELECT coalesce(decided_by,actor_identity) AS decided_by FROM lumiere_platform.import_task_decision
+         WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3
+           AND request_id=$4 AND revision=$5",
+        &[&org,&company,&scope.actor,&request,&revision],
+    ).await.map_err(ApiError::internal)?.map_or_else(|| scope.actor.to_owned(), |row| row.get("decided_by"));
     if task.get::<_, i32>("decision_revision") != revision {
         // A concurrent inspection can finish after the task advances to
         // preparation. Its output belongs to the earlier decision.
@@ -620,7 +654,7 @@ async fn finish(
                 )
                 .map_err(ApiError::internal)?,
             ));
-            let inserted = tx.query_opt("INSERT INTO lumiere_platform.import_review_batch (organization_id,company_id,title,target_entity,source_file,source_sha256,created_by) VALUES ($1::text::numeric,$2::text::numeric,$3,$4,$5,$6,$7) ON CONFLICT (organization_id,company_id,source_sha256) DO NOTHING RETURNING id", &[&org,&company,&dataset.title,&dataset.target_entity,&dataset.source_file,&hash,&scope.actor]).await.map_err(ApiError::internal)?;
+            let inserted = tx.query_opt("INSERT INTO lumiere_platform.import_review_batch (organization_id,company_id,title,target_entity,source_file,source_sha256,created_by) VALUES ($1::text::numeric,$2::text::numeric,$3,$4,$5,$6,$7) ON CONFLICT (organization_id,company_id,source_sha256) DO NOTHING RETURNING id", &[&org,&company,&dataset.title,&dataset.target_entity,&dataset.source_file,&hash,&decision_actor]).await.map_err(ApiError::internal)?;
             let batch: i64 = if let Some(row) = inserted {
                 let batch = row.get("id");
                 for item in &dataset.items {
@@ -700,7 +734,7 @@ pub(super) async fn read_task(
         .await
         .map_err(ApiError::internal)?;
     let reviews = tx.query("SELECT batch.id::text,batch.title,batch.target_entity,link.from_inspection,count(item.id)::int AS total,count(item.id) FILTER (WHERE item.state='needs_review')::int AS pending,count(item.id) FILTER (WHERE item.state='confirmed')::int AS confirmed,count(item.id) FILTER (WHERE item.state='excluded')::int AS excluded FROM lumiere_platform.import_task_review link JOIN lumiere_platform.import_review_batch batch ON batch.organization_id=link.organization_id AND batch.company_id=link.company_id AND batch.id=link.batch_id LEFT JOIN lumiere_platform.import_review_item item ON item.organization_id=batch.organization_id AND item.company_id=batch.company_id AND item.batch_id=batch.id WHERE link.organization_id=$1::text::numeric AND link.company_id=$2::text::numeric AND link.actor_identity=$3 AND link.request_id=$4 GROUP BY batch.id,link.from_inspection ORDER BY batch.id", &[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?;
-    let decisions=tx.query("SELECT decision_id,option_id,other_text,revision,created_at::text FROM lumiere_platform.import_task_decision WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 ORDER BY revision DESC LIMIT 100",&[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?;
+    let decisions=tx.query("SELECT decision_id,option_id,other_text,revision,created_at::text,COALESCE(decided_by,actor_identity) AS decided_by FROM lumiere_platform.import_task_decision WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 ORDER BY revision DESC LIMIT 100",&[&org,&company,&scope.actor,&request]).await.map_err(ApiError::internal)?;
     tx.commit().await.map_err(ApiError::internal)?;
     let history = decisions.iter().map(decision_receipt).collect::<Vec<_>>();
     let latest = history.first().cloned().unwrap_or(Value::Null);
@@ -801,7 +835,7 @@ async fn create_from_document(
     OrgSession { session, .. }: OrgSession,
     Json(selection): Json<DocumentSubmission>,
 ) -> Result<Json<Value>, ApiError> {
-    let context = scope(&state, &session, selection.company_id).await?;
+    let context = task_company_scope(&state, &session, selection.company_id).await?;
     let scoped = StorageScope {
         organization: context.organization_id(),
         company: selection.company_id,
@@ -818,6 +852,23 @@ async fn create_from_document(
     };
     let document_id = parse_id(&selection.document_id)?;
     let version_id = parse_id(&selection.version_id)?;
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    if super::full_administrator(context.field_access()) {
+        if let Some(request) = handoff::find_incoming_document_task(
+            &pool,
+            scoped,
+            &context,
+            document_id,
+            version_id,
+            &selection.checksum,
+            selection.current,
+        )
+        .await?
+        {
+            let (_, task) = handoff::read_for(&pool, &context, scoped, &request).await?;
+            return Ok(Json(task));
+        }
+    }
     let (source, blob) = crate::document_blobs::read_authorized_spreadsheet_source(
         &state,
         &session,
@@ -840,7 +891,6 @@ async fn create_from_document(
     }
     let (request_id, conversation_key) =
         managed_source::document_task_identity(scoped.company, document_id, version_id);
-    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
     if let Some(request) =
         managed_source::find_saved_document_task(&pool, scoped, &source, &conversation_key).await?
     {
@@ -904,7 +954,7 @@ async fn resume(
     Path(request): Path<String>,
     Query(query): Query<TaskQuery>,
 ) -> Result<Json<Value>, ApiError> {
-    let context = scope(&state, &session, query.company_id).await?;
+    let context = task_company_scope(&state, &session, query.company_id).await?;
     if !valid_request_id(&request) {
         return Err(ApiError::BadRequest(
             "invalid import request identity".into(),
@@ -916,7 +966,18 @@ async fn resume(
         company: query.company_id,
         actor: context.actor_identity(),
     };
-    resume_task(&pool, scoped, &request).await
+    let (creator, _) = handoff::read_for(&pool, &context, scoped, &request).await?;
+    resume_task(
+        &pool,
+        StorageScope {
+            actor: &creator,
+            ..scoped
+        },
+        &request,
+    )
+    .await?;
+    let (_, task) = handoff::read_for(&pool, &context, scoped, &request).await?;
+    Ok(Json(task))
 }
 
 async fn resume_task(
@@ -1106,7 +1167,7 @@ async fn decide(
     Path(request): Path<String>,
     Json(body): Json<DecisionBody>,
 ) -> Result<Json<Value>, ApiError> {
-    let context = scope(&state, &session, body.company_id).await?;
+    let context = task_company_scope(&state, &session, body.company_id).await?;
     if !valid_request_id(&request) {
         return Err(ApiError::BadRequest(
             "invalid import request identity".into(),
@@ -1118,8 +1179,14 @@ async fn decide(
         actor: context.actor_identity(),
     };
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
-    let receipt = save_decision(&pool, scoped, &request, &body).await?;
-    let mut task = resume_task(&pool, scoped, &request).await?.0;
+    let (creator, _) = handoff::read_for(&pool, &context, scoped, &request).await?;
+    let storage = StorageScope {
+        actor: &creator,
+        ..scoped
+    };
+    let receipt = save_decision_as(&pool, storage, &request, &body, scoped.actor).await?;
+    resume_task(&pool, storage, &request).await?;
+    let (_, mut task) = handoff::read_for(&pool, &context, scoped, &request).await?;
     task["decisionReceipt"] = receipt;
     Ok(Json(task))
 }
@@ -1130,7 +1197,7 @@ async fn read(
     Path(request): Path<String>,
     Query(query): Query<TaskQuery>,
 ) -> Result<Json<Value>, ApiError> {
-    let context = scope(&state, &session, query.company_id).await?;
+    let context = task_company_scope(&state, &session, query.company_id).await?;
     if !valid_request_id(&request) {
         return Err(ApiError::BadRequest(
             "invalid import request identity".into(),
@@ -1142,14 +1209,24 @@ async fn read(
         company: query.company_id,
         actor: context.actor_identity(),
     };
-    // Read immutable receipt first: the subsequent task snapshot must include
-    // at least that committed revision, even if another answer arrives now.
+    let (creator, mut task) = handoff::read_for(&pool, &context, scoped, &request).await?;
+    let storage = StorageScope {
+        actor: &creator,
+        ..scoped
+    };
     let receipt = match query.decision_id {
-        Some(decision) => Some(read_decision(&pool, scoped, &request, &decision).await?),
+        Some(decision) => Some(read_decision(&pool, storage, &request, &decision).await?),
         None => None,
     };
-    let mut task = read_task(&pool, scoped, &request).await?;
     if let Some(receipt) = receipt {
+        // Re-read after checking the immutable receipt, including current
+        // grant and document access. The snapshot now includes this revision.
+        let (current_creator, latest) =
+            handoff::read_for(&pool, &context, scoped, &request).await?;
+        if current_creator != creator {
+            return Err(ApiError::NotFound("import task not found".into()));
+        }
+        task = latest;
         task["decisionReceipt"] = receipt;
     }
     Ok(Json(task))
@@ -1160,7 +1237,7 @@ async fn list(
     OrgSession { session, .. }: OrgSession,
     Query(query): Query<TaskQuery>,
 ) -> Result<Json<Value>, ApiError> {
-    let context = scope(&state, &session, query.company_id).await?;
+    let context = task_company_scope(&state, &session, query.company_id).await?;
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
     let scoped = StorageScope {
         organization: context.organization_id(),
@@ -1172,7 +1249,20 @@ async fn list(
     let after_request = after.as_ref().map(|value| value.request_id.as_str());
     let requests = {
         let client = pool.get().await.map_err(ApiError::internal)?;
-        client.query("SELECT request_id,created_at::text FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND ($4::text IS NULL OR conversation_key=$4) AND ($5::text IS NULL OR (created_at,request_id)<($5::text::timestamptz,$6)) ORDER BY created_at DESC,request_id DESC LIMIT 21", &[&scoped.organization.to_string(),&scoped.company.to_string(),&scoped.actor,&query.conversation_key,&after_time,&after_request]).await.map_err(ApiError::internal)?
+        let admin = super::full_administrator(context.field_access());
+        client.query(
+            "SELECT DISTINCT ON (task.created_at,task.request_id) task.request_id,task.created_at::text
+             FROM lumiere_platform.import_task task
+             LEFT JOIN lumiere_platform.import_task_handoff handoff
+               USING (organization_id,company_id,actor_identity,request_id)
+             WHERE task.organization_id=$1::text::numeric AND task.company_id=$2::text::numeric
+               AND ((task.actor_identity=$3 AND ($7::bool OR task.conversation_key LIKE 'managed-document-v1:%'))
+                 OR ($7::bool AND handoff.recipient_identity=$3))
+               AND ($4::text IS NULL OR conversation_key=$4)
+               AND ($5::text IS NULL OR (task.created_at,task.request_id)<($5::text::timestamptz,$6))
+             ORDER BY task.created_at DESC,task.request_id DESC LIMIT 21",
+            &[&scoped.organization.to_string(),&scoped.company.to_string(),&scoped.actor,&query.conversation_key,&after_time,&after_request,&admin],
+        ).await.map_err(ApiError::internal)?
     };
     let next_cursor = if requests.len() > 20 {
         requests
@@ -1184,7 +1274,12 @@ async fn list(
     };
     let mut tasks = Vec::with_capacity(requests.len().min(20));
     for row in requests.iter().take(20) {
-        tasks.push(read_task(&pool, scoped, &row.get::<_, String>("request_id")).await?);
+        match handoff::read_for(&pool, &context, scoped, &row.get::<_, String>("request_id")).await
+        {
+            Ok((_, task)) => tasks.push(task),
+            Err(ApiError::NotFound(_) | ApiError::Forbidden(_)) => (),
+            Err(error) => return Err(error),
+        }
     }
     Ok(Json(json!({"tasks":tasks,"nextCursor":next_cursor})))
 }
@@ -1265,15 +1360,44 @@ async fn download(
     Path((request, ordinal)): Path<(String, i32)>,
     Query(query): Query<TaskQuery>,
 ) -> Result<Response, ApiError> {
-    let context = scope(&state, &session, query.company_id).await?;
+    let context = task_company_scope(&state, &session, query.company_id).await?;
     if !valid_request_id(&request) {
         return Err(ApiError::BadRequest(
             "invalid import request identity".into(),
         ));
     }
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let scoped = StorageScope {
+        organization: context.organization_id(),
+        company: query.company_id,
+        actor: context.actor_identity(),
+    };
+    let (creator, _) = handoff::read_for(&pool, &context, scoped, &request).await?;
     let client = pool.get().await.map_err(ApiError::internal)?;
-    let row=client.query_opt("SELECT file_name,original_bytes FROM lumiere_platform.import_task_source WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 AND ordinal=$5", &[&context.organization_id().to_string(),&query.company_id.to_string(),&context.actor_identity(),&request,&ordinal]).await.map_err(ApiError::internal)?.ok_or_else(||ApiError::NotFound("import source not found".into()))?;
+    let row = client
+        .query_opt(
+            "SELECT file_name,original_bytes FROM lumiere_platform.import_task_source source
+          WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric
+            AND actor_identity=$3 AND request_id=$4 AND ordinal=$5
+            AND ($3=$6 OR EXISTS (
+                SELECT 1 FROM lumiere_platform.import_task_handoff handoff
+                 WHERE handoff.organization_id=source.organization_id
+                   AND handoff.company_id=source.company_id
+                   AND handoff.actor_identity=source.actor_identity
+                   AND handoff.request_id=source.request_id AND handoff.recipient_identity=$6
+            ))",
+            &[
+                &context.organization_id().to_string(),
+                &query.company_id.to_string(),
+                &creator,
+                &request,
+                &ordinal,
+                &scoped.actor,
+            ],
+        )
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| ApiError::NotFound("import source not found".into()))?;
     let filename = row.get::<_, String>("file_name");
     let disposition = HeaderValue::from_str(&format!(
         "attachment; filename*=UTF-8''{}",
@@ -1302,6 +1426,10 @@ pub(super) fn router() -> Router<Arc<AppState>> {
         .route("/import-tasks", get(list).post(create))
         .route("/import-tasks/from-document", post(create_from_document))
         .route("/import-tasks/:request", get(read))
+        .route(
+            "/import-tasks/:request/handoff",
+            get(handoff::recipients).post(handoff::update),
+        )
         .route("/import-tasks/:request/files/:ordinal", get(download))
         .route("/import-tasks/:request/resume", axum::routing::post(resume))
         .route(

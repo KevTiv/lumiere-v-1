@@ -4525,6 +4525,26 @@
     }
   },
   "settings": {
+    "importHandoff": {
+      "title": "Guhereza iyinjiza ry’amakuru ngo risuzumwe",
+      "description": "Hitamo umugenzuzi wo muri sosiyete uzakomeza iri yinjiza ry’amakuru ryabitswe.",
+      "recipient": "Umugenzuzi",
+      "chooseRecipient": "Hitamo umugenzuzi",
+      "searchRecipients": "Shaka abagenzuzi",
+      "noRecipients": "Nta mugenzuzi wemerewe",
+      "recipientsLoading": "Birimo kugenzura abagenzuzi bemerewe…",
+      "recipientsError": "Urutonde rw’abagenzuzi ntirwashoboye gufungurwa.",
+      "recipientsDenied": "Nta rutonde rw’abagenzuzi ruboneka kuri iki gikorwa.",
+      "share": "Ohereza ngo bisuzumwe",
+      "received": "Wahawe iri yinjiza ry’amakuru ngo urisuzume.",
+      "copyLink": "Koporora ihuza ryo gusuzuma",
+      "copied": "Ihuza ryakoporowe",
+      "revoke": "Kuraho uburenganzira",
+      "error": "Guhereza byanze. Genzura umugenzuzi wongere ufungure urupapuro mbere yo kugerageza.",
+      "continueFromReview": "Fungura Ibyemezo kugira ngo urangize isuzuma wahawe, maze ukomeze ukoresheje inkomoko yemejwe.",
+      "decisionActors": "Amateka y’ibyemezo",
+      "decisionActor": "Ivugurura {{revision}} · {{actor}}"
+    },
     "importTask": {
       "progressVerifiedRecordCounts": "{{records}} nyandiko z’amateka zemejwe · {{drafts}} nyandiko z’agateganyo zagenzuwe · {{receipts}} nyemezabikorwa zo kwinjiza amakuru",
       "cardSourceCounts": "Imirongo {{total}} yo mu nkomoko · {{ready}} yemejwe · {{held}} ikeneye icyemezo · {{excluded}} yakuwemo",
