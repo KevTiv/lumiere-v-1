@@ -701,6 +701,41 @@ function ReviewWorkspace({
                         ))}
                       </dl>
                     </details>
+                  )}
+                </div>
+              </details>
+              {historySource && referenceInChat && selectedId && detail.data.targetEntity === "product" && entry.state === "confirmed" && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => referenceInChat({
+                  kind: "import_mapping", ...historySource, batchId: selectedId,
+                  itemId: entry.itemId, revision: entry.revision,
+                }, companyId)}>
+                  {t("aiChat.history.useInNewChat", { defaultValue: "Use in new chat" })}
+                </Button>
+              )}
+              {!pinnedReview && item && canUndoReviewDecision(item, entry) ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={unavailable || !!selected}
+                  onClick={() => void undo(entry)}
+                >
+                  {t("settings.importReview.grouped.undo")}
+                </Button>
+              ) : null}
+            </li>
+          )
+        })}
+      </ul>
+      {!pinnedReview && historyId && history.hasNextPage ? (
+        <Button
+          variant="outline"
+          disabled={history.isFetchingNextPage}
+          onClick={() => void history.fetchNextPage()}
+        >
+          {t("settings.importReview.grouped.olderHistory")}
+        </Button>
+      ) : null}
+    </details>
   ) : null
   const queueContent = (
     <>
@@ -1126,41 +1161,6 @@ function ReviewWorkspace({
               {t("settings.importReview.grouped.nextPage")}
             </Button>
           </div>
-                        )}
-                      </div>
-                    </details>
-                    {historySource && referenceInChat && selectedId && detail.data.targetEntity === "product" && entry.state === "confirmed" && (
-                      <Button type="button" variant="ghost" size="sm" onClick={() => referenceInChat({
-                        kind: "import_mapping", ...historySource, batchId: selectedId,
-                        itemId: entry.itemId, revision: entry.revision,
-                      }, companyId)}>
-                        {t("aiChat.history.useInNewChat", { defaultValue: "Use in new chat" })}
-                      </Button>
-                    )}
-                    {!pinnedReview && item && canUndoReviewDecision(item, entry) ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={unavailable || !!selected}
-                        onClick={() => void undo(entry)}
-                      >
-                        {t("settings.importReview.grouped.undo")}
-                      </Button>
-                    ) : null}
-                  </li>
-                )
-              })}
-            </ul>
-            {!pinnedReview && historyId && history.hasNextPage ? (
-              <Button
-                variant="outline"
-                disabled={history.isFetchingNextPage}
-                onClick={() => void history.fetchNextPage()}
-              >
-                {t("settings.importReview.grouped.olderHistory")}
-              </Button>
-            ) : null}
-          </details>
         </>
       ) : null}
     </>
