@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import type { Page } from "@playwright/test"
+import { seedFirstSaleAccounting } from "./first-sale-accounting-fixture"
 import { bootstrapSalesFixture, seedSalesStockFixture } from "./sales-approval-fixture"
 import { id } from "./cov-scheduler-manufacturing-fixtures"
 import { readFileSync } from "node:fs"
@@ -308,6 +309,65 @@ test.describe("O2C adversarial certification", { tag: "@p0" }, () => {
   })
 })
 
+async function saleInvoiceIds(page: Page, orderId: number) {
+  return (await rows(page, "account-moves"))
+    .filter((row) => scalarQueryId(row.saleOrderId ?? row.sale_order_id) === orderId)
+    .map((row) => scalarQueryId(row.id))
+}
+
+async function createAndPostSaleInvoice(page: Page, orderId: number) {
+  await openCreateInvoiceFromOrder(page, orderId)
+  await chooseSelectOptionByLabel(page, "journalId", await fetchSalesInvoiceJournalLabel(page))
+  await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", await fetchAccountSelectLabelByInternalType(page, "income"))
+  await chooseSelectOptionByLabel(page, "receivableAccountId", await fetchAccountSelectLabelByInternalType(page, "receivable"))
+  const [invoiceResponse] = await Promise.all([
+    page.waitForResponse((response) => matchesOperationResponse(response, "create_invoice_from_sale_order"), { timeout: 30_000 }),
+    submitForm(page, "create-invoice-from-sale-order"),
+  ])
+  expect(invoiceResponse.ok()).toBe(true)
+  const id = await fetchDraftInvoiceMoveIdForSaleOrder(page, orderId)
+  expect(await saleInvoiceIds(page, orderId)).toEqual([id])
+  await postDraftInvoiceViaUi(page, id)
+  await assertMoveLinesBalanced(page, id)
+  return id
+}
+
+async function assertReloadedSettlement(
+  page: Page,
+  moveId: number,
+  payment: Awaited<ReturnType<typeof createAndPostPayment>>,
+) {
+  await gotoModule(page, invoiceRecordPageHref(moveId))
+  await expect(page.getByTestId("invoice-page")).toBeVisible()
+  await page.reload({ waitUntil: "domcontentloaded" })
+  await expect(page).toHaveURL((url) => url.pathname === invoiceRecordPageHref(moveId))
+  await expect(page.getByTestId("invoice-page")).toBeVisible()
+  const linkedPayments = (await rows(page, "account-payments")).filter((row) => {
+    const invoiceIds = row.reconciledInvoiceIds ?? row.reconciled_invoice_ids
+    return scalarQueryString(row.ref ?? row.ref_) === payment.reference ||
+      (Array.isArray(invoiceIds) && invoiceIds.some((id) => scalarQueryId(id) === moveId))
+  })
+  expect(linkedPayments.map((row) => scalarQueryId(row.id))).toEqual([payment.paymentId])
+  const [ledgerPayment] = linkedPayments
+  const invoiceIds = ledgerPayment!.reconciledInvoiceIds ?? ledgerPayment!.reconciled_invoice_ids
+  expect(Array.isArray(invoiceIds) ? invoiceIds.map(scalarQueryId) : []).toEqual([moveId])
+  await expect.poll(() => moveSnapshot(page, moveId)).toEqual({ residual: 0, paymentState: "Paid", state: "Posted" })
+  expect(scalarQueryString(ledgerPayment!.state)).toBe("Paid")
+  expect(Number(ledgerPayment!.amount)).toBe(payment.amountTotal)
+  const paymentEntryId = scalarQueryId(ledgerPayment!.moveId ?? ledgerPayment!.move_id)
+  if (paymentEntryId == null) throw new Error("Posted payment has no ledger move ID")
+  expect(paymentEntryId).not.toBe(moveId)
+  expect((await moveSnapshot(page, paymentEntryId)).state).toBe("Posted")
+  const ledgerLines = await rows(page, "account-move-lines")
+  for (const id of [moveId, paymentEntryId]) {
+    await assertMoveLinesBalanced(page, id)
+    const lines = ledgerLines.filter((row) => scalarQueryId(row.moveId ?? row.move_id) === id)
+    expect(lines.some((row) => Number(row.debit) > 0), `Move ${id} has a debit`).toBe(true)
+    expect(lines.some((row) => Number(row.credit) > 0), `Move ${id} has a credit`).toBe(true)
+  }
+  return paymentEntryId
+}
+
 const runRemoteFirstSale = process.env.E2E_ALPHA_FIRST_SALE === "1"
 const runCiFixtureFirstSale = process.env.E2E_ALPHA_FIRST_SALE_CI_FIXTURE === "1" &&
   process.env.GITHUB_ACTIONS === "true" && process.env.GITHUB_EVENT_NAME === "pull_request"
@@ -376,25 +436,8 @@ test.describe("Alpha native first-sale rehearsal", { tag: "@p0" }, () => {
       return id
     })
 
-    const invoices = async () => (await rows(page, "account-moves"))
-      .filter((row) => scalarQueryId(row.saleOrderId ?? row.sale_order_id) === orderId)
-      .map((row) => scalarQueryId(row.id))
-    const moveId = await test.step("Create and post the sale's single linked invoice", async () => {
-      await openCreateInvoiceFromOrder(page, orderId)
-      await chooseSelectOptionByLabel(page, "journalId", await fetchSalesInvoiceJournalLabel(page))
-      await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", await fetchAccountSelectLabelByInternalType(page, "income"))
-      await chooseSelectOptionByLabel(page, "receivableAccountId", await fetchAccountSelectLabelByInternalType(page, "receivable"))
-      const [invoiceResponse] = await Promise.all([
-        page.waitForResponse((response) => matchesOperationResponse(response, "create_invoice_from_sale_order"), { timeout: 30_000 }),
-        submitForm(page, "create-invoice-from-sale-order"),
-      ])
-      expect(invoiceResponse.ok()).toBe(true)
-      const id = await fetchDraftInvoiceMoveIdForSaleOrder(page, orderId)
-      expect(await invoices()).toEqual([id])
-      await postDraftInvoiceViaUi(page, id)
-      await assertMoveLinesBalanced(page, id)
-      return id
-    })
+    const moveId = await test.step("Create and post the sale's single linked invoice", () =>
+      createAndPostSaleInvoice(page, orderId))
 
     const payment = await test.step("Settle the invoice after losing the successful payment reply", async () => {
       const paid = await createAndPostPayment(page, moveId)
@@ -426,38 +469,10 @@ test.describe("Alpha native first-sale rehearsal", { tag: "@p0" }, () => {
         absent: [ORDER_SUMMARY.delivery.partial, ORDER_SUMMARY.payment.partial, ORDER_SUMMARY.payment.unpaid],
         reload: true,
       })
-      const linkedPayments = (await rows(page, "account-payments")).filter((row) => {
-        const invoiceIds = row.reconciledInvoiceIds ?? row.reconciled_invoice_ids
-        return scalarQueryString(row.ref ?? row.ref_) === payment.reference ||
-          (Array.isArray(invoiceIds) && invoiceIds.some((id) => scalarQueryId(id) === moveId))
-      })
-      expect(linkedPayments.map((row) => scalarQueryId(row.id))).toEqual([payment.paymentId])
-      const [ledgerPayment] = linkedPayments
-      const invoiceIds = ledgerPayment!.reconciledInvoiceIds ?? ledgerPayment!.reconciled_invoice_ids
-      expect(Array.isArray(invoiceIds) ? invoiceIds.map(scalarQueryId) : []).toEqual([moveId])
-      expect(await invoices()).toEqual([moveId])
+      expect(await saleInvoiceIds(page, orderId)).toEqual([moveId])
       expect((await fetchOrderPickings(page, orderId, companyId)).map((row) => row.id)).toEqual([pickingId])
       expect(await fetchOrderDeliveredQty(page, orderId)).toBe(1)
-      await expect.poll(() => moveSnapshot(page, moveId)).toEqual({ residual: 0, paymentState: "Paid", state: "Posted" })
-      expect(scalarQueryString(ledgerPayment!.state)).toBe("Paid")
-      expect(Number(ledgerPayment!.amount)).toBe(payment.amountTotal)
-      const paymentEntryId = scalarQueryId(ledgerPayment!.moveId ?? ledgerPayment!.move_id)
-      if (paymentEntryId == null) throw new Error("Posted payment has no ledger move ID")
-      expect(paymentEntryId).not.toBe(moveId)
-      expect((await moveSnapshot(page, paymentEntryId)).state).toBe("Posted")
-      const ledgerLines = await rows(page, "account-move-lines")
-      for (const id of [moveId, paymentEntryId]) {
-        await assertMoveLinesBalanced(page, id)
-        const lines = ledgerLines.filter((row) => scalarQueryId(row.moveId ?? row.move_id) === id)
-        expect(lines.some((row) => Number(row.debit) > 0), `Move ${id} has a debit`).toBe(true)
-        expect(lines.some((row) => Number(row.credit) > 0), `Move ${id} has a credit`).toBe(true)
-      }
-      await gotoModule(page, invoiceRecordPageHref(moveId))
-      await expect(page.getByTestId("invoice-page")).toBeVisible()
-      await page.reload({ waitUntil: "domcontentloaded" })
-      await expect(page).toHaveURL((url) => url.pathname === invoiceRecordPageHref(moveId))
-      await expect(page.getByTestId("invoice-page")).toBeVisible()
-      return paymentEntryId
+      return assertReloadedSettlement(page, moveId, payment)
     })
 
     await testInfo.attach("alpha-first-sale-readback.json", {
@@ -471,8 +486,8 @@ test.describe("Alpha cold-start delivered sale", { tag: ["@p0", "@unauthenticate
   test.skip(!runCiFixtureFirstSale, "Requires the disposable PR fixture")
   test.describe.configure({ retries: 0 })
 
-  test("authors the first quotation and delivers it after completing native setup", async ({ page }) => {
-    test.setTimeout(360_000)
+  test("authors, delivers, invoices and settles the first sale", async ({ page }, testInfo) => {
+    test.setTimeout(480_000)
     for (const url of [process.env.PLAYWRIGHT_BASE_URL, process.env.LUMIERE_API_SERVER_URL, process.env.STDB_HOST]) {
       expect(url).toMatch(/^http:\/\/127\.0\.0\.1:[1-9][0-9]*$/)
     }
@@ -480,7 +495,7 @@ test.describe("Alpha cold-start delivered sale", { tag: ["@p0", "@unauthenticate
 
     const fixtureName = smokeName("first-delivery")
     const { organizationId, companyId, currencyId } = await bootstrapSalesFixture(page, fixtureName)
-    for (const resource of ["sale-orders", "sale-order-lines", "pricelists", "contacts", "stock-pickings", "stock-locations"]) {
+    for (const resource of ["sale-orders", "sale-order-lines", "pricelists", "contacts", "stock-pickings", "stock-locations", "account-moves", "account-payments"]) {
       expect(await rows(page, resource), `new tenant starts with no ${resource}`).toEqual([])
     }
     const { warehouse, product } = await seedSalesStockFixture(page, fixtureName, organizationId, companyId)
@@ -504,7 +519,8 @@ test.describe("Alpha cold-start delivered sale", { tag: ["@p0", "@unauthenticate
       page.getByRole("link", { name: "Open price lists", exact: true }).click(),
     ])
     await priceSetup.waitForURL((url) => url.pathname === "/sales" && url.searchParams.get("tab") === "pricelists")
-    await openEntityCreate(priceSetup, "/sales?tab=pricelists", "sales", "pricelists", "new-pricelist")
+    await priceSetup.getByTestId("module-create-sales-pricelists").click()
+    await expect(priceSetup.getByTestId("form-modal-new-pricelist")).toBeVisible()
     const pricelistName = smokeName("first-price-list")
     await fillField(priceSetup, "name", pricelistName)
     await chooseSelectOptionByValue(priceSetup, "currencyId", currencyId)
@@ -537,7 +553,8 @@ test.describe("Alpha cold-start delivered sale", { tag: ["@p0", "@unauthenticate
       setup.getByRole("link", { name: "Open warehouse locations", exact: true }).click(),
     ])
     await locationSetup.waitForURL((url) => url.pathname === "/warehouse" && url.searchParams.get("tab") === "locations")
-    await openEntityCreate(locationSetup, "/warehouse?tab=locations", "warehouse", "locations", "new-stock-location")
+    await locationSetup.getByTestId("module-create-warehouse-locations").click()
+    await expect(locationSetup.getByTestId("form-modal-new-stock-location")).toBeVisible()
     const destinationName = smokeName("first-customer-location")
     await fillField(locationSetup, "name", destinationName)
     await chooseSelectOptionByValue(locationSetup, "usage", "customer")
@@ -563,6 +580,33 @@ test.describe("Alpha cold-start delivered sale", { tag: ["@p0", "@unauthenticate
     expect((await fetchOrderPickings(page, orderId, companyId)).map((row) => row.id)).toEqual([pickingId])
     const picking = (await rows(page, `stock-pickings?companyId=${companyId}`)).find((row) => id(row) === pickingId)
     expect(scalarQueryId(picking?.locationDestId ?? picking?.location_dest_id)).toBe(id(destinations[0]!))
-    await expectOrderSummary(page, orderId, { present: [ORDER_SUMMARY.delivery.complete], reload: true })
+    const moveId = await test.step("Provision the cold ledger and post the exact delivered order's invoice", async () => {
+      await seedFirstSaleAccounting(page, companyId, currencyId)
+      return createAndPostSaleInvoice(page, orderId)
+    })
+    const payment = await test.step("Register the posted customer receipt against that invoice", async () => {
+      const paid = await createAndPostPayment(page, moveId)
+      expect(paid.amountTotal).toBeGreaterThan(0)
+      expect(await moveSnapshot(page, moveId)).toEqual({ residual: paid.amountTotal, paymentState: "NotPaid", state: "Posted" })
+      await openRegisterForm(page, paid.paymentId, moveId)
+      await Promise.all([
+        page.waitForResponse((response) => matchesOperationResponse(response, "register_payment_on_invoice") && response.ok()),
+        submitForm(page, "register-payment-invoices"),
+      ])
+      await expect.poll(() => moveSnapshot(page, moveId)).toEqual({ residual: 0, paymentState: "Paid", state: "Posted" })
+      return paid
+    })
+    const paymentMoveId = await test.step("Reload and prove a single settled sale with balanced journal lines", async () => {
+      await expectOrderSummary(page, orderId, {
+        present: [ORDER_SUMMARY.delivery.complete, ORDER_SUMMARY.invoice.posted, ORDER_SUMMARY.payment.paid],
+        reload: true,
+      })
+      expect(await saleInvoiceIds(page, orderId)).toEqual([moveId])
+      return assertReloadedSettlement(page, moveId, payment)
+    })
+    await testInfo.attach("alpha-cold-sale-readback.json", {
+      contentType: "application/json",
+      body: JSON.stringify({ organizationId, companyId, orderId, pickingId, moveId, paymentId: payment.paymentId, paymentMoveId, delivered: 1, residual: 0 }),
+    })
   })
 })
