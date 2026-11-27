@@ -16,6 +16,7 @@ export default function Page() {
   )
   const [result, setResult] = useState("")
   const [workspace, setWorkspace] = useState(false)
+  const [checkpoint, setCheckpoint] = useState(false)
   const [actor, setActor] = useState("ab".repeat(32))
   const [companyId, setCompanyId] = useState(9001)
   return (
@@ -49,6 +50,7 @@ export default function Page() {
                   <button type="button" onClick={() => setWorkspace(true)}>
                     Open import handoff fixture
                   </button>
+                  <button type="button" onClick={() => setCheckpoint(true)}>Open review checkpoint fixture</button>
                   {workspace ? (
                     <DataImportWorkspace organizationId={8001} />
                   ) : (
@@ -56,6 +58,7 @@ export default function Page() {
                       organizationId={8001}
                       companyId={companyId}
                       initialId="1"
+                      historySource={checkpoint ? { taskId: "e".repeat(32), sessionKey: "checkpoint-fixture" } : undefined}
                       onContinue={(source) => setResult(source.csv)}
                     />
                   )}

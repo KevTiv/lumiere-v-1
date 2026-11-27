@@ -1522,3 +1522,46 @@ test("review handoff cannot replace a busy or unknown import and explicit recove
     await page.unrouteAll({ behavior: "wait" })
   }
 })
+
+test("a saved issue reopens on another device without replaying a decision", async ({ context, page }) => {
+  let saved: Record<string, unknown> | null = null
+  let item = source()
+  let checkpointWrites = 0
+  const setup = async (target: Page) => {
+    await mockReview(target, [item])
+    await target.route("**/api/import-tasks/" + "e".repeat(32) + "/review-checkpoint**", async route => {
+      if (route.request().method() === "PUT") {
+        const { companyId, expectedRevision, ...position } = route.request().postDataJSON()
+        expect(companyId).toBe(9001)
+        expect(expectedRevision).toBe(0)
+        expect(position).toMatchObject({ reviewId: "1", itemId: "11", itemRevision: 1 })
+        saved = { ...position, revision: 1 }
+        checkpointWrites += 1
+      }
+      await route.fulfill({ json: {
+        organizationId: "8001", companyId: "9001", taskId: "e".repeat(32), checkpoint: saved,
+        status: !saved ? "empty" : saved.itemRevision === item.revision ? "saved" : "stale",
+      } })
+    })
+    await target.goto("/import-review")
+    await target.getByRole("button", { name: "Open review checkpoint fixture" }).click()
+  }
+  await setup(page)
+  await page.getByRole("button", { name: "Review and correct", exact: true }).click()
+  await page.getByRole("button", { name: "Save my place" }).click()
+  await expect(page.getByText("Review position saved.")).toBeVisible()
+
+  const recipient = await context.newPage()
+  await setup(recipient)
+  await recipient.getByRole("button", { name: "Change review actor" }).click()
+  await recipient.getByRole("button", { name: "Resume saved issue" }).click()
+  await expect(recipient.locator('[data-state="selected"]').filter({ hasText: "Synthetic sausage" })).toBeVisible()
+  expect(checkpointWrites).toBe(1)
+
+  item = { ...item, revision: 2 }
+  const stale = await context.newPage()
+  await setup(stale)
+  await expect(stale.getByText("The saved issue has changed.", { exact: false })).toBeVisible()
+  await expect(stale.getByRole("button", { name: "Resume saved issue" })).toHaveCount(0)
+  expect(checkpointWrites).toBe(1)
+})

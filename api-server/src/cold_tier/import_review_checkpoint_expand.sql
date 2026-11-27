@@ -1,4 +1,4 @@
--- Shared task navigation only. Review decisions remain in their existing tables.
+-- Shared navigation position for a saved task. Review decisions remain in their existing tables.
 create table lumiere_platform.import_review_checkpoint (
     organization_id numeric(20,0) not null,
     company_id numeric(20,0) not null,
