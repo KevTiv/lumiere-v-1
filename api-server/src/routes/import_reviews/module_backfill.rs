@@ -15,8 +15,12 @@ use sha2::{Digest, Sha256};
 
 mod durable;
 mod reconciliation;
+#[cfg(test)]
+mod durable_postgres_tests;
 
 pub(super) use durable::{execute_chunk, validate_durable_group};
+#[cfg(test)]
+pub(super) use durable_postgres_tests::exercise_shop_sales_volume;
 
 #[cfg(test)]
 pub(super) use reconciliation::exercise_persistence;
@@ -71,7 +75,7 @@ pub(super) struct WriteBody {
     preview: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Selection {
     item_id: String,
