@@ -201,7 +201,27 @@
       "scheduled-reports": "Ripoti zilizopangwa"
     }
   },
+  "commandPalette": {
+    "recent": {
+      "heading": "Za hivi karibuni"
+    },
+    "quickCreate": {
+      "heading": "Unda haraka",
+      "invoice": "Ankara mpya ya mteja",
+      "bill": "Ankara mpya ya msambazaji",
+      "expense": "Gharama mpya",
+      "salesOrder": "Agizo jipya la mauzo"
+    },
+    "preferences": {
+      "heading": "Mapendeleo",
+      "lightMode": "Badili hadi mwonekano wa mwanga",
+      "darkMode": "Badili hadi mwonekano wa giza",
+      "comfortableDensity": "Ongeza nafasi kati ya safu",
+      "compactDensity": "Punguza nafasi kati ya safu"
+    }
+  },
   "workspaceShell": {
+    "searchShort": "Tafuta…",
     "accountAndPreferences": "Akaunti na mapendeleo",
     "resizeNavigation": "Badilisha upana wa urambazaji",
     "preferences": "Mapendeleo ya eneo la kazi",
@@ -225,6 +245,7 @@
     "search": "Tafuta moduli na rekodi"
   },
   "common": {
+    "clearSearch": "Futa utafutaji",
     "name": "Jina",
     "importSource": {
       "title": "Chanzo cha uingizaji kilichorekodiwa",
@@ -2948,6 +2969,9 @@
     }
   },
   "erpWorkflow": {
+    "createdRecords": "Rekodi {{count}} zilizounganishwa zimeundwa.",
+    "createdRecords_one": "Rekodi {{count}} iliyounganishwa imeundwa.",
+    "openRecord": "Fungua rekodi",
     "applied": "Imekamilika",
     "retry": "Jaribu tena",
     "confirm": {
@@ -5008,6 +5032,13 @@
       }
     },
     "statements": {
+      "basisAll": "Maingizo yaliyothibitishwa na rasimu",
+      "basisPosted": "Maingizo yaliyothibitishwa pekee",
+      "basisExplanation": "Takwimu zinatokana na mistari iliyohifadhiwa kwa ripoti hii. Chagua mstari wa akaunti ili kuona maingizo yake ya jarida.",
+      "statusEmpty": "Hakuna mistari",
+      "statusError": "Imeshindwa kupakia",
+      "statusReady": "Mistari {{count}}",
+      "statusReady_one": "Mstari {{count}}",
       "columns": {
         "amount": "Kiasi cha fedha",
         "comparison": "Ulinganisho",

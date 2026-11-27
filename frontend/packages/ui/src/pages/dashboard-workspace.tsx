@@ -171,7 +171,7 @@ function WorkspaceAccountMenu({
           </div>
         </fieldset>
         <fieldset className="hidden space-y-2 md:block">
-          <legend className="text-xs font-medium">{t("workspaceShell.canvasWidth", { defaultValue: "Content width" })}</legend>
+          <legend className="text-xs font-medium">{t("workspaceShell.contentWidth")}</legend>
           <div className="grid grid-cols-2 gap-1">
             <Button size="sm" variant={contentWidth === "centered" ? "secondary" : "outline"}
               aria-pressed={contentWidth === "centered"} onClick={() => onContentWidthChange("centered")}>

@@ -6,6 +6,13 @@
       "scheduled-reports": "Report zateganyijwe"
     }
   },
+  "commandPalette": {
+    "quickCreate": {
+      "invoice": "Invoice nshya y’umukiriya",
+      "bill": "Invoice nshya y’utanga ibicuruzwa",
+      "salesOrder": "Order nshya y’umukiriya"
+    }
+  },
   "workspaceShell": {
     "accountAndPreferences": "Account n’ibyifuzo"
   },
@@ -780,6 +787,7 @@
       "name": "Izina rya report"
     },
     "statements": {
+      "basisExplanation": "Imibare ikomoka ku mirongo yabitswe muri iyi report. Hitamo umurongo wa account kugira ngo urebe ibyanditswe biwugize.",
       "report": "Report"
     },
     "periodContext": {

@@ -292,6 +292,7 @@
     "forecastFinitePeriod": "Choose a custom date range or a calendar preset before creating a forecast snapshot."
   },
   "workspaceShell": {
+    "searchShort": "Search…",
     "accountAndPreferences": "Account and preferences",
     "resizeNavigation": "Resize navigation",
     "preferences": "Workspace preferences",
@@ -315,6 +316,7 @@
     "search": "Search modules and records"
   },
   "common": {
+    "clearSearch": "Clear search",
     "name": "Name",
     "importSource": {
       "title": "Recorded import source",
@@ -8585,6 +8587,9 @@
     }
   },
   "erpWorkflow": {
+    "createdRecords": "{{count}} linked records created.",
+    "createdRecords_one": "{{count}} linked record created.",
+    "openRecord": "Open record",
     "applied": "Done",
     "approvalPending": "Sent for approval",
     "retry": "Retry",
@@ -17780,6 +17785,13 @@
       }
     },
     "statements": {
+      "basisAll": "Posted & draft entries",
+      "basisPosted": "Posted entries only",
+      "basisExplanation": "Figures are aggregated from the saved statement lines for this report scope. Click any account line to inspect its underlying journal items.",
+      "statusEmpty": "No lines",
+      "statusError": "Load failed",
+      "statusReady": "{{count}} lines",
+      "statusReady_one": "{{count}} line",
       "columns": {
         "amount": "Amount",
         "comparison": "Comparison",
@@ -18589,6 +18601,23 @@
     }
   },
   "commandPalette": {
+    "recent": {
+      "heading": "Recent"
+    },
+    "quickCreate": {
+      "heading": "Quick Create",
+      "invoice": "New customer invoice",
+      "bill": "New vendor bill",
+      "expense": "New expense",
+      "salesOrder": "New sales order"
+    },
+    "preferences": {
+      "heading": "Preferences",
+      "lightMode": "Switch to light mode",
+      "darkMode": "Switch to dark mode",
+      "comfortableDensity": "Switch to comfortable density",
+      "compactDensity": "Switch to compact density"
+    },
     "placeholder": "Search modules, actions and records...",
     "records": {
       "loading": "Searching records...",

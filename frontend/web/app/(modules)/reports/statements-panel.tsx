@@ -227,7 +227,7 @@ export function StatementsPanel({ organizationId, financialReports, hideSelector
                 : query.isError
                   ? { tone: "blocked", label: t("reports.statements.statusError", { defaultValue: "Load failed" }) }
                   : rows.length > 0
-                    ? { tone: "ready", label: t("reports.statements.statusReady", { defaultValue: `${rows.length} lines` }) }
+                    ? { tone: "ready", label: t("reports.statements.statusReady", { count: rows.length }) }
                     : { tone: "partial", label: t("reports.statements.statusEmpty", { defaultValue: "No lines" }) }
             }
           />

@@ -71,13 +71,7 @@ export function useWorkflowSurface(options: { organizationId?: number | bigint }
       const targetHref = targetRef ? workflowRecordHref(targetRef, workspaceProfile) : undefined;
       const description =
         createdCount > 0
-          ? t('erpWorkflow.createdRecords', {
-              count: createdCount,
-              defaultValue:
-                createdCount === 1
-                  ? '1 linked record created.'
-                  : `${createdCount} linked records created.`,
-            })
+          ? t('erpWorkflow.createdRecords', { count: createdCount })
           : undefined;
 
       showWorkflowToast(

@@ -196,7 +196,27 @@
       "scheduled-reports": "Raporo zateganyijwe"
     }
   },
+  "commandPalette": {
+    "recent": {
+      "heading": "Ibyo uheruka"
+    },
+    "quickCreate": {
+      "heading": "Kora vuba",
+      "invoice": "Fagitire nshya y’umukiriya",
+      "bill": "Fagitire nshya y’utanga ibicuruzwa",
+      "expense": "Ikiguzi gishya",
+      "salesOrder": "Komande nshya y’umukiriya"
+    },
+    "preferences": {
+      "heading": "Ibyifuzo",
+      "lightMode": "Hindura ujye ku rumuri",
+      "darkMode": "Hindura ujye ku mwijima",
+      "comfortableDensity": "Erekana imirongo isanzuye",
+      "compactDensity": "Erekana imirongo yegeranye"
+    }
+  },
   "workspaceShell": {
+    "searchShort": "Shakisha…",
     "accountAndPreferences": "Konti n’ibyifuzo",
     "resizeNavigation": "Hindura ubugari bw’inzira",
     "preferences": "Ibyifuzo by’aho ukorera",
@@ -220,6 +240,7 @@
     "search": "Shakisha ibice n’inyandiko"
   },
   "common": {
+    "clearSearch": "Siba ibyo washakishije",
     "name": "Izina",
     "importSource": {
       "title": "Inkomoko y’ibyinjijwe yabitswe",
@@ -2943,6 +2964,9 @@
     }
   },
   "erpWorkflow": {
+    "createdRecords": "Inyandiko {{count}} zifitanye isano zakozwe.",
+    "createdRecords_one": "Inyandiko {{count}} ifitanye isano yakozwe.",
+    "openRecord": "Fungura inyandiko",
     "applied": "Byarangiye",
     "retry": "Ongera ugerageze",
     "confirm": {
@@ -5069,6 +5093,13 @@
       }
     },
     "statements": {
+      "basisAll": "Ibyanditswe byemejwe n’ibitarabyemezwa",
+      "basisPosted": "Ibyanditswe byemejwe gusa",
+      "basisExplanation": "Imibare ikomoka ku mirongo yabitswe muri iyi raporo. Hitamo umurongo wa konti kugira ngo urebe ibyanditswe biwugize.",
+      "statusEmpty": "Nta mirongo",
+      "statusError": "Ntibyashoboye gufunguka",
+      "statusReady": "Imirongo {{count}}",
+      "statusReady_one": "Umurongo {{count}}",
       "columns": {
         "amount": "Amafaranga",
         "comparison": "Kugereranya",
