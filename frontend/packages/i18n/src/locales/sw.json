@@ -5526,7 +5526,7 @@
       "setupTitle": "Sanidi kurekodi gharama za huduma",
       "recovery": {
         "serviceType": "Hakuna aina ya huduma inayotumika kwa kampuni hii.",
-        "journal": "Hakuna jarida la jumla linalotumika kwa kampuni hii.",
+        "journal": "Hakuna jarida linalotumika kwa kampuni hii.",
         "expenseAccount": "Hakuna akaunti ya gharama inayotumika kwa kampuni hii.",
         "offsetAccount": "Hakuna akaunti inayotumika ya mali au dhima kwa ingizo la upande mwingine.",
         "typeName": "Jina la aina ya huduma",
