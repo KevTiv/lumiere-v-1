@@ -54,6 +54,7 @@ pub(crate) async fn serve() -> anyhow::Result<()> {
 
     crate::tenant_services::start(state.clone())?;
     tokio::spawn(crate::routes::verify_import_writer_schema());
+    crate::routes::start_import_runs(state.clone());
     let app = router::app(state, cors);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
