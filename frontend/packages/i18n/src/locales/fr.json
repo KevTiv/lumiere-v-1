@@ -4600,6 +4600,8 @@
       "importsPausedResume": "Votre import enregistré est conservé. Réessayez lorsque les imports reprendront ; les lignes déjà enregistrées sont reconnues, pas dupliquées."
     },
     "importWorkflow": {
+      "pendingSourceTitle": "Lignes sources à réviser",
+      "openPendingSource": "{{title}} · examiner les lignes non résolues ({{rows}})",
       "nativeReceiptBoundary": "Les reçus couvrent les lignes soumises. Les lignes en attente de révision sont exclues. Un lien vers l’enregistrement apparaît uniquement si les preuves de l’import et l’accès actuel à l’enregistrement peuvent être vérifiés.",
       "receiptHistoryUnavailable": "Impossible de charger les reçus précédents. Réessayez.",
       "receiptHistoryMore": "Charger les reçus précédents",

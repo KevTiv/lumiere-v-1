@@ -4548,6 +4548,8 @@
       "importsPausedResume": "Ibyo winjije byabitswe birabitswe. Ongera ugerageze igihe kwinjiza bizaba byasubukuwe; imirongo yamaze kubikwa ntizongera kwandikwa."
     },
     "importWorkflow": {
+      "pendingSourceTitle": "Imirongo y’inkomoko igikeneye gusuzumwa",
+      "openPendingSource": "{{title}} · suzuma imirongo itarakemurwa ({{rows}})",
       "nativeReceiptBoundary": "Inyemezabwishyu zigaragaza imirongo yoherejwe. Imirongo igitegereje gusuzumwa ntirimo. Ihuza ry’inyandiko rigaragara gusa iyo ibimenyetso by’iyinjiza n’uburenganzira bwo kureba inyandiko byemejwe.",
       "receiptHistoryUnavailable": "Inyemezabwishyu za mbere ntizashoboye gufunguka. Ongera ugerageze.",
       "receiptHistoryMore": "Fungura inyemezabwishyu za mbere",

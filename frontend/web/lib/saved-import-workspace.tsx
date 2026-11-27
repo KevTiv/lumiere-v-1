@@ -29,6 +29,7 @@ import {
   importTaskHref,
   isImportTaskView,
   pendingImportReviewId,
+  pendingImportReviews,
   type ImportTaskView,
 } from "./import-task-navigation"
 import {
@@ -50,6 +51,7 @@ export function SavedImportWorkspace({
   taskId,
   view,
   initialReviewId,
+  reviewFilter,
   resumeAtNextStep = false,
   preparationTarget,
   inspectionOnly = false,
@@ -62,10 +64,11 @@ export function SavedImportWorkspace({
   taskId: string
   view: ImportTaskView
   initialReviewId?: string
+  reviewFilter?: "needs_review"
   resumeAtNextStep?: boolean
   preparationTarget?: ImportPreparationSection["targetEntity"]
   inspectionOnly?: boolean
-  onNavigate: (view: ImportTaskView, reviewId?: string) => void
+  onNavigate: (view: ImportTaskView, reviewId?: string, reviewFilter?: "needs_review") => void
   onBack: () => void
   onTaskChange: (task: ChatImportTask) => void
   onTaskFocus?: (task: ChatImportTask) => void
@@ -128,6 +131,7 @@ export function SavedImportWorkspace({
   const wizard = useRef<GuidedImportWizardHandle>(null)
   const heading = useRef<HTMLHeadingElement>(null)
   const reviews = task?.reviews
+  const pendingReviews = pendingImportReviews(reviews)
   const allowedReviewIds = useMemo(
     () => reviews?.map((review) => review.id) ?? [],
     [reviews],
@@ -214,11 +218,12 @@ export function SavedImportWorkspace({
     nextView: ImportTaskView,
     nextReviewId = selectedReviewId,
     focus = false,
+    filter?: "needs_review",
   ) => {
     if (nextView === "preview" || nextView === "results")
       setExecutionView(nextView)
     if (nextReviewId) setReviewId(nextReviewId)
-    onNavigate(nextView, nextReviewId)
+    onNavigate(nextView, nextReviewId, filter)
     if (focus) heading.current?.focus()
   }
   const continueImport = async (source: ReviewedImportSource) => {
@@ -663,7 +668,7 @@ export function SavedImportWorkspace({
         <TabsContent value="decisions" keepMounted>
           {selectedReviewId ? (
             <ImportReviewWorkspace
-              key={selectedReviewId}
+              key={`${selectedReviewId}:${reviewFilter ?? ""}`}
               organizationId={scope.organizationId}
               selectedId={selectedReviewId}
               allowedReviewIds={allowedReviewIds}
@@ -728,6 +733,22 @@ export function SavedImportWorkspace({
                   </select>
                 </label>
               ) : null}
+              {executionView === "results" && pendingReviews.length > 0 && (
+                <section className="space-y-2 rounded-md border p-3" aria-label={t("settings.importWorkflow.pendingSourceTitle")}>
+                  <h3 className="font-medium">{t("settings.importWorkflow.pendingSourceTitle")}</h3>
+                  <ul className="space-y-1">
+                    {pendingReviews.map(review => (
+                      <li key={review.id}>
+                        <Button type="button" variant="link" className="h-auto min-h-9 whitespace-normal px-0 text-left" onClick={() =>
+                          navigate("decisions", review.id, true, "needs_review")
+                        }>
+                          {t("settings.importWorkflow.openPendingSource", { title: review.title, rows: review.pending })}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
               <ImportTaskExecutionPanel
                 organizationId={scope.organizationId}
                 companyId={scope.companyId}

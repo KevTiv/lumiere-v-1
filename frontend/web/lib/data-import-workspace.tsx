@@ -174,12 +174,13 @@ function ScopedWorkspace({
           view={location.view}
           resumeAtNextStep={resumeSavedTask}
           initialReviewId={location.reviewId}
+          reviewFilter={location.reviewFilter}
           inspectionOnly={
             location.taskId === taskId ? inspectionOnly : undefined
           }
-          onNavigate={(view, reviewId) => {
+          onNavigate={(view, reviewId, reviewFilter) => {
             setResumeSavedTask(false)
-            navigate({ ...location, view, reviewId })
+            navigate({ ...location, view, reviewId, reviewFilter })
           }}
           onTaskChange={(task) => {
             if (task.companyId !== String(companyId)) return
@@ -199,6 +200,7 @@ function ScopedWorkspace({
                 "sourceReviewCompany",
                 "sourceReviewItem",
                 "sourceReviewRevision",
+                "sourceReviewFilter",
               ])
                 url.searchParams.delete(name)
               if (url.hash === "#import-task") url.hash = ""

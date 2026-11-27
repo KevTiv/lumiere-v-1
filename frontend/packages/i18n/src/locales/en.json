@@ -16697,6 +16697,8 @@
       "recoveredSubmission": "Your previous submission is retained. Check its saved result or retry the same submission."
     },
     "importWorkflow": {
+      "pendingSourceTitle": "Source rows still need review",
+      "openPendingSource": "{{title}} · review {{rows}} unresolved rows",
       "nativeReceiptBoundary": "Receipts cover submitted rows. Rows held for review are excluded. A record link appears only when the native import evidence and current record access can be verified.",
       "receiptHistoryUnavailable": "Older receipts could not be loaded. Try again.",
       "receiptHistoryMore": "Load older receipts",

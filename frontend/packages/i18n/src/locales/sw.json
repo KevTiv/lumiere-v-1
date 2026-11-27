@@ -4531,6 +4531,8 @@
   },
   "settings": {
     "importWorkflow": {
+      "pendingSourceTitle": "Safu za chanzo zinazohitaji ukaguzi",
+      "openPendingSource": "{{title}} · kagua safu ambazo hazijatatuliwa ({{rows}})",
       "nativeReceiptBoundary": "Risiti zinahusu safu zilizowasilishwa. Safu zinazosubiri ukaguzi hazijajumuishwa. Kiungo cha rekodi huonekana tu baada ya kuthibitisha ushahidi wa uingizaji na ruhusa ya sasa ya kufikia rekodi.",
       "receiptHistoryUnavailable": "Risiti za awali hazikuweza kupakiwa. Jaribu tena.",
       "receiptHistoryMore": "Pakia risiti za awali",
