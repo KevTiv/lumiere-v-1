@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test"
 
+test.use({ hasTouch: true })
+
 for (const width of [320, 390, 768, 1440]) {
   test(`shared list controls preserve work at ${width}px`, async ({ page }) => {
     test.setTimeout(120_000)
@@ -9,6 +11,7 @@ for (const width of [320, 390, 768, 1440]) {
       if (new URL(request.url()).pathname.startsWith("/api/")) apiRequests.push(request.url())
     })
     await page.goto("/list-toolbar", { waitUntil: "domcontentloaded" })
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true)
     // SSR is visible before cold client chunks finish loading. Give hydration its
     // own bounded budget while keeping the interaction assertions at 5 seconds.
     await expect(page.getByTestId("toolbar-disclosure")).toHaveAttribute("data-hydrated", "true", { timeout: 60_000 })
