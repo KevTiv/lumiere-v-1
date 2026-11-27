@@ -82,19 +82,141 @@ export function resolveRealtimeWsUrl(sameOrigin = false): string {
   return `${proto}//${window.location.host}/v1/realtime/ws`
 }
 
-type ServerRealtimeMsg =
-  | { type: "change"; resources?: string[] }
-  | { type: "subscribed" }
-  | { type: "error"; error?: string }
+type RealtimeConnectionOptions = {
+  organizationId: number
+  activeCompanyId: number
+  resources: readonly string[]
+  url: string
+  beforeConnect?: (signal: AbortSignal) => Promise<void>
+  onPhase: (phase: RealtimeAuthorityState["phase"], advance?: boolean) => void
+  onResources: (resources: readonly string[], recovery?: boolean) => void
+  recoverOnSubscribe?: boolean
+}
 
-/**
- * Maintain a Lumiere realtime WebSocket: subscribe to `resources`, invalidate matching
- * `useStdbQuery` caches on each `change` message.
- */
+const SUBSCRIPTION_TIMEOUT_MS = 20_000
+const STABLE_SUBSCRIPTION_MS = 30_000
+
+/** Own one connection and its retries for a single actor and company scope. */
+export function startRealtimeConnection({
+  organizationId,
+  activeCompanyId,
+  resources,
+  url,
+  beforeConnect,
+  onPhase,
+  onResources,
+  recoverOnSubscribe = false,
+}: RealtimeConnectionOptions) {
+  let closed = false
+  let failures = 0
+  let needsRecovery = recoverOnSubscribe
+  let retryTimer: ReturnType<typeof setTimeout> | undefined
+  let disposeAttempt: (() => void) | undefined
+  const requestedResources = new Set(resources)
+
+  const connect = async () => {
+    if (closed) return
+
+    const controller = new AbortController()
+    let socket: WebSocket | undefined
+    let subscribed = false
+    let stableTimer: ReturnType<typeof setTimeout> | undefined
+    const timeout = setTimeout(fail, SUBSCRIPTION_TIMEOUT_MS)
+
+    function dispose() {
+      controller.abort()
+      clearTimeout(timeout)
+      clearTimeout(stableTimer)
+      socket?.close()
+    }
+
+    function fail() {
+      if (closed || controller.signal.aborted) return
+      dispose()
+      needsRecovery = true
+      onPhase("reconnecting", subscribed)
+      failures += 1
+      const delay = Math.min(30_000, 1000 * 2 ** Math.min(failures, 5))
+      retryTimer = setTimeout(connect, delay)
+    }
+
+    disposeAttempt = () => {
+      const lostSubscription = !controller.signal.aborted && subscribed
+      dispose()
+      onPhase("reconnecting", lostSubscription)
+    }
+
+    try {
+      await beforeConnect?.(controller.signal)
+      if (controller.signal.aborted) return
+      socket = new WebSocket(url)
+    } catch {
+      fail()
+      return
+    }
+
+    const connection = socket
+    connection.onopen = () => {
+      if (controller.signal.aborted) return
+      try {
+        connection.send(JSON.stringify({
+          resources,
+          organizationId,
+          companyIds: [activeCompanyId],
+          activeCompanyId,
+        }))
+      } catch {
+        fail()
+      }
+    }
+    connection.onmessage = (event) => {
+      if (controller.signal.aborted || typeof event.data !== "string") return
+      let message: { type?: unknown; resources?: unknown; terminal?: unknown } | null
+      try {
+        message = JSON.parse(event.data)
+      } catch {
+        return
+      }
+      if (message?.type === "error") {
+        if (!subscribed || message.terminal === true) fail()
+        return
+      }
+      const confirmedResources = Array.isArray(message?.resources)
+        ? message.resources.filter((resource): resource is string =>
+            typeof resource === "string" && requestedResources.has(resource))
+        : []
+      if (message?.type === "subscribed" && !subscribed && confirmedResources.length > 0) {
+        clearTimeout(timeout)
+        subscribed = true
+        // A socket that repeatedly closes just after acknowledgement is still unstable.
+        stableTimer = setTimeout(() => { failures = 0 }, STABLE_SUBSCRIPTION_MS)
+        if (needsRecovery) {
+          needsRecovery = false
+          onResources(confirmedResources, true)
+        }
+        onPhase("subscribed", true)
+      } else if (message?.type === "change" && confirmedResources.length > 0) {
+        // The server can send authority changes before an acknowledgement.
+        onResources(confirmedResources)
+      }
+    }
+    connection.onerror = fail
+    connection.onclose = fail
+  }
+
+  onPhase("connecting")
+  void connect()
+  return () => {
+    closed = true
+    clearTimeout(retryTimer)
+    disposeAttempt?.()
+  }
+}
+
+/** Subscribe to company-scoped realtime invalidations once session authority is ready. */
 export function useLumiereRealtime(options: {
   queryClient: QueryClient
   organizationId?: number
-  companyIds?: readonly number[]
   activeCompanyId?: number | null
   actorIdentity?: string | null
   resources: readonly string[]
@@ -102,201 +224,58 @@ export function useLumiereRealtime(options: {
   /** Hosted sessions use host-only handshake cookies and must stay on the current origin. */
   sameOrigin?: boolean
   /** Refresh an HTTP-only handshake credential before connecting. Never put bearer tokens in URLs. */
-  beforeConnect?: () => Promise<void>
+  beforeConnect?: (signal: AbortSignal) => Promise<void>
 }) {
   const {
     queryClient,
     organizationId,
-    companyIds,
     activeCompanyId,
     actorIdentity,
-    resources,
     enabled = true,
     sameOrigin = false,
   } = options
-  const beforeConnectRef = useRef(options.beforeConnect)
-  beforeConnectRef.current = options.beforeConnect
-  const resourcesRef = useRef(resources)
-  resourcesRef.current = resources
+  const beforeConnect = useRef(options.beforeConnect)
+  beforeConnect.current = options.beforeConnect
+  const resourcesKey = JSON.stringify(options.resources)
 
   useEffect(() => {
-    if (!enabled || organizationId == null || organizationId <= 0) {
+    if (!enabled || organizationId == null || organizationId <= 0
+      || activeCompanyId == null || activeCompanyId <= 0 || !actorIdentity) return
+    const authorityKey = realtimeAuthorityKey(organizationId, activeCompanyId, actorIdentity)
+    queryClient.setQueryDefaults(authorityKey, { gcTime: Infinity, staleTime: Infinity })
+    const previous = queryClient.getQueryData<RealtimeAuthorityState>(authorityKey)
+    let generation = previous?.generation ?? 0
+    const publishAuthority = (phase: RealtimeAuthorityState["phase"], advance = false) => {
+      const current = queryClient.getQueryData<RealtimeAuthorityState>(authorityKey)
+      if (advance) generation = Math.max(generation, current?.generation ?? 0) + 1
+      if (current && (current.generation > generation ||
+          (current.generation === generation && current.phase === phase))) return
+      queryClient.setQueryData<RealtimeAuthorityState>(authorityKey, { phase, generation })
+    }
+
+    let url: string
+    try {
+      url = resolveRealtimeWsUrl(sameOrigin)
+    } catch {
+      publishAuthority("reconnecting")
+      return
+    }
+    if (!url) {
+      publishAuthority("reconnecting")
       return
     }
 
-    let closed = false
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-    let ws: WebSocket | null = null
-    let attempt = 0
-    const authorityKey =
-      activeCompanyId != null && activeCompanyId > 0 && actorIdentity
-        ? realtimeAuthorityKey(organizationId, activeCompanyId, actorIdentity)
-        : null
-    let authorityGeneration = authorityKey
-      ? (queryClient.getQueryData<RealtimeAuthorityState>(authorityKey)
-          ?.generation ?? 0)
-      : 0
-    let subscribedConnection = false
-    if (authorityKey)
-      queryClient.setQueryDefaults(authorityKey, {
-        gcTime: Infinity,
-        staleTime: Infinity,
-      })
-    const publishAuthority = (
-      phase: RealtimeAuthorityState["phase"],
-      generation = authorityGeneration,
-    ) => {
-      if (!authorityKey) return
-      const previous =
-        queryClient.getQueryData<RealtimeAuthorityState>(authorityKey)
-      if (previous && previous.generation > generation) return
-      queryClient.setQueryData<RealtimeAuthorityState>(authorityKey, {
-        generation,
-        phase,
-      })
-    }
-    const advanceAuthority = (phase: RealtimeAuthorityState["phase"]) => {
-      if (!authorityKey) return
-      authorityGeneration =
-        Math.max(
-          authorityGeneration,
-          queryClient.getQueryData<RealtimeAuthorityState>(authorityKey)
-            ?.generation ?? 0,
-        ) + 1
-      publishAuthority(phase)
-    }
-
-    const scheduleReconnect = () => {
-      if (closed) {
-        return
-      }
-      attempt += 1
-      const delay = Math.min(30_000, 1000 * 2 ** Math.min(attempt, 5))
-      reconnectTimer = setTimeout(() => {
-        reconnectTimer = null
-        connect()
-      }, delay)
-    }
-
-    const connect = async () => {
-      if (closed) return
-      subscribedConnection = false
-      // An unavailable initial socket and repeated retries must not defeat
-      // fresh HTTP authorization. Only subscription gain/loss advances proof.
-      publishAuthority("connecting")
-      const generation = authorityGeneration
-      try {
-        await beforeConnectRef.current?.()
-      } catch {
-        if (!closed) publishAuthority("reconnecting", generation)
-        scheduleReconnect()
-        return
-      }
-      if (closed) {
-        return
-      }
-      const url = resolveRealtimeWsUrl(sameOrigin)
-      if (!url) {
-        return
-      }
-
-      try {
-        ws = new WebSocket(url)
-      } catch (e) {
-        publishAuthority("reconnecting", generation)
-        console.warn("[lumiere:realtime] WebSocket construct failed", e)
-        scheduleReconnect()
-        return
-      }
-      const connection = ws
-
-      ws.onopen = () => {
-        if (closed || ws !== connection) return
-        attempt = 0
-        const payload = {
-          resources: [...resourcesRef.current],
-          organizationId,
-          companyIds: companyIds?.length ? [...companyIds] : [],
-          activeCompanyId:
-            activeCompanyId != null && activeCompanyId > 0
-              ? activeCompanyId
-              : null,
-        }
-        try {
-          connection.send(JSON.stringify(payload))
-        } catch (e) {
-          console.warn("[lumiere:realtime] subscribe send failed", e)
-          connection.close()
-        }
-      }
-
-      ws.onmessage = (ev) => {
-        if (closed || ws !== connection) return
-        if (typeof ev.data !== "string") {
-          return
-        }
-        let msg: ServerRealtimeMsg
-        try {
-          msg = JSON.parse(ev.data) as ServerRealtimeMsg
-        } catch {
-          return
-        }
-        if (
-          msg.type === "change" &&
-          Array.isArray(msg.resources) &&
-          msg.resources.length > 0
-        ) {
-          invalidateStdbQueryResources(
-            queryClient,
-            organizationId,
-            msg.resources,
-          )
-        } else if (msg.type === "subscribed") {
-          if (!subscribedConnection) {
-            subscribedConnection = true
-            advanceAuthority("subscribed")
-          }
-        } else if (msg.type === "error") {
-          console.warn("[lumiere:realtime]", msg.error ?? "error")
-        }
-      }
-
-      ws.onerror = () => {
-        if (!closed && ws === connection) connection.close()
-      }
-
-      ws.onclose = () => {
-        if (closed || ws !== connection) return
-        ws = null
-        if (subscribedConnection) {
-          subscribedConnection = false
-          advanceAuthority("reconnecting")
-        } else publishAuthority("reconnecting")
-        if (!closed) {
-          scheduleReconnect()
-        }
-      }
-    }
-
-    connect()
-
-    return () => {
-      closed = true
-      if (subscribedConnection) advanceAuthority("reconnecting")
-      else publishAuthority("reconnecting")
-      if (reconnectTimer != null) {
-        clearTimeout(reconnectTimer)
-      }
-      ws?.close()
-    }
-  }, [
-    sameOrigin,
-    queryClient,
-    organizationId,
-    enabled,
-    activeCompanyId,
-    actorIdentity,
-    JSON.stringify(companyIds ?? []),
-    resources,
-  ])
+    return startRealtimeConnection({
+      organizationId,
+      activeCompanyId,
+      url,
+      resources: JSON.parse(resourcesKey) as string[],
+      beforeConnect: async (signal) => beforeConnect.current?.(signal),
+      recoverOnSubscribe: generation > 0,
+      onPhase: publishAuthority,
+      onResources: (resources, recovery) => invalidateStdbQueryResources(
+        queryClient, organizationId, resources, { cancelRefetch: !recovery },
+      ),
+    })
+  }, [sameOrigin, queryClient, organizationId, enabled, activeCompanyId, actorIdentity, resourcesKey])
 }

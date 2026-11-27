@@ -143,21 +143,20 @@ function LumiereRealtimeBridge({
 }) {
   const queryClient = useQueryClient()
   const workOsEnabled = useWorkOsAuthMode()
-  const { activeCompanyId, activeCompanyReady, companyIds } = useErpSession()
+  const { activeCompanyId, activeCompanyReady, identity } = useErpSession()
   const { currentUser, permissionsReady, checkPermission } = useRBAC()
   const workflowRead = permissionsReady !== false && currentUser != null && canReadWorkflowWork(checkPermission)
   const resources = useMemo(() => withAuthorizedWorkRealtimeResources(FULL_CLIENT_SUBSCRIPTION_RESOURCES, workflowRead), [workflowRead])
   useLumiereRealtime({
     queryClient,
     organizationId,
-    companyIds,
     activeCompanyId: activeCompanyReady ? activeCompanyId : null,
-    actorIdentity: currentUser?.id,
+    actorIdentity: identity === "unknown" ? null : identity,
     resources,
-    enabled: organizationId != null && organizationId > 0,
+    enabled: permissionsReady !== false && currentUser?.id === identity,
     sameOrigin: workOsEnabled,
-    beforeConnect: workOsEnabled ? async () => {
-      const response = await fetch('/api/auth/realtime-session', { method: 'POST', credentials: 'same-origin' })
+    beforeConnect: workOsEnabled ? async (signal) => {
+      const response = await fetch('/api/auth/realtime-session', { method: 'POST', credentials: 'same-origin', signal })
       if (!response.ok) throw new Error('Realtime session unavailable')
     } : undefined,
   })

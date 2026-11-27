@@ -225,6 +225,8 @@
     }
   },
   "workspaceShell": {
+    "realtimePaused": "Masasisho ya papo hapo yamesitishwa",
+    "realtimeReconnecting": "Masasisho ya papo hapo yamesitishwa. Huenda mabadiliko ya hivi karibuni yakachelewa kuonekana.",
     "breadcrumb": "Njia ya ukurasa",
     "searchShort": "Tafuta…",
     "accountAndPreferences": "Akaunti na mapendeleo",
