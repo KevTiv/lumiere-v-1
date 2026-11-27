@@ -46,6 +46,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+      - name: Verify Finance Alpha import coverage
+        run: node --test scripts/tests/alpha-import-coverage.test.mjs
       - name: Test external readiness probe
         run: node scripts/tests/test-compose-readiness.mjs
       - name: Test operational Node scripts
