@@ -522,6 +522,7 @@ struct ImportBody {
     request_id: Option<String>,
     file_name: Option<String>,
     source_admission_id: Option<String>,
+    review_task_id: Option<String>,
     #[serde(default)]
     params: Option<ImportParams>,
 }
@@ -578,6 +579,11 @@ fn inspection_receipt(inspected: &lumiere_file_inspection::InspectedCsv) -> Valu
 }
 
 fn validate_source_reference(body: &ImportBody) -> Result<(), ApiError> {
+    if body.review_task_id.is_some() && body.request_id.is_none() {
+        return Err(ApiError::BadRequest(
+            "a saved review requires a tracked import".into(),
+        ));
+    }
     if body.source_admission_id.is_some() && body.request_id.is_none() {
         return Err(ApiError::BadRequest(
             "sourceAdmissionId requires a tracked import request".into(),
@@ -688,6 +694,7 @@ async fn submit_import(
             spec.job_table,
             request_id,
             body.file_name.as_deref(),
+            body.review_task_id.as_deref(),
             &inspected,
         )
         .await?;
@@ -710,8 +717,28 @@ async fn submit_import(
             {"request_id": request_id, "entity": spec.job_table, "csv_data": body.csv,
              "currency_id": params.currency_id.map(|id| json!({"some": id})).unwrap_or_else(|| json!({"none": []})),
              "file_name": body.file_name.map(|name| json!({"some": name})).unwrap_or_else(|| json!({"none": []}))}]);
+        let mut guard_client = if body.review_task_id.is_some() {
+            let pool = crate::cold_tier::pg_pool::required_pool().map_err(ApiError::unavailable)?;
+            Some(pool.get().await.map_err(ApiError::internal)?)
+        } else {
+            None
+        };
+        let guard = match (guard_client.as_mut(), body.review_task_id.as_deref()) {
+            (Some(client), Some(task)) => {
+                let tx = client.transaction().await.map_err(ApiError::internal)?;
+                super::import_reviews::lock_review_dispatch(
+                    &tx, &trusted, company_id, task, request_id,
+                )
+                .await?;
+                Some(tx)
+            }
+            _ => None,
+        };
         let context =
             dispatch_session_reducer(&state, &session, "import_csv_tracked", args).await?;
+        if let Some(guard) = guard {
+            guard.commit().await.map_err(ApiError::internal)?;
+        }
         let mut response = read_exact_outcome(
             &context,
             spec,
@@ -767,6 +794,7 @@ pub(crate) async fn submit_workflow_import(
             request_id: Some(request.request_id.clone()),
             file_name: Some(request.file_name.clone()),
             source_admission_id: None,
+            review_task_id: None,
             params: Some(ImportParams {
                 company_id: Some(request.company_id),
                 currency_id: None,

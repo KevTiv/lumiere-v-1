@@ -216,6 +216,24 @@ async fn accept(
     let tx = client.transaction().await.map_err(ApiError::internal)?;
     let org = scope.organization.to_string();
     let company = scope.company.to_string();
+    handoff::lock_task_alias(
+        &tx,
+        scope.organization,
+        scope.company,
+        scope.actor,
+        &body.request_id,
+    )
+    .await?;
+    let incoming = tx.query_opt(
+        "SELECT request_id FROM lumiere_platform.import_task_handoff WHERE organization_id=$1::text::numeric
+           AND company_id=$2::text::numeric AND recipient_identity=$3 AND request_id=$4",
+        &[&org,&company,&scope.actor,&body.request_id],
+    ).await.map_err(ApiError::internal)?;
+    if incoming.is_some() {
+        return Err(ApiError::Conflict(
+            "this identity refers to a task already shared with you".into(),
+        ));
+    }
     let decision = decision_request(&body.request_id, 1, false, &Value::Null);
     let inserted = tx.query_opt("INSERT INTO lumiere_platform.import_task (organization_id,company_id,actor_identity,request_id,conversation_key,request_sha256,decision_request,preparation_json) VALUES ($1::text::numeric,$2::text::numeric,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING RETURNING request_id", &[&org,&company,&scope.actor,&body.request_id,&body.conversation_key,&hash,&decision,&body.preparation]).await.map_err(ApiError::internal)?;
     if inserted.is_some() {

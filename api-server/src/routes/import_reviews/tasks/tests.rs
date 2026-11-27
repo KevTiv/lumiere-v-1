@@ -713,6 +713,10 @@ async fn exercise_handoff(pool: &deadpool_postgres::Pool, clerk: StorageScope<'_
         owner.actor
     );
     let first = handoff::save(pool, clerk, request, grant(Some(owner.actor), 0)).await?;
+    assert!(matches!(
+        accept(pool, owner, &body, &originals, &hash).await,
+        Err(ApiError::Conflict(_))
+    ));
     assert_eq!(
         handoff::save(pool, clerk, request, grant(Some(owner.actor), 0)).await?,
         first

@@ -231,7 +231,10 @@ export function SavedImportWorkspace({
   }
   const continueImport = async (source: ReviewedImportSource) => {
     if (!allowImport) return
-    if (await wizard.current?.continueFromReview(source)) {
+    const trackedTask = ["product", "contact", "stock_location"].includes(source.targetEntity)
+      ? taskId
+      : undefined
+    if (await wizard.current?.continueFromReview(source, trackedTask)) {
       setNativePreview(true)
       navigate("preview", selectedReviewId, true)
     }
@@ -774,22 +777,18 @@ export function SavedImportWorkspace({
                   </ul>
                 </section>
               )}
-              {executionView === "results" || task.handoff?.canManage !== false ? (
-                <ImportTaskExecutionPanel
-                  organizationId={scope.organizationId}
-                  companyId={scope.companyId}
-                  taskId={taskId}
-                  reviewId={selectedReviewId}
-                  view={executionView}
-                  onReviewSource={(id) => {
-                    if (allowedReviewIds.includes(id))
-                      navigate("decisions", id, true)
-                  }}
-                  onChanged={refreshTask}
-                />
-              ) : !nativePreview ? (
-                <p className="text-sm text-muted-foreground">{t("settings.importHandoff.continueFromReview")}</p>
-              ) : null}
+              <ImportTaskExecutionPanel
+                organizationId={scope.organizationId}
+                companyId={scope.companyId}
+                taskId={taskId}
+                reviewId={selectedReviewId}
+                view={executionView}
+                onReviewSource={(id) => {
+                  if (allowedReviewIds.includes(id))
+                    navigate("decisions", id, true)
+                }}
+                onChanged={refreshTask}
+              />
               <div
                 hidden={!nativePreview && continuationBlock !== "unresolved"}
               >

@@ -3,6 +3,7 @@ use anyhow::{ensure, Result};
 
 fn attempt() -> Attempt {
     Attempt {
+        submitter: "actor".into(),
         request: "a".repeat(32),
         entity: "product".into(),
         content_hash: "b".repeat(64),
@@ -104,6 +105,8 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
         include_str!("../../../cold_tier/import_workflow_expand.sql"),
         include_str!("../../../cold_tier/import_task_inspection_expand.sql"),
         include_str!("../../../cold_tier/import_native_requests_expand.sql"),
+        include_str!("../../../cold_tier/import_task_handoff_expand.sql"),
+        include_str!("../../../cold_tier/import_workflow_actors_expand.sql"),
     ] {
         client.batch_execute(sql).await?;
     }
@@ -220,5 +223,75 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
         )
         .await?;
     ensure!(foreign.is_empty());
+    client
+        .execute(
+            "INSERT INTO lumiere_platform.import_task_handoff
+       (organization_id,company_id,actor_identity,request_id,recipient_identity,revision)
+       VALUES (42,5,'actor-one',$1,'owner',1)",
+            &[&task],
+        )
+        .await?;
+    drop(client);
+    ensure!(record_for_task(
+        pool,
+        scope,
+        "owner",
+        &task,
+        "product",
+        &request,
+        &digest,
+        Some("products.csv"),
+        &rows
+    )
+    .await
+    .is_err());
+    let attempt_id = "4".repeat(32);
+    let new_rows =
+        [json!({"importRow":2,"batchId":batches[0].to_string(),"itemId":"93","revision":1})];
+    for _ in 0..2 {
+        record_for_task(
+            pool,
+            scope,
+            "owner",
+            &task,
+            "product",
+            &attempt_id,
+            &digest,
+            Some("products.csv"),
+            &new_rows,
+        )
+        .await?;
+    }
+    let client = pool.get().await?;
+    let saved = client
+        .query_one(
+            "SELECT actor_identity, submitted_by FROM lumiere_platform.import_task_native_request
+       WHERE native_request_id=$1",
+            &[&attempt_id],
+        )
+        .await?;
+    ensure!(saved.get::<_, String>("actor_identity") == "actor-one");
+    ensure!(saved.get::<_, String>("submitted_by") == "owner");
+    client
+        .execute(
+            "UPDATE lumiere_platform.import_task_handoff SET recipient_identity=NULL,revision=2
+       WHERE organization_id=42 AND company_id=5 AND actor_identity='actor-one' AND request_id=$1",
+            &[&task],
+        )
+        .await?;
+    drop(client);
+    ensure!(record_for_task(
+        pool,
+        scope,
+        "owner",
+        &task,
+        "product",
+        &attempt_id,
+        &digest,
+        Some("products.csv"),
+        &new_rows
+    )
+    .await
+    .is_err());
     Ok(())
 }

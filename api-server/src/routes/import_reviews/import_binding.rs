@@ -145,6 +145,7 @@ pub(crate) async fn record_review_binding(
     entity: &str,
     request: &str,
     file_name: Option<&str>,
+    review_task: Option<&str>,
     inspected: &InspectedCsv,
 ) -> Result<(), ApiError> {
     let Some(item_column) = inspected
@@ -152,13 +153,21 @@ pub(crate) async fn record_review_binding(
         .iter()
         .position(|value| value == "_review_item_id")
     else {
-        return Ok(());
+        return if review_task.is_some() {
+            Err(conflict())
+        } else {
+            Ok(())
+        };
     };
     let authority = TrustedOperationContext::for_resource_read(state, session)?;
     if !full_administrator(authority.field_access()) {
         // Ordinary importers may retain untrusted provenance-looking columns.
         // They cannot turn those columns into a verified source-review link.
-        return Ok(());
+        return if review_task.is_some() {
+            Err(ApiError::Forbidden("source review access required".into()))
+        } else {
+            Ok(())
+        };
     }
     let revision_column = inspected
         .headers
@@ -186,6 +195,7 @@ pub(crate) async fn record_review_binding(
         revision_column,
     )
     .await?;
+    drop(client);
     context.require_current_placement(&state.organization_placements)?;
     let receipt = json!({"version":1,"organizationId":org.to_string(),"companyId":company.to_string(),"actor":actor,
         "requestId":request,"entity":entity,"contentSha256":inspected.content_sha256,"rows":bindings});
@@ -195,6 +205,40 @@ pub(crate) async fn record_review_binding(
             "review import binding exceeds size limit".into(),
         ));
     }
+    let viewer = StorageScope {
+        organization: org,
+        company,
+        actor,
+    };
+    if let Some(task) = review_task {
+        let (creator, _) = super::tasks::handoff::read_for(&pool, &context, viewer, task).await?;
+        super::native_requests::record_for_task(
+            &pool,
+            StorageScope {
+                actor: &creator,
+                ..viewer
+            },
+            actor,
+            task,
+            entity,
+            request,
+            &inspected.content_sha256,
+            file_name,
+            &bindings,
+        )
+        .await?;
+    } else {
+        super::native_requests::record(
+            &pool,
+            viewer,
+            entity,
+            request,
+            &inspected.content_sha256,
+            file_name,
+            &bindings,
+        )
+        .await?;
+    }
     storage::put_immutable(
         &state.config.document_blob_store,
         &key,
@@ -202,20 +246,7 @@ pub(crate) async fn record_review_binding(
         "application/json",
     )
     .await?;
-    super::native_requests::record(
-        &pool,
-        StorageScope {
-            organization: org,
-            company,
-            actor,
-        },
-        entity,
-        request,
-        &inspected.content_sha256,
-        file_name,
-        &bindings,
-    )
-    .await
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
