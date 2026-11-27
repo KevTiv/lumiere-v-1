@@ -47,17 +47,28 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     await expect(input).toBeFocused()
     const bounds = (await panel.boundingBox())!
     await expect(panel).toHaveAttribute("data-mode", width >= 1024 ? "side" : "full")
-    expect(bounds.y).toBe(width >= 1024 ? 13 : 0)
-    expect(bounds.height).toBe(width >= 1024 ? 874 : 900)
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(width)
     if (width >= 1024) {
       await expect(page.getByTestId("sidebar-open-ai-chat")).toHaveAttribute("aria-pressed", "true")
+      const dock = page.getByTestId("workspace-tool-host")
+      const dockBounds = (await dock.boundingBox())!
+      const canvas = (await page.locator('[data-slot="sidebar-inset"]').boundingBox())!
+      expect(dockBounds.y).toBe(canvas.y)
+      expect(dockBounds.height).toBe(canvas.height)
+      const dockContent = await dock.evaluate((element) => ({
+        top: element.clientTop,
+        height: element.clientHeight,
+      }))
+      expect(bounds.y).toBe(dockBounds.y + dockContent.top)
+      expect(bounds.height).toBe(dockContent.height)
       const erp = (await page.getByTestId("workspace-content").boundingBox())!
       expect(erp.x + erp.width).toBeLessThanOrEqual(bounds.x)
       await reference.fill("Edited alongside chat")
     } else {
       expect(bounds.x).toBe(0)
+      expect(bounds.y).toBe(0)
       expect(bounds.width).toBe(width)
+      expect(bounds.height).toBe(900)
     }
     await input.fill("Keep this question")
     await panel.getByRole("button", { name: "Workspace context" }).click()
