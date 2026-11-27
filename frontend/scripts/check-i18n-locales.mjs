@@ -28,11 +28,12 @@ const alphaAreas = new Set([
 const alphaKeys = Object.keys(en).filter(key => alphaAreas.has(key.split(".")[0]))
 const pilotWorkflowNamespaces = [
   "sales.forms.setup.", "expenses.forms.recovery.", "crm.inbox.", "fleet.workspace.",
-  "settings.importHandoff.", "activation.priceList.",
+  "settings.importHandoff.", "activation.pricelist.",
 ]
 const pilotWorkflowKeys = Object.keys(en).filter(key =>
   pilotWorkflowNamespaces.some(prefix => key.startsWith(prefix))
   || key === "activation.guidance.quotation"
+  || key === "activation.checks.pricelist"
   || key === "settings.importWorkflow.nativeReceiptBoundary"
   || key.startsWith("settings.importWorkflow.receipt"),
 )
