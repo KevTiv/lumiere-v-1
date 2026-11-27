@@ -250,7 +250,7 @@ pub(crate) async fn record_review_binding(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn validated_review_rows(
+pub(super) async fn validated_review_rows(
     client: &tokio_postgres::Client,
     org: u64,
     company: u64,

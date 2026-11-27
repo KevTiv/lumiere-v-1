@@ -153,9 +153,18 @@ pub(super) async fn record_for_task(
         "SELECT 1 FROM lumiere_platform.import_task_native_request old
           WHERE old.organization_id=$1::text::numeric AND old.company_id=$2::text::numeric AND old.actor_identity=$3
             AND old.task_request_id=$4 AND old.entity=$5 AND old.native_request_id<>$6
-            AND EXISTS (SELECT 1 FROM lumiere_platform.import_task_handoff handoff
-                         WHERE handoff.organization_id=old.organization_id AND handoff.company_id=old.company_id
-                           AND handoff.actor_identity=old.actor_identity AND handoff.request_id=old.task_request_id)
+            AND (
+              EXISTS (SELECT 1 FROM lumiere_platform.import_task_handoff handoff
+                      WHERE handoff.organization_id=old.organization_id AND handoff.company_id=old.company_id
+                        AND handoff.actor_identity=old.actor_identity AND handoff.request_id=old.task_request_id)
+              OR EXISTS (
+                SELECT 1 FROM lumiere_platform.import_run run
+                JOIN lumiere_platform.import_run_chunk chunk ON chunk.run_id=run.id
+                WHERE run.organization_id=old.organization_id AND run.company_id=old.company_id
+                  AND run.creator_identity=old.actor_identity AND run.task_id=old.task_request_id
+                  AND chunk.id IN (old.native_request_id,$6)
+              )
+            )
             AND EXISTS (SELECT 1 FROM jsonb_array_elements(old.review_rows) old_row
                          JOIN jsonb_array_elements($7::jsonb) candidate
                            ON old_row->>'itemId'=candidate->>'itemId') LIMIT 1",

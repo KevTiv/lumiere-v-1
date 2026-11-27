@@ -66,6 +66,9 @@ fn saved(definition: Definition) -> SavedProposal {
         last_error: None,
         created_at: "2026-11-07T12:00:00Z".into(),
         approved_at: Some("2026-11-07T12:01:00Z".into()),
+        prepared_by: None,
+        approved_by: None,
+        dispatched_by: None,
     }
 }
 
@@ -358,20 +361,71 @@ fn receipt_ids_require_exact_outcomes_and_never_use_order_or_latest_job() -> Res
     receipt["records"][1]["rowNumber"] = json!(3);
     ensure!(native::receipt_ids(&receipt, 2).is_err());
     receipt["status"] = json!("partial");
-    ensure!(native::receipt_ids(&receipt, 2).is_err());
+    ensure!(matches!(native::receipt_ids(&receipt, 2), Err(ApiError::Conflict(_))));
+    receipt["status"] = json!("pending");
+    ensure!(matches!(native::receipt_ids(&receipt, 2), Err(ApiError::Unavailable(_))));
     Ok(())
 }
 
-fn record_fixture(proposal: &SavedProposal) -> (Vec<Value>, Vec<Value>) {
-    let entry = &proposal.definition.entries[0];
-    let binding = |side| {
-        json!({"lumiere_import_proposal":native::source_binding(scoped(),"task",proposal,entry,side)}).to_string()
-    };
-    let timestamp = json!({"microsSinceUnixEpoch":1_704_412_800_000_000_i64});
-    let parent = json!({"id":100,"organizationId":42,"companyId":5,"journalId":7,"currencyId":2,"companyCurrencyId":2,"amountTotal":1234.0,"autoPost":false,"postedBefore":false,"date":timestamp,"state":"Draft","moveType":"Entry","ref":entry.reference,"metadata":binding("header")});
-    let debit = json!({"id":200,"organizationId":42,"companyId":5,"moveId":100,"accountId":8,"journalId":7,"currencyId":2,"companyCurrencyId":2,"date":timestamp,"parentState":"Draft","debit":1234.0,"credit":0.0,"metadata":binding("debit")});
-    let credit = json!({"id":201,"organizationId":42,"companyId":5,"moveId":100,"accountId":9,"journalId":7,"currencyId":2,"companyCurrencyId":2,"date":timestamp,"parentState":"Draft","debit":0.0,"credit":1234.0,"metadata":binding("credit")});
-    (vec![parent], vec![debit, credit])
+fn record_fixture(proposal: &SavedProposal) -> Result<(Vec<Value>, Vec<Value>)> {
+    let mut moves = Vec::new();
+    let mut lines = Vec::new();
+    for (index, entry) in proposal.definition.entries.iter().enumerate() {
+        let move_id = 100 + index;
+        let debit_id = 200 + index * 2;
+        let binding = |side| {
+            json!({"lumiere_import_proposal":native::source_binding(scoped(),"task",proposal,entry,side)}).to_string()
+        };
+        let timestamp = json!({"microsSinceUnixEpoch":1_704_412_800_000_000_i64});
+        let amount = entry.amount.parse::<f64>()?;
+        moves.push(json!({"id":move_id,"organizationId":42,"companyId":5,"journalId":7,"currencyId":2,"companyCurrencyId":2,"amountTotal":amount,"autoPost":false,"postedBefore":false,"date":timestamp,"state":"Draft","moveType":"Entry","ref":entry.reference,"metadata":binding("header")}));
+        lines.push(json!({"id":debit_id,"organizationId":42,"companyId":5,"moveId":move_id,"accountId":8,"journalId":7,"currencyId":2,"companyCurrencyId":2,"date":timestamp,"parentState":"Draft","debit":amount,"credit":0.0,"metadata":binding("debit")}));
+        lines.push(json!({"id":debit_id+1,"organizationId":42,"companyId":5,"moveId":move_id,"accountId":9,"journalId":7,"currencyId":2,"companyCurrencyId":2,"date":timestamp,"parentState":"Draft","debit":0.0,"credit":amount,"metadata":binding("credit")}));
+    }
+    Ok((moves, lines))
+}
+
+#[test]
+fn durable_accounting_verifies_11_entries_22_lines_and_582400_per_side() -> Result<()> {
+    use super::super::durable_runs::SourceRevision;
+
+    let mut reviewed_rows = (0..11)
+        .map(|index| {
+            let amount = if index == 10 { "82400" } else { "50000" };
+            reviewed(index + 1, index as u32 + 2, amount)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut held = reviewed(12, 13, "500")?;
+    held.confirmed.remove("amount");
+    reviewed_rows.push(held);
+    let proposal = saved(build_definition(&reviewed_rows, &configuration(), 0)?);
+    ensure!(proposal.definition.summary.blocked_count == 1);
+    let mut sources = reviewed_rows.iter().take(11)
+        .map(|row| SourceRevision { batch_id: row.batch, item_id: row.id, revision: row.revision })
+        .collect::<Vec<_>>();
+    durable::validate_sources(&proposal, &sources)?;
+    sources.push(SourceRevision { batch_id: 11, item_id: 12, revision: 3 });
+    ensure!(durable::validate_sources(&proposal, &sources).is_err());
+    sources.pop();
+    sources.swap(0, 1);
+    ensure!(durable::validate_sources(&proposal, &sources).is_err());
+    sources.swap(0, 1);
+    sources[0].revision += 1;
+    ensure!(durable::validate_sources(&proposal, &sources).is_err());
+
+    let headers = native::header_request(scoped(), "task", &proposal)?;
+    let header_ids = (100..111).collect::<Vec<_>>();
+    let line_ids = (200..222).collect::<Vec<_>>();
+    let journal_lines = native::line_request(scoped(), "task", &proposal, &header_ids)?;
+    let resumed_lines = native::line_request(scoped(), "task", &proposal, &header_ids)?;
+    ensure!(headers.csv.lines().count() == 12);
+    ensure!(journal_lines.csv.lines().count() == 23);
+    ensure!(journal_lines.request_id == resumed_lines.request_id && journal_lines.csv == resumed_lines.csv);
+    let (moves, lines) = record_fixture(&proposal)?;
+    let result = native::verify_records(scoped(), "task", &proposal, &header_ids, &line_ids, &moves, &lines)?;
+    ensure!(result.record_count == 11 && result.line_count == 22 && result.posted_count == 0);
+    ensure!(result.total_debit == "582400" && result.total_credit == "582400");
+    Ok(())
 }
 
 #[test]
@@ -382,7 +436,7 @@ fn authoritative_readback_checks_source_scope_dates_accounts_amounts_and_draft_s
         &configuration(),
         0,
     )?);
-    let (moves, lines) = record_fixture(&proposal);
+    let (moves, lines) = record_fixture(&proposal)?;
     let result = native::verify_records(
         scoped(),
         "task",

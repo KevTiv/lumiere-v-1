@@ -560,7 +560,7 @@ fn validate_csv_size(csv: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
-fn validate_csv(csv: &str) -> Result<lumiere_file_inspection::InspectedCsv, ApiError> {
+pub(super) fn validate_csv(csv: &str) -> Result<lumiere_file_inspection::InspectedCsv, ApiError> {
     validate_csv_size(csv)?;
     lumiere_file_inspection::inspect_csv(csv)
         .map_err(|error| ApiError::BadRequest(error.to_string()))
@@ -802,6 +802,77 @@ pub(crate) async fn submit_workflow_import(
         },
     )
     .await
+}
+
+pub(super) async fn execute_reviewed_workflow_import(
+    state: &AppState,
+    session: &crate::session::ApiSession,
+    context: &TrustedOperationContext,
+    request: WorkflowImportRequest,
+    task_id: &str,
+    currency_id: Option<u64>,
+) -> Result<Value, ApiError> {
+    let spec = authorize_reviewed_workflow_import(context, &request.entity, currency_id)?;
+    authorize_reducer_company_scope(context, vec![request.company_id]).await?;
+    let inspected = validate_csv(&request.csv)?;
+    match read_exact_outcome(
+        context,
+        spec,
+        &request.request_id,
+        request.company_id,
+        ReceiptCurrency::Exact(currency_id),
+        Some(&inspected.content_sha256),
+    )
+    .await
+    {
+        Ok(receipt) => return Ok(receipt),
+        Err(ApiError::NotFound(_)) => {}
+        Err(error) => return Err(error),
+    }
+    submit_import(
+        state,
+        session,
+        &request.entity,
+        ImportBody {
+            csv: request.csv,
+            request_id: Some(request.request_id),
+            file_name: Some(request.file_name),
+            source_admission_id: None,
+            review_task_id: Some(task_id.to_owned()),
+            params: Some(ImportParams {
+                company_id: Some(request.company_id),
+                currency_id,
+            }),
+        },
+    )
+    .await
+}
+
+pub(super) fn admit_reviewed_workflow_import(
+    context: &TrustedOperationContext,
+    entity: &str,
+    currency: Option<u64>,
+) -> Result<(), ApiError> {
+    authorize_reviewed_workflow_import(context, entity, currency).map(|_| ())
+}
+
+fn authorize_reviewed_workflow_import(
+    context: &TrustedOperationContext,
+    entity: &str,
+    currency: Option<u64>,
+) -> Result<&'static ImportEntity, ApiError> {
+    let spec = resolve_import_entity(entity)
+        .ok_or_else(|| ApiError::NotFound("Import entity not found".into()))?;
+    if CRM_IMPORT_ENTITIES.contains(&spec.table_name) && !crm_csv_import_enabled() {
+        return Err(ApiError::Forbidden("Contact CSV import is disabled".into()));
+    }
+    if !stdb_auth::permission_allowed(context.field_access(), spec.table_name, "create") {
+        return Err(ApiError::Forbidden("Import entity create permission denied".into()));
+    }
+    validate_currency(spec, currency)?;
+    import_read_columns(spec, context.field_access())?;
+    require_tracked_capability()?;
+    Ok(spec)
 }
 
 #[derive(Clone, Debug)]

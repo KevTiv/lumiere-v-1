@@ -2,6 +2,7 @@
 //! PostgreSQL owns review decisions; native ERP receipts own business effects.
 //! A lost response resumes by the same native request IDs, never by timestamps.
 mod binding;
+mod durable;
 mod model;
 mod native;
 mod overlap;
@@ -35,6 +36,7 @@ use crate::{
     web_session::OrgSession,
 };
 pub(crate) use binding::read_workflow_binding;
+pub(super) use durable::{execute_chunk, validate_durable_group};
 use model::*;
 use storage::SavedProposal;
 
@@ -341,18 +343,36 @@ async fn run(
         actor: &creator,
         ..viewer
     };
+    run_approved(state, session, &context, scoped, task, id, body, allow_write)
+        .await
+        .map(|(proposal, _)| proposal.view())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_approved(
+    state: &AppState,
+    session: &ApiSession,
+    context: &TrustedOperationContext,
+    scoped: StorageScope<'_>,
+    task: &str,
+    id: i64,
+    body: &ActionBody,
+    allow_write: bool,
+) -> Result<(SavedProposal, Option<ApiError>), ApiError> {
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let actor = context.actor_identity();
     if allow_write {
         // Commit the actor reservation before any reducer can mutate. A lost
         // response must never cause another actor to reissue the same phase.
         let mut client = pool.get().await.map_err(ApiError::internal)?;
         let reservation = client.transaction().await.map_err(ApiError::internal)?;
-        storage::bind_executor(&reservation, scoped, task, id, body, viewer.actor).await?;
+        storage::bind_executor(&reservation, scoped, task, id, body, actor).await?;
         reservation.commit().await.map_err(ApiError::internal)?;
     }
 
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
-    super::tasks::handoff::lock_grant(&tx, scoped, viewer.actor, task).await?;
+    super::tasks::handoff::lock_grant(&tx, scoped, actor, task).await?;
     // Serialize callers for this proposal and retain shared source-row locks
     // through dispatch. A concurrent reviewer cannot change the approved facts
     // between the freshness check and a native write. A process crash releases
@@ -368,7 +388,7 @@ async fn run(
     let outcome = async {
         if allow_write {
             let decimals = native::validate_references(
-                &context,
+                context,
                 scoped.company,
                 &proposal.definition.configuration,
             )
@@ -384,7 +404,7 @@ async fn run(
         execute_steps(
             state,
             session,
-            &context,
+            context,
             &tx,
             scoped,
             task,
@@ -394,11 +414,12 @@ async fn run(
         .await
     }
     .await;
-    match outcome {
+    let failure = match outcome {
         Ok(result) => {
             proposal.state = "verified".into();
             proposal.execution.phase = Phase::Complete;
             proposal.result = Some(result);
+            None
         }
         Err(error) => {
             proposal.state = "blocked".into();
@@ -409,12 +430,12 @@ async fn run(
             // ApiError redacts internal causes. Source data is never written to
             // traces or copied into task errors by this orchestration layer.
             proposal.last_error = Some(error.to_string());
+            Some(error)
         }
-    }
+    };
     storage::save_progress(&tx, &proposal).await?;
-    let view = proposal.view();
     tx.commit().await.map_err(ApiError::internal)?;
-    Ok(view)
+    Ok((proposal, failure))
 }
 
 #[allow(clippy::too_many_arguments)]
