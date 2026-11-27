@@ -80,6 +80,8 @@ import { firstFileFromFormValue } from '@/lib/document-blob-upload';
 import { useManagedDocumentUpload } from '@/lib/use-managed-document-upload';
 import { DocumentUploadReceipts } from '../../../../components/document-upload-receipts';
 import { DocumentViewerDialog } from '../../../../components/document-viewer-dialog';
+import { DocumentImportButton } from '../../../../components/document-import-button';
+import { documentImportSource } from '@/lib/document-import-source';
 import { documentViewerCompanyId } from '@/lib/document-viewer';
 import { toSetDocumentRetentionParams } from '@/lib/documents-create-params';
 import { useDocumentsModuleSubscription } from '@/lib/module-subscription-hooks';
@@ -258,7 +260,7 @@ function DocumentPageLoaded({
   const applyLegalHold = useApplyDocumentLegalHold(orgId);
   const releaseLegalHold = useReleaseDocumentLegalHold(orgId);
   const createSignatureRequest = useCreateDocumentSignatureRequest(orgId);
-  const { checkPermission, permissionsReady, currentUser } = useRBAC();
+  const { checkPermission, permissionsReady, currentUser, isAdmin } = useRBAC();
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const releaseNoteRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -381,6 +383,29 @@ function DocumentPageLoaded({
   const isDeleted = document.isDeleted === true;
   const isLocked = document.isLocked === true;
   const url = typeof document.url === 'string' && document.url ? document.url : undefined;
+  const importScope = !isDeleted && !documentsQuery.isError && permissionsReady &&
+    session.organizationId === organizationId && session.activeCompanyReady &&
+    operatingCompanyId > 0n && session.activeCompanyId === Number(operatingCompanyId) &&
+    Boolean(session.identity) && currentUser?.id === session.identity && isAdmin() &&
+    checkPermission('document', 'read').allowed
+      ? { organizationId: orgId, companyId: operatingCompanyId }
+      : null;
+  const importButton = (version?: Row) => {
+    if (!importScope) return null;
+    const source = documentImportSource(
+      importScope,
+      documentId,
+      document,
+      version ? { id: String(version.id), row: version } : undefined,
+    );
+    return source ? (
+      <DocumentImportButton
+        key={`${session.identity}:${orgId}:${operatingCompanyId}:${documentId}:${source.versionId}:${source.checksum}`}
+        companyId={Number(operatingCompanyId)}
+        source={source}
+      />
+    ) : null;
+  };
   const canRetryIndexing = uploads.canVersion
     && documentViewerCompanyId(document) === operatingCompanyId
     && url?.startsWith('/api/documents/blobs/object/');
@@ -604,6 +629,7 @@ function DocumentPageLoaded({
               && checkPermission('document', 'read').allowed ? (
                 <AskAboutRecordButton entityType="document" recordId={documentId} label={label} activeTab={activeTab} />
               ) : null}
+            {importButton()}
             {url ? (
               <Button
                 size="sm"
@@ -767,6 +793,11 @@ function DocumentPageLoaded({
                       ) },
                       { key: 'changesDescription', label: t('documents.page.versionChanges', { defaultValue: 'Changes' }), layout: { min: 12, preferred: 18, grow: 1, wrap: 3 } },
                       { key: 'createdAt', label: 'Created', type: 'date' },
+                      ...(importScope && checkPermission('document_version', 'read').allowed ? [{
+                        key: 'id',
+                        label: t('documents.page.importColumn', { defaultValue: 'Import' }),
+                        render: (_value: unknown, row: Row) => importButton(row),
+                      }] : []),
                     ],
                     emptyMessage: t('documents.page.noVersions', { defaultValue: 'No versions yet' }),
                   },

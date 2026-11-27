@@ -1,12 +1,105 @@
 //! Verify viewer selection provenance before accepting a copy into import review.
-use serde_json::Value;
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 use crate::{
     document_blobs::read_authorized_spreadsheet_source, error::ApiError, session::ApiSession,
     state::AppState,
 };
 
-use super::Original;
+use super::{Original, StorageScope};
+
+pub(super) const DOCUMENT_TASK_PREFIX: &str = "managed-document-v1:";
+
+pub(super) fn document_task_identity(
+    company_id: u64,
+    document_id: u64,
+    version_id: u64,
+) -> (String, String) {
+    let conversation = format!("{DOCUMENT_TASK_PREFIX}{document_id}:{version_id}");
+    let request = hex::encode(Sha256::digest(format!("{company_id}:{conversation}")));
+    (request[..32].to_owned(), conversation)
+}
+
+pub(super) fn document_reference(conversation_key: &str) -> Option<Value> {
+    let (document, version) = conversation_key
+        .strip_prefix(DOCUMENT_TASK_PREFIX)?
+        .split_once(':')?;
+    let canonical_id = |value: &str| {
+        value
+            .parse::<u64>()
+            .ok()
+            .is_some_and(|id| id > 0 && id.to_string() == value)
+    };
+    (canonical_id(document) && canonical_id(version))
+        .then(|| json!({"documentId": document, "versionId": version}))
+}
+
+pub(super) fn verify_document_version(
+    source: &crate::spreadsheet::Source,
+    document_id: &str,
+    version_id: &str,
+    checksum: &str,
+) -> Result<(), ApiError> {
+    if source.document_id != document_id
+        || source.version_id != version_id
+        || source.checksum != checksum
+    {
+        return Err(ApiError::Conflict(
+            "the selected document version changed".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// A matching checksum proves the bytes, while the saved reference proves provenance.
+pub(super) async fn find_saved_document_task(
+    pool: &deadpool_postgres::Pool,
+    scope: StorageScope<'_>,
+    source: &crate::spreadsheet::Source,
+    conversation_key: &str,
+) -> Result<Option<String>, ApiError> {
+    let client = pool.get().await.map_err(ApiError::internal)?;
+    let row = client
+        .query_opt(
+            "SELECT task.request_id
+             FROM lumiere_platform.import_task task
+             JOIN lumiere_platform.import_task_source file USING
+                  (organization_id, company_id, actor_identity, request_id)
+             WHERE task.organization_id=$1::text::numeric AND task.company_id=$2::text::numeric
+               AND task.actor_identity=$3 AND file.ordinal=0 AND file.source_sha256=$4
+               AND NOT EXISTS (
+                 SELECT 1 FROM lumiere_platform.import_task_source sibling
+                 WHERE sibling.organization_id=task.organization_id
+                   AND sibling.company_id=task.company_id
+                   AND sibling.actor_identity=task.actor_identity
+                   AND sibling.request_id=task.request_id AND sibling.ordinal<>0
+               )
+               AND (task.conversation_key=$5 OR EXISTS (
+                 SELECT 1 FROM jsonb_array_elements(
+                   CASE WHEN jsonb_typeof(task.preparation_json->'files')='array'
+                     THEN task.preparation_json->'files' ELSE '[]'::jsonb END
+                 ) rule
+                 WHERE rule->>'sourceSha256'=$4
+                   AND rule->'managedSelection'->>'documentId'=$6
+                   AND rule->'managedSelection'->>'versionId'=$7
+               ))
+             ORDER BY (task.conversation_key=$5) DESC, task.created_at DESC, task.request_id DESC
+             LIMIT 1",
+            &[
+                &scope.organization.to_string(),
+                &scope.company.to_string(),
+                &scope.actor,
+                &source.checksum,
+                &conversation_key,
+                &source.document_id,
+                &source.version_id,
+            ],
+        )
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(row.map(|row| row.get("request_id")))
+}
 
 pub(super) fn has_selection(preparation: &Value) -> bool {
     preparation["files"].as_array().is_some_and(|files| {

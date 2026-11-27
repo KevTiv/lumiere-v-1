@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm'
 import ts from 'typescript'
 import { NextRequest, NextResponse } from 'next/server'
 import { safeAuthReturnTo } from './auth-mode'
+import { isOperationWrite } from './ai-index-drain-path'
 import * as crypto from 'node:crypto'
 
 function loadSource(file: string, dependencies: Record<string, unknown>, globals: Record<string, unknown> = {}) {
@@ -112,6 +113,34 @@ test('BFF preserves explicit invalid bearer and rejects cross-origin cookie writ
   }))
   assert.equal(crossOrigin.status, 403)
   assert.equal(calls.length, 1)
+})
+
+test('the managed document import POST reaches the versioned API as a reference-only task write', async () => {
+  const reference = { companyId: 3, documentId: '41', versionId: '9', checksum: 'a'.repeat(64), current: false }
+  const api = loadSource('./api-server-forward.ts', {
+    './auth-mode': { isWorkOsEnabled: () => true }, 'next/server': { NextResponse },
+    '@workos-inc/authkit-nextjs': { withAuth: async () => ({ accessToken: 'provider-token' }) },
+  }, { fetch: async (url: string, init: RequestInit) => {
+    assert.equal(url, 'http://api.test/v1/import-tasks/from-document')
+    assert.equal(init.method, 'POST')
+    const headers = new Headers(init.headers)
+    assert.equal(headers.get('authorization'), 'Bearer provider-token')
+    assert.equal(headers.get('content-type'), 'application/json')
+    assert.deepEqual(await new Response(init.body).json(), reference)
+    return new Response('{"status":"awaiting_decision"}')
+  } })
+  const route = loadSource('../app/api/[...path]/route.ts', {
+    'next/server': { after: () => assert.fail('source preparation should not queue ERP indexing') },
+    '@/lib/api-server-forward': api,
+    '@/lib/ai-index-drain': { kickAiIndexDrain: () => assert.fail('source preparation should not queue ERP indexing') },
+    '@/lib/ai-index-drain-path': { isOperationWrite },
+  })
+  const result = await route.POST(new NextRequest('https://web.test/api/import-tasks/from-document', {
+    method: 'POST',
+    headers: { origin: 'https://web.test', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
+    body: JSON.stringify(reference),
+  }))
+  assert.deepEqual(await result.json(), { status: 'awaiting_decision' })
 })
 
 test('hosted BFF never replaces explicit empty credentials or missing provider sessions with native cookies', async () => {

@@ -14,6 +14,8 @@ import {
   type DocumentViewerFetch,
 } from "./document-viewer"
 
+import { documentImportSource } from "./document-import-source"
+
 const bytes = new TextEncoder().encode("Name,Amount\nCoffee,1200\n")
 const checksum = createHash("sha256").update(bytes).digest("hex")
 const url = "/api/documents/blobs/object/7/default/csv-current"
@@ -580,4 +582,18 @@ test("Office preview requests the exact historical source and validates its resp
       errorCode(code),
     )
   }
+})
+
+test("document import actions pin exact current and historical spreadsheet versions", () => {
+  assert.deepEqual(documentImportSource(scope, "1", document), {
+    documentId: "1", versionId: "11", checksum, current: true,
+  })
+  assert.deepEqual(documentImportSource(scope, "1", document, { id: "10", row: oldVersion }), {
+    documentId: "1", versionId: "10", checksum, current: false,
+  })
+  assert.equal(documentImportSource(scope, "1", { ...document, currentVersionId: null }), null)
+  assert.equal(documentImportSource({ ...scope, companyId: 4n }, "1", document), null)
+  assert.equal(documentImportSource(scope, "1", { ...document, fileName: "farm.pdf", mimetype: "application/pdf" }), null)
+  assert.equal(documentImportSource(scope, "1", { ...document, fileSize: 5_000_001 }), null)
+  assert.equal(documentImportSource(scope, "1", document, { id: "10", row: { ...oldVersion, documentId: 2 } }), null)
 })

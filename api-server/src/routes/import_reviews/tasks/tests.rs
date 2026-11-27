@@ -677,5 +677,140 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
     ensure!(fresh_task["reviews"][0]["id"] != task["reviews"][0]["id"]);
     ensure!(fresh_task["reviews"][0]["pending"] == 1 && fresh_task["reviews"][0]["confirmed"] == 0);
     ensure!(read_task(pool, scoped, &body.request_id).await?["reviews"][0]["confirmed"] == 1);
+    exercise_managed_document_lookup(pool, scoped).await?;
     Ok(())
+}
+
+async fn exercise_managed_document_lookup(
+    pool: &deadpool_postgres::Pool,
+    scope: StorageScope<'_>,
+) -> Result<()> {
+    let (id, conversation) = managed_source::document_task_identity(scope.company, 60, 7);
+    let mut range_task = submission();
+    range_task.request_id = "d".repeat(32);
+    let (originals, _) = decode_submission(&range_task)?;
+    let checksum = originals[0].sha256.clone();
+    let mut source = crate::spreadsheet::Source {
+        document_id: "60".into(),
+        version_id: "7".into(),
+        checksum: checksum.clone(),
+    };
+
+    // Ordinary uploads of identical bytes carry no managed provenance.
+    assert_eq!(
+        managed_source::find_saved_document_task(pool, scope, &source, &conversation).await?,
+        None
+    );
+    range_task.preparation = Some(json!({"version": 1, "files": [{
+        "fileName": "products.csv",
+        "sourceSha256": checksum,
+        "managedSelection": {
+            "documentId": "60", "versionId": "7", "current": false,
+            "sheetName": "CSV", "firstRow": 1, "lastRow": 2,
+            "firstColumn": 1, "lastColumn": 3
+        }
+    }]}));
+    let (originals, hash) = decode_submission(&range_task)?;
+    accept(pool, scope, &range_task, &originals, &hash).await?;
+    assert_eq!(
+        managed_source::find_saved_document_task(pool, scope, &source, &conversation).await?,
+        Some(range_task.request_id)
+    );
+    for other in [
+        StorageScope {
+            actor: "other",
+            ..scope
+        },
+        StorageScope {
+            company: scope.company + 1,
+            ..scope
+        },
+        StorageScope {
+            organization: scope.organization + 1,
+            ..scope
+        },
+    ] {
+        assert_eq!(
+            managed_source::find_saved_document_task(pool, other, &source, &conversation).await?,
+            None
+        );
+    }
+    for (document, version, hash) in [
+        ("61", "7", checksum.clone()),
+        ("60", "8", checksum.clone()),
+        ("60", "7", "e".repeat(64)),
+    ] {
+        let (_, conversation) = managed_source::document_task_identity(
+            scope.company,
+            document.parse()?,
+            version.parse()?,
+        );
+        source.document_id = document.into();
+        source.version_id = version.into();
+        source.checksum = hash;
+        assert_eq!(
+            managed_source::find_saved_document_task(pool, scope, &source, &conversation).await?,
+            None
+        );
+    }
+
+    let mut document_task = submission();
+    document_task.request_id = id.clone();
+    document_task.conversation_key = conversation.clone();
+    let (originals, hash) = decode_submission(&document_task)?;
+    accept(pool, scope, &document_task, &originals, &hash).await?;
+    accept(pool, scope, &document_task, &originals, &hash).await?;
+    source.checksum = checksum;
+    assert_eq!(
+        managed_source::find_saved_document_task(pool, scope, &source, &conversation).await?,
+        Some(id.clone())
+    );
+    let saved = read_task(pool, scope, &id).await?;
+    assert_eq!(
+        saved["managedDocument"],
+        json!({"documentId": "60", "versionId": "7"})
+    );
+    assert_eq!(saved["status"], "awaiting_decision");
+    assert_eq!(saved["reviews"], json!([]));
+    Ok(())
+}
+
+#[test]
+fn document_import_identity_is_stable_and_scoped_to_company_and_exact_version() {
+    let (request, conversation) = managed_source::document_task_identity(9001, 60, 7);
+    assert!(valid_request_id(&request));
+    assert_eq!(
+        managed_source::document_task_identity(9001, 60, 7).0,
+        request
+    );
+    for (company, document, version) in [(9002, 60, 7), (9001, 61, 7), (9001, 60, 8)] {
+        assert_ne!(
+            managed_source::document_task_identity(company, document, version).0,
+            request
+        );
+    }
+    assert_eq!(
+        managed_source::document_reference(&conversation),
+        Some(json!({"documentId": "60", "versionId": "7"}))
+    );
+    assert!(managed_source::document_reference("managed-document-v1:060:7").is_none());
+}
+
+#[test]
+fn document_import_rejects_new_current_version_even_with_unchanged_bytes() {
+    let checksum = "a".repeat(64);
+    let mut source = crate::spreadsheet::Source {
+        document_id: "60".into(),
+        version_id: "7".into(),
+        checksum: checksum.clone(),
+    };
+    assert!(managed_source::verify_document_version(&source, "60", "7", &checksum).is_ok());
+    source.version_id = "8".into();
+    assert!(matches!(
+        managed_source::verify_document_version(&source, "60", "7", &checksum),
+        Err(ApiError::Conflict(_))
+    ));
+    // Selecting the exact historical version remains distinct from accepting current.
+    source.version_id = "7".into();
+    assert!(managed_source::verify_document_version(&source, "60", "7", &checksum).is_ok());
 }

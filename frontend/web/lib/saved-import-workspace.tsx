@@ -98,6 +98,7 @@ export function SavedImportWorkspace({
     (file) => file.managedSelection,
   )
   const managedSelection = managedSource?.managedSelection
+  const managedDocument = task?.managedDocument ?? managedSelection
   const [continuationBlock, setContinuationBlock] =
     useState<GuidedImportContinuationBlock>(null)
   const lastContinuationBlock = useRef<GuidedImportContinuationBlock>(null)
@@ -421,18 +422,22 @@ export function SavedImportWorkspace({
             failed={workflow.isError}
             onRetry={() => void workflow.refetch()}
           />
-          {managedSelection && (
+          {managedDocument && (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <p>
-                {t("documents.viewer.savedSelection", {
-                  defaultValue:
-                    "Selected source · {{sheet}} · R{{firstRow}}C{{firstColumn}}:R{{lastRow}}C{{lastColumn}}",
-                  sheet: managedSelection.sheetName,
-                  firstRow: managedSelection.firstRow,
-                  lastRow: managedSelection.lastRow,
-                  firstColumn: managedSelection.firstColumn,
-                  lastColumn: managedSelection.lastColumn,
-                })}
+                {managedSelection
+                  ? t("documents.viewer.savedSelection", {
+                      defaultValue:
+                        "Selected source · {{sheet}} · R{{firstRow}}C{{firstColumn}}:R{{lastRow}}C{{lastColumn}}",
+                      sheet: managedSelection.sheetName,
+                      firstRow: managedSelection.firstRow,
+                      lastRow: managedSelection.lastRow,
+                      firstColumn: managedSelection.firstColumn,
+                      lastColumn: managedSelection.lastColumn,
+                    })
+                  : t("documents.viewer.savedDocumentVersion", {
+                      defaultValue: "Source saved from Documents",
+                    })}
               </p>
               <Button
                 type="button"
@@ -440,8 +445,8 @@ export function SavedImportWorkspace({
                 size="sm"
                 onClick={() =>
                   setSourcePreview({
-                    documentId: managedSelection.documentId,
-                    versionId: managedSelection.versionId,
+                    documentId: managedDocument.documentId,
+                    versionId: managedDocument.versionId,
                   })
                 }
               >
@@ -452,12 +457,13 @@ export function SavedImportWorkspace({
             </div>
           )}
           {sourcePreview &&
-            managedSelection?.documentId === sourcePreview.documentId &&
-            managedSelection.versionId === sourcePreview.versionId && (
+            managedDocument?.documentId === sourcePreview.documentId &&
+            managedDocument.versionId === sourcePreview.versionId && (
               <DocumentViewerDialog
                 organizationId={BigInt(scope.organizationId)}
                 documentId={sourcePreview.documentId}
                 versionId={sourcePreview.versionId}
+                recordHref={`/documents/${sourcePreview.documentId}?tab=versions`}
                 onOpenChange={(open) => {
                   if (!open) setSourcePreview(null)
                 }}
