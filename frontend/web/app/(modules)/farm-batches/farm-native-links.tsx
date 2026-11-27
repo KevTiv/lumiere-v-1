@@ -22,7 +22,6 @@ import {
   FarmApiError,
   farmApiPath,
   farmDateLabel,
-  farmDateLabel,
   farmRecordId,
   farmRequest,
   farmWrite,
