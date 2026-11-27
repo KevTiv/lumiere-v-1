@@ -2594,7 +2594,15 @@
         "reason": "Motif indiqué par le fournisseur {{reason}}",
         "reasonUnavailable": "Le motif de l’échec est indisponible.",
         "refresh": "Actualiser le statut de livraison"
-      }
+      },
+      "description": "Consultez la conversation WhatsApp de ce contact. La livraison des messages en attente reste à confirmer.",
+      "open": "Ouvrir la conversation",
+      "emptyTitle": "Aucune conversation ouverte",
+      "emptyDescription": "Ouvrez une conversation WhatsApp avec ce contact.",
+      "compose": "Message à envoyer",
+      "placeholder": "Écrivez un message…",
+      "actionFailed": "La demande a échoué. Votre message est conservé.",
+      "phoneRequired": "Ajoutez à ce contact un numéro utilisable sur WhatsApp avant d’ouvrir une conversation."
     },
     "relIntel": {
       "title": "Analyse des relations",
@@ -3357,7 +3365,13 @@
         "openPricelists": "Ouvrir les listes de prix",
         "refreshPriceLists": "Actualiser les listes de prix",
         "pricelistMissing": "Créez une liste de prix dans une devise active dans un autre onglet, puis revenez ici et actualisez les listes. Vos saisies sont conservées.",
-        "pricelistMissingAsk": "Aucune liste de prix utilisable. Demandez à un administrateur d’en créer une dans une devise active, puis actualisez les listes."
+        "pricelistMissingAsk": "Aucune liste de prix utilisable. Demandez à un administrateur d’en créer une dans une devise active, puis actualisez les listes.",
+        "customerMissing": "Ajoutez un client dans un autre onglet, puis revenez au devis. Votre saisie est conservée.",
+        "customerMissingAsk": "Aucun client disponible. Demandez à un administrateur d’en ajouter un, puis revenez au devis.",
+        "openContacts": "Ouvrir les contacts",
+        "warehouseMissing": "Ajoutez un entrepôt dans un autre onglet, puis revenez au devis. Votre saisie est conservée.",
+        "warehouseMissingAsk": "Aucun entrepôt disponible. Demandez à un administrateur d’en ajouter un dans les paramètres des entrepôts, puis revenez au devis.",
+        "openWarehouses": "Ouvrir les paramètres des entrepôts"
       },
       "newSaleOrder": {
         "sections": {
@@ -4295,7 +4309,15 @@
     "forms": {
       "recovery": {
         "receiptRetained": "Reçu : {{fileName}}. Reprenez l’enregistrement une fois en ligne.",
-        "receiptMissing": "Reçu : {{fileName}}. Le fichier local est indisponible. Joignez de nouveau l’original pour continuer."
+        "receiptMissing": "Reçu : {{fileName}}. Le fichier local est indisponible. Joignez de nouveau l’original pour continuer.",
+        "title": "État de l’enregistrement de la dépense",
+        "reviewRequest": "Vérifier l’enregistrement de la dépense",
+        "scopeChanged": "Cette demande appartient à une autre société ou à un autre compte. Revenez à la société ou au compte d’origine pour la vérifier.",
+        "retained": "Votre saisie et la demande d’origine sont conservées. Vérifiez le résultat avant de créer une nouvelle dépense.",
+        "checkStatus": "Vérifier l’état",
+        "continue": "Poursuivre l’enregistrement",
+        "receiptAttached": "Le justificatif {{fileName}} est joint.",
+        "receiptUploaded": "Le justificatif {{fileName}} a été téléversé. Son enregistrement sera vérifié à partir de la demande d’origine."
       },
       "newExpense": {
         "fields": {
@@ -5727,6 +5749,18 @@
         "askAdmin": "Demandez à un administrateur ayant accès à la configuration d’ajouter ce choix.",
         "refresh": "Actualiser les choix de configuration",
         "choicesChanged": "Avant d’enregistrer, choisissez un type de service, un journal, un compte de charges et un compte de contrepartie disponibles."
+      },
+      "driverChoicesUnavailable": "Aucun employé disponible. Vous pouvez retirer le conducteur actuel.",
+      "inspectorChoicesUnavailable": "Aucun employé disponible. Vous pouvez enregistrer le contrôle sans nommer d’inspecteur.",
+      "savedRequest": "L’enregistrement d’une modification du parc attend confirmation.",
+      "retryOriginal": "Le nouvel essai reprend les valeurs et l’identifiant de la demande d’origine, même après le rechargement de la page.",
+      "retrySavedRequest": "Réessayer la demande enregistrée",
+      "companyRequired": "Sélectionnez une société pour consulter et gérer ses véhicules.",
+      "status": {
+        "active": "En activité",
+        "idle": "À l’arrêt",
+        "maintenance": "En entretien",
+        "offline": "Hors ligne"
       }
     }
   }

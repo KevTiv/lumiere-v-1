@@ -2549,7 +2549,15 @@
         "reason": "Sababu ya mtoa huduma {{reason}}",
         "reasonUnavailable": "Sababu ya kushindwa kutoka kwa mtoa huduma haipatikani.",
         "refresh": "Onyesha upya hali ya uwasilishaji"
-      }
+      },
+      "description": "Soma mazungumzo ya WhatsApp ya mtu huyu. Uwasilishaji wa ujumbe ulio kwenye foleni bado haujathibitishwa.",
+      "open": "Fungua mazungumzo",
+      "emptyTitle": "Hakuna mazungumzo yaliyofunguliwa",
+      "emptyDescription": "Fungua mazungumzo ya WhatsApp na mtu huyu.",
+      "compose": "Ujumbe wa kutuma",
+      "placeholder": "Andika ujumbe…",
+      "actionFailed": "Ombi halikufanikiwa. Ujumbe wako umehifadhiwa.",
+      "phoneRequired": "Ongeza nambari ya WhatsApp inayoweza kutumiwa kwa mtu huyu kabla ya kufungua mazungumzo."
     },
     "relIntel": {
       "title": "Uchanganuzi wa mahusiano",
@@ -3310,7 +3318,13 @@
         "openPricelists": "Fungua orodha za bei",
         "refreshPriceLists": "Onyesha upya orodha za bei",
         "pricelistMissing": "Unda orodha ya bei yenye sarafu inayotumika kwenye kichupo kingine, kisha rudi hapa uonyeshe orodha upya. Maelezo uliyojaza yatahifadhiwa.",
-        "pricelistMissingAsk": "Hakuna orodha ya bei inayoweza kutumika. Mwombe msimamizi aunde orodha yenye sarafu inayotumika, kisha uonyeshe orodha upya."
+        "pricelistMissingAsk": "Hakuna orodha ya bei inayoweza kutumika. Mwombe msimamizi aunde orodha yenye sarafu inayotumika, kisha uonyeshe orodha upya.",
+        "customerMissing": "Ongeza mteja kwenye kichupo kingine, kisha urudi kwenye nukuu hii. Ulichoandika kitahifadhiwa.",
+        "customerMissingAsk": "Hakuna wateja. Mwombe msimamizi aongeze mteja, kisha urudi kwenye nukuu hii.",
+        "openContacts": "Fungua anwani",
+        "warehouseMissing": "Ongeza ghala kwenye kichupo kingine, kisha urudi kwenye nukuu hii. Ulichoandika kitahifadhiwa.",
+        "warehouseMissingAsk": "Hakuna ghala. Mwombe msimamizi aongeze ghala katika mipangilio ya maghala, kisha urudi kwenye nukuu hii.",
+        "openWarehouses": "Fungua mipangilio ya maghala"
       },
       "newSaleOrder": {
         "sections": {
@@ -4248,7 +4262,15 @@
     "forms": {
       "recovery": {
         "receiptRetained": "Risiti: {{fileName}}. Endelea kuhifadhi ukiwa mtandaoni.",
-        "receiptMissing": "Risiti: {{fileName}}. Faili haipatikani kwenye kifaa hiki. Ambatisha faili asili tena ili uendelee."
+        "receiptMissing": "Risiti: {{fileName}}. Faili haipatikani kwenye kifaa hiki. Ambatisha faili asili tena ili uendelee.",
+        "title": "Hali ya kuhifadhi gharama",
+        "reviewRequest": "Kagua uhifadhi wa gharama",
+        "scopeChanged": "Ombi hili ni la kampuni au akaunti nyingine. Rudi kwenye kampuni au akaunti ya awali ili ulikague.",
+        "retained": "Ulichoandika na ombi la awali vimehifadhiwa. Angalia matokeo kabla ya kuanzisha gharama nyingine.",
+        "checkStatus": "Angalia hali",
+        "continue": "Endelea kuhifadhi",
+        "receiptAttached": "Risiti {{fileName}} imeambatishwa.",
+        "receiptUploaded": "Risiti {{fileName}} imepakiwa. Usajili wake utathibitishwa kwa kutumia ombi la awali."
       },
       "newExpense": {
         "fields": {
@@ -5575,6 +5597,18 @@
         "askAdmin": "Omba msimamizi mwenye ruhusa ya usanidi aongeze chaguo hili.",
         "refresh": "Onyesha upya chaguo za usanidi",
         "choicesChanged": "Kabla ya kuhifadhi, chagua aina ya huduma, jarida, akaunti ya gharama na akaunti ya upande mwingine zinazopatikana."
+      },
+      "driverChoicesUnavailable": "Hakuna wafanyakazi wa kuchagua. Bado unaweza kuondoa dereva wa sasa.",
+      "inspectorChoicesUnavailable": "Hakuna wafanyakazi wa kuchagua. Unaweza kurekodi ukaguzi bila kutaja mkaguzi.",
+      "savedRequest": "Ombi la kuhifadhi mabadiliko ya magari linasubiri uthibitisho.",
+      "retryOriginal": "Ukijaribu tena, thamani na kitambulisho cha ombi la awali vitatumika hata baada ya kupakia ukurasa upya.",
+      "retrySavedRequest": "Jaribu tena ombi lililohifadhiwa",
+      "companyRequired": "Chagua kampuni ili uone na kudhibiti magari yake.",
+      "status": {
+        "active": "Linatumika",
+        "idle": "Halitumiki kwa sasa",
+        "maintenance": "Linafanyiwa matengenezo",
+        "offline": "Nje ya mtandao"
       }
     }
   }

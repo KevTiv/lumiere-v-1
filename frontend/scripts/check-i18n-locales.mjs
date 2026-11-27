@@ -26,6 +26,16 @@ const alphaAreas = new Set([
   "settings", "workspace", "auth", "notifications", "commandPalette", "recordHeader",
 ])
 const alphaKeys = Object.keys(en).filter(key => alphaAreas.has(key.split(".")[0]))
+const pilotWorkflowNamespaces = [
+  "sales.forms.setup.", "expenses.forms.recovery.", "crm.inbox.", "fleet.workspace.",
+  "settings.importHandoff.", "activation.priceList.",
+]
+const pilotWorkflowKeys = Object.keys(en).filter(key =>
+  pilotWorkflowNamespaces.some(prefix => key.startsWith(prefix))
+  || key === "activation.guidance.quotation"
+  || key === "settings.importWorkflow.nativeReceiptBoundary"
+  || key.startsWith("settings.importWorkflow.receipt"),
+)
 const errors = []
 for (const file of readdirSync(dir).filter(name => name.endsWith(".json") && name !== "en.json")) {
   const name = file.slice(0, -5)
@@ -40,6 +50,9 @@ for (const file of readdirSync(dir).filter(name => name.endsWith(".json") && nam
     // Every string on the language-settings screen must exist in all alpha languages.
     for (const key of Object.keys(en).filter(key => key.startsWith("common.") || key.startsWith("settings.profile.") || key.startsWith("settings.sections.") || key.startsWith("settings.groups.") || key.startsWith("workspaceShell.") || key.startsWith("nav."))) {
       if (!(key in pack)) errors.push(`${name}: missing core language-settings key ${key}`)
+    }
+    for (const key of pilotWorkflowKeys) {
+      if (!(key in pack)) errors.push(`${name}: missing pilot workflow key ${key}`)
     }
     console.log(`${name}: ${alphaKeys.filter(key => key in pack).length}/${alphaKeys.length} alpha keys; ${Object.keys(pack).length} catalog keys supplied`)
   }
