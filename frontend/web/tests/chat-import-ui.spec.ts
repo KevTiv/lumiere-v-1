@@ -122,6 +122,14 @@ async function mockTasks(page: Page, options: {
       return route.fulfill({ status: 500, json: { error: "Source preparation must not dispatch ERP workflow actions" } })
     }
     if (!task || requests.hideStoredTasks || task.companyId !== url.searchParams.get("companyId")) return route.fulfill({ status: 404, json: { error: "Not found" } })
+    if (path.endsWith("/runs") && route.request().method() === "GET") {
+      return route.fulfill({ json: {
+        runs: [], coverage: {
+          reviewRowCount: task.reviews.reduce((sum, review) => sum + review.total, 0),
+          verifiedRowCount: 0, complete: false,
+        },
+      } })
+    }
     if (path.endsWith("/resume") && route.request().method() === "POST") {
       await options.waitForScan
       if (task.status === "saved") {
@@ -330,7 +338,7 @@ test("a prepared task opens its exact source in the existing review workspace", 
   expect(requests.businessWrites).toBe(0)
 })
 
-test("Shop Sales approves only ready rows and reopens exact verified records from a new chat", async ({ page }) => {
+test("Shop Sales queues only ready rows and resumes the same run after reload", async ({ page }) => {
   let reviewedRecords: ChatImportReviewedRecords | undefined
   const requests = await mockTasks(page, { reviewedRecords: () => reviewedRecords })
   await mockSourceReview(page)
@@ -374,11 +382,48 @@ test("Shop Sales approves only ready rows and reopens exact verified records fro
   await page.route(/\/api\/import-reviews\/71(?:\?|$)/, route => route.fulfill({ json: review }))
   const previewDigests = ["c".repeat(64), "d".repeat(64)]
   const recordIds = ["9007199254740993", "62"]
-  const commands: unknown[] = []
+  const previews: unknown[] = []
+  const enqueues: unknown[] = []
+  const runReads: Array<{ taskId: string; runId: string }> = []
+  const runId = "e".repeat(64)
+  let savedTaskId: string | undefined
+  let finished = false
+  const runReceipt = (taskId: string) => ({
+    id: runId, taskId, adapter: "shop_sales", actor: "ab".repeat(32),
+    status: finished ? "verified" : "running",
+    createdAt: "2026-11-01T10:06:00Z", approvedAt: "2026-11-01T10:06:00Z",
+    rowCount: 2, verifiedRowCount: finished ? 2 : 0, failedRows: 0, heldRows: 0,
+    chunks: [{
+      id: "e".repeat(32), ordinal: 0, status: finished ? "verified" : "running",
+      attempts: 1, rowCount: 2, error: null,
+      receipt: finished ? {
+        module: "shop_sales", verifiedItemIds: ["711", "712"], failedRows: 0, heldRows: 0,
+        results: sales.slice(0, 2).map((row, index) => ({
+          itemId: row.id, status: index ? "matched" : "saved", recordId: recordIds[index],
+        })),
+      } : null,
+    }],
+  })
+  await page.route(/\/api\/import-tasks\/([a-f0-9]{32})\/runs(?:\?|$)/, route => {
+    const url = new URL(route.request().url())
+    const taskId = url.pathname.split("/")[3]!
+    if (route.request().method() === "POST") {
+      enqueues.push(route.request().postDataJSON())
+      savedTaskId = taskId
+      return route.fulfill({ status: 202, json: runReceipt(taskId) })
+    }
+    expect(url.searchParams.get("companyId")).toBe("9001")
+    const runs = savedTaskId === taskId ? [runReceipt(taskId)] : []
+    for (const run of runs) runReads.push({ taskId, runId: run.id })
+    return route.fulfill({
+      json: { runs, coverage: { reviewRowCount: 3, verifiedRowCount: finished ? 2 : 0, complete: false } },
+    })
+  })
   await page.route("**/api/import-reviews/71/module-backfill", route => {
     const request = route.request().postDataJSON()
-    commands.push(request)
-    if (request.preview) return route.fulfill({ json: { results: [
+    previews.push(request)
+    expect(request.preview, "a saved Shop Sales task may only preview through the direct route").toBe(true)
+    return route.fulfill({ json: { results: [
       ...sales.slice(0, 2).map((row, index) => ({
         itemId: row.id, status: "ready", digest: previewDigests[index],
         periodStart: row.values.sale_date, periodEnd: row.values.sale_date,
@@ -387,17 +432,6 @@ test("Shop Sales approves only ready rows and reopens exact verified records fro
       })),
       { itemId: "713", status: "held", reason: "Quantity times price differs from the source amount." },
     ] } })
-    reviewedRecords = {
-      counts: { verified: 2, alreadyPresent: 1 },
-      records: sales.slice(0, 2).map((row, index) => ({
-        id: recordIds[index]!, module: "shop_sales", periodStart: row.values.sale_date,
-        displayLabel: row.values.product_label,
-      })),
-      more: false,
-    }
-    return route.fulfill({ json: { results: sales.slice(0, 2).map((row, index) => ({
-      itemId: row.id, status: index ? "matched" : "saved", recordId: recordIds[index],
-    })) } })
   })
 
   await openChat(page)
@@ -412,30 +446,49 @@ test("Shop Sales approves only ready rows and reopens exact verified records fro
   await dialog.getByRole("button", { name: "Preview shop sales" }).click()
   await expect(dialog.getByText("Quantity times price differs from the source amount.", { exact: false })).toBeVisible()
   await expect(dialog.getByText("Total 10000.45", { exact: false })).toBeVisible()
-  expect(commands).toEqual([{
+  expect(previews).toEqual([{
     companyId: 9001, module: "shop_sales", preview: true,
     rows: sales.map(row => ({ itemId: row.id, revision: row.revision })),
   }])
   await dialog.getByRole("button", { name: "Save and verify 2 records" }).click()
-  await expect(dialog.getByText("1 saved · 1 matched existing records", { exact: false })).toBeVisible()
-  await expect(dialog.getByRole("link", { name: "Inkoko", exact: true })).toHaveAttribute(
-    "href", new RegExp(`^/sales\\?tab=shop-sales&backfillCompany=9001&backfillRecord=${recordIds[0]}&backfillTask=[a-f0-9]{32}$`),
-  )
-  expect(commands[1]).toEqual({
-    companyId: 9001, module: "shop_sales", preview: false,
-    rows: sales.slice(0, 2).map((row, index) => ({ itemId: row.id, revision: row.revision, expectedDigest: previewDigests[index] })),
-  })
+  await expect(dialog.getByText("The server is processing this import.", { exact: false }).first()).toBeVisible()
+  const approvedRows = sales.slice(0, 2).map((row) => ({ batchId: "71", itemId: row.id, revision: row.revision }))
+  expect(enqueues).toEqual([{
+    companyId: 9001, requestId: expect.stringMatching(/^[a-f0-9]{32}$/), adapter: "shop_sales",
+    rows: approvedRows,
+    config: { rows: approvedRows.map((row, index) => ({ ...row, expectedDigest: previewDigests[index] })) },
+  }])
+  expect(savedTaskId).toBe(requests.body?.requestId)
+  await expect.poll(() => runReads.length).toBeGreaterThan(0)
 
+  const readsBeforeReload = runReads.length
   await page.goto("/chat-import?thread=sales-follow-up")
+  await page.reload()
   await page.getByRole("button", { name: "Continue saved import", exact: true }).click()
   await dialog.getByRole("button", { name: "Open saved task", exact: true }).click()
+  await expect(dialog.locator('[data-import-queue="running"]')).toBeVisible()
+  await expect.poll(() => runReads.length).toBeGreaterThan(readsBeforeReload)
+  const readsWhileRunning = runReads.length
+  reviewedRecords = {
+    counts: { verified: 2, alreadyPresent: 1 },
+    records: sales.slice(0, 2).map((row, index) => ({
+      id: recordIds[index]!, module: "shop_sales", periodStart: row.values.sale_date,
+      displayLabel: row.values.product_label,
+    })),
+    more: false,
+  }
+  finished = true
+  await expect.poll(() => runReads.length).toBeGreaterThan(readsWhileRunning)
+  await expect(dialog.getByText("2 source rows verified", { exact: true })).toBeVisible()
+  expect(runReads.every(({ taskId, runId: observed }) => taskId === savedTaskId && observed === runId)).toBe(true)
   await dialog.getByRole("tab", { name: "ERP results", exact: true }).click()
   await expect(dialog.getByText("2 verified ERP records", { exact: false })).toBeVisible()
   await dialog.getByText("Exact ERP records", { exact: true }).click()
   await expect(dialog.getByRole("link", { name: /Inkoko/ })).toHaveAttribute(
     "href", `/sales?tab=shop-sales&backfillCompany=9001&backfillRecord=${recordIds[0]}`,
   )
-  expect(commands).toHaveLength(2)
+  expect(previews).toHaveLength(1)
+  expect(enqueues).toHaveLength(1)
   expect(requests.posts).toBe(1)
   expect(requests.businessWrites).toBe(0)
   await expect(page.getByTestId("chat-text-requests")).toHaveText("0")
