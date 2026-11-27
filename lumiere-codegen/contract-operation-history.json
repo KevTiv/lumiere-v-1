@@ -1210,6 +1210,10 @@
       "name": "create_company",
       "shape_fingerprint": "sha256:a9a101463d6e7448c868a305af8b1d0a089587b56a544faab2d220b4c766af89"
     },
+    "erp.create_company_fleet_service_type": {
+      "name": "create_company_fleet_service_type",
+      "shape_fingerprint": "sha256:5a1ffd76bd61d97b5b9ef64116de4253d4bfa9b9798b62a2725e45db023cba87"
+    },
     "erp.create_company_stock_location": {
       "name": "create_company_stock_location",
       "shape_fingerprint": "sha256:c167c6425edad0580bde2dab0b16cb0c6b771c55304d8570f1f36c8f0ab284ac"
@@ -6576,6 +6580,14 @@
       "current_operations_fingerprint": "sha256:2f6b5b3529d7866c65be543eecff5f0f91fb081b3d49647bc233e70a4b67a4dc",
       "operation_count": 1534,
       "reason": "PR #458: add the private SpaceTimeDB grounded chat acceptance fixture registry and its native registration reducer."
+    },
+    {
+      "previous_release": "v0.3.186",
+      "previous_ir_sha256": "sha256:24bff7fc7045ad420d3bcce7507939b1d56764c5cce59cc6209921ba3d93a08f",
+      "previous_operations_fingerprint": "sha256:2f6b5b3529d7866c65be543eecff5f0f91fb081b3d49647bc233e70a4b67a4dc",
+      "current_operations_fingerprint": "sha256:127a82cc6613ef62305e40ba37bc22d5b95203b9f35d5218b93f9de85d6de485",
+      "operation_count": 1535,
+      "reason": "release on top of v0.3.186: add create_company_fleet_service_type; change the shape of none"
     }
   ]
 }
