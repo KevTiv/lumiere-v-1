@@ -216,7 +216,6 @@
   "web/app/(modules)/crm/contact-payments-and-messages-panel.tsx": 1,
   "web/app/(modules)/crm/contact-relationships-panel.tsx": 1,
   "web/app/(modules)/crm/crm-client.tsx": 94,
-  "web/app/(modules)/crm/crm-inbox-panel.tsx": 1,
   "web/app/(modules)/crm/crm-pipeline-admin-panel.tsx": 1,
   "web/app/(modules)/crm/lead-score-panel.tsx": 1,
   "web/app/(modules)/crm/my-activities-panel.tsx": 1,
