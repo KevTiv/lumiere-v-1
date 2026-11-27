@@ -114,9 +114,10 @@ pub(super) async fn project(pool: &Pool, scope: StorageScope<'_>, task: &str, ru
                   WHERE dep.run_id=ANY(depends_on) AND dep.status IN ('blocked','failed','partial')) AS dependency_blocked
         FROM lumiere_platform.import_run WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric
           AND creator_identity=$3 AND task_id=$4 AND ($5::text IS NULL OR id=$5)
-        ORDER BY created_at DESC,id DESC LIMIT 10",&[&org,&company,&scope.actor,&task,&run]).await.map_err(ApiError::internal)?;
-    let mut result = Vec::with_capacity(rows.len());
-    for row in rows {
+        ORDER BY created_at DESC,id DESC LIMIT 11",&[&org,&company,&scope.actor,&task,&run]).await.map_err(ApiError::internal)?;
+    let more = rows.len() > 10;
+    let mut result = Vec::with_capacity(rows.len().min(10));
+    for row in rows.into_iter().take(10) {
         result.push(run_view(&client,row,run.is_some()).await?);
     }
     if run.is_some() {
@@ -124,7 +125,7 @@ pub(super) async fn project(pool: &Pool, scope: StorageScope<'_>, task: &str, ru
     }
     let row = client.query_one(
         "WITH items AS (
-             SELECT DISTINCT item.id,item.revision FROM lumiere_platform.import_review_item item
+             SELECT DISTINCT item.id,item.revision,item.state FROM lumiere_platform.import_review_item item
              JOIN lumiere_platform.import_task_review link
                ON link.organization_id=item.organization_id AND link.company_id=item.company_id AND link.batch_id=item.batch_id
              WHERE item.organization_id=$1::text::numeric AND item.company_id=$2::text::numeric
@@ -135,14 +136,25 @@ pub(super) async fn project(pool: &Pool, scope: StorageScope<'_>, task: &str, ru
                ON claim.organization_id=$1::text::numeric AND claim.company_id=$2::text::numeric
                 AND claim.creator_identity=$3 AND claim.task_id=$4 AND claim.item_id=item.id
              JOIN lumiere_platform.import_run_chunk chunk ON chunk.run_id=claim.run_id AND item.id=ANY(chunk.verified_item_ids)
-             WHERE EXISTS(SELECT 1 FROM jsonb_array_elements(chunk.source_rows) AS source
+             WHERE item.state<>'excluded' AND EXISTS(SELECT 1 FROM jsonb_array_elements(chunk.source_rows) AS source
                           WHERE source->>'itemId'=item.id::text AND source->>'revision'=item.revision::text)
-         ) SELECT (SELECT count(*) FROM items) AS total,(SELECT count(*) FROM verified) AS verified",
+         ) SELECT (SELECT count(*) FROM items) AS total,(SELECT count(*) FROM verified) AS verified,
+                  (SELECT count(*) FROM items WHERE state='excluded') AS excluded",
         &[&org,&company,&scope.actor,&task],
     ).await.map_err(ApiError::internal)?;
     let total: i64 = row.get("total");
     let verified: i64 = row.get("verified");
-    Ok(json!({"runs":result,"coverage":{"reviewRowCount":total,"verifiedRowCount":verified,"complete":total>0 && total==verified}}))
+    let excluded: i64 = row.get("excluded");
+    Ok(json!({
+        "runs": result,
+        "more": more,
+        "coverage": {
+            "reviewRowCount": total,
+            "verifiedRowCount": verified,
+            "excludedRowCount": excluded,
+            "complete": verified > 0 && total == verified + excluded
+        }
+    }))
 }
 
 async fn run_view(client: &tokio_postgres::Client, run: Row, detail: bool) -> Result<Value,ApiError> {

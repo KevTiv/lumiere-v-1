@@ -13,7 +13,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-use super::{scope, tasks, Scope, StorageScope};
+use super::{scope, task_company_scope, tasks, Scope, StorageScope};
 use crate::{
     cold_tier::pg_pool, error::ApiError, platform_control, session::ApiSession, state::AppState,
     trusted_context::TrustedOperationContext, web_session::OrgSession,
@@ -194,8 +194,16 @@ async fn list(
     Path(task): Path<String>,
     Query(query): Query<Scope>,
 ) -> Result<Json<Value>, ApiError> {
-    let authority = authorize(&state, session, query.company_id, &task).await?;
-    storage::project(pg_pool::required_pool().map_err(ApiError::unavailable)?, authority.storage_scope(), &task, None).await.map(Json)
+    let context = task_company_scope(&state, &session, query.company_id).await?;
+    let viewer = StorageScope {
+        organization: context.organization_id(),
+        company: query.company_id,
+        actor: context.actor_identity(),
+    };
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let (creator, _) = tasks::handoff::read_for(pool, &context, viewer, &task).await?;
+    let owner = StorageScope { actor: &creator, ..viewer };
+    storage::project(pool, owner, &task, None).await.map(Json)
 }
 
 async fn detail(
