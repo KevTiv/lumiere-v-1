@@ -464,6 +464,155 @@ test("saved import stages sit above their panels in the narrow Settings workspac
   expect(requests.businessWrites).toBe(0)
 })
 
+test("a clerk hands the same saved import to a named owner and can revoke it", async ({ page, context }) => {
+  const clerk = "ab".repeat(32)
+  const owner = "cd".repeat(32)
+  const taskId = "a".repeat(32)
+  const fileName = "shared-contacts.csv"
+  const checksum = "a".repeat(64)
+  const settings = "/chat-import?surface=settings"
+  const taskPath = `${settings}&importCompany=9001&importTask=${taskId}&importView=sources`
+  const review = {
+    id: "71", title: "Shared contacts", targetEntity: "contact", sourceFile: fileName,
+    total: 1, pending: 0, confirmed: 1, excluded: 0,
+  }
+  const decisionReceipt = {
+    decisionId: "b".repeat(32), optionId: "prepare_import", otherText: null, revision: 2,
+    createdAt: "2026-11-01T10:01:00Z", actor: clerk,
+  }
+  let recipient: string | null = null
+  let revision = 0
+  let writeAttempts = 0
+  const handoffs: unknown[] = []
+
+  const stub = async (viewer: Page, actor: string) => {
+    const canRead = () => actor === clerk || recipient === actor
+    const task = () => ({
+      requestId: taskId, organizationId: "8001", companyId: "9001",
+      conversationKey: "managed-document-v1:60:7", status: "needs_review",
+      createdAt: "2026-11-01T10:00:00Z", warnings: [], error: null,
+      managedDocument: { documentId: "60", versionId: "7" },
+      handoff: { creator: clerk, recipient, revision, canManage: actor === clerk, canReview: actor === owner },
+      files: [{ ordinal: 0, fileName, size: 13, sha256: checksum }],
+      reviews: [review], decisionReceipt, decisionHistory: [decisionReceipt],
+      decision: {
+        id: `${taskId}:purpose`, revision: 2, status: "approved",
+        question: "How would you like to use these files?", allowOther: true,
+        options: [{ id: "prepare_import", label: "Prepare an import for review" }],
+        selectedOptionId: "prepare_import", otherText: null, decisionId: decisionReceipt.decisionId,
+      },
+    })
+    await viewer.route("**/api/query/**", route => route.fulfill({ json: {
+      data: new URL(route.request().url()).pathname.endsWith("/companies")
+        ? [{ id: 9001, organizationId: 8001, name: "Synthetic farm company", currencyId: 1 }]
+        : [],
+    } }))
+    await viewer.route("**/api/import-reviews**", route => {
+      const path = new URL(route.request().url()).pathname
+      if (actor !== owner || !canRead()) return route.fulfill({ status: 403, json: { error: "Review unavailable" } })
+      if (path.endsWith("/71")) return route.fulfill({ json: {
+        ...review, history: [], items: [{
+          id: "711", state: "confirmed", revision: 2, reason: "Verified name",
+          reviewedBy: clerk, reviewedAt: decisionReceipt.createdAt,
+          values: { name: "Coffee supplier" }, confirmedFields: ["name"],
+          source: {
+            key: "contact-2", label: "Coffee supplier", issue: "Verified source contact",
+            source: { file: fileName, row: 2, sha256: checksum },
+            fields: [{ key: "name", label: "Name", kind: "text", sourceValue: "Coffee supplier", required: true }],
+            proposed: { name: "Coffee supplier" },
+          },
+        }],
+      } })
+      return route.fulfill({ json: { data: [review] } })
+    })
+    await viewer.route("**/api/import-tasks**", route => {
+      const url = new URL(route.request().url())
+      const path = url.pathname
+      if (path.endsWith("/handoff")) {
+        if (actor !== clerk) return route.fulfill({ status: 403, json: { error: "Only the creator may manage access" } })
+        if (route.request().method() === "GET") {
+          return route.fulfill({ json: { recipients: [{ value: owner, label: "Morgan Owner" }] } })
+        }
+        const body = route.request().postDataJSON() as {
+          companyId: number; recipient: string | null; expectedRevision: number
+        }
+        handoffs.push(body)
+        if (body.companyId !== 9001 || body.expectedRevision !== revision || (body.recipient !== owner && body.recipient !== null)) {
+          return route.fulfill({ status: 409, json: { error: "Invalid handoff" } })
+        }
+        recipient = body.recipient
+        revision += 1
+        return route.fulfill({ json: { recipient, revision } })
+      }
+      if (route.request().method() !== "GET") {
+        writeAttempts += 1
+        return route.fulfill({ status: 500, json: { error: "No import submission is expected in this fixture" } })
+      }
+      if (path === "/api/import-tasks") {
+        return route.fulfill({ json: { tasks: canRead() ? [task()] : [], nextCursor: null } })
+      }
+      if (!canRead() || path.split("/")[3] !== taskId || url.searchParams.get("companyId") !== "9001") return route.fulfill({ status: 404, json: { error: "Import task not found" } })
+      if (path === `/api/import-tasks/${taskId}/workflow`) return route.fulfill({ json: {
+        version: 1, organizationId: "8001", companyId: "9001", requestId: taskId,
+        capabilities: [], proposals: [], nativeResults: [], nativeResultsMore: false,
+      } })
+      return route.fulfill({ json: task() })
+    })
+    await viewer.route("**/api/import/contact", route => {
+      if (route.request().method() === "POST") writeAttempts += 1
+      return route.fulfill({ status: 500, json: { error: "No import submission is expected in this fixture" } })
+    })
+  }
+
+  await stub(page, clerk)
+  await page.goto(taskPath)
+  const clerkWorkspace = page.getByTestId("saved-import-workspace")
+  await expect(clerkWorkspace.getByRole("tab", { name: "Decisions" })).toBeDisabled()
+  const picker = clerkWorkspace.getByTestId("import-handoff-recipient")
+  await expect(picker).toBeEnabled()
+  await picker.click()
+  await page.getByRole("option", { name: "Morgan Owner", exact: true }).click()
+  await expect(picker).toHaveText("Morgan Owner")
+  await clerkWorkspace.getByRole("button", { name: "Send for review", exact: true }).click()
+  await expect(clerkWorkspace.getByRole("button", { name: "Revoke access", exact: true })).toBeVisible()
+
+  const ownerPage = await context.newPage()
+  try {
+    await stub(ownerPage, owner)
+    await ownerPage.goto(`${settings}&fixtureActor=owner`)
+    const inbox = ownerPage.getByRole("region", { name: "Saved import tasks" })
+    await expect(inbox.getByText("This import was shared with you for review.")).toBeVisible()
+    await inbox.getByRole("button", { name: "Open saved task", exact: true }).click()
+    const ownerWorkspace = ownerPage.getByTestId("saved-import-workspace")
+    await expect(ownerWorkspace.getByRole("link", { name: "Open this task in Data import" })).toHaveAttribute("href", new RegExp(`importTask=${taskId}`))
+    await ownerWorkspace.getByRole("tab", { name: "Sources", exact: true }).click()
+    await expect(ownerWorkspace.getByText(fileName, { exact: true })).toBeVisible()
+    await expect(ownerWorkspace.getByText("Source saved from Documents", { exact: true })).toBeVisible()
+    await ownerWorkspace.getByRole("tab", { name: "Decisions", exact: true }).click()
+    const continueNative = ownerWorkspace.getByRole("button", { name: "Continue import (1 confirmed)", exact: true })
+    await expect(continueNative).toBeEnabled()
+    await continueNative.click()
+    await expect(ownerWorkspace.getByRole("tab", { name: "ERP preview", exact: true })).toHaveAttribute("aria-selected", "true")
+    await expect(ownerWorkspace.getByTestId("guided-import-wizard")).toBeVisible()
+
+    await clerkWorkspace.getByRole("button", { name: "Revoke access", exact: true }).click()
+    await expect(clerkWorkspace.getByRole("button", { name: "Revoke access", exact: true })).toHaveCount(0)
+    await ownerPage.goto(`${taskPath}&fixtureActor=owner`)
+    await expect(ownerPage.getByRole("alert")).toContainText("This saved import is unavailable")
+    await expect(ownerWorkspace.getByRole("tab", { name: "ERP preview", exact: true })).toHaveCount(0)
+    await ownerPage.goto(`${settings}&fixtureActor=owner`)
+    await expect(inbox.getByText(/No saved file tasks yet/)).toBeVisible()
+    await expect(inbox.getByRole("button", { name: "Open saved task", exact: true })).toHaveCount(0)
+  } finally {
+    await ownerPage.close()
+  }
+  expect(handoffs).toEqual([
+    { companyId: 9001, recipient: owner, expectedRevision: 0 },
+    { companyId: 9001, recipient: null, expectedRevision: 1 },
+  ])
+  expect(writeAttempts).toBe(0)
+})
+
 test("Other requires instructions and preserves the paused question after receipt and refresh", async ({ page }) => {
   const requests = await mockTasks(page, { seedPendingTask: true })
   await openChat(page)

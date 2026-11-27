@@ -46,7 +46,7 @@ function ChatFixture({ identity, companyId, conversationKey }: {
 export default function Page() {
   const search = useSearchParams()
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }))
-  const [actor, setActor] = useState("ab".repeat(32))
+  const [actor, setActor] = useState(() => (search.get("fixtureActor") === "owner" ? "cd" : "ab").repeat(32))
   const [companyId, setCompanyId] = useState(9001)
   return <LumiereApiProvider client={webApi}>
     <QueryClientProvider client={client}>
