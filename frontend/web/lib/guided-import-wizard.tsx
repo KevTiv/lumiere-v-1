@@ -16,6 +16,7 @@ import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useTrackedCsvImport } from "@lumiere/query-hooks/hooks/tracked-csv-import"
 import { csvImportInvalidatesQuery, fetchCsvImportReceipt, type CsvImportRequest } from "@lumiere/query-hooks/hooks/csv-import-request"
 import { reduceImportSourceAdmission, sourceAdmissionForScope } from "./import-source-admission"
+import { approvedMasterDataRows, startDurableImportRun } from "./durable-import-request"
 import { buildGuidedImportCsv, guidedImportRequest, trackedImportEntity } from "./guided-import-request"
 import { clearImportRecovery, importRecoveryKey, readImportRecovery, retainImportRequest, type ImportRecoveryScope } from "./guided-import-recovery"
 import { previewPreparedProducts, type ProductImportReference } from "./prepared-product-preview"
@@ -177,6 +178,8 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
   const [sourceAdmission, dispatchSourceAdmission] = useReducer(reduceImportSourceAdmission, null)
   const sourceScopeKey = importRecoveryKey(recoveryScope)
   const reviewTask = useRef<string | undefined>(undefined)
+  const reviewBatch = useRef<string | undefined>(undefined)
+  const scheduledExport = useRef<string | null>(null)
   const sourceAdmissionId = sourceAdmissionForScope(sourceAdmission, sourceScopeKey)
   useEffect(() => { dispatchSourceAdmission({ type: "scope", scopeKey: sourceScopeKey }) }, [sourceScopeKey])
   const [analysis, setAnalysis] = useState<ImportAnalyzeResponse | null>(null)
@@ -333,6 +336,8 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
     setImportedJobId(null)
     setImportRequest(null)
     reviewTask.current = undefined
+    reviewBatch.current = undefined
+    scheduledExport.current = null
     importRequestRef.current = null
     setRollbackConfirmId(null)
     analyze.reset()
@@ -368,6 +373,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
       // be replaced; an unresolved tracked request never loses its identity.
       if (!resetFlow()) return false
       reviewTask.current = savedTaskId
+      reviewBatch.current = source.reviewId
       setWizardKey(source.targetEntity)
       setCsvText(source.csv); setHeaders(parsed.headers); setRows(parsed.rows)
       setSourceFileName(source.fileName); setSourceFormat("csv"); setSourceSheetName(undefined)
@@ -629,6 +635,24 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
       const importCsv = importRequestRef.current?.csvData ?? buildGuidedImportCsv(headers, rows, mapping, skipRows, reviewTask.current)
 
       const request = importRequestRef.current ?? guidedImportRequest({ organizationId: orgId, companyId, entity: targetEntity, csv: importCsv, fileName: sourceFileName || "source.csv", sourceAdmissionId, reviewTaskId: reviewTask.current, companies: companiesQuery.data ?? [] })
+      const taskId = reviewTask.current
+      const batchId = reviewBatch.current
+      const entity = request.entity
+      if (!lookupOnly && !importRequestRef.current && taskId && batchId
+        && (entity === "product" || entity === "contact" || entity === "stock_location")) {
+        if (scheduledExport.current !== request.csvData) {
+          await startDurableImportRun(taskId, {
+            companyId,
+            adapter: "tracked_master_data",
+            config: { entity, csvData: request.csvData, fileName: request.fileName, currencyId: request.currencyId },
+            rows: approvedMasterDataRows(request.csvData, batchId),
+          })
+          scheduledExport.current = request.csvData
+        }
+        await queryClient.invalidateQueries({ queryKey: ["durable-import-runs"] })
+        if (mounted.current) setStatus(t("settings.importOperator.serverRunning", { defaultValue: "The import is running. Check its saved result later." }))
+        return
+      }
       const retain = () => retainImportRequest(window.localStorage, recoveryScope, request)
       if (navigator.locks) await navigator.locks.request(importRecoveryKey(recoveryScope), retain)
       else retain()

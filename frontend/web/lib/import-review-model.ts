@@ -93,6 +93,7 @@ export type ReviewDetail = {
   reviewOperations?: ReviewedRecordOperation[]
 }
 export type ReviewedImportSource = {
+  reviewId: string
   targetEntity: string
   fileName: string
   csv: string
@@ -333,6 +334,7 @@ export function reviewedImportSource(
     ]
   })
   return {
+    reviewId: detail.id,
     targetEntity: detail.targetEntity,
     fileName: `reviewed-${detail.id}.csv`,
     csv: [[...headers, ...provenance], ...csvRows]
