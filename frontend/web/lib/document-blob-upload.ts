@@ -24,7 +24,7 @@ export type DocumentBlobUploadOptions = {
   registration?: object
 }
 
-async function sha256Hex(file: File): Promise<string> {
+export async function sha256Hex(file: Blob): Promise<string> {
   const buffer = await file.arrayBuffer()
   const digest = await crypto.subtle.digest("SHA-256", buffer)
   return Array.from(new Uint8Array(digest))

@@ -591,7 +591,16 @@
         "name": "Izina rya report"
       }
     },
+    "capture": {
+      "attachments": {
+        "unverifiedOwner": "Account y’igikorwa cyabitswe kera ntishobora kugenzurwa kuri iki gikoresho. Banza urebe amafaranga yakoreshejwe yabitswe mbere yo kongera kukinjiza.",
+        "persistenceLimit": "Inyemezabwishyu zitegereje zibikwa muri iyi mushakisha kugeza igihe koherezwa kwabyo byemejwe. Niba ububiko bwarahanaguwe, ongera wongereho file y’umwimerere mbere yo guhuza amakuru."
+      }
+    },
     "forms": {
+      "recovery": {
+        "receiptMissing": "Inyemezabwishyu: {{fileName}}. File ntiboneka kuri iki gikoresho. Ongera wongereho iy’umwimerere kugira ngo ukomeze."
+      },
       "newExpenseSheet": {
         "sections": {
           "sheetDetails": "Ibisobanuro bya report"

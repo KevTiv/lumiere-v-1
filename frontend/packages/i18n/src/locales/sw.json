@@ -4193,6 +4193,10 @@
       "timelineState": "Hali"
     },
     "capture": {
+      "attachments": {
+        "unverifiedOwner": "Akaunti ya rekodi ya zamani haiwezi kuthibitishwa kwenye kifaa hiki. Kagua gharama zilizohifadhiwa kabla ya kuiingiza tena.",
+        "persistenceLimit": "Risiti zilizo kwenye foleni huhifadhiwa katika kivinjari hiki hadi upakiaji uthibitishwe. Ikiwa hifadhi ya kivinjari ilifutwa, ambatisha faili asili tena kabla ya kusawazisha."
+      },
       "title": "Ukamataji wa risiti",
       "retry": "Jaribu tena",
       "discard": "Acha mabadiliko"
@@ -4219,6 +4223,10 @@
       "reject": "Kataa"
     },
     "forms": {
+      "recovery": {
+        "receiptRetained": "Risiti: {{fileName}}. Endelea kuhifadhi ukiwa mtandaoni.",
+        "receiptMissing": "Risiti: {{fileName}}. Faili haipatikani kwenye kifaa hiki. Ambatisha faili asili tena ili uendelee."
+      },
       "newExpense": {
         "fields": {
           "pricelistId": "Orodha ya bei na sarafu",

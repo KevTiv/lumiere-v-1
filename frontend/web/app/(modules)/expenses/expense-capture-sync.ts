@@ -1,3 +1,4 @@
+import { captureFileMatches } from "../../../lib/expense-receipt-storage"
 import { OperationRequestError } from "@lumiere/api-client"
 import type { CreateExpenseParams } from "@lumiere/stdb/types"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
@@ -307,18 +308,6 @@ export function resolveCapturedReceipt(
   return id
 }
 
-export function captureFileMatches(
-  file: File,
-  receipt: ExpenseCaptureReceipt,
-): boolean {
-  return (
-    file.size === receipt.fileSize &&
-    file.name === receipt.fileName &&
-    file.type === receipt.mimeType &&
-    file.lastModified === receipt.lastModified
-  )
-}
-
 export function capturePayloadToParams(
   payload: ExpenseCapturePayload,
   companyId: bigint,
@@ -376,6 +365,7 @@ export interface CaptureSyncServices {
   }) => Promise<bigint>
   create: (params: Partial<CreateExpenseParams>) => Promise<unknown>
   save: (item: ExpenseCaptureOutboxItem) => void
+  afterUploadCheckpoint?: () => Promise<void>
 }
 
 /** Calls the existing operations once; each remote effect keeps its durable request identity. */
@@ -395,8 +385,9 @@ export async function syncExpenseCapture(
       "scope",
       "Select the company saved with this queued capture",
     )
-  if (item.formOrigin && (item.formOrigin.actorIdentity !== scope.actorIdentity
-    || item.formOrigin.organizationId !== String(scope.organizationId))) {
+  const savedActor = item.actorIdentity ?? item.formOrigin?.actorIdentity
+  if ((savedActor && savedActor !== scope.actorIdentity) ||
+      (item.formOrigin && item.formOrigin.organizationId !== String(scope.organizationId))) {
     throw new CaptureReadbackError("scope", "Switch back to the signed-in identity saved with this expense request")
   }
   let current = item
@@ -435,13 +426,13 @@ export async function syncExpenseCapture(
       if (!receipt.uploaded) {
         if (!file || !captureFileMatches(file, receipt))
           throw new Error(
-            "Reattach the original receipt file to continue. File bytes are not stored across reloads.",
+            "The saved receipt file is unavailable. Reattach the original receipt to continue.",
           )
         services.assertWriteAllowed?.()
         receipt = { ...receipt, state: "uploading", lastError: undefined }
         save({ ...current, receipt })
         const upload = await services.upload(file, scope.companyId)
-        if (!upload.objectKey || !upload.checksum)
+        if (!upload.objectKey || !upload.checksum || (receipt.fingerprint && upload.checksum !== receipt.fingerprint))
           throw new Error("The upload did not return a verified file identity")
         receipt = {
           ...receipt,
@@ -454,6 +445,7 @@ export async function syncExpenseCapture(
           },
         }
         save({ ...current, receipt })
+        await services.afterUploadCheckpoint?.()
       }
       let receiptId = resolveCapturedReceipt(
         await services.readReceipts(),

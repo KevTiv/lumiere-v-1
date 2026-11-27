@@ -148,7 +148,7 @@ test.describe("Finance workflow review tools", { tag: "@dev-fixture" }, () => {
     expect(writes).toEqual([])
   })
 
-  test("keeps offline capture metadata after reload and requires file reattachment before sync", async ({
+  test("keeps offline receipt bytes after reload and removes them on discard", async ({
     page,
     context,
   }) => {
@@ -187,9 +187,9 @@ test.describe("Finance workflow review tools", { tag: "@dev-fixture" }, () => {
     panel = page.locator('[data-testid="expenses-capture-panel"]:visible')
     const queue = panel.getByTestId("expenses-capture-queue")
     await expect(queue).toContainText("Offline attachment queue proof")
-    await expect(queue.getByTestId("expenses-capture-reattach")).toBeVisible()
-    await expect(queue.getByTestId("expenses-capture-retry")).toBeDisabled()
-    await expect(queue.getByTestId("expense-capture-attachment-preview")).toHaveCount(0)
+    await expect(queue.getByTestId("expense-capture-attachment-preview")).toContainText("offline-receipt.pdf")
+    await expect(queue.getByTestId("expenses-capture-reattach")).toHaveCount(0)
+    await expect(queue.getByTestId("expenses-capture-retry")).toBeEnabled()
     await queue.getByTestId("expenses-capture-discard").click()
     await expect(queue).toHaveCount(0)
     expect(writes).toEqual([])
