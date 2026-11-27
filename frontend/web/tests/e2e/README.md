@@ -47,6 +47,8 @@ These Playwright tests exercise the current high-value ERP web flows:
 
 ## Native first-sale rehearsal
 
+The disposable PR browser job also runs the cold-start delivery case when it selects the order-to-cash spec. It verifies the new tenant has no sales business records, supplies physical stock and a customer as fixture prerequisites, creates the price list and customer destination through their native setup forms, and checks the exact delivered picking.
+
 The disposable PR browser job runs this case when it selects the order-to-cash spec. For a remote rehearsal, opt in on a dedicated, already-running stack with a single seeded fixture company. It needs the seeded Acme customer, an in-stock Wireless Ergonomic Mouse, active sales and bank journals, an open accounting period, and provisioned native Sales, Warehouse and Accounting actions. Each invocation uses a new reference and consumes one fixture stock unit. Use the operator login for the expected organization and company, and inject the password through your secret manager.
 
 ```bash

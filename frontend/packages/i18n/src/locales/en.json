@@ -71,7 +71,7 @@
     },
     "guidance": {
       "contact": "Enter the contact’s name and save it in this company.",
-      "quotation": "Choose a customer, price list and warehouse to save a quotation. Open the saved quotation to add products.",
+      "quotation": "Create or choose a price list with an active currency, then select a customer and warehouse. Save the quotation before adding products.",
       "expense": "Choose an employee, enter the expense details and attach a receipt if needed. The form saves a draft for review.",
       "accounting": "Accounting checks your fiscal years, open periods, journals, accounts and taxes. Follow the setup actions to complete missing details before posting.",
       "reports": "Open Reports and choose your company, accounting period and report. Check its sources and limitations before using a preview for a financial decision."
@@ -9547,9 +9547,10 @@
         "customerMissing": "Add a customer in a separate tab, then return to this quotation. Your entries stay here.",
         "customerMissingAsk": "No customers are available. Ask an administrator to add a customer, then return to this quotation.",
         "openContacts": "Open contacts",
-        "pricelistMissing": "Create a price list with a currency in a separate tab, then return to this quotation. Your entries stay here.",
-        "pricelistMissingAsk": "No price lists are available. Ask an administrator to create a price list with a currency, then return to this quotation.",
+        "pricelistMissing": "Create a price list with an active currency in a separate tab, then return here and refresh the price lists. Your entries stay here.",
+        "pricelistMissingAsk": "No usable price lists are available. Ask an administrator to create one with an active currency, then refresh the price lists.",
         "openPricelists": "Open price lists",
+        "refreshPriceLists": "Refresh price lists",
         "warehouseMissing": "Add a warehouse in a separate tab, then return to this quotation. Your entries stay here.",
         "warehouseMissingAsk": "No warehouses are available. Ask an administrator to add one in Warehouse setup, then return to this quotation.",
         "openWarehouses": "Open Warehouse setup"
@@ -9653,6 +9654,12 @@
       "readOnly": "You can preview this quotation. Saving a PDF requires permission to read and create documents."
     },
     "workspace": {
+      "deliveryDestination": {
+        "setup": "No customer destination is listed for this company. If confirmation needs one, create a location with Customer usage in Warehouse. Return here and check again.",
+        "ask": "No customer destination is listed for this company. If confirmation needs one, ask a warehouse manager to create a location with Customer usage.",
+        "openLocations": "Open warehouse locations",
+        "refresh": "Check destination again"
+      },
       "queueDenied": "Your role does not have access to this queue. Choose another queue.",
       "queueUnavailable": "This queue is unavailable. Wait for loading to finish or try again.",
       "productsRequired": "Add at least one product before continuing.",

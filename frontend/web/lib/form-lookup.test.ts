@@ -1,3 +1,4 @@
+import { companyCustomerDestination, usableQuotationPricelists } from "./first-sale-readiness"
 import assert from "node:assert/strict"
 import test from "node:test"
 
@@ -75,4 +76,30 @@ test("id lists accept picked arrays and the older comma-separated text alike", (
   assert.deepEqual(parseU64IdList(undefined), [])
   assert.deepEqual(idListTokens([" 2 ", ""]), ["2"])
   assert.throws(() => parseU64IdList("1, x"))
+})
+
+test("quotation price lists require an active currency and exact selected company or shared ownership", () => {
+  const row = { id: "1", companyId: "7", organizationId: "4", isActive: true, currencyId: "2" }
+  const cases = [
+    row,
+    { ...row, id: "2", companyId: null },
+    { ...row, id: "3", companyId: "8" },
+    { ...row, id: "4", organizationId: "5" },
+    { ...row, id: "5", isActive: false },
+    { ...row, id: "6", currencyId: "3" },
+    { ...row, id: "7", currencyId: "0" },
+    { id: "8", organizationId: "4", isActive: true, currencyId: "2" },
+  ]
+  assert.deepEqual(usableQuotationPricelists(cases, [{ id: "2" }, { id: "3", isActive: false }], 4n, 7n).map(({ id }) => id), ["1", "2"])
+  assert.deepEqual(usableQuotationPricelists(cases, [], 4n, 7n), [])
+})
+
+test("delivery guidance accepts only active customer destinations in the order's company", () => {
+  const destination = { id: "1", companyId: "7", organizationId: "4", active: true, usage: "customer" }
+  assert.equal(companyCustomerDestination([], 4n, 7n), "not-listed")
+  assert.equal(companyCustomerDestination([destination], 4n, 7n), "present")
+  assert.equal(companyCustomerDestination([{ ...destination, active: false }], 4n, 7n), "not-listed")
+  assert.equal(companyCustomerDestination([{ ...destination, usage: "internal" }], 4n, 7n), "not-listed")
+  assert.equal(companyCustomerDestination([{ ...destination, companyId: "8" }], 4n, 7n), "not-listed")
+  assert.equal(companyCustomerDestination([{ ...destination, companyId: undefined }], 4n, 7n), "unknown")
 })

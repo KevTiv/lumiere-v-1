@@ -5,6 +5,9 @@ import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { FileText, ListOrdered, MoreHorizontal, PackagePlus, Truck } from 'lucide-react';
+import { useRBAC } from '@lumiere/ui/lib/rbac-context';
+import { companyCustomerDestination } from '@/lib/first-sale-readiness';
+import { warehouseSetupAccess } from '@/lib/warehouse-choice';
 import { useTranslation } from '@lumiere/i18n';
 import {
   Button,
@@ -61,7 +64,7 @@ import type { StockPicking } from '@lumiere/stdb/types';
 import { useAccountMoves, useAccountPayments } from '@lumiere/query-hooks/hooks/accounting';
 import { useContacts, type Contact } from '@lumiere/query-hooks/hooks/crm';
 
-import { useProducts, useStockPickings } from '@lumiere/query-hooks/hooks/inventory';
+import { useStockLocations, useProducts, useStockPickings } from '@lumiere/query-hooks/hooks/inventory';
 import { orderHandoffs } from '@lumiere/query-hooks/hooks/order-to-cash';
 import {
   useAccrueSaleCommission,
@@ -155,6 +158,11 @@ function SaleOrderPageLoaded({
   const { askForm, formDialog } = useFormDialog();
   const { orgId } = orgBigInts(organizationId);
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
+  const { checkPermission, permissionsReady } = useRBAC();
+  const canReadLocations = permissionsReady === true && checkPermission('stock_location', 'read').allowed;
+  const canSetUpDestination = canReadLocations && checkPermission('module:inventory', 'read').allowed &&
+    warehouseSetupAccess(checkPermission).location;
+  const locationsQuery = useStockLocations(orgId, undefined, canReadLocations, operatingCompanyId);
 
   const ordersQuery = useSaleOrders(orgId, initialOrders);
   const { data: orders = [], isLoading: ordersLoading } = ordersQuery;
@@ -590,8 +598,27 @@ function SaleOrderPageLoaded({
     : step === 'approval' ? () => router.push(approvalInboxHref('sale_order', orderId))
     : step === 'delivery' || step === 'review' ? () => setActiveTab('handoffs')
     : undefined;
+  const destinationMissing = canReadLocations && locationsQuery.isSuccess && !locationsQuery.isError &&
+    locationsQuery.fetchStatus === 'idle' && String(order.companyId) === String(operatingCompanyId) &&
+    order.isDropship === false && recordActions.some((action) => action.id === 'sales.order.confirm' && action.canPresent(record)) &&
+    companyCustomerDestination(locationsQuery.data, orgId, operatingCompanyId) === 'not-listed';
+  const destinationSetup = destinationMissing ? (
+    <div className="mt-3 space-y-2" data-testid="sale-order-destination-setup">
+      <p className="text-sm text-muted-foreground">{t(canSetUpDestination
+        ? 'sales.workspace.deliveryDestination.setup'
+        : 'sales.workspace.deliveryDestination.ask')}</p>
+      {canSetUpDestination && <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" render={<Link href={`${buildModuleTabHref('warehouse', 'locations')}&companyId=${operatingCompanyId}`} target="_blank" rel="noopener noreferrer" />} nativeButton={false}>
+          {t('sales.workspace.deliveryDestination.openLocations')}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => void locationsQuery.refetch()}>
+          {t('sales.workspace.deliveryDestination.refresh')}
+        </Button>
+      </div>}
+    </div>
+  ) : undefined;
   const nextAction = <SaleOrderNextAction step={step} actionLabel={recommendedAction?.label}
-    blockedReason={blockedReason} error={transitionError} pending={saleOrderWorkflow.isPending} onContinue={continueStep} />;
+    setup={destinationSetup} blockedReason={blockedReason} error={transitionError} pending={saleOrderWorkflow.isPending} onContinue={continueStep} />;
   const lineGrid = !linesReady ? <p role="status" className="text-sm text-muted-foreground">{linesUnavailable}</p> : (
     <SaleOrderLineGrid
       lines={lines}

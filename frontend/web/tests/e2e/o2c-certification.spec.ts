@@ -1,9 +1,16 @@
 import { expect, test } from "@playwright/test"
 import type { Page } from "@playwright/test"
+import { bootstrapSalesFixture, seedSalesStockFixture } from "./sales-approval-fixture"
+import { id } from "./cov-scheduler-manufacturing-fixtures"
 import { readFileSync } from "node:fs"
 
 import {
   assertMoveLinesBalanced,
+  callReducerBff,
+  chooseSelectOptionByValue,
+  fillField,
+  openEntityCreate,
+  openSaleOrderPage,
   chooseSelectOptionByLabel,
   fetchAccountSelectLabelByInternalType,
   fetchDraftInvoiceMoveIdForSaleOrder,
@@ -457,5 +464,105 @@ test.describe("Alpha native first-sale rehearsal", { tag: "@p0" }, () => {
       contentType: "application/json",
       body: JSON.stringify({ organizationId, companyId, clientRef, orderId, pickingId, moveId, paymentId: payment.paymentId, paymentMoveId, delivered: 1, residual: 0 }),
     })
+  })
+})
+
+test.describe("Alpha cold-start delivered sale", { tag: ["@p0", "@unauthenticated"] }, () => {
+  test.skip(!runCiFixtureFirstSale, "Requires the disposable PR fixture")
+  test.describe.configure({ retries: 0 })
+
+  test("authors the first quotation and delivers it after completing native setup", async ({ page }) => {
+    test.setTimeout(360_000)
+    for (const url of [process.env.PLAYWRIGHT_BASE_URL, process.env.LUMIERE_API_SERVER_URL, process.env.STDB_HOST]) {
+      expect(url).toMatch(/^http:\/\/127\.0\.0\.1:[1-9][0-9]*$/)
+    }
+    expect(process.env.STDB_MODULE).toBe("lumiere-v1-local-e2e")
+
+    const fixtureName = smokeName("first-delivery")
+    const { organizationId, companyId, currencyId } = await bootstrapSalesFixture(page, fixtureName)
+    for (const resource of ["sale-orders", "sale-order-lines", "pricelists", "contacts", "stock-pickings", "stock-locations"]) {
+      expect(await rows(page, resource), `new tenant starts with no ${resource}`).toEqual([])
+    }
+    const { warehouse, product } = await seedSalesStockFixture(page, fixtureName, organizationId, companyId)
+    const customerName = smokeName("first-customer")
+    await callReducerBff(page, "create_contact", [organizationId, {
+      name: customerName, type: "person", companyId, isCustomer: true, isVendor: false,
+      isEmployee: false, isProspect: false, isPartner: false, customerRank: 1, supplierRank: 0,
+    }])
+    const [customer] = (await rows(page, "contacts")).filter((row) => row.name === customerName)
+    if (!customer) throw new Error("Customer fixture did not persist")
+
+    // Keep the first quotation open across native setup in a second tab.
+    await openEntityCreate(page, "/sales?tab=orders", "sales", "orders", "new-sale-order")
+    const reference = smokeName("first-quotation")
+    await fillField(page, "clientOrderRef", reference)
+    await chooseSelectOptionByValue(page, "partnerId", id(customer))
+    await chooseSelectOptionByValue(page, "warehouseId", id(warehouse))
+    await expect(page.getByRole("link", { name: "Open price lists", exact: true })).toBeVisible()
+    const [priceSetup] = await Promise.all([
+      page.waitForEvent("popup"),
+      page.getByRole("link", { name: "Open price lists", exact: true }).click(),
+    ])
+    await priceSetup.waitForURL((url) => url.pathname === "/sales" && url.searchParams.get("tab") === "pricelists")
+    await openEntityCreate(priceSetup, "/sales?tab=pricelists", "sales", "pricelists", "new-pricelist")
+    const pricelistName = smokeName("first-price-list")
+    await fillField(priceSetup, "name", pricelistName)
+    await chooseSelectOptionByValue(priceSetup, "currencyId", currencyId)
+    await Promise.all([
+      priceSetup.waitForResponse((response) => matchesOperationResponse(response, "create_pricelist") && response.ok()),
+      submitForm(priceSetup, "new-pricelist"),
+    ])
+    await priceSetup.close()
+    const [pricelist] = (await rows(page, "pricelists")).filter((row) => row.name === pricelistName)
+    if (!pricelist) throw new Error("Price list did not persist")
+    const refreshPriceLists = page.getByRole("button", { name: "Refresh price lists", exact: true })
+    if (await refreshPriceLists.isVisible()) await refreshPriceLists.click()
+    await expect(page.getByTestId("form-field-clientOrderRef")).toHaveValue(reference)
+    await chooseSelectOptionByValue(page, "pricelistId", id(pricelist))
+    await submitForm(page, "new-sale-order")
+    await expect(page).toHaveURL(/\/sales\/orders\/\d+\?tab=lines&created=1$/)
+    const [order] = (await rows(page, "sale-orders")).filter((row) => row.clientOrderRef === reference)
+    if (!order) throw new Error("Quotation did not persist")
+    const orderId = id(order)
+    expect(scalarQueryId(order.pricelistId)).toBe(id(pricelist))
+    expect(await saleOrderState(page, orderId)).toMatch(/^draft$/i)
+    expect(await fetchOrderPickings(page, orderId, companyId)).toEqual([])
+
+    await addProductLine(page, orderId, String(product.name), "1")
+    await openSaleOrderPage(page, orderId)
+    const setup = page.getByTestId("sale-order-destination-setup")
+    await expect(setup).toBeVisible()
+    const [locationSetup] = await Promise.all([
+      page.waitForEvent("popup"),
+      setup.getByRole("link", { name: "Open warehouse locations", exact: true }).click(),
+    ])
+    await locationSetup.waitForURL((url) => url.pathname === "/warehouse" && url.searchParams.get("tab") === "locations")
+    await openEntityCreate(locationSetup, "/warehouse?tab=locations", "warehouse", "locations", "new-stock-location")
+    const destinationName = smokeName("first-customer-location")
+    await fillField(locationSetup, "name", destinationName)
+    await chooseSelectOptionByValue(locationSetup, "usage", "customer")
+    await Promise.all([
+      locationSetup.waitForResponse((response) => matchesOperationResponse(response, "create_company_stock_location") && response.ok()),
+      submitForm(locationSetup, "new-stock-location"),
+    ])
+    await locationSetup.close()
+    const checkDestination = setup.getByRole("button", { name: "Check destination again", exact: true })
+    if (await checkDestination.isVisible()) await checkDestination.click()
+    await expect(setup).toBeHidden()
+    const destinations = (await rows(page, `stock-locations?companyId=${companyId}`))
+      .filter((row) => row.name === destinationName && row.usage === "customer")
+    expect(destinations).toHaveLength(1)
+
+    await confirmOrderViaUi(page, orderId)
+    const pickingId = await waitForFirstDelivery(page, orderId)
+    for (const action of ["confirm", "assign", "validate"] as const) {
+      await runPickingActionViaInventoryUi(page, pickingId, action)
+    }
+    await expect.poll(() => fetchPickingState(page, pickingId)).toBe("done")
+    await expect.poll(() => fetchOrderDeliveredQty(page, orderId)).toBe(1)
+    expect((await fetchOrderPickings(page, orderId, companyId)).map((row) => row.id)).toEqual([pickingId])
+    const picking = (await rows(page, `stock-pickings?companyId=${companyId}`)).find((row) => id(row) === pickingId)
+    expect(scalarQueryId(picking?.locationDestId ?? picking?.location_dest_id)).toBe(id(destinations[0]!))
+    await expectOrderSummary(page, orderId, { present: [ORDER_SUMMARY.delivery.complete], reload: true })
   })
 })
