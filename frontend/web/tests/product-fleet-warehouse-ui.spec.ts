@@ -536,10 +536,15 @@ async function fleetRecoveryFixture(page: Page, missing: "serviceType" | "journa
   let journalVisible = missing === "serviceType";
   const dispatches: { path: string; body: Record<string, unknown> }[] = [];
   let readbacks = 0;
+  let releaseCanonicalRead: () => void = () => {};
+  const allowCanonicalRead = new Promise<void>((resolve) => { releaseCanonicalRead = resolve; });
   await page.route("**/api/query/**", async (route) => {
     const url = new URL(route.request().url());
     const resource = url.pathname.split("/").at(-1)!;
-    if (resource === "fleet-service-types" && servicePendingReadback) readbacks++;
+    if (resource === "fleet-service-types" && servicePendingReadback) {
+      readbacks++;
+      if (readbacks > 1) await allowCanonicalRead;
+    }
     const data: Record<string, Record<string, unknown>[]> = {
       "fleet-vehicles": [
         { ...company, id: "71", name: "Kigali delivery van", vehicleType: "van", status: "Active" },
@@ -614,6 +619,7 @@ async function fleetRecoveryFixture(page: Page, missing: "serviceType" | "journa
     readbackCount: () => readbacks,
     showType: () => {
       canonicalTypeVisible = true;
+      releaseCanonicalRead();
     },
     showJournal: () => {
       journalVisible = true;
