@@ -15,14 +15,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
   reviewSaleReconciliation,
   type ReviewField,
   type ReviewRow,
@@ -154,6 +146,10 @@ export function ImportReviewEditor({
   onLockChange: (locked: boolean) => void
 }) {
   const { t } = useTranslation()
+  const heading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    heading.current?.focus()
+  }, [])
   const [decision, setDecision] = useState(() => reviewDecision(item))
   const reconciliation = reviewSaleReconciliation(decision.values)
   const saleMismatch =
@@ -246,22 +242,33 @@ export function ImportReviewEditor({
       aria-label={t("settings.importReview.grouped.editor", {
         name: item.source.label,
       })}
-      className="min-w-0 rounded-lg border bg-background p-4"
+      className="@container/editor min-w-0 rounded-lg border bg-background p-3 sm:p-4"
     >
       <div className="mb-3 flex flex-wrap justify-between gap-2">
-        <div>
-          <h4 className="font-semibold">{item.source.label}</h4>
+        <div className="min-w-0">
+          <h4
+            ref={heading}
+            tabIndex={-1}
+            className="scroll-mt-4 break-words font-semibold"
+          >
+            {item.source.label}
+          </h4>
           <p className="text-sm text-muted-foreground">{item.source.issue}</p>
           {interpretations.length ? (
             <details className="rounded-md border p-3">
               <summary className="cursor-pointer text-sm font-medium">
-                {t("settings.importReview.sourceMeaning", { defaultValue: "Interpret source notes" })}
+                {t("settings.importReview.sourceMeaning", {
+                  defaultValue: "Interpret source notes",
+                })}
               </summary>
               <ul className="mt-2 space-y-2 text-sm">
                 {interpretations.map((hint, index) => (
                   <li key={`${hint.key}:${index}`}>
-                    <span className="font-medium">{hint.original}</span>{": "}
-                    {t(`settings.importReview.meaning.${hint.key}`, { defaultValue: hint.message })}
+                    <span className="font-medium">{hint.original}</span>
+                    {": "}
+                    {t(`settings.importReview.meaning.${hint.key}`, {
+                      defaultValue: hint.message,
+                    })}
                   </li>
                 ))}
               </ul>
@@ -277,40 +284,55 @@ export function ImportReviewEditor({
           {t("common.cancel")}
         </Button>
       </div>
+      <p className="mb-3 break-words text-xs text-muted-foreground">
+        {item.source.source.file} ·{" "}
+        {item.source.source.sheet ? <>{item.source.source.sheet} · </> : null}
+        {t(
+          item.source.source.rowBasis === "import_row"
+            ? "settings.importReview.importRow"
+            : "settings.importReview.sourceLine",
+          { row: item.source.source.row },
+        )}{" "}
+        · SHA-256 {item.source.source.sha256}
+      </p>
       <p className="mb-3 text-sm text-muted-foreground">
         {t("settings.importReview.grouped.independentFields")}
       </p>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t("settings.importReview.grouped.field")}</TableHead>
-            <TableHead>{t("settings.importReview.grouped.original")}</TableHead>
-            <TableHead>{t("settings.importReview.proposed")}</TableHead>
-            <TableHead>
-              {t("settings.importReview.grouped.confirmValue")}
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {item.source.fields.map((field) => (
-            <TableRow key={field.key}>
-              <TableCell className="max-w-48 whitespace-normal">
-                {label(field)}
-                {field.required ? " *" : ""}
-              </TableCell>
-              <TableCell className="max-w-48 whitespace-pre-wrap break-words">
-                {field.sourceValue === ""
-                  ? t("settings.importReview.blankCell", {
-                      defaultValue: "Blank source cell",
-                    })
-                  : (field.sourceValue ?? t("settings.importReview.unknown"))}
+      <div className="grid gap-3">
+        {item.source.fields.map((field) => (
+          <fieldset
+            key={field.key}
+            className="min-w-0 rounded-md border px-3 pb-3"
+          >
+            <legend className="px-1 text-sm font-medium">
+              {label(field)}
+              {field.required ? " *" : ""}
+            </legend>
+            <div className="grid gap-3 @xl/editor:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+              <div className="min-w-0 whitespace-pre-wrap break-words text-sm">
+                <p className="mb-1 text-xs font-medium text-muted-foreground">
+                  {t("settings.importReview.grouped.original")}
+                </p>
+                <p data-testid="review-original-value">
+                  {field.sourceValue === ""
+                    ? t("settings.importReview.blankCell", {
+                        defaultValue: "Blank source cell",
+                      })
+                    : (field.sourceValue ?? t("settings.importReview.unknown"))}
+                </p>
                 {field.sourceColumn != null ? (
                   <span className="block text-xs text-muted-foreground">
-                    {t("settings.importReview.sourceColumn", { defaultValue: "Source column {{column}}", column: field.sourceColumn })}
+                    {t("settings.importReview.sourceColumn", {
+                      defaultValue: "Source column {{column}}",
+                      column: field.sourceColumn,
+                    })}
                   </span>
                 ) : null}
-              </TableCell>
-              <TableCell className="min-w-48">
+              </div>
+              <div className="min-w-0">
+                <p className="mb-1 text-xs font-medium text-muted-foreground">
+                  {t("settings.importReview.proposed")}
+                </p>
                 <ReviewValueInput
                   field={field}
                   label={label(field)}
@@ -337,41 +359,45 @@ export function ImportReviewEditor({
                     })}
                   </span>
                 ) : null}
-              </TableCell>
-              <TableCell>
-                <Checkbox
-                  aria-label={t("settings.importReview.grouped.confirmField", {
-                    field: label(field),
-                  })}
-                  checked={decision.confirmedFields.includes(field.key)}
-                  disabled={
-                    busy || uncertain || !decision.values[field.key]?.trim()
-                  }
-                  onCheckedChange={(checked) =>
-                    setDecision((current) => ({
-                      ...current,
-                      state:
-                        current.state === "confirmed"
-                          ? "needs_review"
-                          : current.state,
-                      confirmedFields: checked
-                        ? [
-                            ...current.confirmedFields.filter(
+                <label className="mt-2 flex min-h-8 cursor-pointer items-center gap-2 text-sm">
+                  <Checkbox
+                    aria-label={t(
+                      "settings.importReview.grouped.confirmField",
+                      {
+                        field: label(field),
+                      },
+                    )}
+                    checked={decision.confirmedFields.includes(field.key)}
+                    disabled={
+                      busy || uncertain || !decision.values[field.key]?.trim()
+                    }
+                    onCheckedChange={(checked) =>
+                      setDecision((current) => ({
+                        ...current,
+                        state:
+                          current.state === "confirmed"
+                            ? "needs_review"
+                            : current.state,
+                        confirmedFields: checked
+                          ? [
+                              ...current.confirmedFields.filter(
+                                (key) => key !== field.key,
+                              ),
+                              field.key,
+                            ]
+                          : current.confirmedFields.filter(
                               (key) => key !== field.key,
                             ),
-                            field.key,
-                          ]
-                        : current.confirmedFields.filter(
-                            (key) => key !== field.key,
-                          ),
-                    }))
-                  }
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                      }))
+                    }
+                  />
+                  {t("settings.importReview.grouped.confirmValue")}
+                </label>
+              </div>
+            </div>
+          </fieldset>
+        ))}
+      </div>
       {reconciliation ? (
         <div className="mt-3 space-y-1 text-sm">
           <p>
@@ -441,50 +467,44 @@ export function ImportReviewEditor({
           />
         </label>
       </div>
-      {error || referenceError ? (
-        <p role="alert" className="mt-3 text-sm text-destructive">
-          {error ?? referenceError}
-        </p>
-      ) : null}
-      {uncertain ? (
-        <p role="status" className="mt-3 text-sm">
-          {t("settings.importReview.grouped.uncertainSave")}
-        </p>
-      ) : null}
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button disabled={busy} onClick={() => void submit(false)}>
-          {t(
-            uncertain
-              ? "settings.importReview.grouped.retrySave"
-              : "settings.importReview.save",
-          )}
-        </Button>
-        <Button
-          variant="outline"
-          disabled={busy || uncertain || !hasNext}
-          onClick={() => void submit(true)}
-        >
-          {t("settings.importReview.grouped.saveNext")}
-        </Button>
-        <Button
-          variant="ghost"
-          disabled={busy || uncertain || dirty || !hasNext}
-          onClick={onNext}
-        >
-          {t("settings.importReview.grouped.next")}
-        </Button>
+      <div className="sticky bottom-0 z-10 mt-4 border-t bg-background py-3 @5xl/review:static">
+        {error || referenceError ? (
+          <p role="alert" className="mb-2 text-sm text-destructive">
+            {error ?? referenceError}
+          </p>
+        ) : null}
+        {uncertain ? (
+          <p role="status" className="mb-2 text-sm">
+            {t("settings.importReview.grouped.uncertainSave")}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={hasNext && !uncertain ? "outline" : "default"}
+            disabled={busy}
+            onClick={() => void submit(false)}
+          >
+            {t(
+              uncertain
+                ? "settings.importReview.grouped.retrySave"
+                : "settings.importReview.save",
+            )}
+          </Button>
+          <Button
+            disabled={busy || uncertain || !hasNext}
+            onClick={() => void submit(true)}
+          >
+            {t("settings.importReview.grouped.saveNext")}
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={busy || uncertain || dirty || !hasNext}
+            onClick={onNext}
+          >
+            {t("settings.importReview.grouped.next")}
+          </Button>
+        </div>
       </div>
-      <p className="mt-3 break-all text-xs text-muted-foreground">
-        {item.source.source.file} ·{" "}
-        {item.source.source.sheet ? <>{item.source.source.sheet} ·{" "}</> : null}
-        {t(
-          item.source.source.rowBasis === "import_row"
-            ? "settings.importReview.importRow"
-            : "settings.importReview.sourceLine",
-          { row: item.source.source.row },
-        )}{" "}
-        · SHA-256 {item.source.source.sha256}
-      </p>
     </section>
   )
 }

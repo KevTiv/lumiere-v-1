@@ -1,7 +1,6 @@
 "use client"
 
 import {
-  Fragment,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -223,6 +222,9 @@ function ReviewWorkspace({
   const referenceInChat = useReferenceInNewErpAiChat()
   const [selectedId, setSelectedId] = useState(initialId && (!allowedReviewIds || allowedReviewIds.includes(initialId)) ? initialId : "")
   const [selected, setSelected] = useState<ReviewRow | null>(null)
+  const queue = useRef<HTMLDivElement>(null)
+  const queueViewport = useRef<HTMLDivElement>(null)
+  const restoreFocus = useRef<string | null>(null)
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [historyId, setHistoryId] = useState("")
   const [pinnedReview, setPinnedReview] = useState<PinnedSourceReview | null>(null)
@@ -336,9 +338,32 @@ function ReviewWorkspace({
     )
   }, [detail.data, filter, activeGroup, search])
   const pages = Math.max(1, Math.ceil(matching.length / 50))
-  const currentPage = Math.min(page, pages - 1)
+  const selectedIndex = selected
+    ? matching.findIndex((item) => item.id === selected.id)
+    : -1
+  const currentPage =
+    selectedIndex >= 0 ? Math.floor(selectedIndex / 50) : Math.min(page, pages - 1)
   const visible = matching.slice(currentPage * 50, currentPage * 50 + 50)
   const unavailable = busy || locked || uncertainUndo
+  const editing = !!selected && !!detail.data && !detail.error
+  useLayoutEffect(() => {
+    const viewport = queueViewport.current
+    const row = viewport?.querySelector('[data-state="selected"]')
+    if (!viewport || !row || !viewport.clientHeight) return
+    const { top, height } = row.getBoundingClientRect()
+    viewport.scrollTop +=
+      top - viewport.getBoundingClientRect().top - (viewport.clientHeight - height) / 2
+  }, [selected, currentPage])
+  useLayoutEffect(() => {
+    const itemId = restoreFocus.current
+    if (!itemId || selected || unavailable || !queue.current) return
+    restoreFocus.current = null
+    const target =
+      queue.current.querySelector<HTMLButtonElement>(
+        `[data-correct-item="${CSS.escape(itemId)}"]`,
+      ) ?? queue.current.querySelector<HTMLInputElement>("#review-search")
+    target?.focus()
+  }, [selected, unavailable])
   const chooseGroup = (key: string) => {
     setGroup(key)
     setPage(0)
@@ -450,9 +475,12 @@ function ReviewWorkspace({
     setChecked(new Set())
     setError(null)
   }
-  const nextItem = selected
-    ? matching[matching.findIndex((item) => item.id === selected.id) + 1]
-    : undefined
+  const nextItem = selectedIndex >= 0 ? matching[selectedIndex + 1] : undefined
+  const closeEditor = (itemId: string) => {
+    restoreFocus.current = itemId
+    setPage(currentPage)
+    setSelected(null)
+  }
   const save = async (
     decision: ReviewDecision,
     requestKey: string,
@@ -465,12 +493,8 @@ function ReviewWorkspace({
       next && nextItem
         ? (fresh?.items.find((item) => item.id === nextItem.id) ?? nextItem)
         : null
-    setSelected(nextRow)
-    setHistoryId(nextRow?.id ?? decision.itemId)
-    if (nextRow)
-      setPage(
-        Math.floor(matching.findIndex((item) => item.id === nextRow.id) / 50),
-      )
+    if (nextRow) open(nextRow)
+    else closeEditor(decision.itemId)
   }
   const saveBulk = async (decisions: ReviewDecision[], requestKey: string) => {
     requireCurrentScope()
@@ -598,11 +622,88 @@ function ReviewWorkspace({
     : (detail.data?.history ?? [])
   const pinnedEntry = pinnedReview ? exactSourceReviewRevision(loadedHistoryEntries, pinnedReview) : undefined
   const historyEntries = pinnedReview ? (pinnedEntry ? [pinnedEntry] : []) : loadedHistoryEntries
-  return (
-    <section
-      className="flex min-w-0 flex-col gap-4"
-      aria-label={t("settings.importReview.title")}
-    >
+  const compactQueueCell = selected ? "hidden" : undefined
+  const reviewHistory = detail.data && !detail.error ? (
+    <details id="source-review-history" open={pinnedReview ? true : undefined}>
+      <summary className="cursor-pointer text-sm font-medium">
+        {historyId
+          ? t("settings.importReview.grouped.itemHistory")
+          : t("settings.importReview.history")}
+      </summary>
+      {history.error ? <p role="alert">{history.error.message}</p> : null}
+      {pinnedReview && history.isPending ? <p role="status">{t("businessHistory.savedReviewLoading")}</p> : null}
+      {pinnedReview && !history.isPending && !history.error && !pinnedEntry ? <p role="status">{t("businessHistory.savedReviewUnavailable")}</p> : null}
+      <ul className="mt-2 flex flex-col gap-3 text-sm">
+        {historyEntries.map((entry) => {
+          const item = detail.data.items.find((item) => item.id === entry.itemId)
+          const fields = reviewDecisionDiff(
+            {
+              values: entry.previousValues,
+              confirmedFields: entry.previousConfirmedFields,
+              state: entry.previousState,
+            },
+            entry,
+            item?.source.fields ?? [],
+            t,
+          )
+          const changedFields = new Set(fields.map(({ id }) => id))
+          const savedValues = pinnedReview
+            ? Object.entries(entry.values).filter(([key]) => !changedFields.has(`value:${key}`))
+            : []
+          return (
+            <li
+              className="min-w-0 space-y-2 rounded-lg border p-3"
+              key={`${entry.itemId}:${entry.revision}`}
+            >
+              <details open={pinnedReview || historyId ? true : undefined}>
+                <summary className="cursor-pointer break-words">
+                  <span className="font-medium">
+                    {t("businessHistory.reviewReference", { item: entry.itemId, revision: entry.revision })}
+                  </span>
+                  {item && <span className="text-muted-foreground"> · {item.source.label}</span>}
+                </summary>
+                <div className="mt-3 space-y-2">
+                  <p className="break-words text-muted-foreground">
+                    {item && <>{reviewSourceLabel(item, t)} · </>}
+                    <time dateTime={entry.createdAt}>{entry.createdAt}</time>
+                    {" · "}{resolveIdentityLabel(entry.actor, identityLabels)}
+                  </p>
+                  {item?.source.businessDate && (
+                    <p className="text-muted-foreground">
+                      {t("availableHistory.businessDate")}{" · "}{reviewSourceDate(item.source.businessDate, t)}
+                    </p>
+                  )}
+                  {entry.reason && (
+                    <p className="whitespace-pre-wrap break-words">
+                      <span className="font-medium">{t("settings.importReview.reason")}</span>{" · "}{entry.reason}
+                    </p>
+                  )}
+                  {fields.length > 0 ? (
+                    <HistoryFieldDiff fields={fields} />
+                  ) : (
+                    <p className="text-muted-foreground">
+                      {t("settings.importReview.grouped.noDecisionChanges")}
+                    </p>
+                  )}
+                  {savedValues.length > 0 && (
+                    <details>
+                      <summary className="cursor-pointer text-muted-foreground">
+                        {t("settings.importReview.grouped.reviewValues", { count: savedValues.length })}
+                      </summary>
+                      <dl className="mt-2 space-y-2">
+                        {savedValues.map(([key, value]) => (
+                          <div key={key} className="grid min-w-0 gap-1 sm:grid-cols-2">
+                            <dt>{item?.source.fields.find((field) => field.key === key)?.label ?? key}</dt>
+                            <dd className="whitespace-pre-wrap [overflow-wrap:anywhere]">
+                              {value === null ? t("recordChanges.noValue") : value === "" ? t("recordChanges.emptyText") : value}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </details>
+  ) : null
+  const queueContent = (
+    <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">
@@ -897,10 +998,15 @@ function ReviewWorkspace({
               onLockChange={setLocked}
             />
           ) : null}
-          <Table>
+          <Table
+            pagination={false}
+            viewportRef={queueViewport}
+            bounded={!!selected}
+            className={selected ? "table-fixed" : undefined}
+          >
             <TableHeader>
               <TableRow>
-                <TableHead>
+                <TableHead className={compactQueueCell}>
                   <Checkbox
                     aria-label={t("settings.importReview.grouped.selectPage")}
                     disabled={unavailable || !!selected || !visible.length}
@@ -921,104 +1027,84 @@ function ReviewWorkspace({
                   />
                 </TableHead>
                 <TableHead>{t("settings.importReview.item")}</TableHead>
-                <TableHead>{t("settings.importReview.source")}</TableHead>
-                <TableHead>{t("settings.importReview.question")}</TableHead>
+                <TableHead className={compactQueueCell}>
+                  {t("settings.importReview.source")}
+                </TableHead>
+                <TableHead className={compactQueueCell}>
+                  {t("settings.importReview.question")}
+                </TableHead>
                 <TableHead>{t("settings.importReview.status")}</TableHead>
-                <TableHead>{t("settings.importReview.actions")}</TableHead>
+                <TableHead className={compactQueueCell}>
+                  {t("settings.importReview.actions")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {visible.map((item) => (
-                <Fragment key={item.id}>
-                  <TableRow>
-                    <TableCell>
-                      <Checkbox
-                        aria-label={t(
-                          "settings.importReview.grouped.selectItem",
-                          {
-                            name: item.source.label,
-                            row: item.source.source.row,
-                          },
-                        )}
-                        disabled={unavailable || !!selected}
-                        checked={checked.has(item.id)}
-                        onCheckedChange={(value) =>
-                          setChecked((current) => {
-                            const next = new Set(current)
-                            if (value) next.add(item.id)
-                            else next.delete(item.id)
-                            return next
-                          })
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>{item.source.label}</TableCell>
-                    <TableCell>{reviewSourceLabel(item, t)}</TableCell>
-                    <TableCell className="max-w-sm whitespace-normal">
-                      {item.source.issue}
-                    </TableCell>
-                    <TableCell>
-                      {t(`settings.importReview.filter.${item.state}`)}
-                      {confirmedReviewFields(item).length ? (
-                        <p className="text-xs text-muted-foreground">
-                          {t("settings.importReview.grouped.fieldsConfirmed", {
-                            count: confirmedReviewFields(item).length,
-                          })}
-                        </p>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={
-                          unavailable || (!!selected && selected.id !== item.id)
-                        }
-                        onClick={() => open(item)}
-                      >
-                        {t("settings.importReview.correct")}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={unavailable || !!selected}
-                        onClick={() => { setPinnedReview(null); setHistoryId(item.id) }}
-                      >
-                        {t("settings.importReview.grouped.historyAction")}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                  {selected?.id === item.id ? (
-                    <TableRow>
-                      <TableCell colSpan={6}>
-                        <ImportReviewEditor
-                          key={`${selected.id}:${selected.revision}`}
-                          item={selected}
-                          product={productReview}
-                          organizationId={organizationId}
-                          references={productReferences.data}
-                          referenceError={productReferences.error?.message}
-                          hasNext={!!nextItem}
-                          onNext={() => {
-                            if (nextItem) {
-                              open(nextItem)
-                              setPage(
-                                Math.floor(
-                                  matching.findIndex(
-                                    (item) => item.id === nextItem.id,
-                                  ) / 50,
-                                ),
-                              )
-                            }
-                          }}
-                          onSave={save}
-                          onClose={() => setSelected(null)}
-                          onLockChange={setLocked}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </Fragment>
+                <TableRow
+                  key={item.id}
+                  data-state={selected?.id === item.id ? "selected" : undefined}
+                >
+                  <TableCell className={compactQueueCell}>
+                    <Checkbox
+                      aria-label={t(
+                        "settings.importReview.grouped.selectItem",
+                        {
+                          name: item.source.label,
+                          row: item.source.source.row,
+                        },
+                      )}
+                      disabled={unavailable || !!selected}
+                      checked={checked.has(item.id)}
+                      onCheckedChange={(value) =>
+                        setChecked((current) => {
+                          const next = new Set(current)
+                          if (value) next.add(item.id)
+                          else next.delete(item.id)
+                          return next
+                        })
+                      }
+                    />
+                  </TableCell>
+                  <TableCell className="whitespace-normal break-words">
+                    {item.source.label}
+                  </TableCell>
+                  <TableCell className={compactQueueCell}>
+                    {reviewSourceLabel(item, t)}
+                  </TableCell>
+                  <TableCell className={compactQueueCell ?? "max-w-sm whitespace-normal"}>
+                    {item.source.issue}
+                  </TableCell>
+                  <TableCell className="whitespace-normal break-words">
+                    {t(`settings.importReview.filter.${item.state}`)}
+                    {confirmedReviewFields(item).length ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t("settings.importReview.grouped.fieldsConfirmed", {
+                          count: confirmedReviewFields(item).length,
+                        })}
+                      </p>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className={compactQueueCell}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      data-correct-item={item.id}
+                      disabled={unavailable || !!selected}
+                      onClick={() => open(item)}
+                    >
+                      {t("settings.importReview.correct")}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={unavailable || !!selected}
+                      onClick={() => { setPinnedReview(null); setHistoryId(item.id) }}
+                    >
+                      {t("settings.importReview.grouped.historyAction")}
+                    </Button>
+                  </TableCell>
+                </TableRow>
               ))}
             </TableBody>
           </Table>
@@ -1040,83 +1126,6 @@ function ReviewWorkspace({
               {t("settings.importReview.grouped.nextPage")}
             </Button>
           </div>
-          <details id="source-review-history" open={pinnedReview ? true : undefined}>
-            <summary className="cursor-pointer text-sm font-medium">
-              {historyId
-                ? t("settings.importReview.grouped.itemHistory")
-                : t("settings.importReview.history")}
-            </summary>
-            {history.error ? <p role="alert">{history.error.message}</p> : null}
-            {pinnedReview && history.isPending ? <p role="status">{t("businessHistory.savedReviewLoading")}</p> : null}
-            {pinnedReview && !history.isPending && !history.error && !pinnedEntry ? <p role="status">{t("businessHistory.savedReviewUnavailable")}</p> : null}
-            <ul className="mt-2 flex flex-col gap-3 text-sm">
-              {historyEntries.map((entry) => {
-                const item = detail.data.items.find((item) => item.id === entry.itemId)
-                const fields = reviewDecisionDiff(
-                  {
-                    values: entry.previousValues,
-                    confirmedFields: entry.previousConfirmedFields,
-                    state: entry.previousState,
-                  },
-                  entry,
-                  item?.source.fields ?? [],
-                  t,
-                )
-                const changedFields = new Set(fields.map(({ id }) => id))
-                const savedValues = pinnedReview
-                  ? Object.entries(entry.values).filter(([key]) => !changedFields.has(`value:${key}`))
-                  : []
-                return (
-                  <li
-                    className="min-w-0 space-y-2 rounded-lg border p-3"
-                    key={`${entry.itemId}:${entry.revision}`}
-                  >
-                    <details open={pinnedReview || historyId ? true : undefined}>
-                      <summary className="cursor-pointer break-words">
-                        <span className="font-medium">
-                          {t("businessHistory.reviewReference", { item: entry.itemId, revision: entry.revision })}
-                        </span>
-                        {item && <span className="text-muted-foreground"> · {item.source.label}</span>}
-                      </summary>
-                      <div className="mt-3 space-y-2">
-                        <p className="break-words text-muted-foreground">
-                          {item && <>{reviewSourceLabel(item, t)} · </>}
-                          <time dateTime={entry.createdAt}>{entry.createdAt}</time>
-                          {" · "}{resolveIdentityLabel(entry.actor, identityLabels)}
-                        </p>
-                        {item?.source.businessDate && (
-                          <p className="text-muted-foreground">
-                            {t("availableHistory.businessDate")}{" · "}{reviewSourceDate(item.source.businessDate, t)}
-                          </p>
-                        )}
-                        {entry.reason && (
-                          <p className="whitespace-pre-wrap break-words">
-                            <span className="font-medium">{t("settings.importReview.reason")}</span>{" · "}{entry.reason}
-                          </p>
-                        )}
-                        {fields.length > 0 ? (
-                          <HistoryFieldDiff fields={fields} />
-                        ) : (
-                          <p className="text-muted-foreground">
-                            {t("settings.importReview.grouped.noDecisionChanges")}
-                          </p>
-                        )}
-                        {savedValues.length > 0 && (
-                          <details>
-                            <summary className="cursor-pointer text-muted-foreground">
-                              {t("settings.importReview.grouped.reviewValues", { count: savedValues.length })}
-                            </summary>
-                            <dl className="mt-2 space-y-2">
-                              {savedValues.map(([key, value]) => (
-                                <div key={key} className="grid min-w-0 gap-1 sm:grid-cols-2">
-                                  <dt>{item?.source.fields.find((field) => field.key === key)?.label ?? key}</dt>
-                                  <dd className="whitespace-pre-wrap [overflow-wrap:anywhere]">
-                                    {value === null ? t("recordChanges.noValue") : value === "" ? t("recordChanges.emptyText") : value}
-                                  </dd>
-                                </div>
-                              ))}
-                            </dl>
-                          </details>
                         )}
                       </div>
                     </details>
@@ -1154,6 +1163,59 @@ function ReviewWorkspace({
           </details>
         </>
       ) : null}
+    </>
+  )
+  return (
+    <section
+      className="@container/review min-w-0"
+      aria-label={t("settings.importReview.title")}
+    >
+      <div
+        className={
+          editing
+            ? "grid items-start gap-4 @5xl/review:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+            : undefined
+        }
+      >
+        {editing && selected ? (
+          <div className="min-w-0 @5xl/review:col-start-2 @5xl/review:row-start-1">
+            <ImportReviewEditor
+              key={`${selected.id}:${selected.revision}`}
+              item={selected}
+              product={productReview}
+              organizationId={organizationId}
+              references={productReferences.data}
+              referenceError={productReferences.error?.message}
+              hasNext={!!nextItem}
+              onNext={() => {
+                if (nextItem) open(nextItem)
+              }}
+              onSave={save}
+              onClose={() => closeEditor(selected.id)}
+              onLockChange={setLocked}
+            />
+          </div>
+        ) : null}
+        <div
+          className={
+            editing
+              ? "contents @5xl/review:col-start-1 @5xl/review:row-start-1 @5xl/review:flex @5xl/review:min-w-0 @5xl/review:flex-col @5xl/review:gap-4"
+              : "flex min-w-0 flex-col gap-4"
+          }
+        >
+          <div
+            ref={queue}
+            className={
+              editing
+                ? "hidden min-w-0 flex-col gap-4 @5xl/review:flex"
+                : "flex min-w-0 flex-col gap-4"
+            }
+          >
+            {queueContent}
+          </div>
+          {reviewHistory}
+        </div>
+      </div>
     </section>
   )
 }
