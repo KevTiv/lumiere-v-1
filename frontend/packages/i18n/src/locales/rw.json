@@ -2522,7 +2522,20 @@
     "inbox": {
       "tabLabel": "Ubutumwa bwakiriwe",
       "title": "Ubutumwa bwa WhatsApp bwakiriwe",
-      "close": "Funga"
+      "close": "Funga",
+      "queueMessage": "Shyira ubutumwa ku rutonde rw’ibitegereje",
+      "delivery": {
+        "queued": "Ubutumwa bwabitswe ku rutonde rw’ibitegereje",
+        "draft": "Inyandiko y’agateganyo",
+        "accepted": "Utanga serivisi yakiriye ubutumwa. Ntiharemezwa ko bwageze ku wo bugenewe.",
+        "delivered": "Utanga serivisi yemeje ko ubutumwa bwageze ku wo bugenewe",
+        "failed": "Utanga serivisi yatangaje ko ubutumwa butageze ku wo bugenewe",
+        "inconclusive": "Nta makuru yemejwe y’uko ubutumwa bwageze ku wo bugenewe",
+        "reference": "Indanganturo y’utanga serivisi {{reference}}",
+        "reason": "Impamvu yatanzwe {{reason}}",
+        "reasonUnavailable": "Impamvu y’ikibazo yatanzwe n’utanga serivisi ntiboneka.",
+        "refresh": "Vugurura amakuru y’uko ubutumwa bwageze ku wo bugenewe"
+      }
     },
     "relIntel": {
       "title": "Isesengura ry’imibanire",

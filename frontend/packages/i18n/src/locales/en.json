@@ -5014,7 +5014,19 @@
       "placeholder": "Type a message…",
       "actionFailed": "The request failed. Your message has been retained.",
       "phoneRequired": "Add an eligible WhatsApp number for this contact before opening a conversation.",
-      "queueMessage": "Queue message"
+      "queueMessage": "Queue message",
+      "delivery": {
+        "queued": "Saved to the local queue",
+        "draft": "Local draft",
+        "accepted": "Provider accepted; delivery is unconfirmed",
+        "delivered": "Provider confirmed delivery",
+        "failed": "Provider reported delivery failure",
+        "inconclusive": "No verified delivery status is available",
+        "reference": "Provider reference {{reference}}",
+        "reason": "Provider reason {{reason}}",
+        "reasonUnavailable": "The provider failure reason is unavailable.",
+        "refresh": "Refresh delivery status"
+      }
     },
     "relIntel": {
       "title": "Relationship intelligence",

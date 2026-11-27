@@ -1376,6 +1376,7 @@ function CrmClientLoaded({
           content: (record) => (
             <CrmInboxPanel
               organizationId={organizationId}
+              companyId={operatingCompanyId}
               contactId={rowIdBigInt(record)}
             />
           ),
