@@ -3,6 +3,8 @@ import { selectModuleTab } from "./e2e/helpers"
 
 const expect = baseExpect.configure({ timeout: 15_000 })
 
+test.use({ hasTouch: true })
+
 test("domain tab helper selects the module panel alongside nested and independent panels", async ({ page }) => {
   await page.goto("/navigation?module=sales")
   await expect(page.getByTestId("navigation-disclosure")).toHaveAttribute("data-hydrated", "true")
@@ -22,6 +24,7 @@ for (const width of [320, 390, 768, 1440]) {
     const apiRequests: string[] = []
     page.on("request", (request) => { if (new URL(request.url()).pathname.startsWith("/api/")) apiRequests.push(request.url()) })
     await page.goto("/navigation?module=sales&company=7&tab=order-lines&filter=state:draft&highlight=2")
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true)
     await expect(page.getByTestId("navigation-disclosure")).toHaveAttribute("data-hydrated", "true")
     await expect(page.getByTestId("module-workspace-sales-orders")).toHaveAttribute("aria-current", "page")
     await expect(page.getByTestId("module-tab-sales-order-lines")).toHaveAttribute("aria-selected", "true")
