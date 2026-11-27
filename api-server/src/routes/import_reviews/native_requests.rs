@@ -11,7 +11,7 @@ use crate::{
     cold_tier::pg_pool,
     error::ApiError,
     query_exec::row_u64,
-    routes::import::{read_workflow_import, WorkflowImportRequest},
+    routes::import::{read_workflow_import_for_actor, WorkflowImportRequest},
     state::AppState,
     trusted_context::TrustedOperationContext,
 };
@@ -143,8 +143,9 @@ FROM scoped WHERE $5::text IS NULL OR (created_at,native_request_id) < (SELECT c
 ORDER BY scoped.created_at DESC,native_request_id DESC LIMIT 21";
 
 pub(super) async fn list(
+    state: &AppState,
     context: &TrustedOperationContext,
-    company: u64,
+    scoped: StorageScope<'_>,
     task: &str,
     before: Option<&str>,
 ) -> Result<(Vec<Value>, Option<String>), ApiError> {
@@ -157,9 +158,9 @@ pub(super) async fn list(
         .query(
             ATTEMPT_PAGE,
             &[
-                &context.organization_id().to_string(),
-                &company.to_string(),
-                &context.actor_identity(),
+                &scoped.organization.to_string(),
+                &scoped.company.to_string(),
+                &scoped.actor,
                 &task,
                 &before,
             ],
@@ -170,8 +171,7 @@ pub(super) async fn list(
     let attempts = rows.iter().take(PAGE_SIZE).map(attempt).collect::<Vec<_>>();
     drop(client);
     let results = stream::iter(attempts).map(|attempt|async move {
-        let request=WorkflowImportRequest {entity:attempt.entity.clone(),company_id:company,request_id:attempt.request.clone(),file_name:attempt.file_name.clone().unwrap_or_default(),csv:String::new()};
-        let receipt=match read_workflow_import(context,&request,&attempt.content_hash).await {
+        let receipt=match attempt_receipt(state,context,scoped,&attempt).await {
             Ok(receipt)=>Some(project_receipt(&receipt,&attempt)?),
             Err(ApiError::NotFound(_))=>None,
             Err(error)=>return Err(error),
@@ -194,10 +194,38 @@ fn attempt(row: &tokio_postgres::Row) -> Attempt {
     }
 }
 
+async fn attempt_receipt(
+    state: &AppState,
+    context: &TrustedOperationContext,
+    scoped: StorageScope<'_>,
+    attempt: &Attempt,
+) -> Result<Value, ApiError> {
+    let request = WorkflowImportRequest {
+        entity: attempt.entity.clone(),
+        company_id: scoped.company,
+        request_id: attempt.request.clone(),
+        file_name: attempt.file_name.clone().unwrap_or_default(),
+        csv: String::new(),
+    };
+    let client = if scoped.actor == context.actor_identity() {
+        context.client()
+    } else {
+        &state.stdb
+    };
+    read_workflow_import_for_actor(
+        context,
+        client,
+        scoped.actor,
+        &request,
+        &attempt.content_hash,
+    )
+    .await
+}
+
 pub(super) async fn row_results(
     state: &AppState,
     context: &TrustedOperationContext,
-    company: u64,
+    scoped: StorageScope<'_>,
     task: &str,
     request: &str,
     after: u64,
@@ -207,27 +235,21 @@ pub(super) async fn row_results(
             "Invalid native receipt row page".into(),
         ));
     }
-    let org = context.organization_id();
+    let org = scoped.organization;
+    let company = scoped.company;
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
     let client = pool.get().await.map_err(ApiError::internal)?;
     let saved = client.query_opt("SELECT native_request_id,entity,content_sha256,file_name,review_rows,created_at::text
         FROM lumiere_platform.import_task_native_request
         WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND task_request_id=$4 AND native_request_id=$5",
-        &[&org.to_string(),&company.to_string(),&context.actor_identity(),&task,&request]).await.map_err(ApiError::internal)?
+        &[&org.to_string(),&company.to_string(),&scoped.actor,&task,&request]).await.map_err(ApiError::internal)?
         .ok_or_else(|| ApiError::NotFound("Native receipt not found".into()))?;
     let attempt = attempt(&saved);
     let rows = attempt
         .rows
         .as_array()
         .ok_or_else(|| ApiError::Internal("Invalid receipt source rows".into()))?;
-    let native = WorkflowImportRequest {
-        entity: attempt.entity.clone(),
-        company_id: company,
-        request_id: attempt.request.clone(),
-        file_name: attempt.file_name.clone().unwrap_or_default(),
-        csv: String::new(),
-    };
-    let receipt = read_workflow_import(context, &native, &attempt.content_hash).await?;
+    let receipt = attempt_receipt(state, context, scoped, &attempt).await?;
     let projected = project_receipt(&receipt, &attempt)?;
     let job = projected["jobId"]
         .as_str()

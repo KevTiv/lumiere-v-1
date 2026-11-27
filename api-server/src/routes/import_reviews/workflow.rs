@@ -71,7 +71,7 @@ async fn read(
     };
     tx.commit().await.map_err(ApiError::internal)?;
     let (native_results, native_results_next) =
-        super::native_requests::list(&context, query.company_id, &task, None).await?;
+        super::native_requests::list(&state, &context, scoped, &task, None).await?;
     Ok(Json(
         json!({"version":1,"organizationId":context.organization_id().to_string(),"requestId":task,"companyId":query.company_id.to_string(),"capabilities":super::capabilities::catalog(farm_enabled),"proposals":proposals,"nativeResults":native_results,"nativeResultsMore":native_results_next.is_some(),"nativeResultsNext":native_results_next,"backfilledRecords":backfilled_records,"reviewedRecords":reviewed_records,"farmResults":farm_results,"farmResultsMore":farm_results_more}),
     ))
@@ -91,8 +91,15 @@ async fn read_native_receipts(
     Query(query): Query<NativeReceiptPage>,
 ) -> Result<Json<Value>, ApiError> {
     let context = scope(&state, &session, query.company_id).await?;
+    let viewer = storage_scope(&context, query.company_id);
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let (creator, _) = super::tasks::handoff::read_for(&pool, &context, viewer, &task).await?;
+    let scoped = StorageScope {
+        actor: &creator,
+        ..viewer
+    };
     let (results, next) =
-        super::native_requests::list(&context, query.company_id, &task, query.before.as_deref())
+        super::native_requests::list(&state, &context, scoped, &task, query.before.as_deref())
             .await?;
     context.require_current_placement(&state.organization_placements)?;
     Ok(Json(
@@ -114,10 +121,17 @@ async fn read_native_rows(
     Query(query): Query<NativeReceiptRows>,
 ) -> Result<Json<Value>, ApiError> {
     let context = scope(&state, &session, query.company_id).await?;
+    let viewer = storage_scope(&context, query.company_id);
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let (creator, _) = super::tasks::handoff::read_for(&pool, &context, viewer, &task).await?;
+    let scoped = StorageScope {
+        actor: &creator,
+        ..viewer
+    };
     super::native_requests::row_results(
         &state,
         &context,
-        query.company_id,
+        scoped,
         &task,
         &request,
         query.after.unwrap_or(0),
