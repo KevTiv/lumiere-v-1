@@ -487,9 +487,15 @@ export function useCreateStockLocation(organizationId: bigint, companyId?: bigin
     mutationFn: async (params) => {
       const merged = mergeReducerParams(CREATE_STOCK_LOCATION_DEFAULTS, params);
       const paramsJson = stdbParamsToJson(merged as object, 'CreateStockLocationParams');
-      const { urlPath, init } = companyId == null
-        ? stdbBffCommandPost('create_stock_location', { params: paramsJson })
-        : stdbBffCommandPost('create_company_stock_location', { companyId, params: paramsJson });
+      if (companyId != null) {
+        await dispatchNamedOperation(
+          'create_company_stock_location',
+          { companyId, params: paramsJson },
+          'Failed to create stock location',
+        );
+        return;
+      }
+      const { urlPath, init } = stdbBffCommandPost('create_stock_location', { params: paramsJson });
       const r = await apiFetch(urlPath, init);
       if (!r.ok) throw new Error('Failed to create stock location');
     },
