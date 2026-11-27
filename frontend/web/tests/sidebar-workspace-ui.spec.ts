@@ -82,16 +82,17 @@ test("sidebar preserves the preferred width while the ERP workspace is narrow", 
   await edge.press("End")
   await expect(container(page)).toHaveCSS("width", "400px")
 
+  // The flush shell reserves 32.5rem of the viewport for the workspace.
   await page.setViewportSize({ width: 800, height: 950 })
-  await expect(edge).toHaveAttribute("aria-valuemax", "256")
-  await expect(container(page)).toHaveCSS("width", "256px")
+  await expect(edge).toHaveAttribute("aria-valuemax", "280")
+  await expect(container(page)).toHaveCSS("width", "280px")
   await edge.press("End")
   expect(await page.evaluate(() => localStorage.getItem("lumiere-sidebar-width"))).toBe("400")
 
-  await page.setViewportSize({ width: 980, height: 950 })
   await page.evaluate(() => { document.documentElement.style.fontSize = "20px" })
-  await expect(edge).toHaveAttribute("aria-valuemax", "300")
-  await expect(container(page)).toHaveCSS("width", "300px")
+  await page.setViewportSize({ width: 980, height: 950 })
+  await expect(edge).toHaveAttribute("aria-valuemax", "330")
+  await expect(container(page)).toHaveCSS("width", "330px")
 
   await page.evaluate(() => { document.documentElement.style.fontSize = "" })
   await page.setViewportSize({ width: 1440, height: 950 })
