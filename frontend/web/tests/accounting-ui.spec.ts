@@ -9,10 +9,12 @@ async function expectNoHorizontalOverflow(page: Page) {
 
 for (const viewport of [{ width: 320, height: 844 }, { width: 390, height: 844 }, { width: 768, height: 1000 }, { width: 1440, height: 1000 }]) {
   test.describe(`${viewport.width}px production components with synthetic data`, () => {
+    // The Next dev fixture can recompile after its initial warmup.
+    test.describe.configure({ timeout: 60_000 })
     test.use({ viewport, hasTouch: viewport.width < 1024 })
 
     test.beforeEach(async ({ page }) => {
-      await page.goto("/")
+      await page.goto("/", { waitUntil: "domcontentloaded" })
       await expect(page.getByTestId("fixture-disclosure")).toContainText("no backend operations")
       await expect(page.getByTestId("fixture-disclosure")).toHaveAttribute("data-hydrated", "true")
       await page.evaluate(async () => { await document.fonts.ready })

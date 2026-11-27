@@ -1,7 +1,23 @@
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { messageFailureReason, messageProviderEvidence, type BatchEvidenceRow, type ProviderEvidenceRow } from "../messages/message-batch-review"
 
-export type InboxRow = Record<string, unknown> & BatchEvidenceRow & ProviderEvidenceRow
+export interface InboxRow extends BatchEvidenceRow, ProviderEvidenceRow {
+  channel?: unknown
+  conversationId?: unknown
+  conversation_id?: unknown
+  phoneIdentityId?: unknown
+  phone_identity_id?: unknown
+  body?: unknown
+  lastPreview?: unknown
+  last_preview?: unknown
+  kind?: unknown
+  verificationState?: unknown
+  verification_state?: unknown
+  isPreferred?: unknown
+  is_preferred?: unknown
+  archivedAt?: unknown
+  archived_at?: unknown
+}
 type Row = InboxRow
 type Scope = { organizationId: bigint; companyId: bigint; contactId: bigint }
 
