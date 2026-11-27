@@ -33,7 +33,7 @@ export function fleetServiceChoices(
       validId(row.id),
     );
   const accounts = scoped(rows.accounts).filter(
-    (row) => row.deprecated === false,
+    (row) => row.deprecated === false && (row.isOffBalance ?? row.is_off_balance) !== true,
   );
   const group = (row: EntityRow) =>
     fleetEnumTag(row.internal_group ?? row.internalGroup).toLowerCase();
@@ -42,11 +42,7 @@ export function fleetServiceChoices(
     serviceType: scoped(rows.serviceTypes, true).filter(
       (row) => (row.is_active ?? row.isActive) === true,
     ),
-    journal: scoped(rows.journals).filter(
-      (row) =>
-        row.active === true &&
-        fleetEnumTag(row.type ?? row.type_).toLowerCase() === "general",
-    ),
+    journal: scoped(rows.journals).filter((row) => row.active === true),
     expenseAccount: accounts.filter((row) => group(row) === "expense"),
     offsetAccount: accounts.filter((row) => ["asset", "liability"].includes(group(row))),
   };
@@ -77,12 +73,15 @@ export function canRecordFleetServiceWith(
 
 export function fleetAccountingSetupHref(
   key: FleetServiceSetupKey,
-  allowed: (resource: "account_journal" | "account_account", action: "read" | "create" | "write") => boolean,
+  allowed: (
+    resource: "account_journal" | "account_account",
+    action: "read" | "create" | "write",
+  ) => boolean,
 ): string | undefined {
   if (key === "serviceType") return undefined;
   const journal = key === "journal";
   const resource = journal ? "account_journal" : "account_account";
-  if (!allowed(resource, "read") ||
-      !(allowed(resource, "create") || allowed(resource, "write"))) return undefined;
+  if (!allowed(resource, "read") || !(allowed(resource, "create") || allowed(resource, "write")))
+    return undefined;
   return moduleTabHref("accounting", journal ? "account-journals" : "accounts");
 }

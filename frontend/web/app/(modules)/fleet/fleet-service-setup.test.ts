@@ -29,20 +29,32 @@ const available = {
     { ...otherCompany, id: 11, deprecated: false, internalGroup: "Liability" },
     { ...company, id: 12, deprecated: false, internalGroup: "Income" },
     { ...company, id: 13, deprecated: false, internalGroup: "Liability" },
+    { ...company, id: 14, deprecated: false, internalGroup: "Liability", isOffBalance: true },
   ],
 };
 
 test("setup diagnoses each missing prerequisite from eligible company choices", () => {
   const choices = fleetServiceChoices(available, 11n, 12n);
-  assert.deepEqual(Object.values(choices).map((rows) => rows.map((row) => row.id)), [[1], [8], [10], [13]]);
+  assert.deepEqual(
+    Object.values(choices).map((rows) => rows.map((row) => row.id)),
+    [[1], [7, 8], [10], [13]],
+  );
   assert.deepEqual(missingFleetServiceSetup(choices), []);
 
-  const withoutOffset = fleetServiceChoices({
-    ...available, accounts: available.accounts.filter((row) => row.id !== 13),
-  }, 11n, 12n);
+  const withoutOffset = fleetServiceChoices(
+    {
+      ...available,
+      accounts: available.accounts.filter((row) => row.id !== 13),
+    },
+    11n,
+    12n,
+  );
   assert.deepEqual(missingFleetServiceSetup(withoutOffset), ["offsetAccount"]);
   assert.deepEqual(missingFleetServiceSetup(fleetServiceChoices(available, 14n, 12n)), [
-    "serviceType", "journal", "expenseAccount", "offsetAccount",
+    "serviceType",
+    "journal",
+    "expenseAccount",
+    "offsetAccount",
   ]);
 });
 
@@ -63,11 +75,32 @@ test("a stale or out-of-role selection cannot reach the service command", () => 
 });
 
 test("accounting recovery links target existing tabs and require the specific setup grant", () => {
-  assert.equal(fleetAccountingSetupHref("journal", () => true), "/accounting?tab=account-journals");
-  assert.equal(fleetAccountingSetupHref("expenseAccount", () => true), "/accounting?tab=accounts");
-  assert.equal(fleetAccountingSetupHref("offsetAccount", () => true), "/accounting?tab=accounts");
-  assert.equal(fleetAccountingSetupHref("serviceType", () => true), undefined);
-  assert.equal(fleetAccountingSetupHref("journal", (_resource, action) => action === "read"), undefined);
-  assert.equal(fleetAccountingSetupHref("journal", (resource) => resource === "account_account"), undefined);
-  assert.equal(fleetAccountingSetupHref("offsetAccount", (_resource, action) => action !== "create"), "/accounting?tab=accounts");
+  assert.equal(
+    fleetAccountingSetupHref("journal", () => true),
+    "/accounting?tab=account-journals",
+  );
+  assert.equal(
+    fleetAccountingSetupHref("expenseAccount", () => true),
+    "/accounting?tab=accounts",
+  );
+  assert.equal(
+    fleetAccountingSetupHref("offsetAccount", () => true),
+    "/accounting?tab=accounts",
+  );
+  assert.equal(
+    fleetAccountingSetupHref("serviceType", () => true),
+    undefined,
+  );
+  assert.equal(
+    fleetAccountingSetupHref("journal", (_resource, action) => action === "read"),
+    undefined,
+  );
+  assert.equal(
+    fleetAccountingSetupHref("journal", (resource) => resource === "account_account"),
+    undefined,
+  );
+  assert.equal(
+    fleetAccountingSetupHref("offsetAccount", (_resource, action) => action !== "create"),
+    "/accounting?tab=accounts",
+  );
 });

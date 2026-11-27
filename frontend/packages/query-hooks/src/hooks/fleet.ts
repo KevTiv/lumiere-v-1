@@ -99,6 +99,27 @@ function optionalNumber(value?: number) {
 
 // ── Mutations ────────────────────────────────────────────────────────────────
 
+export function resolveFleetServiceTypeEffect(
+  rows: readonly Record<string, unknown>[],
+  organizationId: bigint,
+  companyId: bigint,
+  name: string,
+): CanonicalRecordRef | null {
+  const candidates = rows.flatMap((row) => {
+    const id = parseStrictU64(row.id) ?? 0n
+    return id > 0n ? [{ row, id: id.toString() }] : []
+  })
+  return resolveUniqueEffect(
+    candidates,
+    ({ row }) =>
+      parseStrictU64(row.organizationId ?? row.organization_id) === organizationId &&
+      parseStrictU64(row.companyId ?? row.company_id) === companyId &&
+      (row.isActive ?? row.is_active) === true &&
+      typeof row.name === "string" && row.name.trim() === name,
+    ({ id }) => ({ resource: "fleet-service-types", id }),
+  )
+}
+
 export function useCreateCompanyFleetServiceType(organizationId: bigint, companyId?: bigint) {
   const queryClient = useQueryClient()
   return useMutation({
@@ -117,15 +138,7 @@ export function useCreateCompanyFleetServiceType(organizationId: bigint, company
             fleetHistoryPath("fleet-service-types"),
             "Failed to read fleet service types",
           )
-          return resolveUniqueEffect(
-            rows,
-            (row) => parseStrictU64(row.organizationId ?? row.organization_id) === organizationId &&
-              parseStrictU64(row.companyId ?? row.company_id) === scopedCompanyId &&
-              (row.isActive ?? row.is_active) === true &&
-              typeof row.name === "string" && row.name.trim() === name &&
-              (parseStrictU64(row.id) ?? 0n) > 0n,
-            (row) => ({ resource: "fleet-service-types", id: String(row.id) }),
-          )
+          return resolveFleetServiceTypeEffect(rows, organizationId, scopedCompanyId, name)
         },
         readbackAttempts: 6,
         readbackDelayMs: 150,

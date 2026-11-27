@@ -5584,7 +5584,7 @@
       "setupTitle": "Tegura uburyo bwo kwandika ikiguzi cya serivisi",
       "recovery": {
         "serviceType": "Nta bwoko bwa serivisi bukora buboneka kuri iki kigo.",
-        "journal": "Nta gitabo rusange cy’ibaruramari gikora kiboneka kuri iki kigo.",
+        "journal": "Nta gitabo cy’ibaruramari gikora kiboneka kuri iki kigo.",
         "expenseAccount": "Nta konti y’ibisohoka ikora iboneka kuri iki kigo.",
         "offsetAccount": "Nta konti ikora y’umutungo cyangwa imyenda iboneka yo kwandika uruhande rwa kabiri.",
         "typeName": "Izina ry’ubwoko bwa serivisi",
