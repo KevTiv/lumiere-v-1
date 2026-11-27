@@ -24,6 +24,7 @@ export const resources = {
   "pt-BR": {
     translation: {
       ...en,
+      farmBatches: templatePtBr.farmBatches,
       common: {
         ...en.common,
         ...templatePtBr.common,
