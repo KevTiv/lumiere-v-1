@@ -30,29 +30,38 @@ export function FleetServiceSetupNotice({
     workspace.states.accounts,
   ]);
   const canCreateType =
-    company != null && permissionsReady !== false &&
+    company != null &&
+    permissionsReady !== false &&
     checkPermission("fleet_vehicle_service_type", "create").allowed;
   const canOpenAccounting = permissionsReady !== false;
   const setupLinks = missingServiceSetup.map((key) => ({
     key,
     href: canOpenAccounting
-      ? fleetAccountingSetupHref(key, (resource, action) => checkPermission(resource, action).allowed)
+      ? fleetAccountingSetupHref(
+          key,
+          (resource, action) => checkPermission(resource, action).allowed,
+        )
       : undefined,
   }));
   const canRefreshOnReturn = setupLinks.some(({ href }) => href);
 
   useEffect(() => {
     if (!canRefreshOnReturn) return;
-    const refresh = () => { void refreshServiceSetup(); };
+    const refresh = () => {
+      void refreshServiceSetup();
+    };
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   }, [canRefreshOnReturn, refreshServiceSetup]);
 
-  const lookupNotice = state.status === "loading" ? (
-    <p role="status" className="text-muted-foreground">
-      {t("fleet.workspace.loadingSetup")}
-    </p>
-  ) : <ModuleDataNotice state={state} />;
+  const lookupNotice =
+    state.status === "loading" ? (
+      <p role="status" className="text-muted-foreground">
+        {t("fleet.workspace.loadingSetup")}
+      </p>
+    ) : (
+      <ModuleDataNotice state={state} />
+    );
   if (missingServiceSetup.length === 0) return lookupNotice;
 
   return (
@@ -76,8 +85,13 @@ export function FleetServiceSetupNotice({
                     className="max-w-60"
                     value={name}
                     disabled={creation.isPending}
-                    onChange={(event) => { setName(event.target.value); creation.reset(); }}
-                    onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}
+                    onChange={(event) => {
+                      setName(event.target.value);
+                      creation.reset();
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") event.preventDefault();
+                    }}
                   />
                   <Button
                     type="button"
@@ -89,11 +103,22 @@ export function FleetServiceSetupNotice({
                     {t("fleet.workspace.recovery.createType")}
                   </Button>
                 </div>
-                {creation.isError ? <p role="alert">{t("fleet.workspace.recovery.createTypeFailed")}</p> : null}
+                {creation.isError ? (
+                  <p role="alert">{t("fleet.workspace.recovery.createTypeFailed")}</p>
+                ) : null}
               </div>
             ) : href ? (
-              <Button size="sm" variant="outline" render={<Link href={href} target="_blank" rel="noopener" />} nativeButton={false}>
-                {t(key === "journal" ? "fleet.workspace.recovery.openJournals" : "fleet.workspace.recovery.openAccounts")}
+              <Button
+                size="sm"
+                variant="outline"
+                render={<Link href={href} target="_blank" rel="noopener" />}
+                nativeButton={false}
+              >
+                {t(
+                  key === "journal"
+                    ? "fleet.workspace.recovery.openJournals"
+                    : "fleet.workspace.recovery.openAccounts",
+                )}
               </Button>
             ) : (
               <p className="text-muted-foreground">{t("fleet.workspace.recovery.askAdmin")}</p>
@@ -108,7 +133,11 @@ export function FleetServiceSetupNotice({
         disabled={refreshing}
         onClick={async () => {
           setRefreshing(true);
-          try { await refreshServiceSetup(); } finally { setRefreshing(false); }
+          try {
+            await refreshServiceSetup();
+          } finally {
+            setRefreshing(false);
+          }
         }}
       >
         {t("fleet.workspace.recovery.refresh")}
