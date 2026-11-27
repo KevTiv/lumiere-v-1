@@ -875,7 +875,7 @@ function SettingsLoaded({
               These direct administrative operations modify low-level records and require existing internal IDs. Routine workspace setup is handled in Company setup and Organization settings.
             </p>
           </div>
-          <details className="group rounded-lg border border-border/70 bg-muted/20 p-3">
+          <details data-testid="settings-admin-actions" className="group rounded-lg border border-border/70 bg-muted/20 p-3">
             <summary className="cursor-pointer select-none text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
               Show direct administration actions ({adminActions.length})
             </summary>
