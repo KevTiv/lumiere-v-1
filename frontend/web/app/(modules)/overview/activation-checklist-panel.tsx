@@ -5,16 +5,19 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { Button } from "@lumiere/ui/components/button"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useContacts } from "@lumiere/query-hooks/hooks/crm"
 import { apiFetch } from "@lumiere/query-hooks/http"
+import { fetchCurrencies } from "@lumiere/query-hooks/hooks/settings-currencies"
 import { warehouseSetupAccess, warehouseSetupHref } from "@/lib/warehouse-choice"
 import { useAssistantNativeForms } from "@lumiere/ui/components/assistant-native-form-provider"
 import {
   activationChecklist, activationCreateTask, activationForm, activationReceiptKey, activationRecordHref,
   activationTaskHref, activationWarehouseState, availableActivationTasks, decodeActivationWarehouses,
+  activationPricelistSetupHref, activationPricelistState, decodeActivationPricelists,
   matchesActivationRecord, parseActivationReceipt, selectedActivationTask,
   type ActivationCheckState, type ActivationReceipt,
 } from "./activation-checklist"
@@ -23,6 +26,7 @@ import {
 export function ActivationChecklistPanel({ organizationId, companyId, collapseWhenReady = false }: { organizationId: number; companyId: number | null; collapseWhenReady?: boolean }) {
   const { t } = useTranslation()
   const { currentUser, checkPermission, permissionsReady, isAdmin } = useRBAC()
+  const { identity, organizationId: sessionOrganizationId, activeCompanyId, activeCompanyReady } = useErpSession()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -64,6 +68,37 @@ export function ActivationChecklistPanel({ organizationId, companyId, collapseWh
   const warehouseMissing = selected === "quotation" && warehouseState === "missing"
   const warehouseSetup = warehouseMissing && companyId != null && warehouseSetupAccess(checkPermission).warehouse
     ? warehouseSetupHref(BigInt(companyId)) : null
+  const canCheckPrices = selected === "quotation" && permissionsCurrent && Boolean(identity) &&
+    sessionOrganizationId === organizationId && activeCompanyReady === true && activeCompanyId === companyId &&
+    companyId != null && checks.companyState === "ready" &&
+    checkPermission("module:sales", "read").allowed && checkPermission("product_pricelist", "read").allowed
+  const priceReadScope = [organizationId, companyId, identity, currentUser?.id] as const
+  const pricelists = useQuery({
+    queryKey: ["pricelists", String(organizationId), "activation-readiness", priceReadScope],
+    enabled: canCheckPrices,
+    retry: false,
+    queryFn: async ({ signal }) => {
+      // Organization-wide lists also qualify; the readiness model checks company and tenant ownership.
+      const response = await apiFetch("/api/query/pricelists", { cache: "no-store", signal })
+      if (!response.ok) throw new Error("Price list readiness could not be verified")
+      return decodeActivationPricelists(await response.json())
+    },
+  })
+  const currencies = useQuery({
+    queryKey: ["currencies", "activation-readiness", priceReadScope],
+    enabled: canCheckPrices,
+    retry: false,
+    queryFn: ({ signal }) => fetchCurrencies((url, init) => apiFetch(url, { ...init, cache: "no-store", signal })),
+  })
+  const pricelistState = activationPricelistState({
+    organizationId, companyId, companyState: checks.companyState,
+    pricelists: canCheckPrices ? pricelists : undefined,
+    currencies: canCheckPrices ? currencies : undefined,
+  })
+  const pricelistMissing = selected === "quotation" && pricelistState === "missing"
+  const pricelistSetup = pricelistMissing ? activationPricelistSetupHref(
+    pricelistState, companyId, (resource, action) => checkPermission(resource, action).allowed,
+  ) : null
   const receipt = receiptState?.scope === scope ? receiptState?.receipt : null
   const receiptForm = activationForm(receipt?.task ?? null)
   const canVerifyReceipt = permissionsCurrent && checks.companyState === "ready" && receiptForm != null
@@ -149,6 +184,7 @@ export function ActivationChecklistPanel({ organizationId, companyId, collapseWh
     ...(selected === "contact" ? [{ id: "contact", label: t("activation.checks.contact", { defaultValue: "Saved contact in this company" }), state: checks.contactState }] : []),
     ...(selected === "quotation" ? [
       { id: "customer", label: t("activation.checks.customer", { defaultValue: "Saved customer in this company" }), state: checks.customerState },
+      { id: "pricelist", label: t("activation.checks.pricelist", { defaultValue: "Active price list with an active currency" }), state: pricelistState },
       { id: "warehouse", label: t("activation.checks.warehouse", { defaultValue: "Active warehouse in this company" }), state: warehouseState },
     ] : []),
   ]
@@ -194,22 +230,30 @@ export function ActivationChecklistPanel({ organizationId, companyId, collapseWh
       </fieldset> : <p className="mt-4 text-sm">{t("activation.noTasks", { defaultValue: "No supported first task is available for your current permissions. Ask your organization administrator for the access needed for your work." })}</p>}
       {selected && <div className="mt-4 space-y-3">
         <p className="max-w-3xl text-sm">{taskGuidance[selected]}</p>
+        {pricelistMissing && <p className="text-sm text-muted-foreground">
+          {pricelistSetup
+            ? t("activation.pricelist.setup", { defaultValue: "Create an active price list with an active currency, then return here to prepare a quotation." })
+            : t("activation.pricelist.ask", { defaultValue: "Ask an administrator to create an active price list with an active currency for this company." })}
+        </p>}
         {warehouseMissing && <p className="text-sm text-muted-foreground">
           {warehouseSetup
             ? t("activation.warehouse.setup", { defaultValue: "Set up an active warehouse in this company before preparing a quotation." })
             : t("activation.warehouse.ask", { defaultValue: "Ask an administrator to set up an active warehouse in this company before preparing a quotation." })}
         </p>}
         <div className="flex flex-wrap gap-2">
+          {pricelistSetup && <Button variant="outline" render={<Link href={pricelistSetup} />} nativeButton={false}>
+            {t("activation.pricelist.open", { defaultValue: "Open price lists" })}
+          </Button>}
           {warehouseSetup && <Button variant="outline" render={<Link href={warehouseSetup} />} nativeButton={false}>
             {t("inventory.warehouseSetup.title")}
           </Button>}
-          <Button type="button" disabled={warehouseMissing || checks.companyState !== "ready" || (selectedForm != null && (!scope || nativeForms?.pending != null))} onClick={startTask}>{taskLabels[selected]}</Button>
+          <Button type="button" disabled={pricelistMissing || warehouseMissing || checks.companyState !== "ready" || (selectedForm != null && (!scope || nativeForms?.pending != null))} onClick={startTask}>{taskLabels[selected]}</Button>
           {selectedForm && outcomeMessage && <Button type="button" variant="outline" onClick={() => router.push(activationTaskHref(selected))}>{t("activation.outcome.openWorkspace", { defaultValue: "Open task workspace" })}</Button>}
           {isAdmin() && checkPermission("admin:organization", "update").allowed && <Button type="button" variant="outline" onClick={() => router.push("/settings?section=organization")}>{t("activation.companySettings", { defaultValue: "Review company settings" })}</Button>}
         </div>
       </div>}
     </>}
-    <Button type="button" variant="outline" className="mt-4" disabled={companies.isFetching || contacts.isFetching || (canReadWarehouses && warehouses.isFetching) || readback.isFetching} onClick={() => { void Promise.allSettled([companies.refetch(), contacts.refetch(), ...(canReadWarehouses ? [warehouses.refetch()] : []), ...(canVerifyReceipt ? [readback.refetch()] : [])]) }}>{t("activation.refresh", { defaultValue: "Refresh checks" })}</Button>
+    <Button type="button" variant="outline" className="mt-4" disabled={companies.isFetching || contacts.isFetching || (canReadWarehouses && warehouses.isFetching) || (canCheckPrices && (pricelists.isFetching || currencies.isFetching)) || readback.isFetching} onClick={() => { void Promise.allSettled([companies.refetch(), contacts.refetch(), ...(canReadWarehouses ? [warehouses.refetch()] : []), ...(canCheckPrices ? [pricelists.refetch(), currencies.refetch()] : []), ...(canVerifyReceipt ? [readback.refetch()] : [])]) }}>{t("activation.refresh", { defaultValue: "Refresh checks" })}</Button>
   </section>
   return completed ? <details className="min-w-0 rounded-xl border p-4 sm:p-6">
     <summary className="w-fit cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">

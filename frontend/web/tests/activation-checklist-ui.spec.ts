@@ -128,3 +128,41 @@ test("quotation checks active company warehouses and only links allowed setup af
   await expect(warehouse).toHaveAttribute("data-state", "unavailable")
   await expect(setup).toHaveCount(0)
 })
+
+
+test("quotation price setup reacts to same-company readback and does not infer setup from denial", async ({ page }) => {
+  const prices = page.getByTestId("activation-checklist").locator('[data-check="pricelist"]')
+  const setup = page.getByRole("link", { name: "Open price lists", exact: true })
+  let rows = [{ id: "7", companyId: "3", organizationId: "1", currencyId: "4", isActive: true }]
+  let denied = false
+  await page.route("**/api/query/companies", route => route.fulfill({ json: { data: [
+    { id: "2", organizationId: "1", currencyId: "4", fiscalYearEndMonth: 12, fiscalYearEndDay: 31 },
+    { id: "3", organizationId: "1", currencyId: "4", fiscalYearEndMonth: 12, fiscalYearEndDay: 31 },
+  ] } }))
+  await page.route("**/api/query/contacts", route => route.fulfill({ json: { data: [] } }))
+  await page.route("**/api/query/warehouses?companyId=2", route => route.fulfill({ json: { data: [{ id: "10", organizationId: "1", companyId: "2", active: true }] } }))
+  await page.route("**/api/bootstrap/currencies", route => route.fulfill({ json: { data: [{ id: "4", code: "RWF", decimalPlaces: 0 }] } }))
+  await page.route("**/api/query/pricelists", route => denied
+    ? route.fulfill({ status: 403, json: { error: "Denied" } })
+    : route.fulfill({ json: { data: rows } }))
+  await page.goto("/activation?activation=quotation")
+  await expect(prices).toHaveAttribute("data-state", "missing")
+  await expect(setup).toHaveAttribute("href", "/sales?tab=pricelists&companyId=2")
+  await expect(page.getByRole("button", { name: "Prepare a quotation", exact: true })).toBeDisabled()
+  await page.getByRole("button", { name: "Toggle price setup permission" }).click()
+  await expect(setup).toHaveCount(0)
+  await expect(page.getByText("Ask an administrator to create an active price list with an active currency for this company.")).toBeVisible()
+  await page.getByRole("button", { name: "Toggle price setup permission" }).click()
+  await expect(setup).toBeVisible()
+
+  rows = [{ ...rows[0]!, companyId: "2" }]
+  await page.getByRole("button", { name: "Refresh checks", exact: true }).click()
+  await expect(prices).toHaveAttribute("data-state", "ready")
+  await expect(setup).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Prepare a quotation", exact: true })).toBeEnabled()
+
+  denied = true
+  await page.getByRole("button", { name: "Refresh checks", exact: true }).click()
+  await expect(prices).toHaveAttribute("data-state", "unavailable")
+  await expect(setup).toHaveCount(0)
+})

@@ -23,7 +23,13 @@
       "quotation": "Kora cyangwa uhitemo urutonde rw’ibiciro rufite ifaranga rikoreshwa, uhitemo umukiriya n’ububiko. Bika devis mbere yo kongeramo ibicuruzwa."
     },
     "checks": {
+      "pricelist": "Urutonde rw’ibiciro rukora mu ifaranga rikoreshwa",
       "warehouse": "Ububiko bukora muri iyi sosiyete"
+    },
+    "pricelist": {
+      "setup": "Kora urutonde rw’ibiciro rukora mu ifaranga rikoreshwa, hanyuma ugaruke hano gutegura inyandiko y’ibiciro.",
+      "ask": "Saba umuyobozi gukorera iyi sosiyete urutonde rw’ibiciro rukora mu ifaranga rikoreshwa.",
+      "open": "Fungura intonde z’ibiciro"
     },
     "warehouse": {
       "setup": "Tegura ububiko bukora muri iyi sosiyete mbere yo gukora inyandiko y’ibiciro biteganyijwe.",

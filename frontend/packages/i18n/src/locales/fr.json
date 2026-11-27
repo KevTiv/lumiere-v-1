@@ -23,7 +23,13 @@
       "quotation": "Créez ou choisissez une liste de prix dans une devise active, puis sélectionnez un client et un entrepôt. Enregistrez le devis avant d’ajouter les produits."
     },
     "checks": {
+      "pricelist": "Liste de prix active dans une devise active",
       "warehouse": "Entrepôt actif dans cette société"
+    },
+    "pricelist": {
+      "setup": "Créez une liste de prix active dans une devise active, puis revenez ici pour préparer un devis.",
+      "ask": "Demandez à un administrateur de créer une liste de prix active dans une devise active pour cette société.",
+      "open": "Ouvrir les listes de prix"
     },
     "warehouse": {
       "setup": "Configurez un entrepôt actif dans cette société avant de préparer un devis.",

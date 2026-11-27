@@ -11,7 +11,8 @@ import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
-import { usableQuotationPricelists } from "@/lib/first-sale-readiness"
+import { quotationPricelistSetupHref, usableQuotationPricelists } from "@/lib/first-sale-readiness"
+import { useCompanyHandoff } from "@/lib/use-company-handoff"
 import { useWarehouseChoice } from "@/lib/use-warehouse-choice"
 import { withFormChoiceSetup } from "@lumiere/ui/lib/form-choice-setup"
 import { CompanyModuleInsights } from "../../../components/module-insights"
@@ -327,9 +328,12 @@ type SalesClientLoadedProps = Omit<SalesClientProps, 'organizationId'> & {
 type SalesCsvImportKind = 'order' | 'orderLine';
 
 export function SalesClient(props: SalesClientProps) {
+  const { t } = useTranslation();
+  const switchingCompany = useCompanyHandoff();
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />;
   }
+  if (switchingCompany) return <p role="status">{t("common.loading")}</p>;
   return <SalesClientLoaded {...props} organizationId={props.organizationId} />;
 }
 
@@ -1174,8 +1178,9 @@ function SalesClientLoaded({
     const canSetUp = (resource: string, module: string) => permissionsReady === true &&
       checkPermission(module, 'read').allowed && checkPermission(resource, 'create').allowed;
     const canCreateCustomer = canSetUp('contact', 'module:crm');
-    const canCreatePricelist = operatingCompanyId > 0n && canSetUp('pricelist', 'module:sales') &&
-      checkPermission('product_pricelist', 'read').allowed;
+    const pricelistSetupHref = permissionsReady === true
+      ? quotationPricelistSetupHref(operatingCompanyId, (resource, action) => checkPermission(resource, action).allowed)
+      : null;
     return withFormChoiceSetup(
       mergeSelectOptionsForFields(newSaleOrderForm(t), {
         partnerId: partnerFieldOptions,
@@ -1197,11 +1202,11 @@ function SalesClientLoaded({
         pricelistId: {
           ready: priceChoicesState.status === 'ready',
           retry: { label: t('sales.forms.setup.refreshPriceLists'), onRetry: () => { void pricelistsQuery.refetch(); void currenciesQuery.refetch(); } },
-          message: canCreatePricelist
+          message: pricelistSetupHref
             ? t('sales.forms.setup.pricelistMissing', { defaultValue: 'Create a price list with an active currency in a separate tab, then return here and refresh the price lists. Your entries stay here.' })
             : t('sales.forms.setup.pricelistMissingAsk', { defaultValue: 'No usable price lists are available. Ask an administrator to create one with an active currency, then refresh the price lists.' }),
-          action: canCreatePricelist ? {
-            href: `${buildModuleTabHref('sales', 'pricelists')}&companyId=${operatingCompanyId}`,
+          action: pricelistSetupHref ? {
+            href: pricelistSetupHref,
             label: t('sales.forms.setup.openPricelists', { defaultValue: 'Open price lists' }),
           } : undefined,
         },

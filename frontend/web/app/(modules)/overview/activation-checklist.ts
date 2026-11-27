@@ -1,3 +1,4 @@
+import { quotationPricelistSetupHref, usableQuotationPricelists } from "@/lib/first-sale-readiness"
 import { companyWarehouseOptions } from "@/lib/warehouse-choice"
 import { onboardingFiscalYearEnd } from "@/lib/onboarding-config"
 import { decodeQueryListResponse } from "@lumiere/api-client"
@@ -157,6 +158,58 @@ export function activationWarehouseState(input: {
   if (choices == null) return "unavailable"
   if (choices.length > 0) return "ready"
   return input.warehouses.isFetching ? "loading" : "missing"
+}
+
+type ActivationPriceRow = Readonly<Record<string, unknown>>
+type ActivationPricelistRead = ActivationRead<ActivationPriceRow> & { isFetching?: boolean }
+
+export function decodeActivationPricelists(payload: unknown): ActivationPriceRow[] {
+  return decodeQueryListResponse(payload, (row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) throw new Error("Invalid price list row")
+    return row as ActivationPriceRow
+  })
+}
+
+export function activationPricelistState(input: {
+  organizationId: Id
+  companyId: Id | null
+  companyState: ActivationCheckState
+  pricelists?: ActivationPricelistRead
+  currencies?: ActivationPricelistRead
+}): ActivationCheckState {
+  if (input.companyState !== "ready") return input.companyState === "missing" ? "unavailable" : input.companyState
+  const { pricelists, currencies } = input
+  if (!pricelists || !currencies || pricelists.status === "error" || currencies.status === "error") return "unavailable"
+  if (pricelists.status === "pending" || currencies.status === "pending" || pricelists.isFetching || currencies.isFetching) return "loading"
+  const organizationId = parseStrictU64(input.organizationId)
+  const companyId = parseStrictU64(input.companyId)
+  if (!organizationId || !companyId || !pricelists.data || !currencies.data) return "unavailable"
+
+  // A masked or malformed projection cannot prove setup is missing.
+  const valid: ActivationPriceRow[] = []
+  let masked = false
+  for (const row of pricelists.data) {
+    const organization = parseStrictU64(row.organizationId ?? row.organization_id)
+    if (organization && organization !== organizationId) continue
+    const company = Object.hasOwn(row, "companyId") ? row.companyId : row.company_id
+    const companyIdentity = parseStrictU64(company)
+    if (companyIdentity && companyIdentity !== companyId) continue
+    const active = row.isActive ?? row.is_active
+    if (active === false) continue
+    const shared = company === null || (company != null && typeof company === "object" && Object.hasOwn(company, "none"))
+    const currency = parseStrictU64(row.currencyId ?? row.currency_id)
+    if (!organization || (!shared && !companyIdentity) || active !== true || !parseStrictU64(row.id) || !currency) {
+      masked = true
+      continue
+    }
+    valid.push(row)
+  }
+  if (usableQuotationPricelists(valid, currencies.data, organizationId, companyId).length) return "ready"
+  return masked ? "unavailable" : "missing"
+}
+
+export function activationPricelistSetupHref(state: ActivationCheckState, companyId: Id | null, can: (resource: string, action: "read" | "create") => boolean) {
+  return state === "missing" ? quotationPricelistSetupHref(companyId, can) : null
 }
 
 /** Navigation suggestions narrow discovery; these checks never authorize a save. */

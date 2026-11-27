@@ -1,3 +1,4 @@
+import { buildModuleTabHref } from "@lumiere/erp-shared/ai-source-links"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 
 type Row = Readonly<Record<string, unknown>>
@@ -34,6 +35,13 @@ export function usableQuotationPricelists<T extends Row>(
       field(row, "isActive", "is_active") === true &&
       currency != null && currencyIds.has(currency)
   })
+}
+
+export function quotationPricelistSetupHref(companyId: unknown, can: (resource: string, action: "read" | "create") => boolean) {
+  const id = positiveId(companyId)
+  if (!id || !can("module:sales", "read") ||
+      !can("product_pricelist", "read") || !can("pricelist", "create")) return null
+  return `${buildModuleTabHref("sales", "pricelists")}&companyId=${id}`
 }
 
 /** The company-scoped stock read cannot prove absence of organization-wide locations. */

@@ -82,12 +82,18 @@
       "unavailable": "Could not verify"
     },
     "checks": {
+      "pricelist": "Active price list with an active currency",
       "company": "Current company access",
       "currency": "Company base currency assigned",
       "fiscal": "Company fiscal year-end recorded",
       "contact": "Saved contact in this company",
       "customer": "Saved customer in this company",
       "warehouse": "Active warehouse in this company"
+    },
+    "pricelist": {
+      "setup": "Create an active price list with an active currency, then return here to prepare a quotation.",
+      "ask": "Ask an administrator to create an active price list with an active currency for this company.",
+      "open": "Open price lists"
     },
     "warehouse": {
       "setup": "Set up an active warehouse in this company before preparing a quotation.",

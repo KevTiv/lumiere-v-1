@@ -23,7 +23,13 @@
       "quotation": "Unda au chagua orodha ya bei yenye sarafu inayotumika, kisha chagua mteja na ghala. Hifadhi nukuu kabla ya kuongeza bidhaa."
     },
     "checks": {
+      "pricelist": "Orodha ya bei inayotumika katika sarafu inayotumika",
       "warehouse": "Ghala linalotumika katika kampuni hii"
+    },
+    "pricelist": {
+      "setup": "Unda orodha ya bei inayotumika katika sarafu inayotumika, kisha urudi hapa kuandaa nukuu ya bei.",
+      "ask": "Mwombe msimamizi aunde orodha ya bei inayotumika katika sarafu inayotumika kwa kampuni hii.",
+      "open": "Fungua orodha za bei"
     },
     "warehouse": {
       "setup": "Sanidi ghala linalotumika katika kampuni hii kabla ya kuandaa makadirio ya bei.",
