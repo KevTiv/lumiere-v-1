@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "@lumiere/i18n"
+import { Badge } from "@lumiere/ui/components/badge"
+import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
+import { useImportReviewCheckpoint } from "./use-import-review-checkpoint"
+import { savedImportGoal, savedImportOperatorState, savedImportQueueLabel } from "./saved-import-operator"
+import { useSavedImportRuns } from "./use-saved-import-runs"
 import { ChatDecisionCard } from "@lumiere/ui"
 import { importTaskNextView } from "@lumiere/ui/ai-chat/import-task-status-card"
 import { FileIdentity } from "@lumiere/ui/components/file-identity"
@@ -78,6 +83,12 @@ export function SavedImportWorkspace({
   const queryClient = useQueryClient()
   const saved = useSavedImportTask(scope, taskId)
   const task = saved.task
+  const companies = useCompanies(scope.organizationId, !!task)
+  const company = companies.isSuccess ? companies.data.find(row => String(row.id) === String(scope.companyId))?.name : undefined
+  const runs = useSavedImportRuns(scope, taskId, task?.status === "needs_review")
+  const runProgress = runs.isSuccess ? runs.data ?? undefined : undefined
+  const runStamp = runProgress?.runs.map(run => `${run.id}:${run.status}`).join(",")
+  const previousRunStamp = useRef<string | undefined>(undefined)
   const workflowScope = {
     organizationId: scope.organizationId,
     companyId: scope.companyId,
@@ -86,6 +97,20 @@ export function SavedImportWorkspace({
   const canReview = task?.handoff?.canReview ?? true
   const workflow = useImportWorkflow(scope.identity, workflowScope, !!task && canReview)
   const workflowData = workflow.isError ? undefined : workflow.data
+  const checkpoint = useImportReviewCheckpoint(scope, taskId, !!task && canReview)
+  const checkpointReview = checkpoint.isSuccess && checkpoint.data.status === "saved"
+    ? checkpoint.data.checkpoint?.reviewId : undefined
+  const [autoResumeReview, setAutoResumeReview] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    if (!runStamp || previousRunStamp.current === runStamp) return
+    const previous = previousRunStamp.current
+    previousRunStamp.current = runStamp
+    if (previous && runProgress?.runs.some(run => !["queued", "running"].includes(run.status))) {
+      void queryClient.invalidateQueries({
+        queryKey: importWorkflowKey(scope.identity, { organizationId: scope.organizationId, companyId: scope.companyId, taskId }),
+      })
+    }
+  }, [queryClient, runProgress, runStamp, scope.identity, scope.organizationId, scope.companyId, taskId])
   useEffect(() => {
     if (task) onTaskFocus?.(task)
   }, [task, onTaskFocus])
@@ -132,19 +157,19 @@ export function SavedImportWorkspace({
   )
   const wizard = useRef<GuidedImportWizardHandle>(null)
   const heading = useRef<HTMLHeadingElement>(null)
+  const handoffPanel = useRef<HTMLDivElement>(null)
   const reviews = task?.reviews
   const pendingReviews = pendingImportReviews(reviews)
   const allowedReviewIds = useMemo(
     () => reviews?.map((review) => review.id) ?? [],
     [reviews],
   )
-  const selectedReviewId =
-    reviewId && allowedReviewIds.includes(reviewId)
-      ? reviewId
-      : ((view === "preview"
-          ? reviews?.find((review) => review.confirmed > 0)?.id
-          : pendingImportReviewId(reviews)) ??
-        allowedReviewIds[0])
+  const eligibleCheckpointReview = checkpointReview && allowedReviewIds.includes(checkpointReview) ? checkpointReview : undefined
+  const selectedReviewId = reviewId && allowedReviewIds.includes(reviewId)
+    ? reviewId
+    : ((!initialReviewId && view !== "preview" ? eligibleCheckpointReview : undefined) ??
+      (view === "preview" ? reviews?.find(review => review.confirmed > 0)?.id : pendingImportReviewId(reviews)) ??
+      allowedReviewIds[0])
   const counts = useMemo(
     () =>
       (reviews ?? []).reduce(
@@ -185,33 +210,26 @@ export function SavedImportWorkspace({
       workflowData?.farmResults?.some((result) => result.count > 0)
     ),
   })
-  const nextReviewId =
-    (nextView === "preview"
-      ? reviews?.find((item) => item.confirmed > 0)?.id
-      : pendingImportReviewId(reviews)) ?? selectedReviewId
+  const nextDecisionReviewId = (!initialReviewId ? eligibleCheckpointReview : undefined) ??
+    pendingImportReviewId(reviews) ?? selectedReviewId
+  const nextReviewId = nextView === "preview"
+    ? reviews?.find(item => item.confirmed > 0)?.id ?? selectedReviewId : nextDecisionReviewId
+  const resumeView = !initialReviewId && eligibleCheckpointReview ? "decisions"
+    : runProgress?.runs.length ? "results" : nextView
+  const resumeReviewId = resumeView === "decisions" ? nextDecisionReviewId : nextReviewId
   useEffect(() => {
-    if (
-      !resumeAtNextStep ||
-      !task ||
-      saved.busy ||
-      workflow.isPending ||
-      workflow.isFetching
-    )
-      return
-    if (!canReview || (!allowImport && (nextView === "preview" || nextView === "results")))
-      return
-    onNavigate(nextView, nextReviewId)
+    if (!resumeAtNextStep || !task || saved.busy || !canReview ||
+        (!initialReviewId && checkpoint.isPending) || workflow.isPending || workflow.isFetching ||
+        (task.status === "needs_review" && runs.isPending)) return
+    if (!allowImport && (resumeView === "preview" || resumeView === "results")) return
+    if (resumeView === "decisions" && !initialReviewId && resumeReviewId === eligibleCheckpointReview) {
+      setAutoResumeReview(eligibleCheckpointReview)
+    }
+    onNavigate(resumeView, resumeReviewId)
   }, [
-    resumeAtNextStep,
-    task,
-    saved.busy,
-    workflow.isPending,
-    workflow.isFetching,
-    allowImport,
-    canReview,
-    nextView,
-    nextReviewId,
-    onNavigate,
+    resumeAtNextStep, task, saved.busy, initialReviewId, checkpoint.isPending,
+    eligibleCheckpointReview, workflow.isPending, workflow.isFetching, runs.isPending,
+    allowImport, canReview, resumeView, resumeReviewId, onNavigate,
   ])
   useEffect(() => {
     if (view === "preview" || view === "results") setExecutionView(view)
@@ -280,22 +298,44 @@ export function SavedImportWorkspace({
 
   const canPrepare =
     !inspectionOnly && !saved.pointer && canPrepareInspectedImport(task)
-  const nextLabel =
-    nextView === "sources"
-      ? t("settings.importTask.nextSources", {
-          defaultValue: "Review files and choose an action",
-        })
-      : nextView === "decisions"
-        ? t("settings.importTask.nextDecisions", {
-            defaultValue: "Review source decisions",
-          })
-        : nextView === "results"
-          ? t("settings.importTask.nextResults", {
-              defaultValue: "Continue to ERP results",
-            })
-          : t("settings.importTask.nextPreview", {
-              defaultValue: "Review ERP options",
-            })
+  const { action, queue } = savedImportOperatorState({
+    task, progress: runProgress, workflow: workflowData, pendingAnswer: !!saved.pointer,
+    runCheckFailed: runs.isError, canPrepare, nextView,
+  })
+  const primaryLabel = {
+    check: t("settings.importOperator.checkResult"),
+    handoff: t("settings.importOperator.openHandoff"),
+    prepare: t("aiChat.import.approvePreparation"),
+    resume: preparationApproved ? t("aiChat.import.resume") : t("aiChat.import.resumeInspection"),
+    sources: t("settings.importTask.nextSources"),
+    decisions: t("settings.importTask.nextDecisions"),
+    preview: t("settings.importTask.nextPreview"),
+    results: t("settings.importOperator.openResults"),
+  }[action]
+  const canOpenStage = canReview && ((action !== "preview" && action !== "results") || allowImport)
+  const showPrimary = action === "check" || action === "handoff" ||
+    (canOpenStage && (action === "prepare" || action === "resume" || action !== view))
+  const checkSavedResult = () => {
+    refreshTask()
+    if (canReview) void workflow.refetch()
+    if (task.status === "needs_review") void runs.refetch()
+  }
+  const runPrimaryAction = () => {
+    switch (action) {
+      case "check": checkSavedResult(); break
+      case "handoff": handoffPanel.current?.focus(); break
+      case "prepare":
+        void saved.answer({
+          requestId: task.decision.id, expectedRevision: task.decision.revision, optionId: "prepare_import",
+        }).catch(() => undefined)
+        break
+      case "resume": void saved.resume().catch(() => undefined); break
+      default:
+        if (action === "decisions" && !initialReviewId && eligibleCheckpointReview) setAutoResumeReview(eligibleCheckpointReview)
+        navigate(action, action === "decisions" ? nextDecisionReviewId : nextReviewId, true)
+    }
+  }
+  const verifiedRows = runProgress?.coverage.verifiedRowCount ?? 0
 
   return (
     <section
@@ -309,15 +349,22 @@ export function SavedImportWorkspace({
           <h2
             ref={heading}
             tabIndex={-1}
-            className="text-lg font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="break-words text-lg font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            {t("settings.importTask.title", { defaultValue: "Saved import" })}
+            {savedImportGoal(t, task, workflowData)}
           </h2>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            {task.status === "needs_review" && runs.isPending
+              ? <span className="text-muted-foreground">{t("settings.importOperator.checkingResult")}</span>
+              : <Badge variant="outline" data-import-queue={queue}>{savedImportQueueLabel(t, queue)}</Badge>}
+            <span>{company || t("settings.importOperator.company", { id: scope.companyId })}</span>
+          </div>
           <p className="text-sm text-muted-foreground">
             {t("settings.importTask.originalFiles", {
               defaultValue: "{{count}} original files",
               count: task.files.length,
             })}
+            {managedDocument && <> · {t("settings.importOperator.sourceVersion", { id: managedDocument.versionId })}</>}
           </p>
           <a
             className="text-sm underline underline-offset-4"
@@ -344,55 +391,36 @@ export function SavedImportWorkspace({
               defaultValue: "Back to saved imports",
             })}
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={saved.busy}
-            onClick={() => {
-              refreshTask()
-              void workflow.refetch()
-            }}
-          >
+          {action !== "check" && <Button type="button" variant="outline" disabled={saved.busy} onClick={checkSavedResult}>
             {t("common.refresh", { defaultValue: "Refresh" })}
-          </Button>
-          {canPrepare ? (
-            <Button
-              type="button"
-              disabled={saved.busy}
-              onClick={() => {
-                void saved
-                  .answer({
-                    requestId: task.decision.id,
-                    expectedRevision: task.decision.revision,
-                    optionId: "prepare_import",
-                  })
-                  .catch(() => undefined)
-              }}
-            >
-              {t("aiChat.import.approvePreparation", {
-                defaultValue: "Approve preparation",
-              })}
-            </Button>
-          ) : canReview ? (
-            <Button
-              type="button"
-              disabled={saved.busy}
-              onClick={() => navigate(nextView, nextReviewId, true)}
-            >
-              {nextLabel}
-            </Button>
-          ) : null}
+          </Button>}
+          {showPrimary && <Button
+            type="button"
+            disabled={saved.busy || (action === "check" && (workflow.isFetching || runs.isFetching))}
+            onClick={runPrimaryAction}
+            data-testid="saved-import-primary-action"
+          >
+            {primaryLabel}
+          </Button>}
         </div>
       </header>
       {task.handoff && (
-        <ImportTaskHandoff
-          key={`${scope.identity}:${scope.companyId}:${taskId}:${task.handoff.revision}`}
-          scope={scope}
-          taskId={taskId}
-          handoff={task.handoff}
-          disabled={saved.busy}
-          onChange={() => void saved.reload()}
-        />
+        <div ref={handoffPanel} tabIndex={-1} className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <ImportTaskHandoff
+            key={`${scope.identity}:${scope.companyId}:${taskId}:${task.handoff.revision}`}
+            scope={scope}
+            taskId={taskId}
+            handoff={task.handoff}
+            disabled={saved.busy}
+            onChange={() => void saved.reload()}
+          />
+        </div>
+      )}
+      {verifiedRows > 0 && <p className="text-sm" role="status">{t("settings.importOperator.verifiedSourceRows", { rows: verifiedRows })}</p>}
+      {queue === "running" && <p className="text-sm text-muted-foreground" role="status">{t("settings.importOperator.serverRunning")}</p>}
+      {runs.isError && <p className="text-sm text-muted-foreground" role="status">{t("settings.importOperator.runUnavailable")}</p>}
+      {queue === "needs-me" && runProgress?.runs.some(run => ["partial", "failed", "blocked"].includes(run.status)) && (
+        <p className="text-sm text-muted-foreground" role="status">{t("settings.importOperator.runNeedsAttention")}</p>
       )}
       {canReview && <ImportTaskProgress
         files={task.files.length}
@@ -665,24 +693,6 @@ export function SavedImportWorkspace({
               {task.decision.otherText}
             </p>
           ) : null}
-          {task.status === "saved" ? (
-            <Button
-              type="button"
-              variant="outline"
-              disabled={saved.busy}
-              onClick={() => {
-                void saved.resume().catch(() => undefined)
-              }}
-            >
-              {preparationApproved
-                ? t("aiChat.import.resume", {
-                    defaultValue: "Resume preparation",
-                  })
-                : t("aiChat.import.resumeInspection", {
-                    defaultValue: "Resume inspection",
-                  })}
-            </Button>
-          ) : null}
           {allowImport && !managedSelection && task.handoff?.canManage !== false ? (
             <ImportPreparationPanel
               task={task}
@@ -705,6 +715,8 @@ export function SavedImportWorkspace({
                   ? { taskId: task.requestId, sessionKey: task.conversationKey }
                   : undefined
               }
+              resumeCheckpoint={reviewFilter == null && selectedReviewId === eligibleCheckpointReview &&
+                (!initialReviewId || autoResumeReview === selectedReviewId)}
               allowUpload={false}
               syncUrl={false}
               allowImport={allowImport}
@@ -713,6 +725,7 @@ export function SavedImportWorkspace({
                 void continueImport(source)
               }}
               onSelectedIdChange={(id) => {
+                setAutoResumeReview(undefined)
                 setReviewId(id)
                 onNavigate("decisions", id)
               }}

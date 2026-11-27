@@ -4547,6 +4547,34 @@
     }
   },
   "settings": {
+    "importOperator": {
+      "needsMe": "Bikeneye ko mbikora",
+      "withReviewer": "Biri ku musuzumyi",
+      "running": "Birimo gukorwa",
+      "done": "Byarangiye",
+      "checkResult": "Reba ibyavuye mu gikorwa byabitswe",
+      "openHandoff": "Reba ibyoherejwe ku musuzumyi",
+      "openResults": "Fungura ibyavuye mu gikorwa byabitswe",
+      "company": "Sosiyete nº {{id}}",
+      "verifiedSourceRows": "Imirongo {{rows}} y’isoko yagenzuwe",
+      "serverRunning": "Seriveri iri gutunganya amakuru yinjizwa. Ushobora kuva kuri uru rupapuro ukazareba ibyabitswe nyuma.",
+      "runUnavailable": "Aho igikorwa kigeze ntihagenzuwe. Ongera ufungure urupapuro ugerageze.",
+      "runNeedsAttention": "Imirongo imwe y’isoko yemejwe iracyakeneye gusuzumwa. Reba ibyabitswe mbere yo kongera kugerageza.",
+      "inspect": "Suzuma dosiye z’isoko",
+      "multiple": "Injiza amatsinda y’amakuru muri ERP",
+      "journals": "Bika inyandiko z’ibaruramari za kera nk’imishinga",
+      "shopSales": "Injiza ibyagurishijwe mu maduka mu gice cy’Igurisha",
+      "products": "Injiza ibicuruzwa",
+      "contacts": "Injiza abo kuvugana na bo",
+      "locations": "Injiza ahantu h’ububiko",
+      "farmEvents": "Injiza ibyabaye mu bworozi",
+      "goal": "Suzuma {{file}} mbere yo kuyinjiza",
+      "filter": "Erekana ibyinjizwa",
+      "all": "Ibyinjizwa byose byabitswe",
+      "noInQueue": "Nta byinjizwa byagenzuwe muri iki gice.",
+      "checkingResult": "Turimo kugenzura ibyabitswe…",
+      "sourceVersion": "Verisiyo y’isoko nº {{id}}"
+    },
     "importHandoff": {
       "title": "Guhereza iyinjiza ry’amakuru ngo risuzumwe",
       "description": "Hitamo umugenzuzi wo muri sosiyete uzakomeza iri yinjiza ry’amakuru ryabitswe.",
@@ -4631,6 +4659,15 @@
         "fieldConfirmation": "Kwemeza {{field}}",
         "noDecisionChanges": "Nta gaciro kanditswe cyangwa imiterere y’isuzuma byahindutse.",
         "proposedAfter": "Nyuma y’iki cyemezo"
+      },
+      "checkpoint": {
+        "save": "Bika aho ngeze",
+        "resume": "Subira ku kibazo cyabitswe",
+        "saved": "Aho igenzura rigeze habitswe.",
+        "stale": "Ikibazo cyabitswe cyahindutse. Hitamo ikibazo kiriho kugira ngo ukomeze.",
+        "failed": "Aho igenzura rigeze ntihashoboye kugenzurwa.",
+        "conflict": "Igenzura cyangwa aho wari ugeze byahindutse. Banza urebe aho bigeze mbere yo kongera kubika.",
+        "boundary": "Ibi bibika aho igenzura rigeze. Amakosora atabitswe aguma muri iyi tab."
       }
     },
     "page": {

@@ -13,6 +13,7 @@ import {
 } from "./module-backfill-navigation"
 import { apiFetch } from "./api-fetch"
 import { chatImportReceiptKey } from "./chat-import-task"
+import { startDurableImportRun } from "./durable-import-request"
 import { importAmountUnits } from "./import-workflow"
 import { ImportsPausedError, importsPausedFrom } from "./import-write-pause"
 import type {
@@ -153,6 +154,7 @@ function BackfillAction({
   const cache = useQueryClient()
   const [overrides, setOverrides] = useState<Record<string, string>>({})
   const [showMatches, setShowMatches] = useState(false)
+  const [scheduledPreview, setScheduledPreview] = useState<string | null>(null)
   const [preview, setPreview] = useState<{
     key: string
     receipt: Receipt
@@ -182,6 +184,26 @@ function BackfillAction({
     mutationFn: async (previewOnly: boolean): Promise<Receipt> => {
       const results: Receipt["results"] = []
       const digests = new Map(ready.map((row) => [row.itemId, row.digest]))
+      if (!previewOnly && taskId) {
+        const adapter = operation.reviewedRecord.dispatch
+        if (adapter !== "sales" && adapter !== "shop_sales" && adapter !== "warehouse") {
+          throw new Error("This import operation is unavailable.")
+        }
+        const rows = items.flatMap(item => {
+          const expectedDigest = digests.get(item.id)
+          return expectedDigest ? [{
+            batchId, itemId: item.id, revision: item.revision, expectedDigest,
+            customerId: overrides[item.id] || undefined,
+          }] : []
+        })
+        await startDurableImportRun(taskId, {
+          companyId,
+          adapter,
+          config: { rows },
+          rows: rows.map(({ batchId, itemId, revision }) => ({ batchId, itemId, revision })),
+        })
+        return { results }
+      }
       const selected = previewOnly
         ? items
         : items.filter((item) => digests.has(item.id))
@@ -219,10 +241,12 @@ function BackfillAction({
     },
     onSuccess: (receipt, previewOnly) => {
       if (previewOnly) setPreview({ key, receipt })
+      else if (taskId) setScheduledPreview(key)
     },
     onSettled: (_data, _error, previewOnly) => {
       if (!previewOnly)
         return Promise.all([
+          cache.invalidateQueries({ queryKey: ["durable-import-runs"] }),
           cache.invalidateQueries({
             queryKey: ["module-backfill", organizationId, companyId],
           }),
@@ -302,7 +326,7 @@ function BackfillAction({
         </Button>
         {showPreview ? (
           <Button
-            disabled={disabled || write.isPending || salesPreview === null}
+            disabled={disabled || write.isPending || salesPreview === null || scheduledPreview === key}
             onClick={() => write.mutate(false)}
           >
             {write.isPending
@@ -434,7 +458,10 @@ function BackfillAction({
       ) : write.isError ? (
         <p role="alert">{write.error.message}</p>
       ) : null}
-      {write.data && write.variables === false ? (
+      {scheduledPreview === key ? (
+        <p role="status">{t("settings.importOperator.serverRunning", { defaultValue: "The import is running. Check its saved result later." })}</p>
+      ) : null}
+      {!taskId && write.data && write.variables === false ? (
         <p role="status">
           {saved} saved · {matched} matched existing records · {held.length}{" "}
           need attention

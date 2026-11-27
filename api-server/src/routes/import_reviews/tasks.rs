@@ -22,6 +22,7 @@ use tokio_postgres::Transaction;
 
 use crate::{cold_tier::pg_pool, error::ApiError, state::AppState, web_session::OrgSession};
 
+mod checkpoint;
 pub(super) mod handoff;
 mod managed_source;
 mod manifest;
@@ -1444,6 +1445,10 @@ pub(super) fn router() -> Router<Arc<AppState>> {
         .route("/import-tasks", get(list).post(create))
         .route("/import-tasks/from-document", post(create_from_document))
         .route("/import-tasks/:request", get(read))
+        .route(
+            "/import-tasks/:request/review-checkpoint",
+            get(checkpoint::read).put(checkpoint::save),
+        )
         .route(
             "/import-tasks/:request/handoff",
             get(handoff::recipients).post(handoff::update),

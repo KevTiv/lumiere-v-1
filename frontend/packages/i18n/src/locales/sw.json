@@ -4552,6 +4552,34 @@
     }
   },
   "settings": {
+    "importOperator": {
+      "needsMe": "Inanihitaji",
+      "withReviewer": "Kwa mkaguzi",
+      "running": "Inaendelea",
+      "done": "Imekamilika",
+      "checkResult": "Kagua matokeo yaliyohifadhiwa",
+      "openHandoff": "Angalia makabidhiano kwa mkaguzi",
+      "openResults": "Fungua matokeo yaliyohifadhiwa",
+      "company": "Kampuni #{{id}}",
+      "verifiedSourceRows": "Safu {{rows}} za chanzo zimethibitishwa",
+      "serverRunning": "Seva inachakata uingizaji huu. Unaweza kuondoka kwenye ukurasa huu na kukagua matokeo yaliyohifadhiwa baadaye.",
+      "runUnavailable": "Maendeleo ya kazi hayakuweza kukaguliwa. Onyesha upya ili ujaribu tena.",
+      "runNeedsAttention": "Baadhi ya safu za chanzo zilizoidhinishwa bado zinahitaji hatua. Kagua matokeo yaliyohifadhiwa kabla ya kujaribu tena.",
+      "inspect": "Kagua faili za chanzo",
+      "multiple": "Ingiza vikundi vya data kwenye ERP",
+      "journals": "Hifadhi rasimu za maingizo ya zamani ya jarida",
+      "shopSales": "Ingiza mauzo ya dukani kwenye Mauzo",
+      "products": "Ingiza bidhaa",
+      "contacts": "Ingiza anwani za mawasiliano",
+      "locations": "Ingiza maeneo ya ghala",
+      "farmEvents": "Ingiza matukio ya ufugaji",
+      "goal": "Kagua {{file}} kabla ya kuiingiza",
+      "filter": "Onyesha uingizaji",
+      "all": "Uingizaji wote uliohifadhiwa",
+      "noInQueue": "Hakuna uingizaji uliokaguliwa katika mwonekano huu.",
+      "checkingResult": "Inakagua matokeo yaliyohifadhiwa…",
+      "sourceVersion": "Toleo la chanzo #{{id}}"
+    },
     "importWorkflow": {
       "pendingSourceTitle": "Safu za chanzo zinazohitaji ukaguzi",
       "openPendingSource": "{{title}} · kagua safu ambazo hazijatatuliwa ({{rows}})",
@@ -4596,6 +4624,15 @@
         "fieldConfirmation": "Uthibitisho wa {{field}}",
         "noDecisionChanges": "Hakuna thamani iliyorekodiwa au hali ya ukaguzi iliyobadilika.",
         "proposedAfter": "Baada ya uamuzi huu"
+      },
+      "checkpoint": {
+        "save": "Hifadhi nilipoishia",
+        "resume": "Endelea na suala lililohifadhiwa",
+        "saved": "Mahali ulipoishia katika ukaguzi pamehifadhiwa.",
+        "stale": "Suala lililohifadhiwa limebadilika. Chagua suala la sasa ili uendelee.",
+        "failed": "Mahali ulipoishia katika ukaguzi hapakuweza kuthibitishwa.",
+        "conflict": "Ukaguzi au mahali ulipoishia pamebadilika. Angalia mahali pa hivi karibuni kabla ya kuhifadhi tena.",
+        "boundary": "Hii huhifadhi mahali ulipoishia. Marekebisho ambayo hayajahifadhiwa hubaki kwenye kichupo hiki."
       }
     },
     "page": {

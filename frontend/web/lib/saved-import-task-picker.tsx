@@ -1,16 +1,20 @@
 "use client"
 
+import { useState } from "react"
 import { useInfiniteQuery } from "@tanstack/react-query"
 import { useTranslation } from "@lumiere/i18n"
 import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
 import { FileIdentity } from "@lumiere/ui/components/file-identity"
+import { Badge } from "@lumiere/ui/components/badge"
 import { Button } from "@lumiere/ui/components/button"
 import { apiFetch } from "./api-fetch"
 import { listSavedImportTasks } from "./chat-import-task"
+import { savedImportGoal, savedImportOperatorState, savedImportQueueLabel, savedImportQueues, type SavedImportQueue } from "./saved-import-operator"
+import { useVisibleSavedImportRuns } from "./use-saved-import-runs"
 import type { SavedImportScope } from "./use-saved-import-task"
 
 export function useSavedImportTaskList(scope: SavedImportScope) {
-  return useInfiniteQuery({
+  const result = useInfiniteQuery({
     queryKey: [
       "saved-import-tasks",
       scope.organizationId,
@@ -24,6 +28,7 @@ export function useSavedImportTaskList(scope: SavedImportScope) {
     retry: false,
     refetchOnMount: "always",
   })
+  return { ...result, scope }
 }
 
 export function SavedImportTaskPicker({
@@ -34,30 +39,23 @@ export function SavedImportTaskPicker({
   onSelect: (id: string) => void
 }) {
   const { t, i18n } = useTranslation()
-  const statusLabels = {
-    awaiting_decision: t("settings.importTask.cardAwaiting", {
-      defaultValue: "Files saved · choose how to use them",
-    }),
-    saved: t("settings.importTask.cardSaved", {
-      defaultValue: "Files saved · preparation can resume",
-    }),
-    needs_review: t("settings.importTask.cardReview", {
-      defaultValue: "Source review prepared",
-    }),
-    inspection_ready: t("settings.importTask.cardInspection", {
-      defaultValue: "Inspection ready",
-    }),
-    failed: t("settings.importTask.cardFailed", {
-      defaultValue: "Preparation needs attention",
-    }),
-  }
+  const [queue, setQueue] = useState<SavedImportQueue | "all">("all")
   const checking =
     query.isPending || (query.isFetching && !query.isFetchingNextPage)
   const tasks =
     query.isError || checking
       ? []
       : (query.data?.pages.flatMap((page) => page.tasks) ?? [])
-  const pager = usePagedRows(tasks, undefined, 5)
+  const checkedTasks = tasks.filter(task => task.status === "needs_review").slice(0, 5)
+  const runs = useVisibleSavedImportRuns(query.scope, checkedTasks)
+  const reads = new Map(checkedTasks.map((task, index) => [task.requestId, runs[index]] as const))
+  const rows = tasks.map(task => {
+    const run = reads.get(task.requestId)
+    const operator = savedImportOperatorState({ task, progress: run?.isSuccess ? run.data ?? undefined : undefined })
+    return { task, operator, checkingRun: run?.isPending === true }
+  })
+  const visible = queue === "all" ? rows : rows.filter(row => !row.checkingRun && row.operator.queue === queue)
+  const pager = usePagedRows(visible, queue, 5)
   return (
     <section
       id="continue-import"
@@ -91,6 +89,19 @@ export function SavedImportTaskPicker({
           {t("common.refresh", { defaultValue: "Refresh" })}
         </Button>
       </div>
+      {tasks.length > 0 && (
+        <label className="flex w-fit max-w-full flex-wrap items-center gap-2 text-sm">
+          {t("settings.importOperator.filter")}
+          <select
+            className="min-h-9 rounded-md border bg-background px-2 py-1 focus-visible:ring-2 focus-visible:ring-ring"
+            value={queue}
+            onChange={event => setQueue(event.currentTarget.value as SavedImportQueue | "all")}
+          >
+            <option value="all">{t("settings.importOperator.all")}</option>
+            {savedImportQueues.map(value => <option key={value} value={value}>{savedImportQueueLabel(t, value)}</option>)}
+          </select>
+        </label>
+      )}
       {checking ? (
         <p role="status" className="text-sm">
           {t("settings.importTask.loading", {
@@ -111,9 +122,14 @@ export function SavedImportTaskPicker({
           })}
         </p>
       ) : null}
-      {tasks.length ? (
+      {tasks.length > 0 && visible.length === 0 && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {rows.some(row => row.checkingRun) ? t("settings.importOperator.checkingResult") : t("settings.importOperator.noInQueue")}
+        </p>
+      )}
+      {visible.length ? (
         <ul className="divide-y">
-          {pager.pageRows.map((task) => {
+          {pager.pageRows.map(({ task, operator, checkingRun }) => {
             const savedAt = new Date(task.createdAt)
             return (
               <li
@@ -121,10 +137,13 @@ export function SavedImportTaskPicker({
                 className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 py-3"
               >
                 <div className="min-w-0 flex-1 basis-48">
+                  <h3 className="break-words text-sm font-medium">{savedImportGoal(t, task)}</h3>
                   <FileIdentity fileName={task.files[0]?.fileName} />
-                  <p className="mt-1 text-sm font-medium">
-                    {statusLabels[task.status]}
-                  </p>
+                  {checkingRun ? (
+                    <span className="text-sm text-muted-foreground">{t("settings.importOperator.checkingResult")}</span>
+                  ) : (
+                    <Badge variant="outline" data-import-queue={operator.queue}>{savedImportQueueLabel(t, operator.queue)}</Badge>
+                  )}
                   {task.handoff?.canManage === false ? (
                     <p className="text-sm text-muted-foreground">
                       {t("settings.importHandoff.received")}

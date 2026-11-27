@@ -68,6 +68,7 @@ import { ModuleBackfillAction } from "./module-backfill-action"
 import { FarmImportAction } from "./farm-import-action"
 import { reviewDecisionDiff, reviewSourceDate, reviewSourceLabel } from "./import-review-decision-diff"
 import { ImportReviewDecisionSummary } from "./import-review-decision-summary"
+import { importReviewCheckpointKey, resolveImportReviewCheckpoint, saveImportReviewCheckpoint, useImportReviewCheckpoint } from "./use-import-review-checkpoint"
 import { resetHistoryQueries } from "./history-data"
 import { sourceHistoryLink } from "./source-observation"
 import { useReferenceInNewErpAiChat } from "./erp-ai-context"
@@ -112,6 +113,7 @@ export function ImportReviewWorkspace({
   onSelectedIdChange,
   onChanged,
   historySource,
+  resumeCheckpoint = false,
 }: {
   organizationId: number
   selectedId?: string
@@ -124,6 +126,7 @@ export function ImportReviewWorkspace({
   onSelectedIdChange?: (id: string) => void
   onChanged?: () => void
   historySource?: { taskId: string; sessionKey: string }
+  resumeCheckpoint?: boolean
 }) {
   const companyId = useOperatingCompanyId(organizationId)
   const { t } = useTranslation()
@@ -142,6 +145,7 @@ export function ImportReviewWorkspace({
       onSelectedIdChange={onSelectedIdChange}
       onChanged={onChanged}
       historySource={historySource}
+      resumeCheckpoint={resumeCheckpoint}
     />
   )
 }
@@ -159,6 +163,7 @@ export function ImportReviewPanel(props: {
   onSelectedIdChange?: (id: string) => void
   onChanged?: () => void
   historySource?: { taskId: string; sessionKey: string }
+  resumeCheckpoint?: boolean
 }) {
   const { identity } = useErpSession()
   const { t } = useTranslation()
@@ -187,6 +192,7 @@ function ReviewWorkspace({
   onSelectedIdChange,
   onChanged,
   historySource,
+  resumeCheckpoint = false,
 }: {
   actor: string
   organizationId: number
@@ -201,6 +207,7 @@ function ReviewWorkspace({
   onSelectedIdChange?: (id: string) => void
   onChanged?: () => void
   historySource?: { taskId: string; sessionKey: string }
+  resumeCheckpoint?: boolean
 }) {
   const { t } = useTranslation()
   const mounted = useRef(true)
@@ -218,6 +225,12 @@ function ReviewWorkspace({
       )
   }
   const cache = useQueryClient()
+  const checkpointScope = { identity: actor, organizationId, companyId }
+  const checkpointTask = historySource?.taskId ?? ""
+  const checkpoint = useImportReviewCheckpoint(checkpointScope, checkpointTask, !!historySource)
+  const [checkpointBusy, setCheckpointBusy] = useState(false)
+  const [checkpointState, setCheckpointState] = useState<"saved" | "stale" | "failed" | "conflict" | null>(null)
+  const resumed = useRef(false)
   const identityLabels = useIdentityLabelMap(organizationId)
   const referenceInChat = useReferenceInNewErpAiChat()
   const [selectedId, setSelectedId] = useState(initialId && (!allowedReviewIds || allowedReviewIds.includes(initialId)) ? initialId : "")
@@ -344,7 +357,7 @@ function ReviewWorkspace({
   const currentPage =
     selectedIndex >= 0 ? Math.floor(selectedIndex / 50) : Math.min(page, pages - 1)
   const visible = matching.slice(currentPage * 50, currentPage * 50 + 50)
-  const unavailable = busy || locked || uncertainUndo
+  const unavailable = busy || locked || uncertainUndo || checkpointBusy
   const editing = !!selected && !!detail.data && !detail.error
   useLayoutEffect(() => {
     const viewport = queueViewport.current
@@ -474,6 +487,68 @@ function ReviewWorkspace({
     setHistoryId(item.id)
     setChecked(new Set())
     setError(null)
+  }
+  const restoreCheckpoint = async () => {
+    if (selected || unavailable || !checkpointTask) return
+    setCheckpointBusy(true)
+    setCheckpointState(null)
+    try {
+      const [position, current] = await Promise.all([checkpoint.refetch(), detail.refetch()])
+      requireCurrentScope()
+      if (position.isError || current.isError) {
+        setCheckpointState("failed")
+        return
+      }
+      const saved = position.data?.checkpoint
+      const items = current.data?.items ?? []
+      const target = saved && position.data?.status === "saved"
+        ? resolveImportReviewCheckpoint(saved, current.data?.id ?? "", items, reviewIssueGroups(items)) : null
+      if (!target) {
+        setCheckpointState("stale")
+        return
+      }
+      setFilter("needs_review")
+      chooseGroup(target.group)
+      setSearch("")
+      if (target.item) open(target.item)
+    } catch {
+      if (mounted.current) setCheckpointState("failed")
+    } finally {
+      if (mounted.current) setCheckpointBusy(false)
+    }
+  }
+  useEffect(() => {
+    if (!resumeCheckpoint || resumed.current || unavailable || !detail.isSuccess || detail.isFetching || checkpoint.isFetching
+      || checkpoint.data?.status !== "saved" || checkpoint.data?.checkpoint?.reviewId !== selectedId || selected) return
+    resumed.current = true
+    void restoreCheckpoint()
+  })
+  const canSaveCheckpoint = !!checkpointTask && !!checkpoint.data && !checkpoint.isFetching && !checkpoint.isError
+    && detail.data?.id === selectedId && !unavailable && filter === "needs_review" && groups.length > 0
+    && (!selected || selected.state === "needs_review")
+  const saveCheckpoint = async () => {
+    if (!canSaveCheckpoint || !checkpoint.data) return
+    setCheckpointBusy(true)
+    setCheckpointState(null)
+    try {
+      const saved = await saveImportReviewCheckpoint(checkpointScope, checkpointTask, {
+        reviewId: selectedId,
+        group: activeGroup?.key ?? "all",
+        itemId: selected?.id ?? null,
+        itemRevision: selected?.revision ?? null,
+        expectedRevision: checkpoint.data.checkpoint?.revision ?? 0,
+      })
+      requireCurrentScope()
+      cache.setQueryData(importReviewCheckpointKey(checkpointScope, checkpointTask), saved)
+      setCheckpointState("saved")
+    } catch (error) {
+      if (!mounted.current) return
+      const conflict = !!error && typeof error === "object" && "status" in error && error.status === 409
+      setCheckpointState(conflict ? "conflict" : "failed")
+      if (conflict) void checkpoint.refetch()
+    } finally {
+      if (mounted.current) setCheckpointBusy(false)
+    }
   }
   const nextItem = selectedIndex >= 0 ? matching[selectedIndex + 1] : undefined
   const closeEditor = (itemId: string) => {
@@ -825,6 +900,30 @@ function ReviewWorkspace({
               </Button>
             </div>
           </div>
+          {checkpointTask && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => void saveCheckpoint()} disabled={!canSaveCheckpoint}>
+                {t("settings.importReview.checkpoint.save")}
+              </Button>
+              {selected && <span className="text-sm text-muted-foreground">{t("settings.importReview.checkpoint.boundary")}</span>}
+              {checkpoint.data?.status === "saved" && checkpoint.data.checkpoint?.reviewId === selectedId && (
+                <Button type="button" size="sm" variant="outline" disabled={unavailable || !!selected}
+                  onClick={() => void restoreCheckpoint()}>
+                  {t("settings.importReview.checkpoint.resume")}
+                </Button>
+              )}
+              {checkpoint.isError && <Button type="button" size="sm" variant="outline" onClick={() => void checkpoint.refetch()}>
+                {t("common.retry")}
+              </Button>}
+              <span role="status" className="text-sm text-muted-foreground">
+                {checkpointState === "saved" ? t("settings.importReview.checkpoint.saved")
+                  : checkpointState === "conflict" ? t("settings.importReview.checkpoint.conflict")
+                    : checkpointState === "failed" || checkpoint.isError ? t("settings.importReview.checkpoint.failed")
+                      : checkpointState === "stale" || checkpoint.data?.status === "stale" ? t("settings.importReview.checkpoint.stale")
+                        : null}
+              </span>
+            </div>
+          )}
           {allowImport && continuationBlock ? (
             <p role="status" data-testid="import-review-handoff-status">
               {continuationBlock === "busy"

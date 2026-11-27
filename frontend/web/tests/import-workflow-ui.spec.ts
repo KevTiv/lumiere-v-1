@@ -7,6 +7,21 @@ async function mockWorkflow(page: Page, loseExecutionReply = false) {
   const digest = "b".repeat(64)
   let proposal: ImportProposal | null = null
   const actions: string[] = []
+  let runStatus: "queued" | "verified" | null = null
+  const run = () => ({
+    id: "f".repeat(64),
+    taskId: task,
+    adapter: "historical_journal",
+    status: runStatus,
+    rowCount: 1,
+    verifiedRowCount: runStatus === "verified" ? 1 : 0,
+    chunks: [{
+      id: "9".repeat(32),
+      status: runStatus,
+      rowCount: 1,
+      receipt: runStatus === "verified" ? { verifiedItemIds: ["1"], failedRows: 0, heldRows: 0 } : null,
+    }],
+  })
   await page.route("**/api/query/**", (route) => {
     const path = new URL(route.request().url()).pathname
     const data = path.endsWith("/account-accounts")
@@ -124,6 +139,17 @@ async function mockWorkflow(page: Page, loseExecutionReply = false) {
         url.pathname.endsWith(`/requests/${proposal.requestKey}`)
         ? route.fulfill({ json: proposal })
         : route.fulfill({ status: 404, json: { error: "Not found" } })
+    if (url.pathname.endsWith("/runs") && route.request().method() === "GET")
+      return route.fulfill({
+        json: {
+          runs: runStatus ? [run()] : [],
+          coverage: {
+            reviewRowCount: 2,
+            verifiedRowCount: runStatus === "verified" ? 1 : 0,
+            complete: false,
+          },
+        },
+      })
     if (route.request().method() === "GET")
       return route.fulfill({
         json: {
@@ -137,6 +163,24 @@ async function mockWorkflow(page: Page, loseExecutionReply = false) {
       })
     const body = route.request().postDataJSON()
     expect(body.companyId).toBe(9001)
+    if (url.pathname.endsWith("/runs")) {
+      expect(proposal?.approvedAt).toBeTruthy()
+      expect(body).toEqual({
+        companyId: 9001,
+        requestId: proposal!.requestKey,
+        adapter: "historical_journal",
+        config: {
+          proposalId: "20",
+          expectedRevision: 1,
+          expectedDigest: digest,
+        },
+        rows: [{ itemId: "1", batchId: "71", revision: 2 }],
+      })
+      actions.push("queue")
+      runStatus = "queued"
+      proposal = { ...proposal!, status: "executing" }
+      return loseExecutionReply ? route.abort("failed") : route.fulfill({ json: run() })
+    }
     if (url.pathname.endsWith("/proposals")) {
       actions.push("prepare")
       expect(body.rows).toEqual([
@@ -222,37 +266,43 @@ async function mockWorkflow(page: Page, loseExecutionReply = false) {
           status: "approved",
           approvedAt: "2026-11-07T00:01:00Z",
         }
-      } else if (url.pathname.endsWith("/execute")) {
-        actions.push("execute")
-        proposal = {
-          ...proposal!,
-          status: "verified",
-          execution: {
-            phase: "complete",
-            parentRequestId: "d".repeat(32),
-            lineRequestId: "e".repeat(32),
-            parentJobId: "30",
-            lineJobId: "31",
-          },
-          result: {
-            verifiedAt: "2026-11-07T00:02:00Z",
-            recordCount: 1,
-            lineCount: 2,
-            totalDebit: "12000",
-            totalCredit: "12000",
-            currencyId: "2",
-            companyId: "9001",
-            recordIds: ["90"],
-            lineIds: ["91", "92"],
-            postedCount: 0,
-          },
-        }
-        if (loseExecutionReply) return route.abort("failed")
+      } else {
+        throw new Error(`Unexpected Accounting proposal action: ${url.pathname}`)
       }
     }
     return route.fulfill({ json: proposal })
   })
-  return actions
+  return {
+    actions,
+    finishNativeReadback() {
+      expect(runStatus).toBe("queued")
+      expect(proposal?.status).toBe("executing")
+      runStatus = "verified"
+      proposal = {
+        ...proposal!,
+        status: "verified",
+        execution: {
+          phase: "complete",
+          parentRequestId: "d".repeat(32),
+          lineRequestId: "e".repeat(32),
+          parentJobId: "30",
+          lineJobId: "31",
+        },
+        result: {
+          verifiedAt: "2026-11-07T00:02:00Z",
+          recordCount: 1,
+          lineCount: 2,
+          totalDebit: "12000",
+          totalCredit: "12000",
+          currencyId: "2",
+          companyId: "9001",
+          recordIds: ["90"],
+          lineIds: ["91", "92"],
+          postedCount: 0,
+        },
+      }
+    },
+  }
 }
 
 async function prepare(page: Page) {
@@ -284,7 +334,7 @@ async function prepare(page: Page) {
 test("source confirmation, approval and verified native completion remain distinct across view changes", async ({
   page,
 }) => {
-  const actions = await mockWorkflow(page)
+  const { actions, finishNativeReadback } = await mockWorkflow(page)
   await prepare(page)
   expect(actions).toEqual(["prepare"])
   await expect(
@@ -300,12 +350,15 @@ test("source confirmation, approval and verified native completion remain distin
   await page
     .getByRole("button", { name: "Create approved draft entries", exact: true })
     .click()
+  await expect.poll(() => actions).toEqual(["prepare", "approve", "queue"])
+  await expect(page.getByText("Verified in ERP", { exact: true })).toHaveCount(0)
+  finishNativeReadback()
   await expect(
     page.getByText(
       "Verified 1 draft entries and 2 lines; debit and credit each total 12000 RWF.",
       { exact: true },
     ),
-  ).toBeVisible()
+  ).toBeVisible({ timeout: 15_000 })
   await page.getByText("Open created journal entries", { exact: true }).click()
   await expect(
     page.getByRole("link", { name: "SOURCE-electricity", exact: true }),
@@ -315,7 +368,7 @@ test("source confirmation, approval and verified native completion remain distin
   )
   await page.reload()
   await expect(page.getByText("Verified in ERP", { exact: true })).toBeVisible()
-  expect(actions).toEqual(["prepare", "approve", "execute"])
+  expect(actions).toEqual(["prepare", "approve", "queue"])
   await page
     .getByRole("button", { name: "Change company", exact: true })
     .click()
@@ -327,7 +380,7 @@ test("source confirmation, approval and verified native completion remain distin
 test("a lost execution reply recovers the saved verified result without a second dispatch", async ({
   page,
 }) => {
-  const actions = await mockWorkflow(page, true)
+  const { actions, finishNativeReadback } = await mockWorkflow(page, true)
   await prepare(page)
   await page
     .getByRole("button", { name: "Approve this exact preview", exact: true })
@@ -335,10 +388,12 @@ test("a lost execution reply recovers the saved verified result without a second
   await page
     .getByRole("button", { name: "Create approved draft entries", exact: true })
     .click()
-  await expect(page.getByText("Verified in ERP", { exact: true })).toBeVisible()
+  await expect.poll(() => actions).toEqual(["prepare", "approve", "queue"])
   await page.reload()
-  await expect(page.getByText("Verified in ERP", { exact: true })).toBeVisible()
-  expect(actions).toEqual(["prepare", "approve", "execute"])
+  await expect(page.getByText("Verified in ERP", { exact: true })).toHaveCount(0)
+  finishNativeReadback()
+  await expect(page.getByText("Verified in ERP", { exact: true })).toBeVisible({ timeout: 15_000 })
+  expect(actions).toEqual(["prepare", "approve", "queue"])
 })
 
 test("opens an older import by exact company and job and continues its row diagnostics", async ({ page }) => {

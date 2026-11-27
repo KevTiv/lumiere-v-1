@@ -15539,6 +15539,34 @@
     }
   },
   "settings": {
+    "importOperator": {
+      "needsMe": "Needs me",
+      "withReviewer": "With reviewer",
+      "running": "Running",
+      "done": "Done",
+      "checkResult": "Check saved result",
+      "openHandoff": "View reviewer handoff",
+      "openResults": "Open saved results",
+      "company": "Company #{{id}}",
+      "verifiedSourceRows": "{{rows}} source rows verified",
+      "serverRunning": "The server is processing this import. You can leave this page and check the saved result later.",
+      "runUnavailable": "Run progress could not be checked. Refresh to try again.",
+      "runNeedsAttention": "Some approved source rows still need attention. Check the saved result before trying again.",
+      "inspect": "Inspect source files",
+      "multiple": "Import source groups into the ERP",
+      "journals": "Save historical journal drafts",
+      "shopSales": "Bring shop sales into Sales",
+      "products": "Import products",
+      "contacts": "Import contacts",
+      "locations": "Import warehouse locations",
+      "farmEvents": "Import farm events",
+      "goal": "Review {{file}} for import",
+      "filter": "Show imports",
+      "all": "All saved imports",
+      "noInQueue": "No checked imports in this view.",
+      "checkingResult": "Checking saved result…",
+      "sourceVersion": "Source version #{{id}}"
+    },
     "importHandoff": {
       "title": "Import review handoff",
       "description": "Choose the company reviewer who should continue this saved import.",
@@ -16714,7 +16742,16 @@
       "replaceDraftHint": "Your current file, mapping and preview will be replaced by the reviewed source.",
       "resolveCurrent": "Check the current import result before loading another source.",
       "draftChanged": "The current import changed. Review it before loading another source.",
-      "recoveredSubmission": "Your previous submission is retained. Check its saved result or retry the same submission."
+      "recoveredSubmission": "Your previous submission is retained. Check its saved result or retry the same submission.",
+      "checkpoint": {
+        "save": "Save my place",
+        "resume": "Resume saved issue",
+        "saved": "Review position saved.",
+        "stale": "The saved issue has changed. Choose a current issue to continue.",
+        "failed": "The review position could not be verified.",
+        "conflict": "The review or saved position changed. Check the latest position before saving again.",
+        "boundary": "This saves your review position. Unsaved corrections stay in this tab."
+      }
     },
     "importWorkflow": {
       "pendingSourceTitle": "Source rows still need review",

@@ -502,6 +502,13 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: include_str!("import_durable_runs_expand.sql"),
     },
+    Migration {
+        version: 56,
+        name: "import_review_checkpoint",
+        change_set: 45,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("import_review_checkpoint_expand.sql"),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

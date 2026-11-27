@@ -3,6 +3,7 @@ import test from "node:test"
 import {
   createImportProposalAttempt,
   dispatchImportProposalAttempt,
+  enqueueJournalProposal,
   parseImportProposalAttempt,
   readImportProposalAttempt,
   ImportWorkflowRequestError,
@@ -626,4 +627,41 @@ test("later source rows carry destinations only when the evidence is verified", 
     await assert.rejects(readNativeReceiptRows(async () => Response.json({ ...envelope, rows: [{ ...row, ...patch }], nextRow: null }), scope, request, 21))
   }
   await assert.rejects(readNativeReceiptRows(async () => Response.json({ ...envelope, entity: "contact", rows: [row], nextRow: null }), scope, request, 21))
+})
+
+test("durable journal execution reuses approval and excludes held source rows", async () => {
+  const proposal = { ...proposalFixture(), approvedAt: "2026-11-07T12:01:00Z" }
+  const run = {
+    id: "d".repeat(64),
+    taskId: scope.taskId,
+    adapter: "historical_journal",
+    status: "queued",
+    rowCount: proposal.entries.length,
+    verifiedRowCount: 0,
+  }
+  const bodies: unknown[] = []
+  const enqueue = () => enqueueJournalProposal(async (url, options) => {
+    assert.equal(url, `/api/import-tasks/${scope.taskId}/runs`)
+    assert.equal(options?.method, "POST")
+    bodies.push(JSON.parse(String(options?.body)))
+    return Response.json(run)
+  }, scope, proposal)
+  assert.deepEqual(await enqueue(), run)
+  await enqueue()
+  assert.deepEqual(bodies, [bodies[0], bodies[0]])
+  assert.deepEqual(bodies[0], {
+    companyId: scope.companyId,
+    requestId: proposal.requestKey,
+    adapter: "historical_journal",
+    config: {
+      proposalId: proposal.id,
+      expectedRevision: proposal.revision,
+      expectedDigest: proposal.digest,
+    },
+    rows: proposal.sources.slice(0, 2),
+  })
+  await assert.rejects(
+    enqueueJournalProposal(async () => Response.json({ ...run, status: "verified" }), scope, proposal),
+    /does not match/,
+  )
 })

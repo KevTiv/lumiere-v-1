@@ -546,7 +546,7 @@
     },
     {
       "path": "api-server/src/routes/import_reviews/tasks.rs",
-      "sha256": "1c9748c5472d30d0313d3c05e3639d1849c53778ab453a1e0548049c67c1dbde"
+      "sha256": "fe2e37ed0337e3bf4c7e52c24f9ed37ed03070cd56c41c85f6516aee2509abfe"
     },
     {
       "path": "frontend/packages/ui/src/lib/product-surface-catalog.ts",
@@ -1642,7 +1642,7 @@
       "surface": "settings",
       "source": "api-server/src/routes/import_reviews/tasks.rs",
       "function": "finish",
-      "line": 635,
+      "line": 636,
       "owner": "source-review/import API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "review-store-or-exact-native-receipt-owner-review-required",

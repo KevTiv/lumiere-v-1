@@ -4599,6 +4599,34 @@
     }
   },
   "settings": {
+    "importOperator": {
+      "needsMe": "À traiter",
+      "withReviewer": "Chez le réviseur",
+      "running": "En cours",
+      "done": "Terminé",
+      "checkResult": "Vérifier le résultat enregistré",
+      "openHandoff": "Voir la transmission pour révision",
+      "openResults": "Ouvrir les résultats enregistrés",
+      "company": "Société nº {{id}}",
+      "verifiedSourceRows": "{{rows}} lignes sources vérifiées",
+      "serverRunning": "Le serveur traite cet import. Vous pouvez quitter la page et vérifier le résultat enregistré plus tard.",
+      "runUnavailable": "Impossible de vérifier l’avancement. Actualisez la page pour réessayer.",
+      "runNeedsAttention": "Certaines lignes sources approuvées restent à traiter. Vérifiez le résultat enregistré avant de réessayer.",
+      "inspect": "Inspecter les fichiers sources",
+      "multiple": "Importer les groupes de données dans l’ERP",
+      "journals": "Enregistrer les brouillons d’écritures historiques",
+      "shopSales": "Importer les ventes en boutique dans Ventes",
+      "products": "Importer les produits",
+      "contacts": "Importer les contacts",
+      "locations": "Importer les emplacements d’entrepôt",
+      "farmEvents": "Importer les événements d’élevage",
+      "goal": "Vérifier {{file}} pour l’import",
+      "filter": "Afficher les imports",
+      "all": "Tous les imports enregistrés",
+      "noInQueue": "Aucun import vérifié dans cette vue.",
+      "checkingResult": "Vérification du résultat enregistré…",
+      "sourceVersion": "Version source nº {{id}}"
+    },
     "importHandoff": {
       "title": "Transmission pour examen",
       "description": "Choisissez la personne de cette société qui poursuivra l’examen de cette importation enregistrée.",
@@ -4683,6 +4711,15 @@
         "fieldConfirmation": "Confirmation de {{field}}",
         "noDecisionChanges": "Aucune valeur enregistrée ni aucun statut de vérification n’a changé.",
         "proposedAfter": "Après cette décision"
+      },
+      "checkpoint": {
+        "save": "Enregistrer ma position",
+        "resume": "Reprendre le point à examiner",
+        "saved": "Position de révision enregistrée.",
+        "stale": "Le point enregistré a changé. Choisissez un point actuel pour continuer.",
+        "failed": "Impossible de vérifier la position de révision.",
+        "conflict": "La révision ou la position enregistrée a changé. Vérifiez la dernière position avant de réessayer.",
+        "boundary": "Votre position de révision est enregistrée. Les corrections non enregistrées restent dans cet onglet."
       }
     },
     "page": {
