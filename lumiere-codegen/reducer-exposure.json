@@ -1137,6 +1137,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_company_fleet_service_type",
+      "exposure": "session",
+      "reason": "Fleet service setup uses the authenticated organization, an explicit company and the service type create permission"
+    },
+    {
       "name": "create_company_stock_location",
       "exposure": "session",
       "reason": "company-scoped stock location creation; validates organization, company and parent-location scope before insert"

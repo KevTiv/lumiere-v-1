@@ -500,6 +500,16 @@
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
+    "create_company_fleet_service_type": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/fleet/fleet.rs checks create permission, company scope and an existing active exact name before inserting.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
     "create_company_stock_location": {
       "client_facing": true,
       "codec": {
