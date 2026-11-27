@@ -1,9 +1,9 @@
 "use client"
 
-import { createContext, Fragment, useEffect, useRef, useState, type ReactNode } from "react"
+import { createContext, useEffect, useRef, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ChevronRight, LogOut, Monitor, Moon, Search, Sun, UserRound } from "lucide-react"
+import { LogOut, Monitor, Moon, Search, Sun, UserRound } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "../components/button"
 import { Popover, PopoverContent, PopoverDescription, PopoverTitle, PopoverTrigger } from "../components/popover"
@@ -14,6 +14,8 @@ import { cn } from "../lib/utils"
 import { HeaderTrailingProvider } from "./dashboard-header"
 import { CompanySwitcher } from "../settings/company-switcher"
 import { useRBAC } from "../lib/rbac-context"
+import { buildNavGroups } from "../lib/navigation-catalog"
+import { Breadcrumb } from "../components/breadcrumb"
 
 /** Allows the sidebar to remain usable outside the application shell (e.g. previews). */
 export const DashboardWorkspaceContext = createContext(false)
@@ -31,50 +33,29 @@ const DOCK_MIN_REM: Record<WorkspaceTool, number> = { assistant: 22.5, notebook:
 // Leave 32rem for work, 4rem for its gutters, 3rem for icon navigation, and .75rem for the gap.
 const WORKSPACE_MIN_REM = 32 + 4 + 3 + 0.75
 
-function formatBreadcrumbSegment(segment: string): string {
-  if (/^\d+$/.test(segment)) return `#${segment}`
-  return segment
-    .split("-")
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
-}
-
 function WorkspaceBreadcrumbs() {
   const pathname = usePathname()
-  if (!pathname || pathname === "/") return null
-  const segments = pathname.split("/").filter(Boolean)
-  if (segments.length === 0) return null
+  const { t } = useTranslation()
+  const modulePath = pathname?.split("/").slice(0, 2).join("/")
+  const module = buildNavGroups(t).flatMap((group) => group.items).find((item) => item.href === modulePath)
+  if (!module) return null
 
   return (
-    <nav
-      aria-label="Breadcrumb"
+    <Breadcrumb
+      aria-label={t("workspaceShell.breadcrumb", { defaultValue: "Breadcrumb" })}
       data-testid="workspace-breadcrumbs"
-      className="hidden min-w-0 items-center gap-1 text-xs text-muted-foreground md:flex"
+      className="hidden min-w-0 text-xs text-muted-foreground md:block group-has-[[data-slot=record-breadcrumbs]]/workspace:hidden!"
     >
-      {segments.map((segment, index) => {
-        const href = `/${segments.slice(0, index + 1).join("/")}`
-        const isLast = index === segments.length - 1
-        const label = formatBreadcrumbSegment(segment)
-        return (
-          <Fragment key={href}>
-            {index > 0 && <ChevronRight className="size-3 shrink-0 text-muted-foreground/60" aria-hidden="true" />}
-            {isLast ? (
-              <span className="truncate font-medium text-foreground max-w-[14rem]" aria-current="page">
-                {label}
-              </span>
-            ) : (
-              <Link
-                href={href}
-                className="truncate max-w-[10rem] rounded px-1 py-0.5 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-              >
-                {label}
-              </Link>
-            )}
-          </Fragment>
-        )
-      })}
-    </nav>
+      {pathname === module.href ? (
+        <span aria-current="page" className="block max-w-56 truncate font-medium text-foreground">
+          {module.label}
+        </span>
+      ) : (
+        <Link href={module.href} className="block max-w-56 truncate rounded px-1 py-0.5 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
+          {module.label}
+        </Link>
+      )}
+    </Breadcrumb>
   )
 }
 
@@ -276,7 +257,7 @@ export function DashboardWorkspace({ sidebar, children, overlays, dockRequest, n
         style={{ "--sidebar-width-icon": "3rem" } as React.CSSProperties}>
         <div data-testid="erp-workspace-stack" className="relative isolate flex min-h-0 min-w-0 flex-1 overflow-hidden bg-sidebar [&_[data-slot=sidebar-container]]:absolute [&_[data-slot=sidebar-container]]:h-full">
           {typeof sidebar === "function" ? sidebar(collapseNavigation) : sidebar}
-          <SidebarInset className="min-h-0 min-w-0 overflow-auto scroll-smooth bg-background md:my-2 md:mr-2 md:rounded-xl md:border md:border-border/60 md:shadow-xs">
+          <SidebarInset className="group/workspace min-h-0 min-w-0 overflow-auto scroll-smooth bg-background md:my-2 md:mr-2 md:rounded-xl md:border md:border-border/60 md:shadow-xs">
             <header data-testid="workspace-header" className="sticky top-0 z-20 flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-background/95 px-3 backdrop-blur-sm sm:px-4">
               <div className="flex min-w-0 items-center gap-2">
                 <WorkspaceNavigationTrigger />

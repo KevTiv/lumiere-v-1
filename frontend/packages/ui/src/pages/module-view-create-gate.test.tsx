@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
-import type { ReactNode } from "react"
+import { StrictMode, type ReactNode } from "react"
 import type { FormModalProps } from "../forms/form-modal"
 import type { RuntimeFormModalProps } from "../forms/runtime-form-modal"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
@@ -9,9 +9,9 @@ import type { ModuleConfig } from "../lib/module-types"
 import type { PolicyRule, Role, User } from "../lib/rbac-types"
 import { RBACProvider } from "../lib/rbac-context"
 
-const navigation = vi.hoisted(() => ({ search: "", replace: vi.fn(), push: vi.fn() }))
+const navigation = vi.hoisted(() => ({ pathname: "/sales", search: "", replace: vi.fn(), push: vi.fn() }))
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/sales",
+  usePathname: () => navigation.pathname,
   useRouter: () => ({ replace: navigation.replace, push: navigation.push }),
   useSearchParams: () => new URLSearchParams(navigation.search),
 }))
@@ -127,7 +127,9 @@ describe("ModuleView scoped dashboard composition", () => {
 })
 afterEach(() => {
   cleanup()
+  navigation.pathname = "/sales"
   navigation.search = ""
+  window.history.replaceState(null, "", "/")
   vi.clearAllMocks()
 })
 
@@ -328,5 +330,104 @@ describe("ModuleView domain-owned static create form", () => {
     fireEvent.click(screen.getByTestId("module-create-sales-orders"))
     expect(screen.getByTestId("create-form")).toBeTruthy()
     if (open) expect(open).not.toHaveBeenCalled()
+  })
+})
+
+describe("ModuleView Quick Create", () => {
+  const navigate = (href: string) => {
+    const url = new URL(href, window.location.origin)
+    window.history.pushState(null, "", url)
+    navigation.pathname = url.pathname
+    navigation.search = url.search
+  }
+
+  const view = (options: {
+    state?: ModuleDataState
+    readiness?: ModuleDataState
+    companyId?: bigint
+    module?: ModuleConfig
+    open?: (tab: string) => "opened" | "unavailable"
+    denied?: boolean
+  } = {}) => {
+    const module = options.module ?? config
+    const records: Record<string, string> = { sales: "sale_order", accounting: "account_move", expenses: "hr_expense" }
+    const record = records[module.id] ?? ""
+    const permissions = [rule(`module:${module.id}`, "read"), rule(record, "read")]
+    if (!options.denied) permissions.push(rule(record, "create"))
+    return <RBACProvider initialUser={user} initialRoles={[role(permissions)]} initialPolicies={[]}>
+      <ModuleView
+        config={module}
+        quickCreate={{ companyId: options.companyId ?? 1n, readiness: options.readiness }}
+        assistantCreate={module.id === "accounting" && options.open ? { tabIds: ["invoices", "bills"], open: options.open } : undefined}
+        onOpenCreateForm={module.id === "expenses" ? (tab) => options.open?.(tab) === "opened" : undefined}
+        dataState={Object.fromEntries(module.tabs.map(({ id }) => [id, options.state ?? { status: "ready" }]))}
+        onFormSubmit={vi.fn()}
+      />
+    </RBACProvider>
+  }
+
+  it("opens the standard order editor from its current route, consumes the URL and allows another command", () => {
+    navigate("/sales?tab=orders")
+    const { rerender } = render(view())
+    expect(screen.queryByTestId("create-form")).toBeNull()
+
+    navigate("/sales?tab=orders&create=1&filter=state:draft#orders")
+    rerender(view({ state: { status: "loading" } }))
+    expect(screen.queryByTestId("create-form")).toBeNull()
+    expect(new URLSearchParams(window.location.search).get("create")).toBe("1")
+
+    rerender(view())
+    expect(screen.getByTestId("create-form")).toBeTruthy()
+    expect(new URLSearchParams(window.location.search).get("create")).toBeNull()
+    expect(new URLSearchParams(window.location.search).get("filter")).toBe("state:draft")
+    expect(window.location.hash).toBe("#orders")
+
+    // A remount is equivalent to reloading the consumed URL.
+    navigate(`/sales${window.location.search}${window.location.hash}`)
+    cleanup()
+    render(view())
+    expect(screen.queryByTestId("create-form")).toBeNull()
+
+    navigate("/sales?tab=orders&create=1")
+    cleanup()
+    render(view())
+    expect(screen.getByTestId("create-form")).toBeTruthy()
+  })
+
+  it.each([
+    ["accounting", "invoices"],
+    ["accounting", "bills"],
+    ["expenses", "expenses"],
+  ])("opens the %s %s domain editor exactly once after cross-route navigation", (moduleId, tab) => {
+    navigate(`/${moduleId}?tab=${tab}&create=1`)
+    const open = vi.fn(() => "opened" as const)
+    const module = { ...config, id: moduleId, tabs: [{
+      ...config.tabs[0]!,
+      id: tab,
+      createPermission: { resource: moduleId === "accounting" ? "account_move" : "hr_expense", action: "create" as const },
+    }] }
+    const { rerender } = render(view({ module, open, readiness: { status: "loading" } }))
+    expect(open).not.toHaveBeenCalled()
+    rerender(view({ module, open }))
+    expect(open).toHaveBeenCalledExactlyOnceWith(tab)
+    rerender(view({ module, open }))
+    expect(open).toHaveBeenCalledOnce()
+    expect(window.location.search).toBe(`?tab=${tab}`)
+  })
+
+  it.each([
+    [{ denied: true }, "permission"],
+    [{ readiness: { status: "error" } as const }, "unavailable"],
+    [{ companyId: 0n }, "active company"],
+  ])("focuses terminal feedback and consumes blocked intents", (options, reason) => {
+    navigate("/sales?tab=orders&create=1")
+    const wrappedView = (opts?: typeof options) => <StrictMode>{view(opts)}</StrictMode>
+    const { rerender } = render(wrappedView(options))
+    const notice = screen.getByRole("alert")
+    expect(notice.textContent).toContain(reason)
+    expect(document.activeElement).toBe(notice)
+    expect(window.location.search).toBe("?tab=orders")
+    rerender(wrappedView())
+    expect(screen.queryByTestId("create-form")).toBeNull()
   })
 })

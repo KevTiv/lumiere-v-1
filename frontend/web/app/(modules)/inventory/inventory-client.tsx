@@ -143,6 +143,7 @@ import { currencyCodeMap, type KpiTileDef } from '@lumiere/ui/lib/kpi-tiles';
 import { isReadyTransfer, isWaitingTransfer, transferKpis } from './transfer-kpis';
 import { completedTransferCounts, inventoryCategoryCounts, inventoryStockValue, stockCategoriesByProduct } from './inventory-dashboard-data';
 import { groupBy } from '@/lib/utils';
+import { listRouteFromQuery, recordHrefWithListRoute } from '@/lib/record-list-route';
 import { transferRecordHref } from './transfer-record';
 import { isStockMoveDestination, stockQuantMoveInput } from './stock-quant-move-model';
 import { SerialBlockRecordAction, trackingDetailConfig } from './tracking-record-sheet';
@@ -521,6 +522,12 @@ function InventoryClientLoaded({
     inventoryTabIds,
   );
   const searchParams = useSearchParams();
+  const transfersHref = `/${workspace}?tab=transfers`;
+  const transfersReturnHref = listRouteFromQuery(transfersHref, searchParams.toString());
+  const openTransferHref = useCallback((transfer: Parameters<typeof transferRecordHref>[0]) => {
+    const href = transferRecordHref(transfer);
+    return href && recordHrefWithListRoute(href, transfersReturnHref);
+  }, [transfersReturnHref]);
   const router = useRouter();
   const lowStockQueue = workspace === 'warehouse' && isOwnerQueue('lowStockProducts', activeTab, searchParams.get('ownerQueue'));
   const [wizardCycleCountId, setWizardCycleCountId] = useState<ScalarId | ''>(
@@ -1541,13 +1548,14 @@ function InventoryClientLoaded({
       ...base,
       view: {
         ...view,
+        listViewKey: `list-filters:${workspace}:transfers:${organizationId}:${operatingCompanyId}`,
         emptyState: {
           ...view.emptyState,
           onAction: openCreateTransfer,
         },
       },
     };
-  }, [t, openCreateTransfer]);
+  }, [t, openCreateTransfer, workspace, organizationId, operatingCompanyId]);
 
   const productRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = productStatusBadges(t);
@@ -1692,7 +1700,7 @@ function InventoryClientLoaded({
         />
       ),
       discussion: {},
-      openHref: transferRecordHref,
+      openHref: openTransferHref,
       customTabs: [
         {
           id: 'moves',
@@ -1717,7 +1725,7 @@ function InventoryClientLoaded({
         },
       ],
     };
-  }, [t, stockMoves, locationLabelById]);
+  }, [t, stockMoves, locationLabelById, openTransferHref]);
 
   const warehouse3dZoneFormConfig = useMemo(
     () =>

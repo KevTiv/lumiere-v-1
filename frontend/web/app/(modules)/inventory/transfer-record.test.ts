@@ -34,3 +34,13 @@ test('ids listed on the transfer count too, and the transfer is never its own ba
   const rows = [{ id: 1n, backorderId: 1n }, { id: 5n }];
   assert.deepEqual(transferBackorders({ id: 1n, backorderIds: [5n] }, rows).map((r) => String(r.id)), ['5']);
 });
+
+test('an explicit transfer origin keeps its workspace and filters across profiles', () => {
+  assert.deepEqual(transferWorkspaceNavigation('full', '/warehouse?tab=transfers&filter=state%3Aassigned'), {
+    moduleId: 'warehouse',
+    rootHref: '/warehouse',
+    transfersHref: '/warehouse?tab=transfers&filter=state%3Aassigned',
+  });
+  assert.equal(transferWorkspaceNavigation('finance-alpha', '/inventory?tab=transfers').rootHref, '/inventory');
+  assert.equal(transferWorkspaceNavigation('finance-alpha', '/inventory?tab=stock').rootHref, '/warehouse');
+});

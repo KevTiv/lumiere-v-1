@@ -1,5 +1,6 @@
 "use client"
 
+import { QuickCreateNotice, useModuleQuickCreate } from "./module-quick-create"
 import { ModuleDataNotice } from "./module-data-notice"
 import { canUseModuleData, type ModuleDataState } from "../lib/module-data-state"
 
@@ -93,6 +94,8 @@ interface ModuleViewProps {
   }
   /** Prevent a second assistant form from replacing a domain-owned editor. */
   assistantFormBlocked?: boolean
+  /** Enable palette intents for this module using its native create forms. */
+  quickCreate?: { companyId: bigint | undefined; readiness?: ModuleDataState }
   /** Dismiss a domain-owned assistant editor when its actor/company scope changes. */
   onAssistantFormScopeChange?: () => void
   /** Runtime kanban columns + move handlers keyed by entity tab id */
@@ -153,6 +156,7 @@ export function ModuleView({
   onOpenCreateForm,
   assistantCreate,
   assistantFormBlocked,
+  quickCreate,
   onAssistantFormScopeChange,
   isPending,
   showSubmitSuccessToast,
@@ -419,6 +423,28 @@ export function ModuleView({
     const opened = openCreateForm(tab.id, request.prompt, request.scopeKey, request.onActivationReturn ? request.requestId : undefined)
     settle(opened ? "opened" : "unavailable")
   })
+  const quickCreateBlock = useModuleQuickCreate(quickCreate ? config.id : undefined, (target) => {
+    if (permissionsReady === false || activeCompanyReady === false || target.tab !== activeTab) return "loading"
+    if (!checkPermission(`module:${target.module}`, "read").allowed ||
+      !checkPermission(target.resource, "read").allowed ||
+      !checkPermission(target.resource, "create").allowed) return "denied"
+    if (!quickCreate?.companyId || quickCreate.companyId <= 0n) return "company"
+    if (openForm || selectedRecord || assistantFormBlocked || assistantCreate?.blocked || isPending) return "busy"
+    const source = dataState?.[target.tab]
+    const readiness = quickCreate.readiness
+    if (source?.status === "denied" || readiness?.status === "denied") return "denied"
+    if (source?.status === "loading" || readiness?.status === "loading" || dataLoading?.[target.tab]) return "loading"
+    if (source?.status !== "ready" || (readiness && readiness.status !== "ready")) return "unavailable"
+
+    if (assistantCreate?.tabIds.includes(target.tab)) {
+      return assistantCreate.open(target.tab)
+    }
+
+    const tab = config.tabs.find(({ id }) => id === target.tab)
+    if (!tab?.createForm || !tab.createPermission || (!onFormSubmit && !(!useRuntimeCreate && onOpenCreateForm))) return "unavailable"
+    if (createGate(tab.createPermission) !== "allowed") return "denied"
+    return openCreateForm(tab.id) ? "opened" : "unavailable"
+  })
   const showDashboardTimeRange =
     dashboardContent == null && activeTabConfig?.type === "dashboard" && onDashboardTimeRangeChange != null
   const showDashboardExport = dashboardContent == null && activeTabConfig?.type === "dashboard" && activeTabUsable
@@ -429,6 +455,7 @@ export function ModuleView({
       data-testid={`module-view-${config.id}`}
       data-hydrated={isHydrated ? "true" : "false"}
     >
+      <QuickCreateNotice blocked={quickCreateBlock} />
       <DashboardHeader
         title={config.title}
         description={

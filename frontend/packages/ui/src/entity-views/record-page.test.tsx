@@ -88,6 +88,14 @@ describe("RecordPage", () => {
     expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy()
   })
 
+  it("marks only the record as current when an ancestor has no destination", () => {
+    renderPage({ breadcrumbs: [{ label: "Orders" }, { label: "SO-7" }] })
+
+    const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" })
+    expect(breadcrumb.querySelectorAll('[aria-current="page"]')).toHaveLength(1)
+    expect(screen.queryByRole("link", { name: "Orders" })).toBeNull()
+  })
+
   it("renders the active tab and reports tab changes", () => {
     const { onTabChange } = renderPage()
 

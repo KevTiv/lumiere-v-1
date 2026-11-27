@@ -19,6 +19,8 @@ export interface RecordNavigationInput<T> {
   /** The ordered keys of the list the user came from, when one was published. */
   contextIds?: readonly string[];
   basePath: string;
+  /** Validated originating list URL to keep across sibling records. */
+  returnHref?: string;
   labelOf: (row: T) => string;
   idOf?: (row: T) => string;
   /** The default order: newest (highest id) first unless the page says otherwise. */
@@ -66,8 +68,9 @@ export function buildRecordNavigation<T>(input: RecordNavigationInput<T>): Recor
 
   const index = ordered.findIndex((row) => idOf(row) === input.currentId);
   if (index === -1) return undefined;
+  const returnQuery = input.returnHref ? `?${new URLSearchParams({ returnTo: input.returnHref })}` : "";
   const link = (row: T | undefined): RecordNavigationLink | undefined =>
-    row ? { href: `${input.basePath}/${idOf(row)}`, label: input.labelOf(row) } : undefined;
+    row ? { href: `${input.basePath}/${idOf(row)}${returnQuery}`, label: input.labelOf(row) } : undefined;
   return {
     position: index + 1,
     total: ordered.length,

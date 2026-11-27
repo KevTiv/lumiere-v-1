@@ -1,13 +1,17 @@
 import type { WorkspaceProfile } from '@lumiere/ui/lib/workspace-profile';
+import { validRecordListRoute } from '../../../lib/record-list-route';
 import { moduleTabHref, stockTransferRecordPageHref } from '@lumiere/erp-shared/record-links';
 
 /** Resolve return links from the active profile, including direct record opens and reloads. */
-export function transferWorkspaceNavigation(profile: WorkspaceProfile) {
-  const moduleId = profile === 'finance-alpha' ? 'warehouse' : 'inventory';
+export function transferWorkspaceNavigation(profile: WorkspaceProfile, returnTo: string | null = null) {
+  const inventoryReturn = validRecordListRoute(returnTo, moduleTabHref('inventory', 'transfers'));
+  const warehouseReturn = validRecordListRoute(returnTo, moduleTabHref('warehouse', 'transfers'));
+  const defaultModule = profile === 'finance-alpha' ? 'warehouse' : 'inventory';
+  const moduleId = inventoryReturn ? 'inventory' : warehouseReturn ? 'warehouse' : defaultModule;
   return {
     moduleId,
     rootHref: `/${moduleId}`,
-    transfersHref: moduleTabHref(moduleId, 'transfers'),
+    transfersHref: inventoryReturn ?? warehouseReturn ?? moduleTabHref(moduleId, 'transfers'),
   };
 }
 

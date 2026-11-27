@@ -7,7 +7,7 @@ import { ErpCommandPalette } from "./erp-command-palette"
 
 const push = vi.fn()
 const hookCalls = vi.hoisted(() => ({ names: [] as string[] }))
-const rbac = vi.hoisted(() => ({ denied: new Set<string>() }))
+const rbac = vi.hoisted(() => ({ denied: new Set<string>(), ready: true }))
 const navigation = vi.hoisted(() => ({ hidden: new Set<string>() }))
 const data = vi.hoisted(() => ({
   loading: false,
@@ -32,7 +32,8 @@ vi.mock("@lumiere/erp-session", () => ({ useErpSession: () => ({ organizationId:
 vi.mock("@/lib/rbac-context", () => ({
   useRBAC: () => ({
     isAdmin: () => false,
-    checkPermission: (resource: string) => ({ allowed: !rbac.denied.has(resource) }),
+    permissionsReady: rbac.ready,
+    checkPermission: (resource: string, action: string) => ({ allowed: !rbac.denied.has(resource) && !rbac.denied.has(`${resource}:${action}`) }),
   }),
 }))
 vi.mock("../lib/navigation-catalog", () => ({
@@ -41,6 +42,7 @@ vi.mock("../lib/navigation-catalog", () => ({
       label: "Modules",
       items: [
         { surfaceId: "sales", label: "Sales", href: "/sales", icon: () => null, resource: "module:sales" },
+        { surfaceId: "expenses", label: "Expenses", href: "/expenses", icon: () => null, resource: "module:expenses" },
         { surfaceId: "accounting", label: "Accounting", href: "/accounting", icon: () => null, resource: "module:accounting" },
         { surfaceId: "crm", label: "CRM", href: "/crm", icon: () => null, resource: "module:crm" },
         { surfaceId: "products", label: "Products", href: "/products", icon: () => null, resource: "module:inventory" },
@@ -86,6 +88,8 @@ beforeEach(() => {
   push.mockReset()
   hookCalls.names.length = 0
   rbac.denied.clear()
+  rbac.ready = true
+  window.localStorage.clear()
   navigation.hidden.clear()
   data.loading = false
   data.failed.clear()
@@ -308,5 +312,43 @@ describe("ErpCommandPalette records", () => {
   it("still lists modules when the query is short", () => {
     openPalette()
     expect(screen.getByText("Sales")).toBeTruthy()
+  })
+})
+
+describe("ErpCommandPalette Quick Create", () => {
+  it.each([
+    ["New customer invoice", "/accounting?tab=invoices&create=1"],
+    ["New vendor bill", "/accounting?tab=bills&create=1"],
+    ["New expense", "/expenses?tab=expenses&create=1"],
+    ["New sales order", "/sales?tab=orders&create=1"],
+  ])("routes %s without remembering it as navigation", (label, href) => {
+    openPalette()
+    fireEvent.click(screen.getByRole("option", { name: label }))
+    expect(push).toHaveBeenCalledWith(href)
+    expect(window.localStorage.getItem("lumiere-recent-commands")).toBeNull()
+  })
+
+  it("filters record-level denials and stale create recents", () => {
+    rbac.denied.add("account_move:create")
+    rbac.denied.add("sale_order:read")
+    window.localStorage.setItem("lumiere-recent-commands", JSON.stringify([
+      { label: "Old invoice action", href: "/accounting?create=1&tab=invoices" },
+      { label: "Old order action", href: "/sales?tab=orders&create=1" },
+      { label: "Previously opened sales", href: "/sales?tab=orders" },
+    ]))
+    openPalette()
+    expect(screen.queryByRole("option", { name: "New customer invoice" })).toBeNull()
+    expect(screen.queryByRole("option", { name: "New vendor bill" })).toBeNull()
+    expect(screen.queryByRole("option", { name: "New sales order" })).toBeNull()
+    expect(screen.queryByRole("option", { name: "Old invoice action" })).toBeNull()
+    expect(screen.queryByRole("option", { name: "Old order action" })).toBeNull()
+    expect(screen.getByRole("option", { name: "Previously opened sales" })).toBeTruthy()
+    expect(screen.getByRole("option", { name: "New expense" })).toBeTruthy()
+  })
+
+  it("waits for permissions before offering create actions", () => {
+    rbac.ready = false
+    openPalette()
+    expect(screen.queryByRole("option", { name: "New expense" })).toBeNull()
   })
 })

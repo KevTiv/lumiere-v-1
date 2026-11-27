@@ -9,7 +9,7 @@ import { buildRecordNavigation, type RecordNavigationInput } from '@/lib/record-
  * filters, search, sort and grouping) when that list published one, else the default order.
  */
 export function useRecordNavigation<T>(input: RecordNavigationInput<T>) {
-  const { rows, currentId, basePath } = input;
+  const { rows, currentId, basePath, returnHref } = input;
   const [contextIds, setContextIds] = useState<string[] | undefined>(undefined);
   useEffect(() => {
     setContextIds(readRecordListContext(basePath));
@@ -17,7 +17,7 @@ export function useRecordNavigation<T>(input: RecordNavigationInput<T>) {
   const latest = useRef(input);
   latest.current = input;
   return useMemo(
-    () => buildRecordNavigation({ ...latest.current, rows, currentId, basePath, contextIds }),
-    [rows, currentId, basePath, contextIds],
+    () => buildRecordNavigation({ ...latest.current, rows, currentId, basePath, contextIds, returnHref }),
+    [rows, currentId, basePath, contextIds, returnHref],
   );
 }
