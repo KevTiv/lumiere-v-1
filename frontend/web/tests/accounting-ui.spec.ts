@@ -141,7 +141,8 @@ for (const viewport of [{ width: 320, height: 844 }, { width: 390, height: 844 }
         const [controlsBox, recordsBox] = await Promise.all([controls.boundingBox(), records.boundingBox()])
 
         if (viewport.width === 390) {
-          await expect(picker).toBeVisible()
+          await expect(picker).toHaveRole("combobox")
+          await expect(picker).toHaveAccessibleName("Needs attention")
           await expect(picker).toHaveAccessibleDescription("Records: 2")
           await expect(controls.getByRole("button")).toHaveCount(0)
           const pickerBox = (await picker.boundingBox())!
@@ -150,6 +151,16 @@ for (const viewport of [{ width: 320, height: 844 }, { width: 390, height: 844 }
           expect(controlsBox!.x).toBeCloseTo(recordsBox!.x, 0)
           expect(recordsBox!.y - controlsBox!.y - controlsBox!.height).toBeCloseTo(12, 0)
           expect(firstRow.y - pickerBox.y).toBeLessThan(180)
+
+          await picker.press("ArrowDown")
+          const options = page.getByRole("listbox")
+          await expect(options.getByRole("option", { name: "Overdue receivables", exact: true })).toBeFocused()
+          await page.keyboard.press("ArrowDown")
+          await expect(options.getByRole("option", { name: "Bills due soon", exact: true })).toBeFocused()
+          await page.keyboard.press("Enter")
+          await expect(picker).toBeFocused()
+          await expect(picker).toHaveText("Bills due soon")
+          await expect(records.getByRole("heading", { name: "Bills due soon", exact: true })).toBeVisible()
         } else {
           await expect(picker).toBeHidden()
           await expect(controls.getByRole("button")).toHaveCount(8)

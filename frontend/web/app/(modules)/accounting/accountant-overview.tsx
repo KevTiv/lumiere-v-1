@@ -2,10 +2,11 @@
 
 import { useMemo, useState, type ReactNode } from "react"
 import Link from "next/link"
-import { ArrowDownLeft, ArrowRight, ArrowUpRight, CalendarClock, CheckCheck, ChevronDown, ChevronRight, CircleAlert, FilePlus2, FileText, Landmark, ReceiptText } from "lucide-react"
+import { ArrowDownLeft, ArrowRight, ArrowUpRight, CalendarClock, CheckCheck, ChevronRight, CircleAlert, FilePlus2, FileText, Landmark, ReceiptText } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
 import { Badge } from "@lumiere/ui/components/badge"
 import { Button } from "@lumiere/ui/components/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 import { workspaceStyles } from "@lumiere/ui/lib/workspace-styles"
 import { paymentMinorUnitsText } from "@lumiere/erp-shared/payment-allocation-projection"
 import { invoiceRecordHref } from "./invoice-record"
@@ -167,21 +168,23 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
             <h3 id="accountant-attention-title" className="font-semibold">{tr("attention", "Needs attention")}</h3>
             <span id="accountant-selected-queue-status" className="flex xl:hidden">{queueStatus(selectedQueue)}</span>
           </div>
-          <div className="relative xl:hidden">
-            <select
-              aria-labelledby="accountant-attention-title"
-              aria-describedby="accountant-selected-queue-status"
-              aria-controls="accountant-queue-records"
-              value={selectedQueue}
-              onChange={(event) => {
-                const definition = queueDefs.find(({ key }) => key === event.target.value)
-                if (definition) selectQueue(definition.key)
-              }}
-              className="min-h-11 w-full appearance-none truncate rounded-md border border-input bg-background py-2 pl-3 pr-9 text-base font-medium text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              {queueDefs.map(({ key, label }) => <option key={key} value={key}>{label}</option>)}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <div className="xl:hidden">
+            <Select value={selectedQueue} onValueChange={(value) => {
+              const definition = queueDefs.find(({ key }) => key === value)
+              if (definition) selectQueue(definition.key)
+            }}>
+              <SelectTrigger
+                aria-labelledby="accountant-attention-title"
+                aria-describedby="accountant-selected-queue-status"
+                data-testid="accountant-mobile-queue-picker"
+                className="min-h-11 font-medium"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="w-[var(--radix-select-trigger-width)] max-h-[var(--radix-select-content-available-height)]">
+                {queueDefs.map(({ key, label }) => <SelectItem key={key} value={key}>{label}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <p className="hidden text-xs text-muted-foreground xl:mt-1 xl:block">{tr("attentionHint", "Choose a queue to review its records.")}</p>
         </div>
