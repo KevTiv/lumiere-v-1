@@ -5,14 +5,7 @@ use rand::{rngs::OsRng, RngCore};
 use serde_json::Value;
 
 use super::{authorize, execute, sql_only, storage, ChunkReceipt, RunChunk, RunGroup};
-use crate::{
-    auth_password::decrypt_token,
-    cold_tier::pg_pool,
-    error::ApiError,
-    platform_control,
-    session::{load_field_access_context, parse_stdb_identity_hex, ApiSession},
-    state::AppState,
-};
+use crate::{cold_tier::pg_pool, error::ApiError, session::load_stored_session, state::AppState};
 
 const ATTEMPT_LIMIT: i32 = 8;
 const DEADLINE: Duration = Duration::from_secs(90);
@@ -27,59 +20,6 @@ struct Job {
     platform_user: String,
     token: String,
     attempts: i32,
-}
-
-/// Reload the current canonical principal under the original approval. Jobs
-/// never retain browser credentials or execute under server authority.
-pub(super) async fn stored_session(
-    state: &AppState,
-    actor: &str,
-    organization: u64,
-    platform_user: &str,
-) -> Result<ApiSession, ApiError> {
-    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
-    let credential = platform_control::find_user_credential_by_stdb_identity(pool, actor)
-        .await
-        .map_err(ApiError::internal)?
-        .ok_or(ApiError::Unauthorized)?;
-    if credential.get::<_, String>("platform_user_id") != platform_user {
-        return Err(ApiError::Unauthorized);
-    }
-    let key = state
-        .config
-        .stdb_credential_encryption_key
-        .as_ref()
-        .ok_or_else(|| ApiError::Unavailable("durable principal credentials unavailable".into()))?;
-    let token = decrypt_token(key, &credential.get::<_, String>("stdb_token_enc"))?;
-    if token.is_empty()
-        || state.config.stdb_server_token.as_deref() == Some(token.as_str())
-        || state.config.stdb_finalization_token.as_deref() == Some(token.as_str())
-    {
-        return Err(ApiError::Unauthorized);
-    }
-    let actual = state
-        .client_with_token(&token)
-        .authenticated_identity()
-        .await
-        .map_err(|_| {
-            ApiError::Unavailable("could not verify the saved operator credential".into())
-        })?;
-    if parse_stdb_identity_hex(&actual).as_deref() != Some(actor) {
-        return Err(ApiError::Unauthorized);
-    }
-    let access = load_field_access_context(&state.stdb, actor, organization)
-        .await
-        .map_err(ApiError::Internal)?
-        .ok_or(ApiError::Unauthorized)?;
-    if access.organization_id != organization || access.identity_hex != actor {
-        return Err(ApiError::Unauthorized);
-    }
-    Ok(ApiSession {
-        stdb_token: token,
-        identity_hex: actor.to_owned(),
-        organization_id: Some(organization),
-        field_access: Some(access),
-    })
 }
 
 async fn claim(pool: &Pool) -> Result<Option<Job>, ApiError> {
@@ -226,7 +166,7 @@ fn failure(error: ApiError, attempts: i32) -> Outcome {
 async fn work(state: &AppState, pool: &Pool, job: &Job) -> Result<(), ApiError> {
     let authority = tokio::time::timeout(DEADLINE, async {
         let session =
-            stored_session(state, &job.actor, job.organization, &job.platform_user).await?;
+            load_stored_session(state, &job.actor, job.organization, &job.platform_user).await?;
         let authority = authorize(state, session, job.company, &job.group.task_id).await?;
         if authority.organization_id != job.organization
             || authority.creator != job.creator
