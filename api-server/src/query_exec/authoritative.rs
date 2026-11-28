@@ -62,6 +62,7 @@ fn authoritative_columns(
         resolve_http_sql_columns(resource, field_access).map_err(ApiError::Internal)?;
     // These native detail fields are absent from their default list projection.
     let detail_fields: &[&str] = match resource {
+        "sale-orders" => &["pricelist_id"],
         "stock-pickings" => &["scheduled_date", "date_done"],
         "stock-cycle-counts" => &["last_count_date", "next_count_date"],
         "stock-moves" | "stock-quants" => &["product_variant_id"],
