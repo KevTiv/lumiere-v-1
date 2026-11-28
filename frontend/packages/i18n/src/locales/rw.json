@@ -4188,6 +4188,10 @@
       "timelineState": "Uko bihagaze"
     },
     "capture": {
+      "attachments": {
+        "unverifiedOwner": "Konti y’igikorwa cyabitswe kera ntishobora kugenzurwa kuri iki gikoresho. Banza urebe amafaranga yakoreshejwe yabitswe mbere yo kongera kukinjiza.",
+        "persistenceLimit": "Inyemezabwishyu zitegereje zibikwa muri iyi mushakisha kugeza igihe koherezwa kwabyo byemejwe. Niba ububiko bwarahanaguwe, ongera wongereho dosiye y’umwimerere mbere yo guhuza amakuru."
+      },
       "title": "Gufata inyemezabwishyu",
       "retry": "Ongera ugerageze",
       "discard": "Reka kubika"
@@ -4214,6 +4218,10 @@
       "reject": "Wange"
     },
     "forms": {
+      "recovery": {
+        "receiptRetained": "Inyemezabwishyu: {{fileName}}. Komeza kubika umaze kujya kuri interineti.",
+        "receiptMissing": "Inyemezabwishyu: {{fileName}}. Dosiye ntiboneka kuri iki gikoresho. Ongera wongereho iy’umwimerere kugira ngo ukomeze."
+      },
       "newExpense": {
         "fields": {
           "pricelistId": "Urutonde rw’ibiciro n’ifaranga",

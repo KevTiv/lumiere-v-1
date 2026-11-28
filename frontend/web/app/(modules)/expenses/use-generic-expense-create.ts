@@ -6,9 +6,10 @@ import type { CreateExpenseParams } from "@lumiere/stdb/types"
 import { createExpenseReceiptAndResolveId } from "@lumiere/query-hooks/hooks/expenses"
 import { fetchQueryList } from "@lumiere/query-hooks/http"
 import { firstFileFromFormValue, uploadDocumentBlob } from "../../../lib/document-blob-upload"
-import { enqueueExpenseCapture, getOrCreateExpenseCaptureDeviceId, newExpenseClientRequestId, readExpenseCaptureOutbox, saveExpenseCaptureCheckpoint, type ExpenseCaptureOutboxItem } from "../../../lib/expense-capture-outbox"
+import { getOrCreateExpenseCaptureDeviceId, newExpenseClientRequestId, readExpenseCaptureOutbox, saveExpenseCaptureCheckpoint, type ExpenseCaptureOutboxItem } from "../../../lib/expense-capture-outbox"
 import { newExpenseReceiptClientRequestId } from "../../../lib/expenses-create-params"
-import { captureFileMatches, syncExpenseCapture } from "./expense-capture-sync"
+import { readExpenseReceipt, storeExpenseReceipt } from "../../../lib/expense-receipt-storage"
+import { enqueueRetainedExpense, syncRetainedExpense, withExpenseOutboxLock } from "./retained-expense-receipt"
 import { genericExpensePayload, pendingGenericExpense } from "./generic-expense-attempt"
 
 interface GenericExpenseCreateOptions {
@@ -28,9 +29,20 @@ export function useGenericExpenseCreate(options: GenericExpenseCreateOptions) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const active = useRef(false)
-  // File bytes are ephemeral; identity and all network checkpoints belong to the outbox.
-  const fileRef = useRef<{ requestId: string; file: File } | null>(null)
+  const [retainedFile, setRetainedFile] = useState<{ requestId: string; stored: boolean } | null>(null)
   const currentAttempt = attempt?.formOrigin?.actorIdentity === options.actorIdentity && attempt.formOrigin.organizationId === String(options.organizationId) ? attempt : null
+  useEffect(() => {
+    if (!currentAttempt?.receipt || currentAttempt.receipt.uploaded || currentAttempt.companyId !== String(options.companyId)) return
+    let current = true
+    const requestId = currentAttempt.clientRequestId
+    void readExpenseReceipt(String(options.organizationId), currentAttempt).then(
+      (file) => { if (current) setRetainedFile({ requestId, stored: Boolean(file) }) },
+      () => { if (current) setRetainedFile({ requestId, stored: false }) },
+    )
+    return () => { current = false }
+  }, [currentAttempt, options.companyId, options.organizationId])
+  const receiptStored = retainedFile?.requestId === currentAttempt?.clientRequestId
+    ? retainedFile?.stored : undefined
   const readStored = useCallback(() => {
     const scope = live.current
     if (!scope.actorIdentity || scope.organizationId <= 0n) throw new Error("Sign in before restoring an expense request")
@@ -75,7 +87,7 @@ export function useGenericExpenseCreate(options: GenericExpenseCreateOptions) {
       assertScope()
       if (!live.current.canWrite()) throw new Error("Expense creation is not available. The retained request can still be checked.")
     }
-    const result = await syncExpenseCapture(item, { organizationId: scope.organizationId, companyId: scope.companyId, actorIdentity: scope.actorIdentity }, fileRef.current?.requestId === item.clientRequestId ? fileRef.current.file : undefined, {
+    const result = await syncRetainedExpense(item, { organizationId: scope.organizationId, companyId: scope.companyId, actorIdentity: scope.actorIdentity }, {
       assertWriteAllowed: assertWriteAdmission,
       readExpenses: () => { assertScope(); return fetchQueryList("/api/query/expenses", "Unable to confirm the saved expense") },
       readReceipts: () => { assertScope(); return fetchQueryList("/api/query/expense-receipts", "Unable to confirm the saved receipt") },
@@ -89,7 +101,6 @@ export function useGenericExpenseCreate(options: GenericExpenseCreateOptions) {
     })
     if (result.syncState !== "synced" || !result.expenseId) throw new Error(result.lastError ?? "The saved expense is not confirmed. Check its status before further action.")
     assertScope()
-    fileRef.current = null
     setAttempt(null)
     live.current.onConfirmed(result.expenseId)
   }, [])
@@ -97,7 +108,15 @@ export function useGenericExpenseCreate(options: GenericExpenseCreateOptions) {
   const execute = useCallback(async (work: () => Promise<void>) => {
     if (active.current) throw new Error("An expense status check is already in progress")
     active.current = true; setBusy(true); setError(null)
-    try { await work() }
+    try {
+      const scope = live.current
+      await withExpenseOutboxLock(String(scope.organizationId), getOrCreateExpenseCaptureDeviceId(), async () => {
+        if (live.current.actorIdentity !== scope.actorIdentity || live.current.organizationId !== scope.organizationId || live.current.companyId !== scope.companyId) {
+          throw new Error("The signed-in account or company changed")
+        }
+        await work()
+      })
+    }
     catch (cause) { setError(cause instanceof Error ? cause.message : "The expense is not confirmed"); throw cause }
     finally { active.current = false; setBusy(false) }
   }, [])
@@ -110,15 +129,15 @@ export function useGenericExpenseCreate(options: GenericExpenseCreateOptions) {
     const file = firstFileFromFormValue(values.receiptFile)
     if (payload.hasReceipt && !file) throw new Error("Choose a receipt file, or clear the receipt checkbox")
     const clientRequestId = newExpenseClientRequestId()
-    const item = enqueueExpenseCapture(String(scope.organizationId), {
+    const item = await enqueueRetainedExpense(String(scope.organizationId), {
       clientRequestId, deviceId, companyId: String(scope.companyId), payload,
       formOrigin: { actorIdentity: scope.actorIdentity!, organizationId: String(scope.organizationId), pricelistId: String(values.pricelistId) },
       receipt: file && payload.hasReceipt ? { state: "queued", clientRequestId: newExpenseReceiptClientRequestId(), fileName: file.name, fileSize: file.size, mimeType: file.type, lastModified: file.lastModified } : undefined,
-    })
+    }, payload.hasReceipt ? file ?? undefined : undefined)
     // Persist the complete payload before upload, receipt registration, or expense dispatch.
     setAttempt(item)
-    if (file) fileRef.current = { requestId: clientRequestId, file }
-    await run(item)
+    if (payload.hasReceipt) setRetainedFile({ requestId: clientRequestId, stored: true })
+    if (navigator.onLine !== false) await run(item)
   }), [execute, readPending, run])
 
   const checkStatus = useCallback(() => execute(async () => {
@@ -128,11 +147,16 @@ export function useGenericExpenseCreate(options: GenericExpenseCreateOptions) {
     await run(item)
   }), [execute, readPending, run])
   const reattach = useCallback((values: FormValues) => {
-    if (!currentAttempt?.receipt || currentAttempt.receipt.uploaded || currentAttempt.syncState === "unknown" || currentAttempt.syncState === "submitting") return
+    if (!currentAttempt?.receipt || currentAttempt.receipt.uploaded || receiptStored !== false ||
+        currentAttempt.syncState === "unknown" || currentAttempt.syncState === "submitting") return
     const file = firstFileFromFormValue(values.receiptFile)
     if (!file) return
-    if (!captureFileMatches(file, currentAttempt.receipt)) { fileRef.current = null; setError("Select the original receipt file with the same name, size, type, and modification time"); return }
-    fileRef.current = { requestId: currentAttempt.clientRequestId, file }; setError(null)
-  }, [currentAttempt])
-  return { attempt: currentAttempt, busy, error, open, resume, submit, checkStatus, reattach }
+    void execute(async () => {
+      const { item } = readPending()
+      if (item?.clientRequestId !== currentAttempt.clientRequestId || item.companyId !== String(live.current.companyId)) return
+      await storeExpenseReceipt(String(live.current.organizationId), item, file)
+      setRetainedFile({ requestId: item.clientRequestId, stored: true })
+    }).catch(() => undefined)
+  }, [currentAttempt, execute, readPending, receiptStored])
+  return { attempt: currentAttempt, busy, error, open, resume, submit, checkStatus, reattach, receiptStored }
 }

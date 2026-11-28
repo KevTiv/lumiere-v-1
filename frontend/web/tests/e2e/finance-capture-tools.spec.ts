@@ -157,8 +157,9 @@ test.describe(
   { tag: ["@dev-fixture", "@cov11"] },
   () => {
     for (const receipt of receipts) {
-      test(`uploads a real ${receipt.kind} receipt through capture and retains one exact expense after refresh`, async ({
+      test(`resumes a real ${receipt.kind} receipt from the offline queue and retains one exact expense`, async ({
         page,
+        context,
       }, testInfo) => {
         test.setTimeout(120_000)
         const organizationId = String(await fetchSessionOrganizationId(page))
@@ -214,6 +215,16 @@ test.describe(
             `capture-${receipt.kind.toLowerCase()}-preview.png`,
           ),
         })
+        await context.setOffline(true)
+        await panel.getByTestId("expenses-capture-submit").click()
+        await expect(panel.getByTestId("expenses-capture-queue")).toContainText(receipt.name)
+        expect(expenseWrites).toHaveLength(0)
+        expect(receiptWrites).toHaveLength(0)
+        await context.setOffline(false)
+        await page.reload()
+        const queue = panel.getByTestId("expenses-capture-queue")
+        await expect(queue.getByTestId("expense-capture-attachment-preview")).toContainText(receipt.name)
+        await expect(queue.getByTestId("expenses-capture-reattach")).toHaveCount(0)
         const completedPromise = page.waitForResponse(
           (response) =>
             response.request().method() === "POST" &&
@@ -225,7 +236,7 @@ test.describe(
             request.method() === "POST" &&
             matchesOperationResponse(request, "create_expense"),
         )
-        await panel.getByTestId("expenses-capture-submit").click()
+        await queue.getByTestId("expenses-capture-retry").click()
         const completedResponse = await completedPromise
         expect(completedResponse.ok()).toBeTruthy()
         const completed = (await completedResponse.json()) as CompletedUpload

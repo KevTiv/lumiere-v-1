@@ -1,7 +1,7 @@
 /**
  * Online-first expense capture outbox.
  * Stores metadata and verified upload checkpoints, with stable request identities.
- * File bytes stay in the capture tab. Interrupted expense dispatches require exact readback.
+ * Pending file bytes use a scope-bound IndexedDB record. Interrupted dispatches require exact readback.
  */
 
 import {
@@ -50,6 +50,7 @@ export interface ExpenseCaptureReceipt {
   mimeType: string
   fileSize: number
   lastModified: number
+  fingerprint?: string
   uploaded?: {
     objectKey: string
     checksum: string
@@ -64,6 +65,7 @@ export interface ExpenseCaptureReceipt {
 export interface ExpenseCaptureOutboxItem {
   clientRequestId: string
   deviceId: string
+  actorIdentity?: string
   payload: ExpenseCapturePayload
   /** Captured scope is immutable; a company switch must not retarget an offline item. */
   companyId?: string
@@ -123,10 +125,10 @@ export function enqueueExpenseCapture(
   organizationId: string | number,
   item: Omit<ExpenseCaptureOutboxItem, "createdAt" | "syncState">,
 ): ExpenseCaptureOutboxItem {
-  const items = readExpenseCaptureOutbox(organizationId, item.deviceId, Boolean(item.formOrigin))
+  const items = readExpenseCaptureOutbox(organizationId, item.deviceId, Boolean(item.formOrigin || item.actorIdentity))
   const existing = items.find((i) => i.clientRequestId === item.clientRequestId)
   if (existing) {
-    if (item.formOrigin && (JSON.stringify(existing.payload) !== JSON.stringify(item.payload)
+    if ((item.formOrigin || item.actorIdentity) && (existing.actorIdentity !== item.actorIdentity || JSON.stringify(existing.payload) !== JSON.stringify(item.payload)
       || existing.companyId !== item.companyId || JSON.stringify(existing.formOrigin) !== JSON.stringify(item.formOrigin))) {
       throw new Error("The existing expense request does not match this draft")
     }
@@ -197,7 +199,7 @@ export function discardExpenseCapture(
   clientRequestId: string,
 ): void {
   const existing = readExpenseCaptureOutbox(organizationId, deviceId, true)
-  if (existing.some((item) => item.clientRequestId === clientRequestId && item.formOrigin && item.syncState !== "synced")) throw new Error("Retained expense requests must be resolved before removal")
+  if (existing.some((item) => item.clientRequestId === clientRequestId && (item.formOrigin && item.syncState !== "synced" || item.syncState === "submitting" || item.syncState === "unknown"))) throw new Error("Retained expense requests must be resolved before removal")
   const items = existing.filter((i) => i.clientRequestId !== clientRequestId)
   writeExpenseCaptureOutbox(organizationId, deviceId, items)
 }
@@ -223,15 +225,15 @@ export function saveExpenseCaptureCheckpoint(
   deviceId: string,
   next: ExpenseCaptureOutboxItem,
 ): void {
-  const items = readExpenseCaptureOutbox(organizationId, deviceId, Boolean(next.formOrigin))
+  const items = readExpenseCaptureOutbox(organizationId, deviceId, Boolean(next.formOrigin || next.actorIdentity))
   const matches = items.filter(
     (item) => item.clientRequestId === next.clientRequestId,
   )
   if (matches.length !== 1 || next.deviceId !== deviceId)
     throw new Error("The queued capture identity is unavailable or ambiguous")
   const previous = matches[0]!
-  if (previous.formOrigin && JSON.stringify(previous.receipt && [previous.receipt.clientRequestId, previous.receipt.fileName, previous.receipt.fileSize, previous.receipt.mimeType, previous.receipt.lastModified]) !== JSON.stringify(next.receipt && [next.receipt.clientRequestId, next.receipt.fileName, next.receipt.fileSize, next.receipt.mimeType, next.receipt.lastModified])) throw new Error("The saved expense receipt identity is immutable")
-  if (previous.formOrigin && (JSON.stringify(previous.payload) !== JSON.stringify(next.payload)
+  if ((previous.formOrigin || previous.actorIdentity) && JSON.stringify(previous.receipt && [previous.receipt.clientRequestId, previous.receipt.fileName, previous.receipt.fileSize, previous.receipt.mimeType, previous.receipt.lastModified, previous.receipt.fingerprint]) !== JSON.stringify(next.receipt && [next.receipt.clientRequestId, next.receipt.fileName, next.receipt.fileSize, next.receipt.mimeType, next.receipt.lastModified, next.receipt.fingerprint])) throw new Error("The saved expense receipt identity is immutable")
+  if ((previous.formOrigin || previous.actorIdentity) && (previous.actorIdentity !== next.actorIdentity || JSON.stringify(previous.payload) !== JSON.stringify(next.payload)
     || previous.companyId !== next.companyId || JSON.stringify(previous.formOrigin) !== JSON.stringify(next.formOrigin))) {
     throw new Error("The saved expense request is immutable")
   }

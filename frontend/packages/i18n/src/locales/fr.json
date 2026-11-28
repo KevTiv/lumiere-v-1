@@ -4240,6 +4240,10 @@
       "timelineState": "État"
     },
     "capture": {
+      "attachments": {
+        "unverifiedOwner": "Le compte d’une ancienne saisie ne peut pas être vérifié sur cet appareil. Consultez les dépenses enregistrées avant de la saisir à nouveau.",
+        "persistenceLimit": "Les reçus en attente sont conservés dans ce navigateur jusqu’à la vérification du transfert. Si le stockage du navigateur a été effacé, joignez de nouveau le fichier original avant la synchronisation."
+      },
       "title": "Saisie de reçus",
       "retry": "Réessayer",
       "discard": "Abandonner"
@@ -4266,6 +4270,10 @@
       "reject": "Rejeter"
     },
     "forms": {
+      "recovery": {
+        "receiptRetained": "Reçu : {{fileName}}. Reprenez l’enregistrement une fois en ligne.",
+        "receiptMissing": "Reçu : {{fileName}}. Le fichier local est indisponible. Joignez de nouveau l’original pour continuer."
+      },
       "newExpense": {
         "fields": {
           "pricelistId": "Liste de prix et devise",

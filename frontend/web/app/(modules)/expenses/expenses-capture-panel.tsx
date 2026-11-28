@@ -45,10 +45,10 @@ import { expenseRateRowsToSelectOptions } from "../../../lib/form-lookup"
 import { uploadDocumentBlob } from "../../../lib/document-blob-upload"
 import {
   discardExpenseCapture,
-  enqueueExpenseCapture,
   getOrCreateExpenseCaptureDeviceId,
   listQueuedExpenseCaptures,
   newExpenseClientRequestId,
+  readExpenseCaptureOutbox,
   saveExpenseCaptureCheckpoint,
   type ExpenseCaptureOutboxItem,
   type ExpenseCapturePayload,
@@ -58,7 +58,9 @@ import { expenseCompanyLookupRows, expenseCreateContext, expenseDefaultEmployee,
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
-import { captureFileMatches, syncExpenseCapture } from "./expense-capture-sync"
+import { readExpenseReceipt, removeExpenseReceipt, storeExpenseReceipt } from "../../../lib/expense-receipt-storage"
+import { enqueueRetainedExpense, syncRetainedExpense, withExpenseOutboxLock } from "./retained-expense-receipt"
+import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
 import { EXPENSE_RECEIPT_ACCEPT, expenseReceiptContentType } from "./expense-receipt-file"
 import { CaptureAttachmentPreview } from "./capture-attachment-preview"
@@ -74,7 +76,22 @@ export function ExpensesCapturePanel({
   const explainError = useExplainErpError()
   const orgId = BigInt(organizationId)
   const companyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
-  const { identity } = useErpSession()
+  const { identity, organizationId: sessionOrganizationId } = useErpSession()
+  const { checkPermission, permissionsReady } = useRBAC()
+  const canWrite = permissionsReady !== false && sessionOrganizationId === organizationId && Boolean(identity) &&
+    companyId > 0n && checkPermission("hr_expense", "create").allowed
+  const currentScope = useRef({ identity, sessionOrganizationId, companyId, canWrite })
+  currentScope.current = { identity, sessionOrganizationId, companyId, canWrite }
+  const assertScope = () => {
+    const current = currentScope.current
+    if (!identity || current.identity !== identity || current.sessionOrganizationId !== organizationId || current.companyId !== companyId) {
+      throw new Error("The signed-in account or company changed")
+    }
+  }
+  const assertWrite = () => {
+    assertScope()
+    if (!currentScope.current.canWrite) throw new Error("Expense creation is unavailable for this company")
+  }
   const createExpense = useCreateExpense(orgId, companyId)
   const employeesQuery = useEmployees(orgId)
   const employees = employeesQuery.data ?? []
@@ -98,7 +115,9 @@ export function ExpensesCapturePanel({
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
-  const [files] = useState(() => new Map<string, File>())
+  const [files, setFiles] = useState<{ scope: string; values: Map<string, File | undefined> }>()
+  const scopeKey = JSON.stringify([organizationId, identity, String(companyId), deviceId])
+  const localWork = useRef(false)
   useEffect(() => {
     try {
       setDeviceId(getOrCreateExpenseCaptureDeviceId())
@@ -111,10 +130,26 @@ export function ExpensesCapturePanel({
       )
     }
   }, [t])
-  const queued = useMemo(
-    () => (deviceId ? listQueuedExpenseCaptures(organizationId, deviceId).filter((item) => !item.formOrigin) : []),
-    [organizationId, deviceId, tick],
-  )
+  const { queued, hasUnverifiedLegacy } = useMemo(() => {
+    const items = deviceId && identity && sessionOrganizationId === organizationId
+      ? listQueuedExpenseCaptures(organizationId, deviceId)
+      : []
+    return {
+      queued: items.filter(item => !item.formOrigin && item.actorIdentity === identity),
+      hasUnverifiedLegacy: items.some(item => !item.formOrigin && !item.actorIdentity),
+    }
+  }, [organizationId, sessionOrganizationId, deviceId, identity, tick])
+  useEffect(() => {
+    let current = true
+    void Promise.all(queued.filter(item => item.companyId === String(companyId) && item.receipt && !item.receipt.uploaded).map(async (item) => {
+      const file = await readExpenseReceipt(String(organizationId), item).catch(() => undefined)
+      return [item.clientRequestId, file] as const
+    })).then(entries => {
+      if (!current) return
+      setFiles({ scope: scopeKey, values: new Map(entries) })
+    })
+    return () => { current = false }
+  }, [queued, companyId, organizationId, scopeKey])
   const [employeeId, setEmployeeId] = useState("")
   const employeeWasChosen = useRef(false)
   const employeeScope = `${identity ?? ""}:${orgId}:${companyId}`
@@ -142,6 +177,14 @@ export function ExpensesCapturePanel({
   const [mileageRateId, setMileageRateId] = useState("")
   const [perDiemDays, setPerDiemDays] = useState("")
   const [perDiemRateId, setPerDiemRateId] = useState("")
+  useEffect(() => {
+    setReceiptFile(null)
+    setReceiptNote("")
+    setReceiptError(undefined)
+    setName("")
+    setAmount("")
+  }, [employeeScope])
+
 
   const buildPayload = (): ExpenseCapturePayload | null => {
     const currencyId = scopedPricelists.find(
@@ -196,33 +239,31 @@ export function ExpensesCapturePanel({
     if (!deviceId) return
     setStatus(null)
     try {
-      const result = await syncExpenseCapture(
-        item,
-        { organizationId: orgId, companyId },
-        files.get(item.clientRequestId),
-        {
-          readExpenses: () =>
-            fetchQueryList(
-              "/api/query/expenses",
-              "Unable to confirm the expense capture",
-            ),
-          readReceipts: () =>
-            fetchQueryList(
-              "/api/query/expense-receipts",
-              "Unable to confirm the receipt",
-            ),
-          upload: (file, scopeCompanyId) =>
-            uploadDocumentBlob({ file, companyId: scopeCompanyId, purpose: "expense_receipt" }),
-          register: (params) => createExpenseReceiptAndResolveId(orgId, params),
-          create: (params) => createExpense.mutateAsync(params),
+      const result = await withExpenseOutboxLock(String(organizationId), deviceId, async () => {
+        assertScope()
+        return syncRetainedExpense(item, { organizationId: orgId, companyId, actorIdentity: identity }, {
+          assertWriteAllowed: assertWrite,
+          readExpenses: () => {
+            assertScope()
+            return fetchQueryList("/api/query/expenses", "Unable to confirm the expense capture")
+          },
+          readReceipts: () => {
+            assertScope()
+            return fetchQueryList("/api/query/expense-receipts", "Unable to confirm the receipt")
+          },
+          upload: (file, scopeCompanyId) => {
+            assertWrite()
+            return uploadDocumentBlob({ file, companyId: scopeCompanyId, purpose: "expense_receipt" })
+          },
+          register: (params) => { assertWrite(); return createExpenseReceiptAndResolveId(orgId, params) },
+          create: (params) => { assertWrite(); return createExpense.mutateAsync(params) },
           save: (next) => {
             saveExpenseCaptureCheckpoint(organizationId, deviceId, next)
             setTick((value) => value + 1)
           },
-        },
-      )
+        })
+      })
       if (result.syncState === "synced") {
-        files.delete(result.clientRequestId)
         setStatus(
           t("expenses.capture.attachments.confirmed", {
             id: result.expenseId,
@@ -266,7 +307,7 @@ export function ExpensesCapturePanel({
       return
     }
     const payload = buildPayload()
-    if (!payload || !deviceId) {
+    if (!payload || !deviceId || !identity || !canWrite || localWork.current) {
       setError(t("expenses.capture.validation"))
       return
     }
@@ -279,26 +320,32 @@ export function ExpensesCapturePanel({
     setError(null)
     setStatus(null)
     const clientRequestId = newExpenseClientRequestId()
+    localWork.current = true
+    setBusy(true)
     try {
-      const item = enqueueExpenseCapture(organizationId, {
-        clientRequestId,
-        deviceId,
-        companyId: String(companyId),
-        payload,
-        receipt:
-          hasReceipt && receiptFile
-            ? {
-                state: "queued",
-                clientRequestId: newExpenseReceiptClientRequestId(),
-                fileName: receiptFile.name,
-                mimeType: receiptFile.type,
-                fileSize: receiptFile.size,
-                lastModified: receiptFile.lastModified,
-              }
-            : undefined,
+      const item = await withExpenseOutboxLock(String(organizationId), deviceId, () => {
+        assertWrite()
+        return enqueueRetainedExpense(String(organizationId), {
+          clientRequestId,
+          deviceId,
+          actorIdentity: identity,
+          companyId: String(companyId),
+          payload,
+          receipt:
+            hasReceipt && receiptFile
+              ? {
+                  state: "queued",
+                  clientRequestId: newExpenseReceiptClientRequestId(),
+                  fileName: receiptFile.name,
+                  mimeType: receiptFile.type,
+                  fileSize: receiptFile.size,
+                  lastModified: receiptFile.lastModified,
+                }
+              : undefined,
+        }, hasReceipt ? receiptFile ?? undefined : undefined)
       })
-      if (receiptFile && hasReceipt) files.set(clientRequestId, receiptFile)
       setTick((value) => value + 1)
+      assertScope()
       setName("")
       setAmount("")
       setReceiptNote("")
@@ -309,10 +356,7 @@ export function ExpensesCapturePanel({
           defaultValue: "Capture queued on this device.",
         }),
       )
-      if (navigator.onLine) {
-        setBusy(true)
-        await syncOne(item)
-      }
+      if (navigator.onLine) await syncOne(item)
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -323,34 +367,61 @@ export function ExpensesCapturePanel({
             }),
       )
     } finally {
+      localWork.current = false
       setBusy(false)
     }
   }
 
   const runQueued = async (items: ExpenseCaptureOutboxItem[]) => {
+    if (localWork.current) return
+    localWork.current = true
     setBusy(true)
     setError(null)
     setStatus(null)
     try {
       for (const item of items) await syncOne(item)
     } finally {
+      localWork.current = false
       setBusy(false)
     }
   }
-  const reattach = (item: ExpenseCaptureOutboxItem, file: File | undefined) => {
-    if (!file || !item.receipt) return
-    if (!captureFileMatches(file, item.receipt)) {
-      setError(
-        t("expenses.capture.attachments.originalFile", {
-          defaultValue:
-            "Select the original receipt file with the same name, size, type, and modified date.",
-        }),
-      )
-      return
-    }
-    files.set(item.clientRequestId, file)
+  const updateLocalReceipt = async (item: ExpenseCaptureOutboxItem, update: (saved: ExpenseCaptureOutboxItem) => Promise<void>) => {
+    if (localWork.current || !deviceId || item.actorIdentity !== identity) return
+    localWork.current = true
+    setBusy(true)
     setError(null)
-    setTick((value) => value + 1)
+    try {
+      await withExpenseOutboxLock(String(organizationId), deviceId, async () => {
+        assertScope()
+        const saved = readExpenseCaptureOutbox(organizationId, deviceId, true).find(row => row.clientRequestId === item.clientRequestId)
+        if (!saved || saved.actorIdentity !== identity || saved.companyId !== String(companyId) ||
+            saved.syncState === "unknown" || saved.syncState === "submitting" || saved.syncState === "synced") {
+          throw new Error("This retained request must be checked before changing its receipt")
+        }
+        await update(saved)
+      })
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      localWork.current = false
+      setBusy(false)
+      setTick(value => value + 1)
+    }
+  }
+
+  const reattach = (item: ExpenseCaptureOutboxItem, file: File | undefined) => {
+    if (!file || !item.receipt || item.companyId !== String(companyId)) return
+    void updateLocalReceipt(item, async saved => {
+      if (!saved.receipt?.uploaded) await storeExpenseReceipt(String(organizationId), saved, file)
+    })
+  }
+
+  const discard = (item: ExpenseCaptureOutboxItem) => {
+    if (!deviceId || item.companyId !== String(companyId)) return
+    void updateLocalReceipt(item, async saved => {
+      if (saved.receipt) await removeExpenseReceipt(String(organizationId), saved)
+      discardExpenseCapture(organizationId, deviceId, saved.clientRequestId)
+    })
   }
 
   return (
@@ -392,11 +463,18 @@ export function ExpensesCapturePanel({
         </div>
       </CardHeader>
       <CardContent className="flex min-w-0 max-w-full flex-col gap-4">
+        {hasUnverifiedLegacy && (
+          <Alert>
+            <AlertDescription>{t("expenses.capture.attachments.unverifiedOwner", {
+              defaultValue: "An older capture has no verified account on this device. Check saved Expenses before entering it again.",
+            })}</AlertDescription>
+          </Alert>
+        )}
         <Alert>
           <AlertDescription>
             {t("expenses.capture.attachments.persistenceLimit", {
               defaultValue:
-                "Capture details and completed upload checkpoints are saved on this device. Unuploaded file bytes stay in this capture panel only. After leaving this panel or reloading, reattach the original file before syncing.",
+                "Queued receipts are saved in this browser until upload is verified. If browser storage was cleared, reattach the original file before syncing.",
             })}
           </AlertDescription>
         </Alert>
@@ -757,7 +835,7 @@ export function ExpensesCapturePanel({
           <Button
             type="button"
             size="sm"
-            disabled={busy || !deviceId || companyId <= 0n}
+            disabled={busy || !deviceId || !canWrite}
             onClick={() => void captureDelayedSync()}
             data-testid="expenses-capture-submit"
           >
@@ -770,7 +848,8 @@ export function ExpensesCapturePanel({
             data-testid="expenses-capture-queue"
           >
             {queued.map((item) => {
-              const file = files.get(item.clientRequestId)
+              const localFiles = files?.scope === scopeKey ? files.values : undefined
+              const file = item.receipt?.uploaded ? undefined : localFiles?.get(item.clientRequestId)
               const missing =
                 item.payload.hasReceipt && !item.receipt?.uploaded && !file
               const unknown =
@@ -860,7 +939,7 @@ export function ExpensesCapturePanel({
                       {item.lastError}
                     </p>
                   ) : null}
-                  {missing ? (
+                  {missing && !unknown && localFiles?.has(item.clientRequestId) ? (
                     <Field className="min-w-0">
                       <FieldLabel htmlFor={`reattach-${item.clientRequestId}`}>
                         {t("expenses.capture.attachments.reattach", {
@@ -910,17 +989,8 @@ export function ExpensesCapturePanel({
                       type="button"
                       size="sm"
                       variant="ghost"
-                      disabled={busy}
-                      onClick={() => {
-                        if (deviceId)
-                          discardExpenseCapture(
-                            organizationId,
-                            deviceId,
-                            item.clientRequestId,
-                          )
-                        files.delete(item.clientRequestId)
-                        setTick((value) => value + 1)
-                      }}
+                      disabled={busy || unknown || item.companyId !== String(companyId)}
+                      onClick={() => discard(item)}
                       data-testid="expenses-capture-discard"
                     >
                       {t("expenses.capture.discard")}

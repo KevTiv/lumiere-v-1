@@ -1100,7 +1100,9 @@ function ExpensesClientLoaded({
       ? t("expenses.forms.recovery.receiptAttached", { defaultValue: "Receipt attached: {{fileName}}.", fileName: expenseCreate.attempt.receipt.fileName })
       : expenseCreate.attempt.receipt.uploaded
         ? t("expenses.forms.recovery.receiptUploaded", { defaultValue: "Receipt uploaded: {{fileName}}. Its registration will be checked with the original request.", fileName: expenseCreate.attempt.receipt.fileName })
-        : t("expenses.forms.recovery.receiptRetained", { defaultValue: "Receipt: {{fileName}}. If the upload has not completed after a reload, select the original file to continue.", fileName: expenseCreate.attempt.receipt.fileName }) : null,
+        : expenseCreate.receiptStored === false
+          ? t("expenses.forms.recovery.receiptMissing", { defaultValue: "Receipt: {{fileName}}. Its local file is unavailable. Reattach the original to continue.", fileName: expenseCreate.attempt.receipt.fileName })
+          : t("expenses.forms.recovery.receiptRetained", { defaultValue: "Receipt: {{fileName}}. Continue saving when you are online.", fileName: expenseCreate.attempt.receipt.fileName }) : null,
   ].filter(Boolean).join(" ") || null : null
 
   return (
@@ -1159,7 +1161,7 @@ function ExpensesClientLoaded({
             if (reportContinuation) { setWorkflowForm(reportContinuation); setReportContinuation(null) }
           }
         }}
-        config={quickActionForm?.action === "createSheet" ? mergeFieldDefaultValues(expenseSheetFormConfig, reportContinuation ? { employeeId: String(reportContinuation.row.employeeId) } : {}) : { ...retainedExpenseForm(expenseFormConfig, expenseCreate.attempt, expenseCreate.attempt?.companyId === String(operatingCompanyId)), ...(expenseCreate.attempt ? { cancelLabel: t("common.close") } : {}) }}
+        config={quickActionForm?.action === "createSheet" ? mergeFieldDefaultValues(expenseSheetFormConfig, reportContinuation ? { employeeId: String(reportContinuation.row.employeeId) } : {}) : { ...retainedExpenseForm(expenseFormConfig, expenseCreate.attempt, expenseCreate.attempt?.companyId === String(operatingCompanyId) && expenseCreate.receiptStored === false), ...(expenseCreate.attempt ? { cancelLabel: t("common.close") } : {}) }}
         hasDurableRecovery={quickActionForm?.action === "createExpense" && expenseCreate.attempt !== null}
         isPending={isFormMutationPending || expenseCreate.busy}
         closeOnSubmit={quickActionForm?.action === "createSheet"}
