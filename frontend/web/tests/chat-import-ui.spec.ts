@@ -651,7 +651,7 @@ test("a clerk hands the same saved import to a named owner and can revoke it", a
     await clerkWorkspace.getByRole("button", { name: "Revoke access", exact: true }).click()
     await expect(clerkWorkspace.getByRole("button", { name: "Revoke access", exact: true })).toHaveCount(0)
     await ownerPage.goto(`${taskPath}&fixtureActor=owner`)
-    await expect(ownerPage.getByRole("alert")).toContainText("This saved import is unavailable")
+    await expect(ownerPage.getByRole("alert").filter({ hasText: "This saved import is unavailable" })).toBeVisible()
     await expect(ownerWorkspace.getByRole("tab", { name: "ERP preview", exact: true })).toHaveCount(0)
     await ownerPage.goto(`${settings}&fixtureActor=owner`)
     await expect(inbox.getByText(/No saved file tasks yet/)).toBeVisible()
