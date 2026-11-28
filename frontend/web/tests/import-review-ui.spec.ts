@@ -129,6 +129,7 @@ async function mockReview(
   options: {
     stale?: boolean
     loseBulkReply?: boolean
+    loseRowReply?: boolean
     targetEntity?: string
     incompleteBulkReceipt?: boolean
     reviewOperations?: ReviewDetail["reviewOperations"]
@@ -137,8 +138,10 @@ async function mockReview(
   const items = new Map(initial.map((item) => [item.id, item]))
   const history: ReviewHistory[] = []
   const requests: string[] = []
+  const rowRequests: string[] = []
   const receipts = new Map<string, string>()
   let writes = 0
+  let lostRowReceipt: string | undefined
   let bulkReplies = 0
   let productReferencesDenied = false
   let readGate: Promise<void> | undefined
@@ -258,15 +261,26 @@ async function mockReview(
         },
       })
     if (route.request().method() === "PATCH") {
+      const raw = route.request().postData()!
+      rowRequests.push(raw)
       const body = route.request().postDataJSON() as ReviewDecision
       const decision = { ...body, itemId: path.split("/").at(-1)! }
+      if (raw === lostRowReceipt)
+        return route.fulfill({
+          json: { item: items.get(decision.itemId), replayed: true },
+        })
       const issue = problem(decision)
       if (issue)
         return route.fulfill({
           status: issue.startsWith("This item") ? 409 : 400,
           json: { error: issue },
         })
-      return route.fulfill({ json: { item: apply(decision), replayed: false } })
+      const item = apply(decision)
+      if (options.loseRowReply && !lostRowReceipt) {
+        lostRowReceipt = raw
+        return route.abort("failed")
+      }
+      return route.fulfill({ json: { item, replayed: false } })
     }
     if (path.endsWith("/decisions")) {
       const raw = route.request().postData()!
@@ -325,6 +339,7 @@ async function mockReview(
     items,
     history,
     requests,
+    rowRequests,
     writes: () => writes,
     denyProductReferences: () => { productReferencesDenied = true },
     holdReadsUntilDenied: () => {
@@ -534,13 +549,18 @@ test("confirming a proposed price preserves unknown weight, original unit and co
     .getByRole("button", { name: "Review and correct", exact: true })
     .click()
   const panel = editor(page)
-  await expect(
-    panel
-      .getByRole("row")
-      .filter({ hasText: "Recorded quantity / proposed weight *" })
-      .getByRole("cell")
-      .nth(1),
-  ).toHaveText("8")
+  const quantity = panel.getByRole("group", {
+    name: "Recorded quantity / proposed weight *",
+    exact: true,
+  })
+  await expect(quantity.getByTestId("review-original-value")).toHaveText("8")
+  await expect(panel.getByRole("heading")).toBeFocused()
+  await expect(firstRow).toBeVisible()
+  const [queueBox, editorBox] = await Promise.all([
+    firstRow.boundingBox(),
+    panel.boundingBox(),
+  ])
+  expect(queueBox!.x + queueBox!.width).toBeLessThan(editorBox!.x)
   await panel
     .getByRole("combobox", { name: "Unit for corrected prices", exact: true })
     .click()
@@ -574,8 +594,13 @@ test("confirming a proposed price preserves unknown weight, original unit and co
     name: "Review Next unresolved product",
     exact: true,
   })
-  await expect(nextEditor).toBeVisible()
+  await expect(nextEditor.getByRole("heading")).toBeFocused()
   await nextEditor.getByRole("button", { name: "Cancel", exact: true }).click()
+  await expect(
+    page
+      .getByRole("row", { name: /Next unresolved product/ })
+      .getByRole("button", { name: "Review and correct", exact: true }),
+  ).toBeFocused()
   await page.reload()
   await firstRow
     .getByRole("button", { name: "Review and correct", exact: true })
@@ -678,6 +703,62 @@ test("complete-row confirmation requires explicit values and named product refer
   await expect(page.getByTestId("reviewed-csv")).toContainText("1,4800,4800")
   await expect(page.getByTestId("reviewed-csv")).toContainText("source_file")
   expect(server.items.get("11")?.source.fields[0].sourceValue).toBe("8")
+})
+
+test("narrow correction keeps evidence and actions in view and advances onto the next queue page", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 740 })
+  const rows = Array.from({ length: 51 }, (_, index) => {
+    const row = source(String(index + 1))
+    row.source.label = `Product ${index + 1}`
+    return row
+  })
+  rows[49]!.source.fields[0]!.sourceColumn = 4
+  const server = await mockReview(page, rows, { loseRowReply: true })
+  await page.goto("/import-review")
+  const correct = (name: string) =>
+    page
+      .getByRole("row")
+      .filter({ has: page.getByRole("cell", { name, exact: true }) })
+      .getByRole("button", { name: "Review and correct", exact: true })
+  await correct("Product 50").click()
+
+  const panel = page.getByRole("region", { name: "Review Product 50" })
+  await expect(panel.getByRole("heading")).toBeFocused()
+  await expect(page.getByRole("table")).toBeHidden()
+  await expect(page.getByText("This row’s decision history", { exact: true })).toBeVisible()
+  const quantity = panel.getByRole("group", {
+    name: "Recorded quantity / proposed weight *",
+    exact: true,
+  })
+  const original = quantity.getByTestId("review-original-value")
+  const proposed = quantity.getByRole("textbox")
+  await expect(original).toHaveText("8")
+  await expect(quantity.getByText("Source column 4")).toBeVisible()
+  const [originalBox, proposedBox] = await Promise.all([
+    original.boundingBox(),
+    proposed.boundingBox(),
+  ])
+  expect(originalBox!.y + originalBox!.height).toBeLessThan(proposedBox!.y)
+  await expect(panel.getByRole("button", { name: "Save and next item" })).toBeInViewport()
+  await proposed.fill("1")
+  await expect(panel.getByRole("button", { name: "Next item", exact: true })).toBeDisabled()
+  await panel.getByRole("button", { name: "Save and next item" }).click()
+  const retry = panel.getByRole("button", { name: "Retry same review submission" })
+  await expect(retry).toBeInViewport()
+  await expect(proposed).toBeDisabled()
+  await retry.click()
+
+  const next = page.getByRole("region", { name: "Review Product 51" })
+  await expect(next.getByRole("heading")).toBeFocused()
+  await expect(next.getByLabel("Recorded quantity / proposed weight", { exact: true })).toHaveValue("")
+  await next.getByRole("button", { name: "Cancel", exact: true }).click()
+  await expect(correct("Product 51")).toBeFocused()
+  expect(server.items.get("50")?.values.quantity).toBe("1")
+  expect(server.rowRequests).toHaveLength(2)
+  expect(server.rowRequests[0]).toBe(server.rowRequests[1])
+  expect(server.writes()).toBe(1)
 })
 
 test("stale inline saves retain entered values and never report success", async ({
