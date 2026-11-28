@@ -4668,7 +4668,16 @@
       "shopSalesPreviewCounts": "Aperçu · {{newCount}} nouvelles · {{existingCount}} déjà présentes · {{heldCount}} en attente",
       "shopSalesPreviewAmounts": "{{currency}} {{newAmount}} à créer · {{currency}} {{existingAmount}} déjà présents",
       "importsPaused": "Les imports sont suspendus pour une mise à jour",
-      "importsPausedResume": "Votre import enregistré est conservé. Réessayez lorsque les imports reprendront ; les lignes déjà enregistrées sont reconnues, pas dupliquées."
+      "importsPausedResume": "Votre import enregistré est conservé. Réessayez lorsque les imports reprendront ; les lignes déjà enregistrées sont reconnues, pas dupliquées.",
+      "start": "Démarrer un import enregistré",
+      "startHint": "Enregistrez vos fichiers CSV ou Excel d’origine, puis choisissez de les inspecter ou de préparer l’import. Vous pouvez reprendre la même tâche sur n’importe quel appareil.",
+      "chooseFiles": "Choisir les fichiers sources",
+      "uploadLimits": "Jusqu’à 20 fichiers, 5 Mo chacun et 20 Mo au total. Les fichiers d’origine restent associés à la tâche.",
+      "saving": "Enregistrement des fichiers ou vérification du reçu…",
+      "shortcuts": "Raccourcis d’import de données",
+      "startShortcut": "Démarrer un import",
+      "continueShortcut": "Reprendre un import enregistré",
+      "guidedShortcut": "Import guidé et révision"
     },
     "importWorkflow": {
       "pendingSourceTitle": "Lignes sources à réviser",

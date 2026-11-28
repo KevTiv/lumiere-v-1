@@ -2,6 +2,7 @@
 
 import { ModuleBackfillRecords, useCanReadModuleBackfill } from '../../../components/module-backfill-records';
 import { moduleBackfillEmptyHref, moduleBackfillTabs } from '@/lib/module-backfill-navigation';
+import { savedImportIntakeHref } from "@/lib/saved-import-intake-navigation";
 import { InventoryOpsPanel } from './inventory-ops-panel';
 
 import { isInventoryWorkspaceReadEnabled } from '@lumiere/stdb/subscriptions';
@@ -2261,6 +2262,7 @@ function InventoryClientLoaded({
     warehouseTaskStatusOptions,
   });
 
+  const canStartSavedImport = permissionsReady === true && operatingCompanyId > 0n && checkPermission('module:settings', 'read').allowed;
   const config = useMemo(() => {
     const withTransferActions = (
       tab: (typeof moduleConfig.tabs)[number],
@@ -2347,6 +2349,12 @@ function InventoryClientLoaded({
                   label: t('inventory.csvImport.toolbarProductCategories'),
                   onClick: () => setCsvKind('productCategory'),
                 },
+                ...(canStartSavedImport ? [{
+                  id: 'saved-import-products',
+                  toolbarGroup: { id: 'imports', label: t('inventory.productActions.importMenu', { defaultValue: 'Import' }) },
+                  label: t('settings.importTask.start'),
+                  onClick: () => router.push(savedImportIntakeHref('product')),
+                }] : []),
                 {
                   id: 'csv-product',
                   toolbarGroup: { id: 'imports', label: t('inventory.productActions.importMenu', { defaultValue: 'Import' }) },
@@ -2961,6 +2969,11 @@ function InventoryClientLoaded({
             view: {
               ...v,
               actions: [
+                ...(canStartSavedImport ? [{
+                  id: 'saved-import-locations',
+                  label: t('settings.importTask.start'),
+                  onClick: () => router.push(savedImportIntakeHref('stock_location')),
+                }] : []),
                 {
                   id: 'csv-stock-location',
                   label: t('inventory.csvImport.toolbarLocations'),
@@ -3267,6 +3280,8 @@ function InventoryClientLoaded({
   }, [
     workspace,
     canReadBackfill,
+    canStartSavedImport,
+    router,
     organizationId,
     orgId,
     setup.status,
