@@ -220,6 +220,8 @@
     }
   },
   "workspaceShell": {
+    "realtimePaused": "Amakuru ntiyivugurura ako kanya",
+    "realtimeReconnecting": "Amakuru ntiyivugurura ako kanya. Impinduka za vuba zishobora gutinda kugaragara.",
     "breadcrumb": "Inzira y’urupapuro",
     "searchShort": "Shakisha…",
     "accountAndPreferences": "Konti n’ibyifuzo",

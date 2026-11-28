@@ -292,6 +292,8 @@
     "forecastFinitePeriod": "Choose a custom date range or a calendar preset before creating a forecast snapshot."
   },
   "workspaceShell": {
+    "realtimePaused": "Live updates paused",
+    "realtimeReconnecting": "Live updates paused. Recent changes may take longer to appear.",
     "breadcrumb": "Breadcrumb",
     "searchShort": "Search…",
     "accountAndPreferences": "Account and preferences",

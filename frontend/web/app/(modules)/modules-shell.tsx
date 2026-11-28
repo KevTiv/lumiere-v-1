@@ -10,6 +10,7 @@ import { Button } from "@lumiere/ui/components/button"
 import { toast } from "sonner"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { ModuleActivity } from "../../components/module-activity"
+import { RealtimeStatus } from "../../components/realtime-status"
 import { NavigationEditorContext } from "@lumiere/ui/forms/navigation-guard-context"
 import { AssistantNativeFormProvider, useAssistantNativeFormController, useAssistantNativeForms } from "@lumiere/ui/components/assistant-native-form-provider"
 import { ALPHA_ASSISTANT_CAPABILITIES, ASSISTANT_PAGE_MODULES, getAssistantCapability, isAssistantPageAction, resolveAssistantActionRequest, type AssistantAction, type AssistantActionScope } from "@lumiere/query-hooks/assistant-actions"
@@ -1398,7 +1399,7 @@ function ModulesContent({
         onOpenSearch={() => setIsSearchOpen(true)}
         onSignOut={performSignOut}
         userProfile={currentUserProfile.data}
-        headerTools={<ModuleActivity />}
+        headerTools={<>{firstOrgProfile && <RealtimeStatus />}<ModuleActivity /></>}
         notifications={orgReady && messagesVisible ? <HeaderNotificationBell organizationId={orgId} /> : null}
         sidebar={(collapsed) => (
           <DashboardSidebar

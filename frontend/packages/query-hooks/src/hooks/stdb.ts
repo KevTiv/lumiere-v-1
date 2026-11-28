@@ -220,21 +220,23 @@ export function invalidateStdbQueryResources(
   qc: QueryClient,
   organizationId: bigint | number,
   resources: readonly string[],
+  options?: { cancelRefetch?: boolean },
 ) {
   const invalidateHttpCaches =
     !isSubscriptionReady() || resources.some(isInvalidationOnlyResource)
+  const uniqueKeys = new Map<string, QueryKey>()
   for (const resource of resources) {
-    // Typed HTTP rows use a separate namespace so the opt-in legacy direct-row
-    // cache can never populate them with unprojected SDK entities.
-    void qc.invalidateQueries({
-      queryKey: typedStdbQueryKey(resource, organizationId),
-    })
-    const httpKeys = invalidateHttpCaches
-      ? realtimeQueryKeysForResource(resource, organizationId)
-      : workProjectionQueryKeysForResource(resource, organizationId)
-    for (const queryKey of httpKeys) {
-      void qc.invalidateQueries({ queryKey })
-    }
+    // Keep typed HTTP rows separate from unprojected direct-SDK rows.
+    const keys = [
+      typedStdbQueryKey(resource, organizationId),
+      ...(invalidateHttpCaches
+        ? realtimeQueryKeysForResource(resource, organizationId)
+        : workProjectionQueryKeysForResource(resource, organizationId)),
+    ]
+    for (const queryKey of keys) uniqueKeys.set(JSON.stringify(queryKey), queryKey)
+  }
+  for (const queryKey of uniqueKeys.values()) {
+    void qc.invalidateQueries({ queryKey }, options)
   }
 }
 

@@ -220,6 +220,8 @@
     }
   },
   "workspaceShell": {
+    "realtimePaused": "Mises à jour en direct suspendues",
+    "realtimeReconnecting": "Les mises à jour en direct sont suspendues. Les changements récents peuvent mettre plus de temps à apparaître.",
     "breadcrumb": "Fil d’Ariane",
     "searchShort": "Rechercher…",
     "accountAndPreferences": "Compte et préférences",
