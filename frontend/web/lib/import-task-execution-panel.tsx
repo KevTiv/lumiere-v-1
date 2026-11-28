@@ -30,6 +30,7 @@ import {
 import { operatingCompanyCurrencyCode } from "./operating-company-currency"
 import type { ReviewDetail } from "./import-review-model"
 import {
+  enqueueJournalProposal,
   readNativeReceiptPage,
   transitionImportProposal,
   type DistinctExpenseDecision,
@@ -45,6 +46,7 @@ import { useImportProposalAttempt } from "./use-import-proposal-attempt"
 import { importTaskHref } from "./import-task-navigation"
 import { NativeImportReceiptRows } from "./native-import-receipt-rows"
 import { importWorkflowKey, useImportWorkflow } from "./use-import-workflow"
+import { savedImportRunsKey } from "./use-saved-import-runs"
 
 interface Props {
   organizationId: number
@@ -259,18 +261,35 @@ function ExecutionPanel({
     scope,
     onAccepted: accept,
   })
+  const refreshExecution = () => {
+    void queryClient.invalidateQueries({
+      queryKey: savedImportRunsKey({ identity: actor, organizationId, companyId }, taskId),
+    })
+    void workflow.refetch()
+  }
   const transition = useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       proposal: current,
       action,
     }: {
       proposal: ImportProposal
       action: "approve" | "execute" | "verify"
-    }) => transitionImportProposal(apiFetch, scope, current, action),
-    onSuccess: accept,
-    onError: (error: Error) => {
+    }) => action === "execute"
+      ? enqueueJournalProposal(apiFetch, scope, current)
+      : transitionImportProposal(apiFetch, scope, current, action),
+    onSuccess: (result) => {
+      if (!("adapter" in result)) {
+        accept(result)
+        return
+      }
+      setActionError(null)
+      refreshExecution()
+      onChanged?.()
+    },
+    onError: (error: Error, { action }) => {
       setActionError(error.message)
-      void workflow.refetch()
+      if (action === "execute") refreshExecution()
+      else void workflow.refetch()
     },
   })
   const busy = preparation.busy || transition.isPending

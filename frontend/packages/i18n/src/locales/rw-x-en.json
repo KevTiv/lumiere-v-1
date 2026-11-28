@@ -678,6 +678,9 @@
     }
   },
   "settings": {
+    "importOperator": {
+      "inspect": "Suzuma file z’isoko"
+    },
     "importWorkflow": {
       "companySetup": "Igenamiterere ry’ikigo kuri iyi file"
     },

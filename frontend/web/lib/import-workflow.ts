@@ -393,7 +393,7 @@ export function parseImportProposal(
   return proposal
 }
 
-function workflowPath(scope: WorkflowScope): string {
+function importTaskPath(scope: WorkflowScope): string {
   requestId.parse(scope.taskId)
   if (
     !Number.isSafeInteger(scope.organizationId) ||
@@ -402,7 +402,11 @@ function workflowPath(scope: WorkflowScope): string {
     scope.companyId < 1
   )
     throw new Error("Select a company before opening an import.")
-  return `/api/import-tasks/${scope.taskId}/workflow`
+  return `/api/import-tasks/${scope.taskId}`
+}
+
+function workflowPath(scope: WorkflowScope): string {
+  return `${importTaskPath(scope)}/workflow`
 }
 
 async function responseBody(response: Response): Promise<unknown> {
@@ -621,6 +625,48 @@ export async function prepareImportProposal(
     scope,
     await createImportProposalAttempt(scope, input),
   )
+}
+
+const journalRunSchema = z.object({
+  id: digest,
+  taskId: requestId,
+  adapter: z.literal("historical_journal"),
+  status: z.enum(["queued", "running", "verified", "partial", "failed", "blocked"]),
+  rowCount: count,
+  verifiedRowCount: count,
+})
+
+export async function enqueueJournalProposal(
+  fetcher: WorkflowFetch,
+  scope: WorkflowScope,
+  proposal: Pick<ImportProposal, "id" | "requestKey" | "revision" | "digest" | "entries" | "approvedAt">,
+) {
+  if (!proposal.approvedAt) throw new Error("Approve this exact journal preview before running it.")
+  const rows = z.array(sourceRevision).min(1).max(200).parse(
+    proposal.entries.map(({ batchId, itemId, sourceRevision: revision }) => ({ batchId, itemId, revision })),
+  )
+  const run = journalRunSchema.parse(await responseBody(await fetcher(`${importTaskPath(scope)}/runs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      companyId: scope.companyId,
+      requestId: requestId.parse(proposal.requestKey),
+      adapter: "historical_journal",
+      config: {
+        proposalId: positiveId.parse(proposal.id),
+        expectedRevision: z.number().int().positive().parse(proposal.revision),
+        expectedDigest: digest.parse(proposal.digest),
+      },
+      rows,
+    }),
+  })))
+  if (run.taskId !== scope.taskId ||
+      run.rowCount !== rows.length ||
+      run.verifiedRowCount > run.rowCount ||
+      (run.status === "verified" && run.verifiedRowCount !== run.rowCount)) {
+    throw new Error("The saved run does not match the approved preview.")
+  }
+  return run
 }
 
 export async function transitionImportProposal(
