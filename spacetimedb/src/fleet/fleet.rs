@@ -398,6 +398,34 @@ pub fn create_fleet_vehicle_service_type(
     organization_id: u64,
     params: CreateFleetVehicleServiceTypeParams,
 ) -> Result<(), String> {
+    save_fleet_service_type(ctx, organization_id, params, false)
+}
+
+/// Create an active type for one company, reusing its exact name on a retry.
+#[reducer]
+pub fn create_company_fleet_service_type(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    name: String,
+) -> Result<(), String> {
+    save_fleet_service_type(
+        ctx,
+        organization_id,
+        CreateFleetVehicleServiceTypeParams {
+            name,
+            company_id: Some(company_id),
+        },
+        true,
+    )
+}
+
+fn save_fleet_service_type(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateFleetVehicleServiceTypeParams,
+    reuse_active: bool,
+) -> Result<(), String> {
     check_permission(ctx, organization_id, "fleet_vehicle_service_type", "create")?;
 
     if params.name.trim().is_empty() {
@@ -405,6 +433,21 @@ pub fn create_fleet_vehicle_service_type(
     }
     if let Some(company_id) = params.company_id {
         require_company_in_organization(ctx, organization_id, company_id)?;
+    }
+
+    if reuse_active
+        && ctx
+            .db
+            .fleet_vehicle_service_type()
+            .fleet_vehicle_service_type_by_org()
+            .filter(&organization_id)
+            .any(|row| {
+                row.company_id == params.company_id
+                    && row.is_active
+                    && row.name == params.name.trim()
+            })
+    {
+        return Ok(());
     }
 
     let row = ctx

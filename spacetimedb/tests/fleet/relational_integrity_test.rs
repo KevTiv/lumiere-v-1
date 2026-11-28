@@ -4,8 +4,9 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::fleet::fleet::{
     create_fleet_vehicle, create_fleet_vehicle_service_type, fleet_vehicle,
-    fleet_vehicle_service_type, update_fleet_vehicle, update_fleet_vehicle_details, CreateFleetVehicleParams,
-    CreateFleetVehicleServiceTypeParams, UpdateFleetVehicleDetailsParams, UpdateFleetVehicleParams,
+    fleet_vehicle_service_type, update_fleet_vehicle, update_fleet_vehicle_details,
+    CreateFleetVehicleParams, CreateFleetVehicleServiceTypeParams, UpdateFleetVehicleDetailsParams,
+    UpdateFleetVehicleParams,
 };
 use crate::hr::employees::{create_employee, hr_employee, CreateEmployeeParams};
 use crate::test_harness::OrgFixture;
@@ -195,6 +196,44 @@ pub fn test_driver_id_relations(ctx: &ReducerContext) -> Result<(), String> {
 pub fn test_service_type_id_relations(ctx: &ReducerContext) -> Result<(), String> {
     let local = OrgFixture::seed_minimal(ctx)?;
     let foreign = OrgFixture::seed_minimal(ctx)?;
+
+    for name in [
+        "  Fleet scheduled maintenance  ",
+        "Fleet scheduled maintenance",
+    ] {
+        crate::fleet::create_company_fleet_service_type(
+            ctx,
+            local.organization_id,
+            local.company_id,
+            name.into(),
+        )?;
+    }
+    let saved = ctx
+        .db
+        .fleet_vehicle_service_type()
+        .iter()
+        .filter(|row| {
+            row.organization_id == local.organization_id
+                && row.company_id == Some(local.company_id)
+                && row.is_active
+                && row.name == "Fleet scheduled maintenance"
+        })
+        .count();
+    if saved != 1 {
+        return Err(format!(
+            "retry must resolve to one saved company service type, got {saved}"
+        ));
+    }
+    if crate::fleet::create_company_fleet_service_type(
+        ctx,
+        local.organization_id,
+        foreign.company_id,
+        "Invalid company".into(),
+    )
+    .is_ok()
+    {
+        return Err("cross-organization service type creation succeeded".into());
+    }
 
     create_fleet_vehicle_service_type(
         ctx,
