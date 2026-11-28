@@ -5475,5 +5475,25 @@
     "unverifiedJournalLine": "Mstari wa jarida nambari {{id}} haukuweza kuthibitishwa.",
     "loadBatchListFailed": "Makundi ya mifugo hayakuweza kupakiwa.",
     "loadRevisionsFailed": "Matoleo ya tukio hayakuweza kupakiwa."
+  },
+  "fleet": {
+    "workspace": {
+      "loadingSetup": "Inapakia chaguo za huduma na uhasibu…",
+      "setupTitle": "Sanidi kurekodi gharama za huduma",
+      "recovery": {
+        "serviceType": "Hakuna aina ya huduma inayotumika kwa kampuni hii.",
+        "journal": "Hakuna jarida linalotumika kwa kampuni hii.",
+        "expenseAccount": "Hakuna akaunti ya gharama inayotumika kwa kampuni hii.",
+        "offsetAccount": "Hakuna akaunti inayotumika ya mali au dhima kwa ingizo la upande mwingine.",
+        "typeName": "Jina la aina ya huduma",
+        "createType": "Unda aina ya huduma",
+        "createTypeFailed": "Aina ya huduma haikuweza kuthibitishwa. Angalia chaguo au jaribu tena kwa jina lilelile.",
+        "openJournals": "Fungua majarida kwenye kichupo kipya",
+        "openAccounts": "Fungua orodha ya akaunti kwenye kichupo kipya",
+        "askAdmin": "Omba msimamizi mwenye ruhusa ya usanidi aongeze chaguo hili.",
+        "refresh": "Onyesha upya chaguo za usanidi",
+        "choicesChanged": "Kabla ya kuhifadhi, chagua aina ya huduma, jarida, akaunti ya gharama na akaunti ya upande mwingine zinazopatikana."
+      }
+    }
   }
 }

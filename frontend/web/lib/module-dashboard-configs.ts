@@ -3569,7 +3569,8 @@ export interface FleetModuleOptions {
   employees?: FleetFormOption[]
   serviceTypes?: FleetFormOption[]
   journals?: FleetFormOption[]
-  accounts?: FleetFormOption[]
+  expenseAccounts?: FleetFormOption[]
+  offsetAccounts?: FleetFormOption[]
 }
 
 export const fleetModuleConfig = (
@@ -3579,7 +3580,8 @@ export const fleetModuleConfig = (
     employees = [],
     serviceTypes = [],
     journals = [],
-    accounts = [],
+    expenseAccounts = [],
+    offsetAccounts = [],
   }: FleetModuleOptions = {},
 ): ModuleConfig => ({
   id: "fleet",
@@ -3615,7 +3617,8 @@ export const fleetModuleConfig = (
         vehicles,
         serviceTypes,
         journals,
-        accounts,
+        expenseAccounts,
+        offsetAccounts,
       ),
       createLabel: t("fleet.lifecycle.service.action"),
       createAction: "recordFleetService",

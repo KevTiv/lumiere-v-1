@@ -5629,5 +5629,25 @@
     "unverifiedJournalLine": "La ligne de journal n° {{id}} n’a pas pu être vérifiée.",
     "loadBatchListFailed": "Les lots d’élevage n’ont pas pu être chargés.",
     "loadRevisionsFailed": "Les versions de l’événement n’ont pas pu être chargées."
+  },
+  "fleet": {
+    "workspace": {
+      "loadingSetup": "Chargement des choix de service et de comptabilité…",
+      "setupTitle": "Configurer l’enregistrement des coûts de service",
+      "recovery": {
+        "serviceType": "Aucun type de service actif n’est disponible pour cette entreprise.",
+        "journal": "Aucun journal actif n’est disponible pour cette entreprise.",
+        "expenseAccount": "Aucun compte de charges actif n’est disponible pour cette entreprise.",
+        "offsetAccount": "Aucun compte d’actif ou de passif actif n’est disponible pour la contrepartie.",
+        "typeName": "Nom du type de service",
+        "createType": "Créer un type de service",
+        "createTypeFailed": "Le type de service n’a pas pu être confirmé. Vérifiez les choix ou réessayez avec le même nom.",
+        "openJournals": "Ouvrir les journaux dans un nouvel onglet",
+        "openAccounts": "Ouvrir le plan comptable dans un nouvel onglet",
+        "askAdmin": "Demandez à un administrateur ayant accès à la configuration d’ajouter ce choix.",
+        "refresh": "Actualiser les choix de configuration",
+        "choicesChanged": "Avant d’enregistrer, choisissez un type de service, un journal, un compte de charges et un compte de contrepartie disponibles."
+      }
+    }
   }
 }

@@ -832,5 +832,15 @@
     "expenseReportID": "Ikiranga report y’amafaranga yakoreshejwe",
     "switchToTheOperatingCompanyForThis": "Hindura ujye ku kigo gikora kijyanye n’iyi file yatumijwe cyangwa iri genzura ry’inkomoko.",
     "saveACSVOrExcelSourceAnd": "Bika file ya CSV cyangwa Excel maze utegure ibyabaye ku matsinda y’amatungo kugira ngo bigenzurwe. Shyiramo ikiranga umukumbi, ikiranga icyabaye, ubwoko bwacyo n’itariki y’igikorwa."
+  },
+  "fleet": {
+    "workspace": {
+      "recovery": {
+        "expenseAccount": "Nta account y’ibisohoka ikora iboneka kuri iki kigo.",
+        "offsetAccount": "Nta account ikora y’umutungo cyangwa imyenda iboneka yo kwandika uruhande rwa kabiri.",
+        "openAccounts": "Fungura urutonde rwa account mu gice gishya",
+        "choicesChanged": "Mbere yo kubika, hitamo ubwoko bwa serivisi, igitabo cy’ibaruramari, account y’ibisohoka na account y’uruhande rwa kabiri biboneka."
+      }
+    }
   }
 }

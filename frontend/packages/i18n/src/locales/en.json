@@ -15183,15 +15183,28 @@
   },
   "fleet": {
     "workspace": {
+      "loadingSetup": "Loading service and accounting choices…",
+      "setupTitle": "Set up service cost recording",
+      "recovery": {
+        "serviceType": "No active service type is available for this company.",
+        "journal": "No active journal is available for this company.",
+        "expenseAccount": "No active expense account is available for this company.",
+        "offsetAccount": "No active asset or liability account is available for the offset.",
+        "typeName": "Service type name",
+        "createType": "Create service type",
+        "createTypeFailed": "The service type could not be confirmed. Check the choices or retry with the same name.",
+        "openJournals": "Open journals in a new tab",
+        "openAccounts": "Open chart of accounts in a new tab",
+        "askAdmin": "Ask an administrator with setup access to add this choice.",
+        "refresh": "Refresh setup choices",
+        "choicesChanged": "Choose an available service type, journal, expense account, and offset account before saving."
+      },
       "driverChoicesUnavailable": "No employee choices are available. You can still unassign the current driver.",
       "inspectorChoicesUnavailable": "No employee choices are available. You can record the inspection without an inspector.",
       "savedRequest": "A fleet save is waiting for confirmation.",
       "retryOriginal": "Retry uses the original values and request identity, including after a reload.",
       "retrySavedRequest": "Retry saved request",
       "companyRequired": "Select an operating company to view and manage its vehicles.",
-      "loadingSetup": "Loading service and accounting choices…",
-      "setupTitle": "Set up service cost recording",
-      "setupHint": "An administrator must configure an active service type, a company journal, and expense and offset accounts before you can record a garage intervention and its cost.",
       "status": {
         "active": "Active",
         "idle": "Idle",

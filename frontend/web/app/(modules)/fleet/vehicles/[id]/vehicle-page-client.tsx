@@ -50,6 +50,7 @@ import { fleetEnumTag, rowsOfVehicle } from '../../fleet-record';
 import { useFleetWorkspace } from '../../use-fleet-workspace';
 import { fleetVehicleChoiceLabel } from '../../fleet-workspace';
 import { FleetRecoveryNotice } from '../../fleet-recovery-notice';
+import { canRecordFleetServiceWith } from '../../fleet-service-setup';
 import { FleetServiceSetupNotice } from '../../fleet-service-setup-notice';
 
 interface VehiclePageClientProps {
@@ -83,7 +84,7 @@ function VehiclePageLoaded({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const workspace = useFleetWorkspace(organizationId, initialVehicles);
-  const { orgId, company, vehicles, serviceRecords, inspections, activeServiceTypes: serviceTypes, employeeChoices: employees, journals, accounts } = workspace;
+  const { orgId, company, vehicles, serviceRecords, inspections, serviceChoices, employeeChoices: employees } = workspace;
   const fleetActions = useFleetActions(orgId, company, employees.map((row) => String(row.id)));
   const { checkPermission, permissionsReady } = useRBAC();
   const canWrite = permissionsReady !== false && checkPermission('fleet_vehicle', 'write').allowed;
@@ -172,9 +173,10 @@ function VehiclePageLoaded({
       recordFleetServiceForm(
         t,
         thisVehicle,
-        option(serviceTypes as unknown[], 'Service type'),
-        accountJournalRowsToSelectOptions(journals as unknown as Row[]),
-        accountAccountRowsToSelectOptions(accounts as unknown as Row[]),
+        option(serviceChoices.serviceType, 'Service type'),
+        accountJournalRowsToSelectOptions(serviceChoices.journal),
+        accountAccountRowsToSelectOptions(serviceChoices.expenseAccount),
+        accountAccountRowsToSelectOptions(serviceChoices.offsetAccount),
       ),
       { vehicle_id: vehicleId },
     ),
@@ -199,7 +201,6 @@ function VehiclePageLoaded({
     <>
       <ModuleDataNotice state={workspace.states.vehicles} />
       <FleetRecoveryNotice key={`${organizationId}:${company}`} actions={fleetActions} />
-      {activeTab === 'service' && canWrite ? <FleetServiceSetupNotice workspace={workspace} /> : null}
       <RecordPage
         testIdPrefix="vehicle"
         breadcrumbs={[
@@ -236,7 +237,7 @@ function VehiclePageLoaded({
           <>
             {workspace.states.vehicles.status === 'ready' ? <AskAboutRecordButton entityType="fleet_vehicle" recordId={vehicleId} label={label} activeTab={activeTab} /> : null}
             {workspace.states.vehicles.status === 'ready' ? <RecordHeaderActions key={`${company}:${vehicleId}`} model="vehicle" record={vehicle} organizationId={orgId} companyId={company} /> : null}
-            {canWrite ? <Button size="sm" disabled={!workspace.serviceReady || fleetActions.isPending} data-testid="vehicle-action-service" onClick={() => setForm('service')}>
+            {canWrite ? <Button size="sm" disabled={!workspace.serviceFormReady || fleetActions.isPending} data-testid="vehicle-action-service" onClick={() => setForm('service')}>
               {t('fleet.lifecycle.service.action')}
             </Button> : null}
             {canWrite ? <Button variant="outline" size="sm" disabled={!workspace.inspectionReady || fleetActions.isPending} data-testid="vehicle-action-inspection" onClick={() => setForm('inspection')}>
@@ -297,7 +298,7 @@ function VehiclePageLoaded({
         ]}
       />
 
-      {form && canWrite && workspace.states.vehicles.status === 'ready' && (form === 'service' ? workspace.serviceReady : form === 'inspection' ? workspace.inspectionReady : workspace.assignmentReady) ? (
+      {form && canWrite && workspace.states.vehicles.status === 'ready' && (form === 'service' ? workspace.serviceFormReady : form === 'inspection' ? workspace.inspectionReady : workspace.assignmentReady) ? (
         <FormModal
           key={`${company}:${vehicleId}:${form}`}
           open
@@ -310,10 +311,17 @@ function VehiclePageLoaded({
           config={forms[form]}
           isPending={fleetActions.isPending}
           closeOnSubmit={false}
+          renderPreview={form === 'service' && workspace.needsServiceSetup
+            ? () => <FleetServiceSetupNotice workspace={workspace} />
+            : undefined}
+          submissionDisabled={form === 'service' && workspace.needsServiceSetup}
           submitError={formError}
           onSubmit={async (formData) => {
             setFormError(null);
             try {
+              if (form === 'service' && (!workspace.serviceLookupsReady || !canRecordFleetServiceWith(serviceChoices, formData))) {
+                throw new Error(t('fleet.workspace.recovery.choicesChanged'));
+              }
               await fleetActions.submit(formAction[form], formData);
               showWorkflowToast({ kind: 'success', title: forms[form].title, description: label });
               setForm(null);

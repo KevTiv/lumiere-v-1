@@ -527,3 +527,189 @@ test("failed vehicle submission retains the form and entered identity", async ({
     dialog.getByRole("textbox", { name: "License plate", exact: false }),
   ).toHaveValue("RAH 918 A");
 });
+
+async function fleetRecoveryFixture(page: Page, missing: "serviceType" | "journal" | "both") {
+  const company = { organizationId: "7", companyId: "11" };
+  const name = "Brake inspection";
+  let servicePendingReadback = false;
+  let canonicalTypeVisible = missing === "journal";
+  let journalVisible = missing === "serviceType";
+  const dispatches: { path: string; body: Record<string, unknown> }[] = [];
+  let readbacks = 0;
+  let releaseCanonicalRead: () => void = () => {};
+  const allowCanonicalRead = new Promise<void>((resolve) => { releaseCanonicalRead = resolve; });
+  await page.route("**/api/query/**", async (route) => {
+    const url = new URL(route.request().url());
+    const resource = url.pathname.split("/").at(-1)!;
+    if (resource === "fleet-service-types" && servicePendingReadback) {
+      readbacks++;
+      if (readbacks > 1) await allowCanonicalRead;
+    }
+    const data: Record<string, Record<string, unknown>[]> = {
+      "fleet-vehicles": [
+        { ...company, id: "71", name: "Kigali delivery van", vehicleType: "van", status: "Active" },
+        {
+          ...company,
+          id: "72",
+          name: "Musanze supply truck",
+          vehicleType: "truck",
+          status: "Active",
+        },
+      ],
+      "fleet-service-types": [
+        { ...company, companyId: "22", id: "190", name, isActive: true },
+        ...(canonicalTypeVisible ? [{ ...company, id: "91", name, isActive: true }] : []),
+      ],
+      "account-journals": journalVisible
+        ? [
+            {
+              ...company,
+              id: "92",
+              name: "Maintenance journal",
+              code: "SERV",
+              active: true,
+              type: "General",
+            },
+          ]
+        : [
+            {
+              ...company,
+              id: "92",
+              name: "Inactive journal",
+              code: "OLD",
+              active: false,
+              type: "General",
+            },
+          ],
+      "account-accounts": [
+        {
+          ...company,
+          id: "93",
+          name: "Maintenance expense",
+          code: "5000",
+          deprecated: false,
+          internalGroup: "Expense",
+        },
+        {
+          ...company,
+          id: "94",
+          name: "Accounts payable",
+          code: "2000",
+          deprecated: false,
+          internalGroup: "Liability",
+        },
+      ],
+    };
+    await route.fulfill({ json: { data: data[resource] ?? [] } });
+  });
+  await page.route("**/api/operations/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    dispatches.push({ path, body });
+    if (path.endsWith("/erp.create_company_fleet_service_type")) {
+      servicePendingReadback = true;
+      await route.fulfill({ json: { ok: true } });
+      return;
+    }
+    await route.fulfill({ status: 400, json: { error: "Unexpected fixture operation" } });
+  });
+  return {
+    dispatches,
+    name,
+    readbackCount: () => readbacks,
+    showType: () => {
+      canonicalTypeVisible = true;
+      releaseCanonicalRead();
+    },
+    showJournal: () => {
+      journalVisible = true;
+    },
+  };
+}
+
+async function openFleetServiceRecovery(page: Page, role?: "operator") {
+  await page.goto(`/fleet-service-recovery/71?tab=service${role ? `&role=${role}` : ""}`);
+  await expect(page.getByTestId("vehicle-page")).toContainText("Kigali delivery van");
+  await page.getByTestId("vehicle-action-service").click();
+  const form = page.getByRole("dialog", { name: "Record service" });
+  await expect(form).toBeVisible();
+  return form;
+}
+
+test("Fleet service recovery waits for a company service type and retains the vehicle draft", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const fixture = await fleetRecoveryFixture(page, "serviceType");
+  const form = await openFleetServiceRecovery(page);
+  const setup = form.getByTestId("fleet-service-setup");
+  await expect(setup).toContainText("No active service type");
+  await expect(setup).not.toContainText("No active journal");
+  await expect(setup).not.toContainText("No active expense account");
+  await expect(setup).not.toContainText("No active asset or liability account");
+  const provider = form.getByTestId("form-field-provider");
+  await provider.fill("Kigali garage");
+  await setup.getByRole("textbox", { name: "Service type name" }).fill(`  ${fixture.name}  `);
+  await setup.getByRole("button", { name: "Create service type" }).click();
+  await expect.poll(() => fixture.readbackCount()).toBeGreaterThan(0);
+  await expect(setup).toBeVisible();
+  fixture.showType();
+  await expect(setup).toHaveCount(0);
+  await expect(provider).toHaveValue("Kigali garage");
+  await expect(form.getByTestId("form-field-vehicle_id")).toContainText("Kigali delivery van");
+  await form.getByTestId("form-field-service_type_id").click();
+  await expect(page.getByRole("option", { name: fixture.name, exact: true })).toHaveCount(1);
+  await expect(page).toHaveURL(/\/fleet-service-recovery\/71\?tab=service$/);
+  expect(fixture.dispatches).toHaveLength(1);
+  expect(fixture.dispatches[0]?.path).toBe("/api/operations/erp.create_company_fleet_service_type");
+  expect(String(fixture.dispatches[0]?.body.companyId)).toBe("11");
+  expect(fixture.dispatches[0]?.body.name).toBe(fixture.name);
+});
+
+test("Fleet journal recovery opens Accounting separately and refreshes the same vehicle on return", async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const fixture = await fleetRecoveryFixture(page, "journal");
+  await context.route("**/accounting?tab=account-journals", (route) =>
+    route.fulfill({ contentType: "text/html", body: "<title>Accounting journal fixture</title>" }),
+  );
+  const form = await openFleetServiceRecovery(page);
+  const setup = form.getByTestId("fleet-service-setup");
+  await expect(setup).toContainText("No active journal");
+  await expect(setup).not.toContainText("No active service type");
+  const provider = form.getByTestId("form-field-provider");
+  await provider.fill("Kigali garage");
+  const open = setup.getByRole("link", { name: "Open journals in a new tab" });
+  await expect(open).toHaveAttribute("href", "/accounting?tab=account-journals");
+  const [accounting] = await Promise.all([context.waitForEvent("page"), open.click()]);
+  await expect(accounting).toHaveURL(/\/accounting\?tab=account-journals$/);
+  fixture.showJournal();
+  await accounting.close();
+  await page.bringToFront();
+  // Headless Chromium may omit a focus event when the fixture popup closes.
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(setup).toHaveCount(0);
+  await expect(provider).toHaveValue("Kigali garage");
+  await expect(form.getByTestId("form-field-vehicle_id")).toContainText("Kigali delivery van");
+  await expect(page).toHaveURL(/\/fleet-service-recovery\/71\?tab=service$/);
+  expect(fixture.dispatches).toHaveLength(0);
+});
+
+test("Fleet operators without setup rights can see the blocker without a setup action", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const fixture = await fleetRecoveryFixture(page, "both");
+  const form = await openFleetServiceRecovery(page, "operator");
+  const setup = form.getByTestId("fleet-service-setup");
+  await expect(setup).toContainText("No active service type");
+  await expect(setup).toContainText("No active journal");
+  await expect(setup.getByText(/Ask an administrator/)).toHaveCount(2);
+  await expect(setup.getByRole("button", { name: "Create service type" })).toHaveCount(0);
+  await expect(setup.getByRole("link")).toHaveCount(0);
+  await expect(form.getByRole("button", { name: "Record service" })).toBeDisabled();
+  expect(fixture.dispatches).toHaveLength(0);
+});
