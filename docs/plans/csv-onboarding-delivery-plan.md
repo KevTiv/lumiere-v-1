@@ -7,7 +7,44 @@ This plan covers CSV intake through verified records in the normal ERP modules.
 It builds on the
 [agent sandbox import plan](./agent-sandbox-import-onboarding-plan.md).
 
-## Alpha operation register
+## Finance Alpha import coverage
+
+The [machine-readable register](../../frontend/web/lib/alpha-import-coverage.json)
+audits the Wave 4 stack at `9557d1e6`. It records each entry point, its format
+and visibility conditions, the native implementation and scope, saved-task
+support, and served-build evidence. The [discovery types](../../frontend/web/lib/alpha-import-discovery.ts)
+provide the same read-only data to consumers. Run
+`node --test scripts/tests/alpha-import-coverage.test.mjs` to check the complete
+workspace profile, Settings keys, module CSV actions, and code anchors.
+
+- **Discovery.** A Finance Alpha surface or wizard key only controls where an
+  operator can find a flow. Some imports are confined to a module toolbar or
+  specialized form. For example, lots have a native registration and client
+  handler, with no action that opens the handler on the audited surface.
+- **Admission and authority.** The [native import registry](../../api-server/src/routes/import.rs)
+  distinguishes organization-only, organization-plus-currency and company
+  reducer arguments. Tracked requests also bind a company and check the
+  importing actor. CRM contact, lead and opportunity submission requires the
+  server's opt-in even when a module or wizard displays the action. Farm
+  discovery needs the selected company's Farm Operations pack and current
+  farm read permission. The farm import page also checks create access for
+  intake. The historical-document replay entry requires create access on
+  entries and lines, entry write access, payment-transaction read access and
+  reconciliation creation, plus callable replay capability.
+- **Saved tasks.** The [server catalog](../../api-server/src/routes/import_reviews/capabilities.rs)
+  distinguishes execution, reviewed record operations, native preview and
+  evidence-only destinations. The [task routes](../../api-server/src/routes/import_reviews/tasks.rs)
+  control original access and the explicit named handoff. A document intake
+  clerk can use the authorized document flow. The source review and
+  workflow endpoints still enforce [full administration and company scope](../../api-server/src/routes/import_reviews/mod.rs).
+  Held operations include their current recovery paths. They have no
+  execution action in the discovery data.
+- **Served evidence.** Each audited operation starts as `unverified` for
+  this baseline. Repository, hosted CI and historical pilot evidence below
+  remain reference material. Operation-level release proof requires an
+  identified served revision and exact authorized result links.
+
+### Earlier Alpha operation register
 
 Baseline checked on 15 November 2026 at
 [main `4e37059c`](https://github.com/KevTiv/lumiere-v-1/commit/4e37059c0b6b7841b0b9129a736a7896770f68bf).
