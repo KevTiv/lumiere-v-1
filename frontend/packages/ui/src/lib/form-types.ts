@@ -46,6 +46,7 @@ export interface BaseField {
     message: string
     /** Opens setup separately so the current form and its entered values stay mounted. */
     action?: { href: string; label: string }
+    retry?: { label: string; onRetry: () => void }
   }
   required?: boolean
   disabled?: boolean

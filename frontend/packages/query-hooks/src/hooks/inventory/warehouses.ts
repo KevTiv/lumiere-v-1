@@ -121,6 +121,8 @@ export function useWarehouses(
     enabled,
     ...inventoryListQueryOptions('warehouses', organizationId, 'Failed to fetch warehouses', companyId),
     initialData: inventoryInitialData(initialData, companyId),
+    // Setup can complete in another tab even while this query's cache is fresh.
+    refetchOnWindowFocus: companyId == null ? undefined : 'always',
   });
 }
 

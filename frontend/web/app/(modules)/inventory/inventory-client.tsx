@@ -1,7 +1,7 @@
 'use client';
 
 import { ModuleBackfillRecords, useCanReadModuleBackfill } from '../../../components/module-backfill-records';
-import { moduleBackfillTabs } from '@/lib/module-backfill-navigation';
+import { moduleBackfillEmptyHref, moduleBackfillTabs } from '@/lib/module-backfill-navigation';
 import { InventoryOpsPanel } from './inventory-ops-panel';
 
 import { isInventoryWorkspaceReadEnabled } from '@lumiere/stdb/subscriptions';
@@ -326,7 +326,9 @@ import {
   Play,
   Sparkles,
 } from 'lucide-react';
-import { buildCreateWarehouseParamsFromTemplate } from '@/lib/warehouse-create-params';
+import { useCompanyHandoff } from "@/lib/use-company-handoff";
+import { warehouseSetupAccess } from "@/lib/warehouse-choice";
+import { buildCreateWarehouseParamsFromTemplate, buildFirstWarehouseParams } from '@/lib/warehouse-create-params';
 import {
   pickingWaveCreateParamsFromForm,
   toCreateBarcodeRuleParamsFromForm,
@@ -425,8 +427,9 @@ export function InventoryClient(props: InventoryClientProps) {
   const { t } = useTranslation();
   const { identity, organizationId: sessionOrganizationId, activeCompanyReady } = useErpSession();
   const companyId = useDefaultOperatingCompanyBigInt(props.organizationId);
+  const switchingCompany = useCompanyHandoff();
   if (!hasValidOrganizationId(props.organizationId)) return <MissingOrganization />;
-  if (!activeCompanyReady || sessionOrganizationId !== props.organizationId) {
+  if (switchingCompany || !activeCompanyReady || sessionOrganizationId !== props.organizationId) {
     return <p role="status" className="p-4 text-sm text-muted-foreground">{t('common.loading')}</p>;
   }
   if (!companyId) {
@@ -887,7 +890,7 @@ function InventoryClientLoaded({
   });
   const createInventoryAdjustment = useCreateInventoryAdjustment(orgId);
 
-  const createStockLocation = useCreateStockLocation(orgId);
+  const createStockLocation = useCreateStockLocation(orgId, workspace === 'warehouse' ? operatingCompanyId : undefined);
   const updateStockLocation = useUpdateStockLocation(orgId);
   const createWarehouse = useCreateWarehouse(orgId, operatingCompanyId);
   const updateWarehouse = useUpdateWarehouse(orgId, operatingCompanyId);
@@ -963,13 +966,33 @@ function InventoryClientLoaded({
     }));
   }, [setup.templates, t]);
 
-  const warehouseFormConfig = useMemo(
-    () =>
-      mergeSelectOptionsForFields(newWarehouseForm(t), {
-        templateWarehouseId: warehouseTemplateOptions,
-      }),
-    [t, warehouseTemplateOptions],
-  );
+  const setupAccess = warehouseSetupAccess(checkPermission);
+  const warehouseCreateReady = permissionsReady !== false && setupAccess.warehouse &&
+    (setup.status === 'ready' || setup.status === 'first-warehouse');
+  const warehouseFormConfig = useMemo(() => {
+    const form = mergeSelectOptionsForFields(newWarehouseForm(t), {
+      templateWarehouseId: warehouseTemplateOptions,
+    });
+    if (setup.status !== 'first-warehouse') return form;
+    return {
+      ...form,
+      description: t('inventory.warehouseSetup.first-warehouse'),
+      sections: form.sections.map(section => ({
+        ...section,
+        fields: section.fields.map(field => {
+          if (field.type === 'checkbox' && field.name === 'active') return { ...field, defaultValue: true };
+          if (field.type !== 'select' || field.name !== 'templateWarehouseId') return field;
+          return {
+            ...field,
+            id: 'lotStockId',
+            name: 'lotStockId',
+            label: t('inventory.warehouseSetup.stockLocation'),
+            options: (setup.stockLocations ?? []).map(row => ({ value: String(row.id), label: String(row.name ?? row.id) })),
+          };
+        }),
+      })),
+    };
+  }, [setup.status, setup.stockLocations, t, warehouseTemplateOptions]);
 
   const assignUserFieldOptions = useMemo(() => {
     const rows = orgUsers as Record<string, unknown>[];
@@ -1498,6 +1521,11 @@ function InventoryClientLoaded({
     );
   }, [t, openCreateProduct, updateProduct, workspace, referenceCategories, checkPermission, permissionsReady]);
 
+  const recordedCountsHref = moduleBackfillEmptyHref('warehouse', {
+    canRead: workspace === 'warehouse' && canReadBackfill,
+    status: stockQuantsRead.state.status,
+    nativeRowCount: stockQuants.length,
+  });
   const stockEntityConfig = useMemo((): EntityViewConfig => {
     const base = stockQuantsTableConfig(t, {
       onEmptyAction: openCreateStockQuant,
@@ -1510,6 +1538,11 @@ function InventoryClientLoaded({
         emptyState: {
           ...view.emptyState,
           onAction: openCreateStockQuant,
+          relatedLink: recordedCountsHref ? {
+            href: recordedCountsHref,
+            label: t('moduleRecords.browseRecordedCounts'),
+            description: t('moduleRecords.recordedCountsEmptyStockHint'),
+          } : undefined,
         },
         actions: [
           ...(view.actions ?? []),
@@ -1539,7 +1572,7 @@ function InventoryClientLoaded({
         ],
       },
     };
-  }, [t, openCreateStockQuant, stockQuants]);
+  }, [t, openCreateStockQuant, recordedCountsHref, stockQuants]);
 
   const transfersEntityConfig = useMemo((): EntityViewConfig => {
     const base = transfersTableConfig(t, { onEmptyAction: openCreateTransfer });
@@ -3221,7 +3254,7 @@ function InventoryClientLoaded({
       ],
     };
     if (workspace === 'products') return productCatalogWorkspace(configured, t);
-    if (workspace === 'warehouse') return withWarehouseSetup(warehouseWorkspace(configured, t, locations), setup.status === 'ready');
+    if (workspace === 'warehouse') return withWarehouseSetup(warehouseWorkspace(configured, t, locations), warehouseCreateReady);
     return {
       ...configured,
       tabs: configured.tabs.map((tab) => tab.entityConfig && INVENTORY_OPERATIONAL_LISTS.has(tab.id)
@@ -3257,7 +3290,7 @@ function InventoryClientLoaded({
     lotRecordSheet,
     serialRecordSheet,
     productFormConfig,
-    warehouseFormConfig,
+    warehouseFormConfig, warehouseCreateReady,
     transferFormConfig,
     adjustmentFormConfig,
     stockLocationFormConfig,
@@ -3587,23 +3620,23 @@ function InventoryClientLoaded({
         stockLocationParams as unknown as CreateStockLocationParams,
       );
     } else if (action === 'createWarehouse') {
-      const templateWarehouseId = formData.templateWarehouseId;
-      if (templateWarehouseId === '' || templateWarehouseId == null) throw new Error(t('inventory.warehouseWorkspace.setupRequired', { defaultValue: 'Choose an available warehouse template. The first warehouse needs authorized setup before this form can be used.' }));
-      if (setup.status !== 'ready') throw new Error(t('inventory.warehouseWorkspace.setupRequired'));
-      const template = setup.templates.find(
-        (w) => String(w.id) === String(templateWarehouseId),
-      ) as Record<string, unknown> | undefined;
-      if (!template) throw new Error(t('inventory.warehouseWorkspace.setupRequired', { defaultValue: 'Choose an available warehouse template. The first warehouse needs authorized setup before this form can be used.' }));
-      await createWarehouse.mutateAsync(
-        buildCreateWarehouseParamsFromTemplate(template, {
-          name: String(formData.name ?? '').trim(),
-          code: String(formData.code ?? '').trim(),
-          active: formData.active == null ? true : Boolean(formData.active),
-          sequence: Number(formData.sequence ?? 0),
-          // Ensures template row lookup key is visible to static form–mutation tooling
-          templateWarehouseId: String(templateWarehouseId),
-        }) as unknown as CreateWarehouseParams,
-      );
+      const setupError = () => new Error(t('inventory.warehouseWorkspace.setupRequired'));
+      if (!warehouseCreateReady) throw setupError();
+      const values = {
+        name: String(formData.name ?? ''),
+        code: String(formData.code ?? ''),
+        active: formData.active == null ? true : Boolean(formData.active),
+        sequence: Number(formData.sequence ?? 0),
+      };
+      if (setup.status === 'first-warehouse') {
+        const location = setup.stockLocations?.find(row => String(row.id) === String(formData.lotStockId));
+        if (!location) throw setupError();
+        await createWarehouse.mutateAsync(buildFirstWarehouseParams(location.id, values) as unknown as CreateWarehouseParams);
+      } else {
+        const template = setup.templates.find(row => String(row.id) === String(formData.templateWarehouseId));
+        if (!template) throw setupError();
+        await createWarehouse.mutateAsync(buildCreateWarehouseParamsFromTemplate(template, values) as unknown as CreateWarehouseParams);
+      }
     } else if (action === 'createQualityCheck') {
       const productRaw = formData.productId;
       if (productRaw === '' || productRaw == null) return;
@@ -3827,7 +3860,9 @@ function InventoryClientLoaded({
       {activeTabUsable && formDialog}
       {workspace === 'warehouse' && <WarehouseSetupNotice
         status={setup.status}
-        canManage={permissionsReady !== false && checkPermission('warehouse', 'create').allowed}
+        canManage={permissionsReady !== false && setupAccess.warehouse}
+        canCreateLocation={permissionsReady !== false && setupAccess.location}
+        needsCustomerLocation={setup.needsCustomerLocation}
         onLocations={permissionsReady !== false && checkPermission('stock_location', 'read').allowed ? () => setActiveTab('locations') : undefined}
         onRetry={(('onRetry' in warehousesRead.state && warehousesRead.state.onRetry) ||
           ('onRetry' in locationsRead.state && locationsRead.state.onRetry)) ? () => {

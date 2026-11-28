@@ -18,6 +18,15 @@
     "unverified": "Mipangilio iliyohifadhiwa haikuweza kuthibitishwa. Kagua mipangilio ya sasa kabla ya kujaribu tena.",
     "recheck": "Kagua tena"
   },
+  "activation": {
+    "checks": {
+      "warehouse": "Ghala linalotumika katika kampuni hii"
+    },
+    "warehouse": {
+      "setup": "Sanidi ghala linalotumika katika kampuni hii kabla ya kuandaa makadirio ya bei.",
+      "ask": "Mwombe msimamizi asanidi ghala linalotumika katika kampuni hii kabla ya kuandaa makadirio ya bei."
+    }
+  },
   "aiChat": {
     "followUp": {
       "using": "Inatumia: {{label}} kutoka swali lako la mwisho",
@@ -48,6 +57,10 @@
     "emptyShopSales": "Hakuna mauzo ya dukani yaliyohifadhiwa.",
     "sales": "Muhtasari wa mauzo kwa wateja",
     "warehouse": "Hesabu zilizorekodiwa",
+    "browseCustomerSales": "Vinjari muhtasari wa mauzo kwa wateja",
+    "customerSalesEmptyOrdersHint": "Kagua mihtasari ya mauzo yenye tarehe na marejeleo ya vyanzo vyake.",
+    "browseRecordedCounts": "Vinjari hesabu zilizorekodiwa",
+    "recordedCountsEmptyStockHint": "Kagua hesabu halisi za bidhaa zenye tarehe na marejeleo ya vyanzo vyake.",
     "period": "Kipindi cha mauzo",
     "countDate": "Tarehe ya kuhesabu",
     "customer": "Mteja",
@@ -5249,6 +5262,21 @@
   "pageComposition": {
     "addBelow": "Ongeza wijeti hapa chini",
     "addBelowNamed": "Ongeza wijeti chini ya {{title}}"
+  },
+  "inventory": {
+    "warehouseSetup": {
+      "title": "Usanidi wa maghala",
+      "denied": "Huna ruhusa ya kuona maghala au maeneo ya kuhifadhi bidhaa yanayohitajika kwa usanidi.",
+      "first-warehouse": "Unda ghala ukitumia eneo la ndani linalotumika kuhifadhi bidhaa katika kampuni hii.",
+      "stockLocation": "Eneo la ndani la kuhifadhi bidhaa",
+      "customerLocation": "Usafirishaji wa bidhaa pia unahitaji eneo linalotumika la aina ya Mteja. Tumia Maeneo kuliongeza kwa kampuni hii.",
+      "locationPermission": "Mwombe msimamizi wa shirika lako aunde eneo la kuhifadhi bidhaa linalohitajika.",
+      "choiceLoading": "Inakagua maghala ya kampuni hii…",
+      "choiceDenied": "Huna ruhusa ya kuona maghala. Mwombe msimamizi wako akupe ruhusa hiyo.",
+      "choiceFailed": "Maghala hayakuweza kuthibitishwa. Jaribu tena bila kuondoka kwenye fomu hii.",
+      "choiceEmptyManager": "Hakuna ghala linalotumika kwa kampuni hii. Fungua usanidi wa maghala kisha urudi kuchagua ghala lililohifadhiwa. Maingizo yako yatabaki hapa.",
+      "choiceEmptyOperator": "Hakuna ghala linalotumika kwa kampuni hii. Mwombe msimamizi wako amalize usanidi wa maghala kisha urudi hapa."
+    }
   },
   "farmBatches": {
     "farmBatches": "Makundi ya mifugo",

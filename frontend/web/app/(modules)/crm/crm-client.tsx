@@ -129,7 +129,9 @@ import {
   type Contact,
 } from "@lumiere/query-hooks/hooks/crm"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
-import { useProducts, useUoms, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
+import { useWarehouseChoice } from "@/lib/use-warehouse-choice"
+import { withFormChoiceSetup } from "@lumiere/ui/lib/form-choice-setup"
+import { useProducts, useUoms } from "@lumiere/query-hooks/hooks/inventory"
 import { useAccountTaxes } from "@lumiere/query-hooks/hooks/accounting"
 import { EntityLabelsProvider, labelsFromOptions } from "@lumiere/ui"
 import type { EntityRecordSheetConfig, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
@@ -456,8 +458,8 @@ function CrmClientLoaded({
   const { rows: leadLostReasons } = moduleCollection(lostReasonsQuery)
   const pricelistsQuery = usePricelists(orgId)
   const { rows: pricelists } = moduleCollection(pricelistsQuery)
-  const warehousesQuery = useWarehouses(orgId)
-  const { rows: warehouses } = moduleCollection(warehousesQuery)
+  const warehouseCompanyId = workflowModal?.kind === "convertOpp" ? workflowModal.companyId : operatingCompanyId
+  const { options: warehouseSelectOptions, help: warehouseChoiceHelp, status: warehouseStatus } = useWarehouseChoice(orgId, warehouseCompanyId)
   const activityTypesQuery = useQuery({
     queryKey: ["activity-types", organizationId],
     queryFn: () => fetchQueryList("/api/query/activity-types", "Could not load activity types"),
@@ -608,18 +610,6 @@ function CrmClientLoaded({
     [pricelists],
   )
 
-  const warehouseSelectOptions = useMemo(
-    () =>
-      warehouses.map((w) => {
-        const row = w as Record<string, unknown>
-        return {
-          value: String(row.id ?? ""),
-          label: String(row.name ?? row.id ?? ""),
-        }
-      }),
-    [warehouses],
-  )
-
   const openOpportunityOptions = useMemo(() => {
     const fromApi = openOpportunityRowsToSelectOptions(
       opportunities as Record<string, unknown>[],
@@ -735,8 +725,8 @@ function CrmClientLoaded({
     const defaults: Record<string, unknown> = {}
     if (pricelistSelectOptions[0]) defaults.pricelistId = pricelistSelectOptions[0].value
     if (warehouseSelectOptions[0]) defaults.warehouseId = warehouseSelectOptions[0].value
-    return mergeFieldDefaultValues(base, defaults)
-  }, [t, pricelistSelectOptions, warehouseSelectOptions])
+    return withFormChoiceSetup(mergeFieldDefaultValues(base, defaults), { warehouseId: warehouseChoiceHelp })
+  }, [t, pricelistSelectOptions, warehouseChoiceHelp, warehouseSelectOptions])
 
   const openConvertLeadModal = useCallback(
     (rows: Record<string, unknown>[]) => {
@@ -1195,12 +1185,11 @@ function CrmClientLoaded({
     stagesReady: moduleQueryState(opportunityStagesQuery).status === "ready" && opportunityStageOptions.length > 0,
     wonStageReady: moduleQueryState(opportunityStagesQuery).status === "ready" && wonStageId != null,
     lostReasonsReady: moduleQueryState(lostReasonsQuery).status === "ready" && lostReasonSelectOptions.some((option) => option.value !== ""),
-    orderSetupReady: moduleQueryState(pricelistsQuery).status === "ready" && moduleQueryState(warehousesQuery).status === "ready"
-      && pricelistSelectOptions.length > 0 && warehouseSelectOptions.length > 0 && wonStageId != null,
+    orderSetupReady: moduleQueryState(pricelistsQuery).status === "ready" && pricelistSelectOptions.length > 0 && wonStageId != null,
     activityTypesReady: activitiesRead.state.status === "ready" && moduleQueryState(activityTypesQuery).status === "ready" && activityTypeOptions.length > 0,
   }), [leadsRead.state.status, opportunitiesRead.state.status, contactsRead.state.status, checkPermission, isFormMutationPending,
     operatingCompanyId, opportunityStagesQuery, opportunityStageOptions.length, wonStageId, lostReasonsQuery, lostReasonSelectOptions,
-    pricelistsQuery, warehousesQuery, pricelistSelectOptions.length, warehouseSelectOptions.length, activitiesRead.state.status, activityTypesQuery, activityTypeOptions.length])
+    pricelistsQuery, pricelistSelectOptions.length, activitiesRead.state.status, activityTypesQuery, activityTypeOptions.length])
 
   const handleRecordAction = useCallback(async (kind: CrmRecordKind, action: CrmActionId, row: EntityRow) => {
     const availability = crmWorkflowActions(kind, row, recordActionContext(kind)).find((item) => item.id === action)
@@ -2371,7 +2360,7 @@ function CrmClientLoaded({
     : (workflowModal?.kind === "scheduleActivity" ? !workflowContext.canCreateActivity : !workflowContext.canWrite) ? "permissionRequired"
     : workflowModal?.kind === "scheduleActivity" && !workflowContext.activityTypesReady ? "activityTypeRequired"
     : (workflowModal?.kind === "convertLead" || workflowModal?.kind === "changeStage") && !workflowContext.stagesReady ? "stagesRequired"
-    : workflowModal?.kind === "convertOpp" && !workflowContext.orderSetupReady ? "orderSetupRequired"
+    : workflowModal?.kind === "convertOpp" && (!workflowContext.orderSetupReady || warehouseStatus !== "ready" || warehouseSelectOptions.length === 0) ? "orderSetupRequired"
     : workflowModal?.kind === "markOppLost" && !workflowContext.lostReasonsReady ? "lostReasonRequired" : undefined
   const workflowUsable = workflowModal == null || workflowUnavailableReason == null
 
@@ -2493,7 +2482,7 @@ function CrmClientLoaded({
         await convertLead.mutateAsync({ leadId: workflowModal.leadId, params: p })
       } else if (workflowModal.kind === "convertOpp") {
         const p = toConvertOpportunityParams(formData)
-        if (!p) throw new Error(t("crm.forms.convertToSaleOrder.validation.pricelistWarehouse"))
+        if (!p || !warehouseSelectOptions.some(choice => choice.value === String(formData.warehouseId))) throw new Error(t("crm.forms.convertToSaleOrder.validation.pricelistWarehouse"))
         await convertOppToOrder.mutateAsync({
           opportunityId: workflowModal.opportunityId,
           params: p,
@@ -2804,7 +2793,6 @@ function CrmClientLoaded({
           if (workflowModal?.kind === "markOppLost") void lostReasonsQuery.refetch()
           if (workflowModal?.kind === "convertOpp") {
             void pricelistsQuery.refetch()
-            void warehousesQuery.refetch()
             void opportunityStagesQuery.refetch()
           }
         }}>{t("common.retry")}</Button> : undefined}

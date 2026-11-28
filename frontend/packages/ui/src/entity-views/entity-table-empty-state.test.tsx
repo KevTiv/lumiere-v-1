@@ -90,6 +90,21 @@ describe("EntityTable first-time empty state", () => {
     expect(onImport).toHaveBeenCalledTimes(1)
   })
 
+  it("presents the related read-only destination alongside the regular empty hint", () => {
+    renderTable({
+      emptyState: {
+        learnHint: "Start with a quotation.",
+        relatedLink: {
+          href: "/sales?tab=customer-sales",
+          label: "Browse customer sales summaries",
+          description: "Review dated summaries with source references.",
+        },
+      },
+    }, [], { grant: "read" })
+    expect(screen.getByText("Start with a quotation.")).toBeTruthy()
+    expect(screen.getByRole("link", { name: "Browse customer sales summaries" }).getAttribute("href")).toBe("/sales?tab=customer-sales")
+  })
+
   it("replaces the CTA with a read-only message when the user lacks the action's permission", () => {
     renderTable(
       {
@@ -128,10 +143,16 @@ describe("EntityTable first-time empty state", () => {
 
 describe("EntityTable no-results state", () => {
   it("offers Clear filters when a search hides every row, and restores the rows", () => {
-    renderTable({ emptyState: { title: "No orders yet" } }, rows)
+    renderTable({
+      emptyState: {
+        title: "No orders yet",
+        relatedLink: { href: "/sales?tab=customer-sales", label: "Browse customer sales summaries", description: "Review dated summaries." },
+      },
+    }, rows)
     fireEvent.change(screen.getByRole("textbox", { name: "Search records" }), { target: { value: "zzz" } })
     expect(screen.getByTestId("entity-empty-no-results")).toBeTruthy()
     expect(screen.queryByTestId("entity-empty-first-time")).toBeNull()
+    expect(screen.queryByRole("link", { name: "Browse customer sales summaries" })).toBeNull()
     fireEvent.click(screen.getByTestId("entity-empty-clear-filters"))
     expect(screen.queryByTestId("entity-empty-no-results")).toBeNull()
     expect(screen.getByText("SO-001")).toBeTruthy()

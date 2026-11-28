@@ -1,4 +1,7 @@
 "use client"
+import { useWarehouseChoice } from "@/lib/use-warehouse-choice"
+import { withFormChoiceSetup } from "@lumiere/ui/lib/form-choice-setup"
+
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { canUseModuleData, mergeModuleStates, moduleCollection, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { manufacturingResultLinks, type ManufacturingResultLink } from "@/lib/manufacturing-result-links"
@@ -22,7 +25,7 @@ import {
 } from "@lumiere/ui"
 import type { ManufacturingCsvImportKind } from "@lumiere/ui"
 import type { EntitySurfacePermission, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
-import type { Product, Warehouse, StockPicking, StockQuant } from "@lumiere/stdb/types"
+import type { Product, StockPicking, StockQuant } from "@lumiere/stdb/types"
 import { manufacturingModuleConfig } from "@/lib/module-dashboard-configs"
 import { useManufacturingModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -64,13 +67,11 @@ import {
   useProducts,
   useStockQuants,
   useStockPickings,
-  useWarehouses,
 } from "@lumiere/query-hooks/hooks/inventory"
 import { useIotDevices } from "@lumiere/query-hooks/hooks/iot"
 import type { IoTDevice } from "@lumiere/query-hooks/hooks/iot"
 import {
   productRowsToSelectOptions,
-  warehouseRowsToSelectOptions,
   pickingTypeOptionsFromTransfers,
   locationOptionsFromQuantsAndTransfers,
   mrpBomRowsToSelectOptions,
@@ -85,7 +86,6 @@ interface ManufacturingClientProps {
   initialRoutingOperations?: MrpRoutingWorkcenter[]
   initialIotDevicesState?: QueryResourceState<IoTDevice>
   initialProducts?: Product[]
-  initialWarehouses?: Warehouse[]
   initialStockPickings?: StockPicking[]
   initialStockQuants?: StockQuant[]
   organizationId?: number
@@ -111,7 +111,6 @@ function ManufacturingClientLoaded({
   initialRoutingOperations,
   initialIotDevicesState,
   initialProducts,
-  initialWarehouses,
   initialStockPickings,
   initialStockQuants,
   organizationId,
@@ -163,7 +162,7 @@ function ManufacturingClientLoaded({
   const qualityChecksRead = moduleCollection(useQualityChecks(orgId))
   const qualityChecks = qualityChecksRead.rows
   const { data: products = [] } = useProducts(orgId, initialProducts);
-  const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
+  const { options: warehouseFieldOptions, help: warehouseChoiceHelp } = useWarehouseChoice(orgId, operatingCompanyId);
   const { data: transfers = [] } = useStockPickings(
     orgId,
     initialStockPickings,
@@ -210,12 +209,6 @@ function ManufacturingClientLoaded({
     return [{ value: "", label: t("common.lookup.noBoms"), disabled: true }]
   }, [boms, t])
 
-  const warehouseFieldOptions = useMemo(() => {
-    const fromApi = warehouseRowsToSelectOptions(warehouses)
-    if (fromApi.length > 0) return fromApi
-    return [{ value: "", label: t("common.lookup.noWarehouses"), disabled: true }]
-  }, [warehouses, t])
-
   const pickingAndLocations = useMemo(() => {
     const picking = pickingTypeOptionsFromTransfers(transfers)
     const locs = locationOptionsFromQuantsAndTransfers(stockQuants, transfers)
@@ -230,15 +223,15 @@ function ManufacturingClientLoaded({
 
   const moFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(newManufacturingOrderForm(t), {
+      withFormChoiceSetup(mergeSelectOptionsForFields(newManufacturingOrderForm(t), {
         productId: productFieldOptions,
         bomId: bomFieldOptions,
         warehouseId: warehouseFieldOptions,
         pickingTypeId: pickingAndLocations.picking,
         locationSrcId: pickingAndLocations.locs,
         locationDestId: pickingAndLocations.locs,
-      }),
-    [t, productFieldOptions, bomFieldOptions, warehouseFieldOptions, pickingAndLocations],
+      }), { warehouseId: warehouseChoiceHelp }),
+    [t, productFieldOptions, bomFieldOptions, warehouseFieldOptions, warehouseChoiceHelp, pickingAndLocations],
   )
 
   const bomFormConfig = useMemo(
@@ -575,6 +568,10 @@ function ManufacturingClientLoaded({
       throw new Error(t("manufacturing.errors.noActiveCompany"))
     }
     if (action === "createManufacturingOrder") {
+      const warehouseId = String(formData.warehouseId ?? "");
+      if (warehouseId && !warehouseFieldOptions.some(choice => choice.value === warehouseId)) {
+        throw new Error(warehouseChoiceHelp.message);
+      }
       const prodRaw = formData.productId
       const matches = products.filter((p) => String(p.id) === String(prodRaw))
       if (matches.length !== 1) throw new Error(t("manufacturing.forms.newBom.components.invalid"))
@@ -704,7 +701,7 @@ function ManufacturingClientLoaded({
       <FormModal
         open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? moFormConfig}
+        config={quickActionForm?.action === "createManufacturingOrder" ? moFormConfig : quickActionForm?.form ?? moFormConfig}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {

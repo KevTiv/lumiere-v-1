@@ -33,7 +33,8 @@ import {
 import { usePricelists, useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
 import { proposalOrderLinks } from "@lumiere/query-hooks/hooks/cross-record-links"
 import { CrossRecordLinks } from "../../../components/order-handoff-links"
-import { useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
+import { useWarehouseChoice } from "@/lib/use-warehouse-choice"
+import { withFormChoiceSetup } from "@lumiere/ui/lib/form-choice-setup"
 import type { Proposal } from "@lumiere/query-hooks/hooks/proposals"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
@@ -152,7 +153,7 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
   const approveProposal = useApproveProposal(orgId, operatingCompanyId)
   const convertProposal = useConvertProposalToSaleOrder(orgId, operatingCompanyId)
   const { data: pricelists = [] } = usePricelists(orgId)
-  const { data: warehouses = [] } = useWarehouses(orgId)
+  const { options: warehouseOptions, help: warehouseChoiceHelp } = useWarehouseChoice(orgId, operatingCompanyId)
   const { data: saleOrders = [], isLoading: saleOrdersLoading, isError: saleOrdersError } = useSaleOrders(orgId)
 
   const isPending =
@@ -169,7 +170,6 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
         return { value: String(row.id ?? ""), label: String(row.name ?? row.id ?? "") }
       })
     const pricelistOptions = options(pricelists)
-    const warehouseOptions = options(warehouses)
     const base = mergeSelectOptionsForFields(
       { ...convertOpportunityToOrderForm(t), id: "convert-proposal-order" },
       { pricelistId: pricelistOptions, warehouseId: warehouseOptions },
@@ -177,8 +177,8 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
     const defaults: { pricelistId?: string; warehouseId?: string } = {}
     if (pricelistOptions[0]) defaults.pricelistId = pricelistOptions[0].value
     if (warehouseOptions[0]) defaults.warehouseId = warehouseOptions[0].value
-    return mergeFieldDefaultValues(base, defaults)
-  }, [t, pricelists, warehouses])
+    return withFormChoiceSetup(mergeFieldDefaultValues(base, defaults), { warehouseId: warehouseChoiceHelp })
+  }, [t, pricelists, warehouseOptions, warehouseChoiceHelp])
 
   const currencyOptions = useMemo(() => currencyOptionsFromRows(currencies), [currencies])
   const proposalCreateForm = useMemo(
@@ -540,6 +540,9 @@ function ProposalsClientLoaded({ initialProposals, organizationId }: ProposalsCl
           config={convertFormConfig}
           isPending={isPending}
           onSubmit={async (formData) => {
+            if (!warehouseOptions.some(choice => choice.value === String(formData.warehouseId))) {
+              throw new Error(warehouseChoiceHelp.message)
+            }
             await convertProposal.mutateAsync({
               proposalId: convertProposalId,
               pricelistId: String(formData.pricelistId ?? ""),

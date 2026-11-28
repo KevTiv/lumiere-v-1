@@ -10,7 +10,7 @@ const id = (value: unknown) => {
   return parsed != null && parsed > 0n ? parsed.toString() : null;
 };
 
-export type WarehouseSetupStatus = 'company-required' | 'loading' | 'unavailable' | 'locations-required' | 'assisted-setup' | 'ready';
+export type WarehouseSetupStatus = 'company-required' | 'loading' | 'unavailable' | 'denied' | 'locations-required' | 'assisted-setup' | 'first-warehouse' | 'ready';
 
 /** Only readable, active templates in the selected company may supply operational references. */
 export function warehouseSetup(input: {
@@ -20,12 +20,13 @@ export function warehouseSetup(input: {
   locations: readonly Row[];
   warehouseState: ModuleDataState;
   locationState: ModuleDataState;
-}): { status: WarehouseSetupStatus; templates: readonly Row[] } {
+}): { status: WarehouseSetupStatus; templates: readonly Row[]; stockLocations?: readonly Row[]; needsCustomerLocation?: boolean } {
   const organizationId = id(input.organizationId);
   const companyId = id(input.companyId);
   if (!organizationId || !companyId) return { status: 'company-required', templates: [] };
   const states = [input.warehouseState, input.locationState];
-  if (states.some(state => ['denied', 'error', 'partial'].includes(state.status))) {
+  if (states.some(state => state.status === 'denied')) return { status: 'denied', templates: [] };
+  if (states.some(state => ['error', 'partial'].includes(state.status))) {
     return { status: 'unavailable', templates: [] };
   }
   if (states.some(state => state.status === 'loading')) return { status: 'loading', templates: [] };
@@ -42,24 +43,27 @@ export function warehouseSetup(input: {
     id(field(row, 'organizationId', 'organization_id')) === organizationId &&
     (field(row, 'companyId', 'company_id') == null || id(field(row, 'companyId', 'company_id')) === companyId) && row.active === true,
   );
-  const stockLocations = locations.filter(row => row.usage === 'internal');
+  const stockLocations = locations.filter(row => row.usage === 'internal' && id(row.id));
   if (stockLocations.length === 0) return { status: 'locations-required', templates: [] };
   const locationIds = new Set(locations.map(row => id(row.id)));
   const stockLocationIds = new Set(stockLocations.map(row => id(row.id)));
-  if (input.warehouses.some(row =>
+  const activeWarehouses = input.warehouses.filter(row =>
     id(field(row, 'organizationId', 'organization_id')) === organizationId &&
-    id(field(row, 'companyId', 'company_id')) === companyId && row.active === true &&
+    id(field(row, 'companyId', 'company_id')) === companyId && row.active === true,
+  );
+  const needsCustomerLocation = !locations.some(row => row.usage === 'customer' && id(row.id));
+  if (activeWarehouses.length === 0) return { status: 'first-warehouse', templates: [], stockLocations, needsCustomerLocation };
+  if (activeWarehouses.some(row =>
     (field(row, 'lotStockId', 'lot_stock_id') === undefined || ['in', 'out', 'int', 'pack', 'pick'].some(prefix =>
       field(row, `${prefix}TypeId`, `${prefix}_type_id`) === undefined,
     )),
   )) return { status: 'unavailable', templates: [] };
-  const templates = input.warehouses.filter(row =>
-    id(field(row, 'organizationId', 'organization_id')) === organizationId &&
-    id(field(row, 'companyId', 'company_id')) === companyId && row.active === true &&
+  const templates = activeWarehouses.filter(row =>
+    id(row.id) !== null &&
     stockLocationIds.has(id(field(row, 'lotStockId', 'lot_stock_id'))) &&
     // Operation types are codes in the current model, not a separate readable table.
     ['in', 'out', 'int', 'pack', 'pick'].every(prefix =>
-      id(field(row, `${prefix}TypeId`, `${prefix}_type_id`)) !== null,
+      parseStrictU64(field(row, `${prefix}TypeId`, `${prefix}_type_id`)) != null,
     ) &&
     [
       ['whInputStockLocId', 'wh_input_stock_loc_id'],
@@ -73,7 +77,7 @@ export function warehouseSetup(input: {
       return value == null || locationIds.has(id(value));
     }),
   );
-  return { status: templates.length ? 'ready' : 'assisted-setup', templates };
+  return { status: templates.length ? 'ready' : 'assisted-setup', templates, needsCustomerLocation };
 }
 
 /** An unavailable template must not open a form that cannot be submitted. */

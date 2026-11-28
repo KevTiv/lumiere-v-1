@@ -5,7 +5,6 @@ import { expect, type Page, type Response } from "@playwright/test"
 
 import {
   chooseFirstEnabledOption,
-  chooseSelectOptionByLabel,
   chooseSelectOptionByValue,
   fetchDefaultCompanyId,
   fetchInvoiceMoveDetails,
@@ -80,9 +79,6 @@ export async function createAndPostInvoice(page: Page, label: string): Promise<n
 /** Operator creates and posts an exact-reference customer receipt for the invoice amount. */
 export async function createAndPostPayment(page: Page, moveId: number) {
   const { partnerId, amountTotal, currencyId } = await fetchInvoiceMoveDetails(page, moveId)
-  const partner = (await rows(page, "contacts")).find((row) => scalarQueryId(row.id) === partnerId)
-  const partnerName = String(partner?.name ?? partner?.displayName ?? partner?.display_name ?? "")
-  expect(partnerName).not.toBe("")
 
   await gotoModule(page, "/accounting", "accounting")
   await openAccountingTab(page, "payments")
@@ -90,7 +86,7 @@ export async function createAndPostPayment(page: Page, moveId: number) {
   await expect(page.getByTestId("form-modal-new-account-payment")).toBeVisible()
   await chooseSelectOptionByValue(page, "paymentType", "InBound")
   await chooseSelectOptionByValue(page, "partnerType", "Customer")
-  await chooseSelectOptionByLabel(page, "partnerId", partnerName)
+  await chooseSelectOptionByValue(page, "partnerId", partnerId)
   await fillField(page, "amount", String(amountTotal))
   await chooseSelectOptionByValue(page, "currencyId", currencyId)
   await chooseFirstEnabledOption(page, "journalId")

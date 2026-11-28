@@ -1,4 +1,6 @@
+import { companyWarehouseOptions } from "@/lib/warehouse-choice"
 import { onboardingFiscalYearEnd } from "@/lib/onboarding-config"
+import { decodeQueryListResponse } from "@lumiere/api-client"
 import { moduleTabHref } from "@lumiere/erp-shared/record-links"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 
@@ -122,6 +124,39 @@ export function activationChecklist(input: {
     : companyContacts.some(row => row.isCustomer === true) ? "ready"
       : scopeUnverifiable || companyContacts.some(row => row.isCustomer === undefined) ? "unavailable" : "missing"
   return { companyState, currencyState, fiscalState, contactState, customerState }
+}
+
+type ActivationWarehouse = {
+  id?: unknown
+  active?: unknown
+  organizationId?: unknown
+  companyId?: unknown
+}
+
+export function decodeActivationWarehouses(payload: unknown): ActivationWarehouse[] {
+  return decodeQueryListResponse(payload, (row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) throw new Error("Invalid warehouse row")
+    return row
+  })
+}
+
+export function activationWarehouseState(input: {
+  organizationId: Id
+  companyId: Id | null
+  companyState: ActivationCheckState
+  warehouses?: ActivationRead<ActivationWarehouse> & { isFetching?: boolean }
+}): ActivationCheckState {
+  if (input.companyState !== "ready") return input.companyState === "missing" ? "unavailable" : input.companyState
+  if (input.warehouses?.status === "pending") return "loading"
+  if (input.warehouses?.status !== "success" || !input.warehouses.data) return "unavailable"
+
+  const organizationId = parseStrictU64(input.organizationId)
+  const companyId = parseStrictU64(input.companyId)
+  if (!organizationId || !companyId) return "unavailable"
+  const choices = companyWarehouseOptions(input.warehouses.data, organizationId, companyId)
+  if (choices == null) return "unavailable"
+  if (choices.length > 0) return "ready"
+  return input.warehouses.isFetching ? "loading" : "missing"
 }
 
 /** Navigation suggestions narrow discovery; these checks never authorize a save. */

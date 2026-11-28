@@ -18,6 +18,15 @@
     "unverified": "Ntibyashobotse kwemeza igenamiterere ryabitswe. Reba igenamiterere ririho mbere yo kongera kugerageza.",
     "recheck": "Ongera ugenzure"
   },
+  "activation": {
+    "checks": {
+      "warehouse": "Ububiko bukora muri iyi sosiyete"
+    },
+    "warehouse": {
+      "setup": "Tegura ububiko bukora muri iyi sosiyete mbere yo gukora inyandiko y’ibiciro biteganyijwe.",
+      "ask": "Saba umuyobozi gutegura ububiko bukora muri iyi sosiyete mbere yo gukora inyandiko y’ibiciro biteganyijwe."
+    }
+  },
   "aiChat": {
     "followUp": {
       "using": "Hakoreshejwe: {{label}} biturutse ku kibazo cyawe cya nyuma",
@@ -43,6 +52,10 @@
     "emptyShopSales": "Nta byagurishijwe mu maduka byabitswe.",
     "sales": "Incamake y’ibyagurishijwe ku bakiriya",
     "warehouse": "Ibarura ryanditswe",
+    "browseCustomerSales": "Reba incamake z’igurisha ku bakiriya",
+    "customerSalesEmptyOrdersHint": "Reba incamake z’igurisha zifite amatariki n’ibiranga aho amakuru yaturutse.",
+    "browseRecordedCounts": "Reba ibarura ryabitswe",
+    "recordedCountsEmptyStockHint": "Reba ibarura ryakozwe ku bicuruzwa, amatariki yaryo n’ibiranga aho amakuru yaturutse.",
     "period": "Igihe cy’igurisha",
     "countDate": "Itariki y’ibarura",
     "customer": "Umukiriya",
@@ -5351,6 +5364,21 @@
   "pageComposition": {
     "addBelow": "Ongeraho widget hasi",
     "addBelowNamed": "Ongeraho widget munsi ya {{title}}"
+  },
+  "inventory": {
+    "warehouseSetup": {
+      "title": "Igenamiterere ry’ububiko",
+      "denied": "Nta burenganzira ufite bwo kureba ububiko cyangwa ahantu ibicuruzwa bibikwa bikenewe mu igenamiterere.",
+      "first-warehouse": "Kora ububiko ukoresheje ahantu h’imbere ho kubika ibicuruzwa hakora muri iyi sosiyete.",
+      "stockLocation": "Ahantu h’imbere ho kubika ibicuruzwa",
+      "customerLocation": "Kohereza ibicuruzwa bisaba n’ahantu hakora ho kubika ibicuruzwa h’ubwoko bw’Umukiriya. Hange mu gice cy’Ahantu muri iyi sosiyete.",
+      "locationPermission": "Saba umuyobozi w’umuryango wawe gukora ahantu ho kubika ibicuruzwa hakenewe.",
+      "choiceLoading": "Turimo kugenzura ububiko bw’iyi sosiyete…",
+      "choiceDenied": "Nta burenganzira ufite bwo kureba ububiko. Busabe umuyobozi wawe.",
+      "choiceFailed": "Ububiko ntibwashoboye kugenzurwa. Ongera ugerageze utavuye muri iyi fishi.",
+      "choiceEmptyManager": "Nta bubiko bukora buri muri iyi sosiyete. Fungura igenamiterere ry’ububiko, hanyuma ugaruke uhitemo ububiko bwabitswe. Ibyo winjije bizagumaho.",
+      "choiceEmptyOperator": "Nta bubiko bukora buri muri iyi sosiyete. Saba umuyobozi wawe kurangiza igenamiterere ry’ububiko, hanyuma ugaruke hano."
+    }
   },
   "farmBatches": {
     "farmBatches": "Amatsinda y’amatungo",

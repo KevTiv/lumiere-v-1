@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { activationChecklist, activationForm, activationRecordHref, activationTaskHref, availableActivationTasks, matchesActivationRecord, parseActivationReceipt, selectedActivationTask } from "./activation-checklist"
+import { activationChecklist, activationForm, activationRecordHref, activationTaskHref, activationWarehouseState, availableActivationTasks, decodeActivationWarehouses, matchesActivationRecord, parseActivationReceipt, selectedActivationTask } from "./activation-checklist"
 
 const company = { id: 2n, organizationId: 1n, currencyId: 4n, fiscalYearEndMonth: 12, fiscalYearEndDay: 31 }
 const customer = { id: 9n, organizationId: 1n, companyId: 2n, isCustomer: true }
@@ -100,4 +100,26 @@ test("a retained save pointer requires an exact current-scope record", () => {
   assert.equal(matchesActivationRecord({ ...row, company_id: null }, receipt, 1, 2), false)
   assert.equal(parseActivationReceipt('{"task":"reports","recordId":"9"}'), null)
   assert.equal(parseActivationReceipt('{"task":"contact","recordId":"../9"}'), null)
+})
+
+test("quotation warehouse readiness requires a confirmed active warehouse in the exact company", () => {
+  const context = { organizationId: 1, companyId: 2, companyState: "ready" as const }
+  const warehouse = { id: "11", organizationId: "1", companyId: "2", active: true }
+  const state = (data: unknown) => activationWarehouseState({
+    ...context,
+    warehouses: { status: "success", data: decodeActivationWarehouses({ data }) },
+  })
+  assert.equal(state([warehouse]), "ready")
+  assert.equal(state([{ ...warehouse, active: 1 }]), "unavailable")
+  assert.equal(state([{ ...warehouse, active: false }, { ...warehouse, companyId: "3" }, { ...warehouse, organizationId: "3" }]), "missing")
+  assert.equal(state([]), "missing")
+  assert.equal(state([{ ...warehouse, active: undefined }]), "unavailable")
+  assert.equal(state([{ ...warehouse, companyId: undefined }]), "unavailable")
+  assert.equal(activationWarehouseState(context), "unavailable")
+  assert.equal(activationWarehouseState({ ...context, warehouses: { status: "success", data: [], isFetching: true } }), "loading")
+  assert.equal(activationWarehouseState({ ...context, warehouses: { status: "pending" } }), "loading")
+  assert.equal(activationWarehouseState({ ...context, warehouses: { status: "error", data: [warehouse] } }), "unavailable")
+  assert.equal(activationWarehouseState({ ...context, companyId: null, companyState: "missing" }), "unavailable")
+  assert.throws(() => decodeActivationWarehouses({}))
+  assert.throws(() => decodeActivationWarehouses({ data: [null] }))
 })

@@ -3,13 +3,15 @@
 import { OrderSummaryNotices } from './order-summary-notices';
 import { saleOrderListFieldAliases } from '@lumiere/ui/lib/sales-entity-configs';
 import { ModuleBackfillRecords, useCanReadModuleBackfill } from "../../../components/module-backfill-records"
-import { moduleBackfillTabs } from "@/lib/module-backfill-navigation"
+import { resolveModuleHistoryFilter } from "@lumiere/ui/lib/module-history-filter"
+import { moduleBackfillEmptyHref, moduleBackfillTabs } from "@/lib/module-backfill-navigation"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
 import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
 import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { useWarehouseChoice } from "@/lib/use-warehouse-choice"
 import { withFormChoiceSetup } from "@lumiere/ui/lib/form-choice-setup"
 import { CompanyModuleInsights } from "../../../components/module-insights"
 
@@ -198,9 +200,9 @@ import {
   useStockPickings,
   useStockMoves,
 } from '@lumiere/query-hooks/hooks/inventory';
-import type { Warehouse, StockPicking } from '@lumiere/stdb/types';
+import type { StockPicking } from '@lumiere/stdb/types';
 import { useContacts, useUsers, type Contact } from '@lumiere/query-hooks/hooks/crm';
-import { useWarehouses, useProducts, useUoms, useProductCategories } from '@lumiere/query-hooks/hooks/inventory';
+import { useProducts, useUoms, useProductCategories } from '@lumiere/query-hooks/hooks/inventory';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { useRuntimeListConfig } from '@lumiere/ui/forms';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
@@ -231,7 +233,6 @@ import { saleOrderDetailWithPartners, saleOrderRecordHref } from './sale-order-r
 import {
   contactRowsToPartnerSelectOptions,
   pricelistRowsToSelectOptions,
-  warehouseRowsToSelectOptions,
   loyaltyProgramRowsToSelectOptions,
   accountJournalRowsToSelectOptions,
   accountAccountRowsToSelectOptions,
@@ -312,7 +313,6 @@ interface SalesClientProps {
   initialLoyaltyPrograms?: PosLoyaltyProgram[];
   initialLoyaltyCards?: PosLoyaltyCard[];
   initialContacts?: Contact[];
-  initialWarehouses?: Warehouse[];
   initialStockPickings?: StockPicking[];
   initialReturnOrders?: ReturnOrder[];
   initialReturnOrderLines?: ReturnOrderLine[];
@@ -370,7 +370,6 @@ function SalesClientLoaded({
   initialLoyaltyPrograms,
   initialLoyaltyCards,
   initialContacts,
-  initialWarehouses,
   initialStockPickings,
   initialReturnOrders,
   initialReturnOrderLines,
@@ -460,8 +459,7 @@ function SalesClientLoaded({
   const contactsRead = moduleCollection(useContacts(orgId, initialContacts));
   const contacts = contactsRead.rows;
   const { data: users = [] } = useUsers(orgId);
-  const warehousesRead = moduleCollection(useWarehouses(orgId, initialWarehouses));
-  const warehouses = warehousesRead.rows;
+  const { options: warehouseFieldOptions, help: warehouseChoiceHelp, status: warehouseStatus } = useWarehouseChoice(orgId, operatingCompanyId);
   const productsRead = moduleCollection(useProducts(orgId));
   const products = productsRead.rows;
   const { data: productCategories = [] } = useProductCategories(orgId);
@@ -924,22 +922,6 @@ function SalesClientLoaded({
     ];
   }, [pricelists, t, pricelistsRead.state.status, currencies]);
 
-  const warehouseFieldOptions = useMemo(() => {
-    if (warehousesRead.state.status === "loading" || warehousesRead.state.status === "denied" || warehousesRead.state.status === "error") {
-      const label = warehousesRead.state.status === "loading"
-        ? t("sales.forms.refinement.lookupLoading", { defaultValue: "Loading choices…" })
-        : warehousesRead.state.status === "denied"
-          ? t("sales.forms.refinement.lookupDenied", { defaultValue: "You do not have access to these choices." })
-          : t("sales.forms.refinement.lookupFailed", { defaultValue: "Choices could not be loaded. Refresh to try again." });
-      return [{ value: "", label, disabled: true }];
-    }
-    const fromApi = warehouseRowsToSelectOptions(warehouses);
-    if (fromApi.length > 0) return fromApi;
-    return [
-      { value: '', label: t('common.lookup.noWarehouses'), disabled: true },
-    ];
-  }, [warehouses, t, warehousesRead.state.status]);
-
   const paymentTermFieldOptions = useMemo(() => {
     const fromApi = paymentTermRowsToSelectOptions(paymentTerms as Record<string, unknown>[]);
     if (fromApi.length > 0) return fromApi;
@@ -1173,7 +1155,6 @@ function SalesClientLoaded({
       checkPermission(module, 'read').allowed && checkPermission(resource, 'create').allowed;
     const canCreateCustomer = canSetUp('contact', 'module:crm');
     const canCreatePricelist = canSetUp('pricelist', 'module:sales');
-    const canCreateWarehouse = canSetUp('warehouse', 'module:inventory');
     return withFormChoiceSetup(
       mergeSelectOptionsForFields(newSaleOrderForm(t), {
         partnerId: partnerFieldOptions,
@@ -1202,20 +1183,11 @@ function SalesClientLoaded({
             label: t('sales.forms.setup.openPricelists', { defaultValue: 'Open price lists' }),
           } : undefined,
         },
-        warehouseId: {
-          ready: warehousesRead.state.status === 'ready',
-          message: canCreateWarehouse
-            ? t('sales.forms.setup.warehouseMissing', { defaultValue: 'Add a warehouse in a separate tab, then return to this quotation. Your entries stay here.' })
-            : t('sales.forms.setup.warehouseMissingAsk', { defaultValue: 'No warehouses are available. Ask an administrator to add one in Warehouse setup, then return to this quotation.' }),
-          action: canCreateWarehouse ? {
-            href: buildModuleTabHref('warehouse', 'warehouses'),
-            label: t('sales.forms.setup.openWarehouses', { defaultValue: 'Open Warehouse setup' }),
-          } : undefined,
-        },
+        warehouseId: warehouseChoiceHelp,
       },
     );
-  }, [t, partnerFieldOptions, pricelistFieldOptions, warehouseFieldOptions, paymentTermFieldOptions,
-    permissionsReady, checkPermission, contactsRead.state.status, pricelistsRead.state.status, warehousesRead.state.status]);
+  }, [t, partnerFieldOptions, pricelistFieldOptions, warehouseFieldOptions, paymentTermFieldOptions, warehouseChoiceHelp,
+    permissionsReady, checkPermission, contactsRead.state.status, pricelistsRead.state.status]);
 
   const openCreateSaleOrder = useCallback(
     () => setQuickActionForm({ form: saleOrderFormConfig, action: 'createSaleOrder' }),
@@ -1502,6 +1474,15 @@ function SalesClientLoaded({
     };
   }, [t, returnOrderWorkflow.actions, returnOrderWorkflow.createCreditNote]);
 
+  const orderHistory = resolveModuleHistoryFilter('sales', 'orders', searchParams.get('period'), {
+    timeZone: searchParams.get('periodTimeZone') ?? 'UTC',
+  });
+  const orderSummaryHref = moduleBackfillEmptyHref('sales', {
+    canRead: canReadBackfill,
+    status: ordersRead.state.status,
+    nativeRowCount: orders.length,
+    history: orderHistory,
+  });
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
     const base = saleOrdersTableConfig(t, {
       formatSaleOrderDisplayName: saleOrderPrimaryLabel,
@@ -1515,6 +1496,11 @@ function SalesClientLoaded({
         emptyState: {
           ...runtimeView.emptyState,
           onAction: openCreateSaleOrder,
+          relatedLink: orderSummaryHref ? {
+            href: orderSummaryHref,
+            label: t('moduleRecords.browseCustomerSales'),
+            description: t('moduleRecords.customerSalesEmptyOrdersHint'),
+          } : undefined,
         },
         actions: [
           {
@@ -1624,6 +1610,7 @@ function SalesClientLoaded({
     orderLines,
     setCsvKind,
     canPreviewQuotation,
+    orderSummaryHref,
     documentSession.activeCompanyId,
     documentSession.identity,
     organizationId,
@@ -2628,9 +2615,9 @@ function SalesClientLoaded({
     const invalidInput = () => new Error(t('sales.forms.refinement.invalidInput', { defaultValue: 'Check the required choices and entered values. Your entries have been retained.' }));
     if (!tabUsable(actionTabs[action])) throw new Error('Required data is unavailable. Refresh and try again.');
     if (action === 'createSaleOrder') {
-      if ([contactsRead.state, pricelistsRead.state, warehousesRead.state].some((state) => state.status !== "ready")) throw new Error(t("sales.forms.refinement.requiredChoicesUnavailable", { defaultValue: "Required choices are not available. Wait for loading to finish or refresh to try again. Your entries have been retained." }));
+      if ([contactsRead.state, pricelistsRead.state, { status: warehouseStatus }].some((state) => state.status !== "ready")) throw new Error(t("sales.forms.refinement.requiredChoicesUnavailable", { defaultValue: "Required choices are not available. Wait for loading to finish or refresh to try again. Your entries have been retained." }));
       const p = toCreateSaleOrderParams(formData, pricelists, operatingCompanyId);
-      if (!p) throw new Error(t('sales.forms.refinement.requiredOrderContext', { defaultValue: 'Choose a customer, an available price list with a currency, and a warehouse. Your entries have been retained.' }));
+      if (!p || !warehouseFieldOptions.some((choice) => choice.value === String(p.warehouseId))) throw new Error(t('sales.forms.refinement.requiredOrderContext', { defaultValue: 'Choose a customer, an available price list with a currency, and a warehouse. Your entries have been retained.' }));
       const saved = await createSaleOrder.mutateAsync(p);
       phCapture('sale_order_created', { organization_id: organizationId });
       if (onActivationSaved) {
@@ -2753,7 +2740,7 @@ function SalesClientLoaded({
         organizationId={organizationId}
         quickCreate={{
           companyId: operatingCompanyId,
-          readiness: mergeModuleStates([contactsRead.state, pricelistsRead.state, warehousesRead.state]),
+          readiness: mergeModuleStates([contactsRead.state, pricelistsRead.state]),
         }}
         assistantFormBlocked={quickActionForm !== null || partialDeliveryPicking !== null || cancelPickingTarget !== null || creditReturnOrderId !== null || openReturnForm || chatterTarget !== null}
         config={config}

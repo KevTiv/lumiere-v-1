@@ -12,6 +12,7 @@ import { mergeModuleStates, type ModuleDataState } from "@lumiere/ui/lib/module-
 import type { ModuleConfig } from "@lumiere/ui/lib/module-types";
 import { entityColumnLayouts as layout } from "@lumiere/ui/lib/entity-column-layouts";
 
+import { WAREHOUSE_CREATE_PERMISSION } from "@/lib/warehouse-choice";
 import { WAREHOUSE_TAB_IDS } from '../../../lib/inventory-workspace-navigation';
 import { moduleBackfillTabs } from '../../../lib/module-backfill-navigation';
 export { WAREHOUSE_TAB_IDS } from '../../../lib/inventory-workspace-navigation';
@@ -19,7 +20,7 @@ export { WAREHOUSE_TAB_IDS } from '../../../lib/inventory-workspace-navigation';
 const CREATE_PERMISSIONS: Readonly<Record<string, EntitySurfacePermission>> = {
   stock: { resource: "stock_quant", action: "create" },
   transfers: { resource: "stock_picking", action: "create" },
-  warehouses: { resource: "warehouse", action: "create" },
+  warehouses: WAREHOUSE_CREATE_PERMISSION,
   locations: { resource: "stock_location", action: "create" },
   adjustments: { resource: "inventory_adjustment", action: "create" },
   replenishment: { resource: "replenishment_rule", action: "create" },
@@ -27,7 +28,7 @@ const CREATE_PERMISSIONS: Readonly<Record<string, EntitySurfacePermission>> = {
 
 // These are presentation gates for existing native owners, never command authority.
 const ACTION_PERMISSIONS: Readonly<Record<string, EntitySurfacePermission>> = {
-  "csv-warehouse": { resource: "warehouse", action: "create" },
+  "csv-warehouse": WAREHOUSE_CREATE_PERMISSION,
   "edit-warehouse": { resource: "warehouse", action: "write" },
   "delete-warehouse": { resource: "warehouse", action: "delete" },
   "warehouse-geo": { resource: "warehouse_geo", action: "write" },

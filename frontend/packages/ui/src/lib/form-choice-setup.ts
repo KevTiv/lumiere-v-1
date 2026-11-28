@@ -18,12 +18,8 @@ export function withFormChoiceSetup(
         const help = setup[field.name]
         if (field.type !== "select" || !help) return field
         const hasChoice = field.options.some((option) => option.value !== "" && !option.disabled)
-        return {
-          ...field,
-          recoveryHelp: help.ready && !hasChoice
-            ? { message: help.message, action: help.action }
-            : undefined,
-        }
+        const { ready, ...recoveryHelp } = help
+        return { ...field, recoveryHelp: ready && !hasChoice ? recoveryHelp : undefined }
       }),
     })),
   }

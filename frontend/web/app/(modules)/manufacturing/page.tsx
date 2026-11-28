@@ -11,7 +11,6 @@ const SSR_RESOURCES = [
   "mrp-workcenters",
   "mrp-routing-workcenters",
   "products",
-  "warehouses",
   "stock-pickings",
   "stock-quants",
 ] as const
@@ -34,7 +33,6 @@ export default async function ManufacturingPage() {
     workcenters,
     routingOperations,
     products,
-    warehouses,
     stockPickings,
     stockQuants,
   ] = records
@@ -50,7 +48,6 @@ export default async function ManufacturingPage() {
         initialRoutingOperations={routingOperations}
         initialIotDevicesState={iotDevicesState}
         initialProducts={products}
-        initialWarehouses={warehouses}
         initialStockPickings={stockPickings}
         initialStockQuants={stockQuants}
         organizationId={session.organizationId}
