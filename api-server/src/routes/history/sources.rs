@@ -267,7 +267,7 @@ pub(crate) async fn verified_import_destination(
     let adapter = record_adapter(table)?;
     let access = load_field_access_context(owner, context.actor_identity(), org)
         .await
-        .map_err(ApiError::internal)?
+        .map_err(ApiError::Internal)?
         .ok_or_else(|| ApiError::Forbidden("Import source access revoked".into()))?;
     let columns = read_columns(&access, &adapter)?;
     if project_mapping(mapping, job, org, company, table, record, &columns)?.is_none()

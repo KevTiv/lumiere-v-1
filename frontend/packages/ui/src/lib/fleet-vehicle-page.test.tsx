@@ -26,6 +26,7 @@ import { mergeFieldDefaultValues } from "./form-config-merge";
 import type { FormConfig, SelectField } from "./form-types";
 import * as fleetWorkspace from "../../../../web/app/(modules)/fleet/fleet-workspace";
 import * as fleetRecord from "../../../../web/app/(modules)/fleet/fleet-record";
+import * as fleetServiceSetup from "../../../../web/app/(modules)/fleet/fleet-service-setup";
 
 vi.mock("@lumiere/i18n", () => ({
   useTranslation: () => ({
@@ -129,6 +130,7 @@ const workspace = productionExports(
       },
     },
     "./fleet-workspace": fleetWorkspace,
+    "./fleet-service-setup": fleetServiceSetup,
   },
 );
 const page = productionExports(
@@ -252,6 +254,7 @@ const page = productionExports(
     },
     "../../fleet-record": fleetRecord,
     "../../fleet-workspace": fleetWorkspace,
+    "../../fleet-service-setup": fleetServiceSetup,
     "../../use-fleet-workspace": workspace,
     "../../fleet-recovery-notice": { FleetRecoveryNotice: () => null },
     "../../fleet-service-setup-notice": { FleetServiceSetupNotice: () => null },
