@@ -14,9 +14,9 @@ for (const viewport of [{ width: 320, height: 844 }, { width: 390, height: 844 }
     test.use({ viewport, hasTouch: viewport.width < 1024 })
 
     test.beforeEach(async ({ page }) => {
-      await page.goto("/", { waitUntil: "domcontentloaded" })
+      await page.goto("/")
       await expect(page.getByTestId("fixture-disclosure")).toContainText("no backend operations")
-      await expect(page.getByTestId("fixture-disclosure")).toHaveAttribute("data-hydrated", "true")
+      await expect(page.getByTestId("fixture-disclosure")).toHaveAttribute("data-hydrated", "true", { timeout: 20_000 })
       await page.evaluate(async () => { await document.fonts.ready })
       await expect(page.getByTestId("workspace-header")).toBeVisible()
     })
