@@ -37,6 +37,28 @@ fn native_receipt_results_require_exact_request_and_do_not_claim_readback() -> R
     Ok(())
 }
 
+#[test]
+fn large_source_pages_require_exact_distinct_mappings() -> Result<()> {
+    let rows: Vec<_> = (2..=45).rev().map(|row| json!({"importRow":row})).collect();
+    let first = source_page(&rows, 0)?;
+    ensure!(first.len() == 21 && first[19].0 == 21);
+    let remaining = source_page(&rows, first[19].0)?;
+    ensure!(remaining.first().map(|row| row.0) == Some(22) && remaining[19].0 == 41);
+    ensure!(source_page(&rows, remaining[19].0)?.len() == 4);
+    ensure!(source_page(&[json!({"importRow":2}), json!({"importRow":2})], 0).is_err());
+    ensure!(source_page(&[json!({"itemId":"9"})], 0).is_err());
+
+    let exact = json!({"organization_id":7,"job_id":13,"table_name":"product","row_number":2,"record_id":"9007199254740993"});
+    let other = json!({"organization_id":8,"job_id":13,"table_name":"product","row_number":2,"record_id":15});
+    let candidates = vec![exact.clone(), other];
+    ensure!(
+        exact_mapping(&candidates, 7, 13, "product", 2).map(|(id, _)| id) == Some(9007199254740993)
+    );
+    ensure!(exact_mapping(&candidates, 7, 13, "contact", 2).is_none());
+    ensure!(exact_mapping(&[exact.clone(), exact], 7, 13, "product", 2).is_none());
+    Ok(())
+}
+
 #[tokio::test]
 async fn postgres_native_requests_attach_only_complete_actor_owned_task_sources() -> Result<()> {
     if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
@@ -170,5 +192,33 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
         )
         .await
         .is_err());
+    // Identical timestamps exercise the immutable request ID tie-breaker.
+    client.execute("INSERT INTO lumiere_platform.import_task_native_request
+        (organization_id,company_id,actor_identity,task_request_id,native_request_id,entity,content_sha256,review_rows,created_at)
+        SELECT 42,5,actor,$1,lpad(to_hex(i),32,'0'),'product',$2,$3,'2000-01-01 00:00:00+00'
+        FROM generate_series(1,24) i CROSS JOIN (VALUES ('actor-one'),('actor-two')) AS a(actor)",
+        &[&task,&digest,&json!(rows)]).await?;
+    let first = client
+        .query(
+            ATTEMPT_PAGE,
+            &[&"42", &"5", &"actor-one", &task, &None::<String>],
+        )
+        .await?;
+    ensure!(first.len() == 21);
+    let anchor: String = first[19].get("native_request_id");
+    let second = client
+        .query(
+            ATTEMPT_PAGE,
+            &[&"42", &"5", &"actor-one", &task, &Some(anchor)],
+        )
+        .await?;
+    ensure!(second.len() == 5);
+    let foreign = client
+        .query(
+            ATTEMPT_PAGE,
+            &[&"42", &"5", &"actor-two", &task, &Some(request)],
+        )
+        .await?;
+    ensure!(foreign.is_empty());
     Ok(())
 }

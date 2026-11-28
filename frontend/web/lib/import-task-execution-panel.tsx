@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useErpSession } from "@lumiere/erp-session"
 import { accountMoveBatchHref } from "@lumiere/erp-shared/record-links"
 import { useTranslation } from "@lumiere/i18n"
@@ -30,17 +30,20 @@ import {
 import { operatingCompanyCurrencyCode } from "./operating-company-currency"
 import type { ReviewDetail } from "./import-review-model"
 import {
+  readNativeReceiptPage,
   transitionImportProposal,
   type DistinctExpenseDecision,
   type ImportCapability,
   type ImportNativeResult,
   type ImportProposal,
   type ImportWorkflow,
+  type WorkflowScope,
 } from "./import-workflow"
 import { ModuleBackfillAction } from "./module-backfill-action"
 import { moduleBackfillHref } from "./module-backfill-navigation"
 import { useImportProposalAttempt } from "./use-import-proposal-attempt"
 import { importTaskHref } from "./import-task-navigation"
+import { NativeImportReceiptRows } from "./native-import-receipt-rows"
 import { importWorkflowKey, useImportWorkflow } from "./use-import-workflow"
 
 interface Props {
@@ -142,9 +145,19 @@ function ExecutionPanel({
   )
   const [actionError, setActionError] = useState<string | null>(null)
   const proposals = workflow.isError ? [] : (workflow.data?.proposals ?? [])
-  const nativeResults = workflow.isError
-    ? []
-    : (workflow.data?.nativeResults ?? [])
+  const nativeResultsNext = workflow.data?.nativeResultsNext
+  const olderReceipts = useInfiniteQuery({
+    queryKey: [...queryKey, "native-receipts", nativeResultsNext],
+    initialPageParam: nativeResultsNext ?? "",
+    queryFn: ({ pageParam }) => readNativeReceiptPage(apiFetch, scope, pageParam),
+    getNextPageParam: (page) => page.next ?? undefined,
+    enabled: false,
+    retry: false,
+  })
+  const nativeResults = workflow.isError ? [] : Array.from(new Map(
+    [...(workflow.data?.nativeResults ?? []), ...(olderReceipts.data?.pages.flatMap((page) => page.results) ?? [])]
+      .map((result) => [result.requestId, result]),
+  ).values())
   // A blocked attempt may have released its rows after verified cleanup.
   // Preparation rechecks unresolved earlier effects on the server.
   const consumedIds = new Set(
@@ -715,10 +728,7 @@ function ExecutionPanel({
             })}
           </h4>
           <p className="text-sm text-muted-foreground">
-            {t("settings.importWorkflow.nativeReceiptBoundary", {
-              defaultValue:
-                "These are saved import job receipts. Open a job to inspect row errors and its current status. These receipts do not provide the Accounting adapter’s full ERP readback.",
-            })}
+            {t("settings.importWorkflow.nativeReceiptBoundary")}
           </p>
           {nativeResults.map((result) => (
             <NativeResult
@@ -729,11 +739,19 @@ function ExecutionPanel({
                   item.readiness === "native_preview" &&
                   item.targetEntities.includes(result.entity),
               )}
-              companyId={companyId}
-              taskId={taskId}
+              scope={scope}
+              actor={actor}
             />
           ))}
-          {workflow.data?.nativeResultsMore && (
+          {nativeResultsNext && (olderReceipts.data == null || olderReceipts.hasNextPage) && (
+            <div className="space-y-2">
+              {olderReceipts.isError && <p role="alert" className="text-destructive">{t("settings.importWorkflow.receiptHistoryUnavailable")}</p>}
+              <Button type="button" variant="outline" disabled={olderReceipts.isFetching} onClick={() => void olderReceipts.fetchNextPage()}>
+                {olderReceipts.isFetching ? t("common.loading") : t("settings.importWorkflow.receiptHistoryMore")}
+              </Button>
+            </div>
+          )}
+          {!nativeResultsNext && workflow.data?.nativeResultsMore && (
             <div className="space-y-2 text-sm">
               <p>
                 {t("settings.importWorkflow.nativeResultsLimit", {
@@ -775,14 +793,15 @@ function ExecutionPanel({
 function NativeResult({
   result,
   capability,
-  companyId,
-  taskId,
+  scope,
+  actor,
 }: {
   result: ImportNativeResult
   capability?: ImportCapability
-  companyId: number
-  taskId: string
+  scope: WorkflowScope
+  actor: string
 }) {
+  const { companyId, taskId } = scope
   const { t } = useTranslation()
   const receipt = result.receipt
   return (
@@ -840,6 +859,7 @@ function NativeResult({
           })}
         </p>
       )}
+      {receipt && <NativeImportReceiptRows actor={actor} scope={scope} result={result} />}
       <p className="text-xs text-muted-foreground">
         {t("settings.importWorkflow.nativeSourceCount", {
           defaultValue:

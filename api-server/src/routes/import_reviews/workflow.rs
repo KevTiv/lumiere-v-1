@@ -16,6 +16,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio_postgres::Transaction;
 
@@ -60,11 +61,60 @@ async fn read(
         (Vec::new(), false)
     };
     tx.commit().await.map_err(ApiError::internal)?;
-    let (native_results, native_results_more) =
-        super::native_requests::list(&context, query.company_id, &task).await?;
+    let (native_results, native_results_next) =
+        super::native_requests::list(&context, query.company_id, &task, None).await?;
     Ok(Json(
-        json!({"version":1,"organizationId":context.organization_id().to_string(),"requestId":task,"companyId":query.company_id.to_string(),"capabilities":super::capabilities::catalog(farm_enabled),"proposals":proposals,"nativeResults":native_results,"nativeResultsMore":native_results_more,"backfilledRecords":backfilled_records,"reviewedRecords":reviewed_records,"farmResults":farm_results,"farmResultsMore":farm_results_more}),
+        json!({"version":1,"organizationId":context.organization_id().to_string(),"requestId":task,"companyId":query.company_id.to_string(),"capabilities":super::capabilities::catalog(farm_enabled),"proposals":proposals,"nativeResults":native_results,"nativeResultsMore":native_results_next.is_some(),"nativeResultsNext":native_results_next,"backfilledRecords":backfilled_records,"reviewedRecords":reviewed_records,"farmResults":farm_results,"farmResultsMore":farm_results_more}),
     ))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeReceiptPage {
+    company_id: u64,
+    before: Option<String>,
+}
+
+async fn read_native_receipts(
+    State(state): State<Arc<AppState>>,
+    OrgSession { session, .. }: OrgSession,
+    Path(task): Path<String>,
+    Query(query): Query<NativeReceiptPage>,
+) -> Result<Json<Value>, ApiError> {
+    let context = scope(&state, &session, query.company_id).await?;
+    let (results, next) =
+        super::native_requests::list(&context, query.company_id, &task, query.before.as_deref())
+            .await?;
+    context.require_current_placement(&state.organization_placements)?;
+    Ok(Json(
+        json!({"organizationId":context.organization_id().to_string(),"companyId":query.company_id.to_string(),"taskId":task,"results":results,"next":next}),
+    ))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeReceiptRows {
+    company_id: u64,
+    after: Option<u64>,
+}
+
+async fn read_native_rows(
+    State(state): State<Arc<AppState>>,
+    OrgSession { session, .. }: OrgSession,
+    Path((task, request)): Path<(String, String)>,
+    Query(query): Query<NativeReceiptRows>,
+) -> Result<Json<Value>, ApiError> {
+    let context = scope(&state, &session, query.company_id).await?;
+    super::native_requests::row_results(
+        &state,
+        &context,
+        query.company_id,
+        &task,
+        &request,
+        query.after.unwrap_or(0),
+    )
+    .await
+    .map(Json)
 }
 
 async fn prepare(
@@ -392,6 +442,14 @@ async fn resolve_native(
 pub(super) fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/import-tasks/:task/workflow", get(read))
+        .route(
+            "/import-tasks/:task/workflow/native-receipts",
+            get(read_native_receipts),
+        )
+        .route(
+            "/import-tasks/:task/workflow/native-receipts/:request",
+            get(read_native_rows),
+        )
         .route(
             "/import-tasks/:task/workflow/requests/:requestKey",
             get(read_request),

@@ -253,6 +253,32 @@ async fn native_mapping_receipt(
     Ok(false)
 }
 
+/// Confirm a task's exact native mapping under the same evidence and record policy as History.
+pub(crate) async fn verified_import_destination(
+    owner: &StdbClient,
+    context: &TrustedOperationContext,
+    mapping: &Value,
+    job: &Value,
+    company: u64,
+    table: &str,
+    record: u64,
+) -> Result<bool, ApiError> {
+    let org = context.organization_id();
+    let adapter = record_adapter(table)?;
+    let access = load_field_access_context(owner, context.actor_identity(), org)
+        .await
+        .map_err(ApiError::Internal)?
+        .ok_or_else(|| ApiError::Forbidden("Import source access revoked".into()))?;
+    let columns = read_columns(&access, &adapter)?;
+    if project_mapping(mapping, job, org, company, table, record, &columns)?.is_none()
+        || !native_mapping_receipt(owner, mapping, job, org, company, table, record).await?
+    {
+        return Ok(false);
+    }
+    require_record_with_access(owner, context, &adapter, company, record, &access).await?;
+    Ok(true)
+}
+
 async fn read_sources(
     owner: &StdbClient,
     store: &crate::document_blob_store::DocumentBlobStoreConfig,

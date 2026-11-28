@@ -11,13 +11,19 @@ export type ImportTaskLocation = {
   companyId: number
   view: ImportTaskView
   reviewId?: string
+  reviewFilter?: "needs_review"
 }
 
 /** Match the first unresolved source group shown by the native review workspace. */
 export function pendingImportReviewId(
   reviews: readonly { id: string; pending: number }[] | undefined,
 ): string | undefined {
-  return reviews?.find(({ pending }) => pending > 0)?.id
+  return pendingImportReviews(reviews)[0]?.id
+}
+
+/** Task projections count only rows still requiring a decision in each linked review. */
+export function pendingImportReviews<T extends { id: string; pending: number }>(reviews: readonly T[] | undefined): T[] {
+  return reviews?.filter(({ id, pending }) => /^[1-9]\d*$/.test(id) && Number.isSafeInteger(pending) && pending > 0) ?? []
 }
 
 export function isImportTaskView(value: unknown): value is ImportTaskView {
@@ -30,7 +36,9 @@ function validLocation(location: ImportTaskLocation): boolean {
     Number.isSafeInteger(location.companyId) &&
     location.companyId > 0 &&
     isImportTaskView(location.view) &&
-    (location.reviewId === undefined || /^[1-9]\d*$/.test(location.reviewId))
+    (location.reviewId === undefined || /^[1-9]\d*$/.test(location.reviewId)) &&
+    (location.reviewFilter === undefined ||
+      (location.reviewFilter === "needs_review" && location.view === "decisions" && location.reviewId != null))
   )
 }
 
@@ -51,6 +59,8 @@ export function readImportTaskLocation(
       ? { reviewId: params.get("sourceReview")! }
       : {}),
   }
+  if (location.view === "decisions" && location.reviewId && params.get("sourceReviewFilter") === "needs_review")
+    location.reviewFilter = "needs_review"
   return validLocation(location) ? location : null
 }
 
@@ -67,6 +77,8 @@ export function withImportTaskLocation(
   next.searchParams.set("importView", location.view)
   next.searchParams.delete("sourceReviewItem")
   next.searchParams.delete("sourceReviewRevision")
+  if (location.reviewFilter) next.searchParams.set("sourceReviewFilter", location.reviewFilter)
+  else next.searchParams.delete("sourceReviewFilter")
   if (location.reviewId) {
     next.searchParams.set("sourceReview", location.reviewId)
     next.searchParams.set("sourceReviewCompany", String(location.companyId))

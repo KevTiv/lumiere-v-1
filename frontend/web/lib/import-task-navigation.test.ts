@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   importTaskHref,
+  pendingImportReviews,
   readImportTaskLocation,
   withImportTaskLocation,
 } from "./import-task-navigation"
@@ -69,4 +70,18 @@ test("untrusted links cannot select another company, an invalid task, or an inva
     () => importTaskHref({ ...location, taskId: "../other" }),
     /valid saved import/,
   )
+})
+
+test("held rows link only to a task-bound, unresolved review and keep its authoritative count", () => {
+  const pending = { id: "71", title: "Products", pending: 23 }
+  assert.deepEqual(pendingImportReviews([pending, { id: "72", title: "Contacts", pending: 0 }]), [pending])
+  assert.deepEqual(pendingImportReviews(undefined), [])
+  const target = { ...location, reviewId: pending.id, reviewFilter: "needs_review" as const }
+  const url = new URL(importTaskHref(target), "https://example.com")
+  assert.equal(url.searchParams.get("sourceReviewFilter"), "needs_review")
+  assert.deepEqual(readImportTaskLocation(url.search, 3), target)
+  assert.equal(readImportTaskLocation(url.search, 4), null)
+  assert.equal(withImportTaskLocation(url, { ...location, view: "results" }).searchParams.has("sourceReviewFilter"), false)
+  url.searchParams.set("sourceReviewCompany", "4")
+  assert.equal(readImportTaskLocation(url.search, 3)?.reviewFilter, undefined)
 })
