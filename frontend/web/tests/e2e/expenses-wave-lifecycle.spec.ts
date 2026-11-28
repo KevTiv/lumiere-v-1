@@ -1,4 +1,4 @@
-import { matchesOperationResponse } from "./operation-response"
+import { matchesOperationFaultTarget, matchesOperationResponse } from "./operation-response"
 /**
  * Expenses Waves A–F UI coverage for this session.
  * Tags: @expenses @p0 (shell/lifecycle UI).
@@ -223,48 +223,39 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     await expectNoAppError(page)
   })
 
-  test("capture conflict controls appear after forced error @expenses", async ({ page }) => {
-    await gotoModule(page, "/expenses", "expenses")
-    // Seed a conflict item via localStorage to assert retry/discard UI without flaky network.
-    const organizationId = await fetchSessionOrganizationId(page)
-    const currencyId = await fetchCurrencyIdByCode(page, "USD")
-    await page.evaluate(
-      ({ orgId, currencyId }) => {
-        const deviceKey = "lumiere.expense-capture-device-id"
-        let deviceId = window.localStorage.getItem(deviceKey)
-        if (!deviceId) {
-          deviceId = "e2e-device"
-          window.localStorage.setItem(deviceKey, deviceId)
-        }
-        const key = `lumiere.expense-capture-outbox.${orgId}.${deviceId}`
-        const item = {
-          clientRequestId: `exp-cap-conflict-${Date.now()}`,
-          deviceId,
-          payload: {
-            employeeId: "1",
-            name: "Conflict meal",
-            date: new Date().toISOString().slice(0, 10),
-            unitAmount: 9,
-            quantity: 1,
-            currencyId: String(currencyId),
-            hasReceipt: true,
-            lineKind: "Standard",
-          },
-          createdAt: new Date().toISOString(),
-          syncState: "conflict",
-          lastError: "idempotency conflict",
-        }
-        window.localStorage.setItem(key, JSON.stringify([item]))
-      },
-      { orgId: organizationId, currencyId },
+  test("keeps recovery controls after an expense capture is rejected @expenses @p0", async ({
+    page,
+  }) => {
+    const name = smokeName("Rejected capture")
+    const error = "Expense capture idempotency conflict"
+    await page.route(
+      (url) => matchesOperationFaultTarget(url, "create_expense"),
+      (route) => route.fulfill({ status: 409, json: { error } }),
     )
-    await page.reload()
     await gotoModule(page, "/expenses?tab=operations", "expenses")
-    await expect(page.getByTestId("expenses-capture-item-conflict")).toBeVisible()
-    await expect(page.getByTestId("expenses-capture-retry")).toBeVisible()
-    await expect(page.getByTestId("expenses-capture-discard")).toBeVisible()
-    await page.getByTestId("expenses-capture-discard").click()
-    await expect(page.getByTestId("expenses-capture-item-conflict")).toHaveCount(0)
+    const panel = page.locator('[data-testid="expenses-capture-panel"]:visible')
+    await panel.getByTestId("expenses-capture-employee").click()
+    await page.getByRole("option", { disabled: false }).first().click()
+    await panel.getByTestId("expenses-capture-pricelist").click()
+    await page.getByRole("option", { disabled: false }).first().click()
+    await panel.getByTestId("expenses-capture-name").fill(name)
+    await panel.getByTestId("expenses-capture-amount").fill("9")
+    await panel.getByTestId("expenses-capture-has-receipt").click()
+    await panel.getByTestId("expenses-capture-submit").click()
+
+    const rejected = panel
+      .getByTestId("expenses-capture-item-rejected")
+      .filter({ hasText: name })
+    await expect(rejected).toContainText(error)
+    await page.reload()
+    await expect(rejected).toContainText(error)
+    await expect(rejected.getByTestId("expenses-capture-retry")).toBeEnabled()
+    await expect(rejected.getByTestId("expenses-capture-discard")).toBeEnabled()
+    await rejected.getByTestId("expenses-capture-discard").click()
+    await expect(rejected).toHaveCount(0)
+    await page.reload()
+    await expect(panel).toBeVisible()
+    await expect(rejected).toHaveCount(0)
   })
 
   test("ops panel can create card statement line @expenses", async ({ page }) => {
