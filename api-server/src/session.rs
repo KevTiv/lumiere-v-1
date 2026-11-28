@@ -5,7 +5,10 @@ pub mod workos;
 
 use serde_json::Value;
 
+use crate::auth_password::decrypt_token;
+use crate::cold_tier::pg_pool;
 use crate::error::ApiError;
+use crate::platform_control;
 use crate::state::AppState;
 use stdb_auth::{
     select_field_permissions_for_org_sql, select_roles_active_sql,
@@ -440,6 +443,59 @@ pub struct ApiSession {
     pub identity_hex: String,
     pub organization_id: Option<u64>,
     pub field_access: Option<FieldAccessContext>,
+}
+
+/// Reload the current canonical principal under the original approval. Jobs
+/// never retain browser credentials or execute under server authority.
+pub(crate) async fn load_stored_session(
+    state: &AppState,
+    actor: &str,
+    organization: u64,
+    platform_user: &str,
+) -> Result<ApiSession, ApiError> {
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    let credential = platform_control::find_user_credential_by_stdb_identity(pool, actor)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or(ApiError::Unauthorized)?;
+    if credential.get::<_, String>("platform_user_id") != platform_user {
+        return Err(ApiError::Unauthorized);
+    }
+    let key = state
+        .config
+        .stdb_credential_encryption_key
+        .as_ref()
+        .ok_or_else(|| ApiError::Unavailable("durable principal credentials unavailable".into()))?;
+    let token = decrypt_token(key, &credential.get::<_, String>("stdb_token_enc"))?;
+    if token.is_empty()
+        || state.config.stdb_server_token.as_deref() == Some(token.as_str())
+        || state.config.stdb_finalization_token.as_deref() == Some(token.as_str())
+    {
+        return Err(ApiError::Unauthorized);
+    }
+    let actual = state
+        .client_with_token(&token)
+        .authenticated_identity()
+        .await
+        .map_err(|_| {
+            ApiError::Unavailable("could not verify the saved operator credential".into())
+        })?;
+    if parse_stdb_identity_hex(&actual).as_deref() != Some(actor) {
+        return Err(ApiError::Unauthorized);
+    }
+    let access = load_field_access_context(&state.stdb, actor, organization)
+        .await
+        .map_err(ApiError::Internal)?
+        .ok_or(ApiError::Unauthorized)?;
+    if access.organization_id != organization || access.identity_hex != actor {
+        return Err(ApiError::Unauthorized);
+    }
+    Ok(ApiSession {
+        stdb_token: token,
+        identity_hex: actor.to_owned(),
+        organization_id: Some(organization),
+        field_access: Some(access),
+    })
 }
 
 async fn require_interactive_native_principal(

@@ -530,7 +530,7 @@
     },
     {
       "path": "api-server/src/routes/import.rs",
-      "sha256": "0414dd660716444c1ee14cf348e62edb649a44057c4c3dcef16158e982175d25"
+      "sha256": "18e3c12a9d5af8f8723dc9bd5133f19e2bca8e83b396002257fd960891a8b9d0"
     },
     {
       "path": "api-server/src/routes/import_reviews/farm_import.rs",
@@ -538,11 +538,11 @@
     },
     {
       "path": "api-server/src/routes/import_reviews/import_binding.rs",
-      "sha256": "b8d3da374cb9d39853e08d0838a6837b68ce99c961b4831e3ea5528eb7c1d8c9"
+      "sha256": "476c13631911bbe15990c1144dbb71cf29421bff589a799f8734ce10a8b1168d"
     },
     {
       "path": "api-server/src/routes/import_reviews/mod.rs",
-      "sha256": "e45c80df0e4d3caa9cb97845365499bc16bb1690dee1637ee30249c942a5d107"
+      "sha256": "7b16bfb917b89c4bbbc5ef8c0c3d25a87997a2551d2b061b728040d9b4ccff9b"
     },
     {
       "path": "api-server/src/routes/import_reviews/tasks.rs",
@@ -1603,7 +1603,7 @@
       "surface": "settings",
       "source": "api-server/src/routes/import_reviews/mod.rs",
       "function": "create",
-      "line": 173,
+      "line": 176,
       "owner": "source-review/import API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "review-store-or-exact-native-receipt-owner-review-required",
@@ -1616,7 +1616,7 @@
       "surface": "settings",
       "source": "api-server/src/routes/import_reviews/mod.rs",
       "function": "decide",
-      "line": 257,
+      "line": 260,
       "owner": "source-review/import API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "review-store-or-exact-native-receipt-owner-review-required",
@@ -1629,7 +1629,7 @@
       "surface": "settings",
       "source": "api-server/src/routes/import_reviews/mod.rs",
       "function": "decide_bulk",
-      "line": 376,
+      "line": 379,
       "owner": "source-review/import API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "review-store-or-exact-native-receipt-owner-review-required",
@@ -1681,7 +1681,7 @@
       "surface": "settings",
       "source": "api-server/src/routes/import.rs",
       "function": "read_exact_outcome",
-      "line": 1173,
+      "line": 1246,
       "owner": "source-review/import API",
       "authority": "existing-service-owner-not-a-new-native-operation",
       "history_policy": "review-store-or-exact-native-receipt-owner-review-required",

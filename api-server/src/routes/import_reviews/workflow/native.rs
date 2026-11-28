@@ -308,6 +308,11 @@ pub(super) fn line_request(
 }
 
 pub(super) fn receipt_ids(receipt: &Value, expected: usize) -> Result<Vec<u64>, ApiError> {
+    if receipt["status"] == "pending" {
+        return Err(ApiError::Unavailable(
+            "native journal import has not returned its final receipt".into(),
+        ));
+    }
     if receipt["status"] != "success"
         || receipt["errorRows"].as_u64() != Some(0)
         || receipt["totalRows"].as_u64() != Some(expected as u64)

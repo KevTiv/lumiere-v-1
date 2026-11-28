@@ -1,6 +1,9 @@
 //! Durable, tenant-scoped source review and approved import workflows.
 //! Business writes use the existing validated native import owner.
 mod capabilities;
+mod durable_master_data;
+mod durable_runs;
+pub(crate) use durable_runs::start as start_import_runs;
 mod farm_import;
 mod history_data;
 mod history_period;
@@ -548,6 +551,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/import-reviews/:batch/items/:item/history", get(history))
         .layer(DefaultBodyLimit::max(5_000_000))
         .merge(tasks::router())
+        .merge(durable_runs::router())
         .merge(recipes::router())
         .merge(workflow::router())
         .layer(axum::middleware::map_response(

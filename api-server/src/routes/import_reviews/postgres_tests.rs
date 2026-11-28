@@ -254,6 +254,7 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
 
     drop(client);
     verify_replayed_backfill_receipt(pool, scoped, dataset, batch, id).await?;
+    module_backfill::exercise_shop_sales_volume(pool).await?;
     Ok(())
 }
 
