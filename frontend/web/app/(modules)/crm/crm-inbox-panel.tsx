@@ -1,17 +1,17 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { MessageCircleIcon, SendIcon } from "lucide-react"
 
+import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
 import {
   useAppendCrmConversationMessage,
-  useContactPhoneIdentities,
-  useCrmConversationMessages,
-  useCrmConversations,
   useOpenCrmConversation,
   useUpdateCrmConversation,
 } from "@lumiere/query-hooks/hooks/crm"
+import { apiFetch } from "@/lib/api-fetch"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -34,8 +34,26 @@ import { Label } from "@/components/ui/label"
 import { nullableBigIntU64 as asId, unwrapSome as optionValue } from "@lumiere/erp-shared/form-coercion"
 import { mergeModuleStates, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice"
+import { crmInboxDelivery, crmInboxRowInScope, crmWhatsAppConversation, type InboxRow } from "./crm-inbox-delivery"
+import { CrmInboxDeliveryStatus } from "./crm-inbox-delivery-status"
 
-type Row = Record<string, unknown>
+type Row = InboxRow
+type InboxResource = "crm-conversations" | "crm-conversation-messages" | "operational-messages" | "contact-phone-identities"
+
+function useInboxRows(resource: InboxResource, organizationId: number, companyId: bigint, enabled: boolean) {
+  const { identity } = useErpSession()
+  return useQuery({
+    queryKey: [resource, String(organizationId), "crm-inbox", String(companyId), identity],
+    enabled: enabled && Boolean(identity),
+    queryFn: async ({ signal }): Promise<Row[]> => {
+      const response = await apiFetch(`/api/query/${resource}?companyId=${companyId}`, { signal, cache: "no-store" })
+      if (!response.ok) throw Object.assign(new Error(resource), { status: response.status })
+      const body = await response.json() as { data?: Row[] }
+      if (!Array.isArray(body.data)) throw new Error(resource)
+      return body.data
+    },
+  })
+}
 
 function channelTag(value: unknown): string {
   if (value != null && typeof value === "object" && "tag" in value) {
@@ -55,16 +73,25 @@ function isPhoneIdentityUsable(row: Row, contactId: bigint): boolean {
 export interface CrmInboxPanelProps {
   organizationId: number
   contactId: bigint
+  companyId: bigint
 }
 
-export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps) {
+export function CrmInboxPanel(props: CrmInboxPanelProps) {
+  const { identity, activeCompanyReady } = useErpSession()
+  const { organizationId, companyId, contactId } = props
+  return <ScopedCrmInboxPanel key={`${identity}:${organizationId}:${companyId}:${contactId}`} {...props} companyId={activeCompanyReady ? companyId : 0n} />
+}
+
+function ScopedCrmInboxPanel({ organizationId, companyId, contactId }: CrmInboxPanelProps) {
   const { t } = useTranslation()
   const organization = BigInt(organizationId)
-  const conversationsQuery = useCrmConversations(organization)
-  const messagesQuery = useCrmConversationMessages(organization)
-  const phoneIdentitiesQuery = useContactPhoneIdentities(organization)
+  const scope = useMemo(() => ({ organizationId: organization, companyId, contactId }), [organization, companyId, contactId])
+  const scopeReady = organization > 0n && companyId > 0n && contactId > 0n
+  const conversationsQuery = useInboxRows("crm-conversations", organizationId, companyId, scopeReady)
+  const messagesQuery = useInboxRows("crm-conversation-messages", organizationId, companyId, scopeReady)
+  const phoneIdentitiesQuery = useInboxRows("contact-phone-identities", organizationId, companyId, scopeReady)
   const sourceState = mergeModuleStates([conversationsQuery, messagesQuery, phoneIdentitiesQuery].map(moduleQueryState))
-  const ready = sourceState.status === "ready"
+  const ready = scopeReady && sourceState.status === "ready"
   const conversations = ready ? conversationsQuery.data ?? [] : []
   const messages = ready ? messagesQuery.data ?? [] : []
   const phoneIdentities = ready ? phoneIdentitiesQuery.data ?? [] : []
@@ -73,47 +100,55 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
   const updateConversation = useUpdateCrmConversation(organization)
   const [body, setBody] = useState("")
   const [actionError, setActionError] = useState<string | null>(null)
-  const scope = `${organizationId}:${contactId}`
-  const activeScope = useRef(scope)
-  activeScope.current = scope
-  useEffect(() => { setBody(""); setActionError(null) }, [organizationId, contactId])
-  const busy = openConversation.isPending || appendMessage.isPending || updateConversation.isPending
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
   const submitting = useRef(false)
+  const [readingActionResult, setReadingActionResult] = useState(false)
+  const busy = openConversation.isPending || appendMessage.isPending || updateConversation.isPending || readingActionResult
   const runAction = async (action: () => Promise<unknown>) => {
     if (!ready || busy || submitting.current) return
     submitting.current = true
+    setReadingActionResult(true)
     setActionError(null)
     try { await action() }
     catch (cause) {
-      if (activeScope.current === scope) setActionError(cause instanceof Error ? cause.message : t("crm.inbox.actionFailed", { defaultValue: "The request failed. Your message has been retained." }))
-    } finally { submitting.current = false }
+      if (mounted.current) setActionError(cause instanceof Error ? cause.message : t("crm.inbox.actionFailed", { defaultValue: "The request failed. Your message has been retained." }))
+    } finally {
+      submitting.current = false
+      if (mounted.current) setReadingActionResult(false)
+    }
   }
 
   const conversation = useMemo(() => {
     return (
-      (conversations as Row[]).find((row) => {
-        if (asId(row.contactId ?? row.contact_id) !== contactId) return false
-        return String(row.status ?? "") !== "closed"
-      }) ?? null
+      conversations.find((row) =>
+        crmWhatsAppConversation(row, scope) && String(row.status ?? "") !== "closed",
+      ) ?? null
     )
-  }, [conversations, contactId])
+  }, [conversations, scope])
 
   const conversationId = conversation ? asId(conversation.id) : null
+  const operationalQuery = useInboxRows("operational-messages", organizationId, companyId, ready && Boolean(conversationId))
+  const operational = moduleQueryState(operationalQuery).status === "ready" ? operationalQuery.data ?? [] : []
 
   const phoneIdentityId = useMemo(() => {
-    const candidates = (phoneIdentities as Row[]).filter((row) =>
-      isPhoneIdentityUsable(row, contactId),
+    const candidates = phoneIdentities.filter((row) =>
+      crmInboxRowInScope(row, scope) && isPhoneIdentityUsable(row, contactId),
     )
     const preferred = candidates.find((row) => Boolean(row.isPreferred ?? row.is_preferred))
     return preferred ? asId(preferred.id) : candidates[0] ? asId(candidates[0].id) : null
-  }, [contactId, phoneIdentities])
+  }, [contactId, phoneIdentities, scope])
 
   const thread = useMemo(() => {
     if (!conversationId) return []
-    return (messages as Row[]).filter(
-      (row) => asId(row.conversationId ?? row.conversation_id) === conversationId,
+    return messages.filter(
+      (row) => crmInboxRowInScope(row, scope)
+        && asId(row.conversationId ?? row.conversation_id) === conversationId,
     )
-  }, [messages, conversationId])
+  }, [messages, conversationId, scope])
 
   return (
     <Card>
@@ -131,14 +166,17 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
               size="sm"
               disabled={!ready || busy || phoneIdentityId == null}
               onClick={() =>
-                void runAction(() => openConversation.mutateAsync({
-                  contactId,
-                  channel: { tag: "WhatsApp" },
-                  phoneIdentityId: phoneIdentityId ?? undefined,
-                  externalThreadId: undefined,
-                  assignedUserId: undefined,
-                  metadata: undefined,
-                }))
+                void runAction(async () => {
+                  await openConversation.mutateAsync({
+                    contactId,
+                    channel: { tag: "WhatsApp" },
+                    phoneIdentityId: phoneIdentityId ?? undefined,
+                    externalThreadId: undefined,
+                    assignedUserId: undefined,
+                    metadata: undefined,
+                  })
+                  if (mounted.current) await conversationsQuery.refetch()
+                })
               }
             >
               {t("crm.inbox.open", "Open thread")}
@@ -150,15 +188,18 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
               disabled={!ready || busy || !conversationId}
               onClick={() =>
                 conversationId &&
-                void runAction(() => updateConversation.mutateAsync({
-                  conversationId,
-                  params: {
-                    status: "closed",
-                    assignedUserId: undefined,
-                    externalThreadId: undefined,
-                    metadata: undefined,
-                  },
-                }))
+                void runAction(async () => {
+                  await updateConversation.mutateAsync({
+                    conversationId,
+                    params: {
+                      status: "closed",
+                      assignedUserId: undefined,
+                      externalThreadId: undefined,
+                      metadata: undefined,
+                    },
+                  })
+                  if (mounted.current) await conversationsQuery.refetch()
+                })
               }
             >
               {t("crm.inbox.close", "Close")}
@@ -190,13 +231,22 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <Badge variant="secondary">{channelTag(conversation.channel)}</Badge>
               <Badge variant="outline">{String(conversation.status)}</Badge>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={messagesQuery.isFetching || operationalQuery.isFetching}
+                onClick={() => { void messagesQuery.refetch(); void operationalQuery.refetch() }}
+              >
+                {t("crm.inbox.delivery.refresh")}
+              </Button>
               {conversation.lastPreview || conversation.last_preview ? (
                 <span className="text-muted-foreground truncate">
                   {String(optionValue(conversation.lastPreview ?? conversation.last_preview))}
                 </span>
               ) : null}
             </div>
-            <ul className="max-h-64 space-y-2 overflow-y-auto">
+            <ul aria-live="polite" className="max-h-64 space-y-2 overflow-y-auto">
               {thread.map((msg) => (
                 <li
                   key={String(msg.id)}
@@ -204,9 +254,12 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
                 >
                   <div className="mb-1 flex items-center gap-2">
                     <Badge variant="outline">{String(msg.direction)}</Badge>
-                    <span className="text-muted-foreground text-xs">{String(msg.status)}</span>
+                    {msg.direction !== "outbound" && <span className="text-muted-foreground text-xs">{String(msg.status)}</span>}
                   </div>
                   <p className="[overflow-wrap:anywhere]">{String(msg.body)}</p>
+                  {msg.direction === "outbound" && (
+                    <CrmInboxDeliveryStatus delivery={crmInboxDelivery(msg, conversation, messages, operational, scope)} />
+                  )}
                 </li>
               ))}
             </ul>
@@ -225,8 +278,7 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
                   onClick={() => {
                     const submittedBody = body.trim()
                     void runAction(async () => {
-                      await appendMessage.mutateAsync(
-                      {
+                      await appendMessage.mutateAsync({
                         conversationId,
                         params: {
                           direction: "outbound",
@@ -236,9 +288,11 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
                           operationalMessageId: undefined,
                           metadata: undefined,
                         },
-                      },
-                      )
-                      if (activeScope.current === scope) setBody((current) => current.trim() === submittedBody ? "" : current)
+                      })
+                      if (mounted.current) {
+                        setBody((current) => current.trim() === submittedBody ? "" : current)
+                        await Promise.all([conversationsQuery.refetch(), messagesQuery.refetch()])
+                      }
                     })
                   }}
                 >

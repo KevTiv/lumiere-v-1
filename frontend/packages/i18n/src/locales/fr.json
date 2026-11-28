@@ -2572,7 +2572,20 @@
     "inbox": {
       "tabLabel": "Boîte de réception",
       "title": "Boîte de réception WhatsApp",
-      "close": "Fermer"
+      "close": "Fermer",
+      "queueMessage": "Mettre le message en file d’attente",
+      "delivery": {
+        "queued": "Message placé dans la file d’attente locale",
+        "draft": "Brouillon local",
+        "accepted": "Le fournisseur a accepté le message. La livraison reste à confirmer.",
+        "delivered": "Livraison confirmée par le fournisseur",
+        "failed": "Le fournisseur a signalé un échec de livraison",
+        "inconclusive": "Aucun statut de livraison vérifié n’est disponible",
+        "reference": "Référence du fournisseur {{reference}}",
+        "reason": "Motif indiqué par le fournisseur {{reason}}",
+        "reasonUnavailable": "Le motif de l’échec est indisponible.",
+        "refresh": "Actualiser le statut de livraison"
+      }
     },
     "relIntel": {
       "title": "Analyse des relations",

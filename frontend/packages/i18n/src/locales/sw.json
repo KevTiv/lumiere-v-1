@@ -2527,7 +2527,20 @@
     "inbox": {
       "tabLabel": "Kikasha",
       "title": "Kikasha cha WhatsApp",
-      "close": "Funga"
+      "close": "Funga",
+      "queueMessage": "Weka ujumbe kwenye foleni",
+      "delivery": {
+        "queued": "Ujumbe umehifadhiwa kwenye foleni ya ndani",
+        "draft": "Rasimu ya ndani",
+        "accepted": "Mtoa huduma amekubali ujumbe. Uwasilishaji bado haujathibitishwa.",
+        "delivered": "Mtoa huduma amethibitisha uwasilishaji",
+        "failed": "Mtoa huduma ameripoti kuwa uwasilishaji umeshindwa",
+        "inconclusive": "Hakuna hali ya uwasilishaji iliyothibitishwa",
+        "reference": "Rejeleo la mtoa huduma {{reference}}",
+        "reason": "Sababu ya mtoa huduma {{reason}}",
+        "reasonUnavailable": "Sababu ya kushindwa kutoka kwa mtoa huduma haipatikani.",
+        "refresh": "Onyesha upya hali ya uwasilishaji"
+      }
     },
     "relIntel": {
       "title": "Uchanganuzi wa mahusiano",
