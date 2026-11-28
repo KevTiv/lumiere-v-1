@@ -35,6 +35,13 @@ test("readiness alone keeps onboarding open and a verified outcome can be reopen
 for (const width of [320, 390, 768, 1440]) {
   test(`activation keeps scope, role, task choice and layout at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 })
+    await page.route(/\/api\/query\/warehouses\?companyId=[23]$/, route => route.fulfill({ json: { data: [
+      { id: "7", companyId: new URL(route.request().url()).searchParams.get("companyId"), organizationId: "1", active: true },
+    ] } }))
+    await page.route("**/api/query/pricelists", route => route.fulfill({ json: { data: [
+      { id: "10", companyId: "2", organizationId: "1", currencyId: "4", isActive: true },
+    ] } }))
+    await page.route("**/api/bootstrap/currencies", route => route.fulfill({ json: { data: [{ id: "4", code: "RWF", decimalPlaces: 0 }] } }))
     await page.route("**/api/query/companies", route => route.fulfill({ json: { data: [
       { id: "2", organizationId: "1", currencyId: "4", fiscalYearEndMonth: 12, fiscalYearEndDay: 31 },
       { id: "3", organizationId: "1", currencyId: "4", fiscalYearEndMonth: 6, fiscalYearEndDay: 30 },
@@ -105,7 +112,9 @@ test("quotation checks active company warehouses and only links allowed setup af
   expect(requests).toBe(0)
 
   try {
-    await panel.getByRole("radio", { name: "Prepare a quotation", exact: true }).check()
+    const quotation = panel.getByRole("radio", { name: "Prepare a quotation", exact: true })
+    await quotation.click()
+    await expect(quotation).toBeChecked()
     await expect(warehouse).toHaveAttribute("data-state", "loading")
     await expect(setup).toHaveCount(0)
   } finally {
