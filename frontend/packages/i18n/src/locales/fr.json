@@ -19,8 +19,17 @@
     "recheck": "Vérifier à nouveau"
   },
   "activation": {
+    "guidance": {
+      "quotation": "Créez ou choisissez une liste de prix dans une devise active, puis sélectionnez un client et un entrepôt. Enregistrez le devis avant d’ajouter les produits."
+    },
     "checks": {
+      "pricelist": "Liste de prix active dans une devise active",
       "warehouse": "Entrepôt actif dans cette société"
+    },
+    "pricelist": {
+      "setup": "Créez une liste de prix active dans une devise active, puis revenez ici pour préparer un devis.",
+      "ask": "Demandez à un administrateur de créer une liste de prix active dans une devise active pour cette société.",
+      "open": "Ouvrir les listes de prix"
     },
     "warehouse": {
       "setup": "Configurez un entrepôt actif dans cette société avant de préparer un devis.",
@@ -3078,6 +3087,14 @@
     }
   },
   "sales": {
+    "workspace": {
+      "deliveryDestination": {
+        "setup": "Aucun emplacement client ne figure dans la liste de cette société. Si la confirmation en exige un, créez un emplacement de type Client dans Entrepôt. Revenez ici pour vérifier.",
+        "ask": "Aucun emplacement client ne figure dans la liste de cette société. Si la confirmation en exige un, demandez au responsable de l’entrepôt de créer un emplacement de type Client.",
+        "openLocations": "Ouvrir les emplacements de l’entrepôt",
+        "refresh": "Vérifier à nouveau la destination"
+      }
+    },
     "order": {
       "attachments": "Pièces jointes",
       "deliveries": "Livraisons",
@@ -3336,6 +3353,12 @@
       }
     },
     "forms": {
+      "setup": {
+        "openPricelists": "Ouvrir les listes de prix",
+        "refreshPriceLists": "Actualiser les listes de prix",
+        "pricelistMissing": "Créez une liste de prix dans une devise active dans un autre onglet, puis revenez ici et actualisez les listes. Vos saisies sont conservées.",
+        "pricelistMissingAsk": "Aucune liste de prix utilisable. Demandez à un administrateur d’en créer une dans une devise active, puis actualisez les listes."
+      },
       "newSaleOrder": {
         "sections": {
           "customer": "Client",

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { activationChecklist, activationForm, activationRecordHref, activationTaskHref, activationWarehouseState, availableActivationTasks, decodeActivationWarehouses, matchesActivationRecord, parseActivationReceipt, selectedActivationTask } from "./activation-checklist"
+import { activationChecklist, activationForm, activationRecordHref, activationPricelistSetupHref, activationPricelistState, decodeActivationPricelists, activationTaskHref, activationWarehouseState, availableActivationTasks, decodeActivationWarehouses, matchesActivationRecord, parseActivationReceipt, selectedActivationTask } from "./activation-checklist"
 
 const company = { id: 2n, organizationId: 1n, currencyId: 4n, fiscalYearEndMonth: 12, fiscalYearEndDay: 31 }
 const customer = { id: 9n, organizationId: 1n, companyId: 2n, isCustomer: true }
@@ -122,4 +122,39 @@ test("quotation warehouse readiness requires a confirmed active warehouse in the
   assert.equal(activationWarehouseState({ ...context, companyId: null, companyState: "missing" }), "unavailable")
   assert.throws(() => decodeActivationWarehouses({}))
   assert.throws(() => decodeActivationWarehouses({ data: [null] }))
+})
+
+const priceContext = { organizationId: "1", companyId: "2", companyState: "ready" as const }
+const pricelist = { id: "9007199254740993", organizationId: "1", companyId: "2", currencyId: "8", isActive: true }
+const priceRead = (data: readonly Record<string, unknown>[]) => ({ status: "success" as const, data })
+
+test("quotation price readiness uses active company and shared lists with a current currency", () => {
+  const state = (rows: readonly Record<string, unknown>[], currency: Record<string, unknown> = { id: "8" }) =>
+    activationPricelistState({ ...priceContext, pricelists: priceRead(rows), currencies: priceRead([currency]) })
+  assert.equal(state([pricelist]), "ready")
+  assert.equal(state([{ ...pricelist, companyId: null }]), "ready")
+  assert.equal(state([{ ...pricelist, companyId: { none: [] } }]), "ready")
+  assert.equal(state([{ id: "5", organization_id: "1", company_id: "2", currency_id: "8", is_active: true }]), "ready")
+  assert.equal(state([{ ...pricelist, companyId: "3" }, { ...pricelist, organizationId: "3" }]), "missing")
+  assert.equal(state([{ ...pricelist, isActive: false }]), "missing")
+  assert.equal(state([pricelist], { id: "8", is_active: false }), "missing")
+  assert.equal(state([pricelist], { id: "9" }), "missing")
+})
+
+test("price setup appears only on verified emptiness and with native setup permissions", () => {
+  const reads = { pricelists: priceRead([]), currencies: priceRead([{ id: "8" }]) }
+  assert.equal(activationPricelistState({ ...priceContext, ...reads }), "missing")
+  assert.equal(activationPricelistState({ ...priceContext, ...reads, pricelists: priceRead([{ ...pricelist, companyId: undefined }]) }), "unavailable")
+  assert.equal(activationPricelistState({ ...priceContext, ...reads, pricelists: priceRead([{ ...pricelist, currencyId: undefined }]) }), "unavailable")
+  assert.equal(activationPricelistState({ ...priceContext, ...reads, currencies: { status: "error", data: [{ id: "8" }] } }), "unavailable")
+  assert.equal(activationPricelistState({ ...priceContext, ...reads, currencies: { ...reads.currencies, isFetching: true } }), "loading")
+  assert.equal(activationPricelistState({ ...priceContext, pricelists: reads.pricelists }), "unavailable")
+  assert.deepEqual(decodeActivationPricelists({ data: [pricelist] }), [pricelist])
+  assert.throws(() => decodeActivationPricelists({ unchecked: true }))
+  assert.equal(activationPricelistSetupHref("missing", "2", () => true), "/sales?tab=pricelists&companyId=2")
+  assert.equal(activationPricelistSetupHref("unavailable", "2", () => true), null)
+  assert.equal(activationPricelistSetupHref("loading", "2", () => true), null)
+  for (const denied of ["product_pricelist", "pricelist", "module:sales"]) {
+    assert.equal(activationPricelistSetupHref("missing", "2", resource => resource !== denied), null)
+  }
 })

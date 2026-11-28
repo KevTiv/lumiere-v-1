@@ -19,8 +19,17 @@
     "recheck": "Ongera ugenzure"
   },
   "activation": {
+    "guidance": {
+      "quotation": "Kora cyangwa uhitemo urutonde rw’ibiciro rufite ifaranga rikoreshwa, uhitemo umukiriya n’ububiko. Bika devis mbere yo kongeramo ibicuruzwa."
+    },
     "checks": {
+      "pricelist": "Urutonde rw’ibiciro rukora mu ifaranga rikoreshwa",
       "warehouse": "Ububiko bukora muri iyi sosiyete"
+    },
+    "pricelist": {
+      "setup": "Kora urutonde rw’ibiciro rukora mu ifaranga rikoreshwa, hanyuma ugaruke hano gutegura inyandiko y’ibiciro.",
+      "ask": "Saba umuyobozi gukorera iyi sosiyete urutonde rw’ibiciro rukora mu ifaranga rikoreshwa.",
+      "open": "Fungura intonde z’ibiciro"
     },
     "warehouse": {
       "setup": "Tegura ububiko bukora muri iyi sosiyete mbere yo gukora inyandiko y’ibiciro biteganyijwe.",
@@ -3026,6 +3035,14 @@
     }
   },
   "sales": {
+    "workspace": {
+      "deliveryDestination": {
+        "setup": "Nta hantu hagenewe umukiriya hari ku rutonde rw’iyi sosiyete. Niba hakenewe aho kohereza ibicuruzwa kugira ngo wemeze, shyiraho ahantu ho mu bwoko bw’Umukiriya mu Bubiko. Garuka hano wongere ugenzure.",
+        "ask": "Nta hantu hagenewe umukiriya hari ku rutonde rw’iyi sosiyete. Niba hakenewe aho kohereza ibicuruzwa kugira ngo wemeze, saba ushinzwe ububiko gushyiraho ahantu ho mu bwoko bw’Umukiriya.",
+        "openLocations": "Fungura ahantu ho mu bubiko",
+        "refresh": "Ongera ugenzure aho ibicuruzwa bijya"
+      }
+    },
     "order": {
       "attachments": "Inyandiko zometseho",
       "deliveries": "Ibyagejejwe ku bakiriya",
@@ -3284,6 +3301,12 @@
       }
     },
     "forms": {
+      "setup": {
+        "openPricelists": "Fungura intonde z’ibiciro",
+        "refreshPriceLists": "Ongera urebe intonde z’ibiciro",
+        "pricelistMissing": "Kora urutonde rw’ibiciro rufite ifaranga rikoreshwa mu yindi tab, ugaruke hano wongere urebe intonde. Ibyo wanditse biragumaho.",
+        "pricelistMissingAsk": "Nta rutonde rw’ibiciro rushobora gukoreshwa. Saba umuyobozi gukora urutonde rufite ifaranga rikoreshwa, wongere urebe intonde."
+      },
       "newSaleOrder": {
         "sections": {
           "customer": "Umukiriya",

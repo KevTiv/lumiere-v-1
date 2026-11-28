@@ -7,9 +7,8 @@ import { provisionActor } from "./pretenant-support"
 import { bootstrapFixtureAccountSession } from "./fixture-account"
 import { createStockQuantFixture } from "./inventory-quant-fixtures"
 
-/** Setup-only fixtures: keep approval publication out of the shared demo company. */
-export async function isolatedSalesApprovalFixture(page: Page) {
-  const fixtureName = smokeName("approval-tenant")
+/** Start with a new company under a reserved, isolated fixture identity. */
+export async function bootstrapSalesFixture(page: Page, fixtureName: string) {
   await bootstrapFixtureAccountSession(page.request, `${fixtureName}@example.test`, "Password123$")
   const bootstrap = await page.request.post("/api/bootstrap/tenant", { data: {
     organization: { name: fixtureName, code: fixtureName, timezone: "UTC", dateFormat: "YYYY-MM-DD", language: "en", isActive: true,
@@ -22,22 +21,11 @@ export async function isolatedSalesApprovalFixture(page: Page) {
   const organizationId = await fetchSessionOrganizationId(page)
   const currencyId = await fetchCurrencyIdByCode(page, "USD")
   const companyId = await fetchDefaultCompanyId(page)
-  // Graph reducers are trusted-fixture-only. Give the local fixture service an
-  // explicit, tenant-scoped workflow author membership; do not bypass policy.
-  const fixtureToken = process.env.STDB_SERVER_TOKEN
-  if (!fixtureToken) throw new Error("Workflow graph fixture requires the local database owner token")
-  const ownerClaims = JSON.parse(Buffer.from(fixtureToken.split(".")[1]!, "base64url").toString("utf8")) as { hex_identity?: string }
-  const ownerIdentity = String(ownerClaims.hex_identity ?? "").replace(/^0x/, "")
-  expect(ownerIdentity).toMatch(/^[0-9a-f]{64}$/i)
-  const graphRoleName = smokeName("fixture-graph-author")
-  await callReducerBff(page, "create_role", [organizationId, {
-    name: graphRoleName, description: "Isolated workflow fixture setup", parent_id: null,
-    permissions: ["workflow:write"], is_active: true, metadata: null,
-  }])
-  await callReducerBff(page, "add_org_member", [ownerIdentity, organizationId, {
-    role_name: graphRoleName, company_id: companyId, job_title: null, department_id: null,
-    employee_id: null, is_active: true, is_default: false, metadata: null,
-  }])
+  return { organizationId, companyId, currencyId }
+}
+
+/** Create stock references without creating sales documents, price lists or a customer destination. */
+export async function seedSalesStockFixture(page: Page, fixtureName: string, organizationId: number, companyId: number) {
   await callReducerBff(page, "create_uom_category", [organizationId, stdbParamsToJson({ name: fixtureName, sequence: 1 }, "CreateUomCategoryParams")])
   // UOM categories have no governed query resource. This setup-only observer
   // reads the new tenant's exact category; owner credentials stay in Node.
@@ -55,10 +43,9 @@ export async function isolatedSalesApprovalFixture(page: Page) {
   }, "CreateUomParams")])
   await callReducerBff(page, "create_product_category", [organizationId, stdbParamsToJson({ name: fixtureName, sequence: 1 }, "CreateProductCategoryParams")])
   const source = await location(page, companyId)
-  await location(page, companyId, false, "customer")
   // Picking type ids are warehouse configuration values, not table FKs.
   const typeId = 1
-  const warehouseName = smokeName("approval-warehouse")
+  const warehouseName = smokeName("fixture-warehouse")
   await callReducerBff(page, "create_warehouse", [organizationId, companyId, stdbParamsToJson({
     name: warehouseName, code: warehouseName, lotStockId: id(source),
     inTypeId: typeId, outTypeId: typeId, intTypeId: typeId, packTypeId: typeId, pickTypeId: typeId,
@@ -72,6 +59,33 @@ export async function isolatedSalesApprovalFixture(page: Page) {
   const warehouses = (await warehouseResponse.json()).data as Array<Record<string, unknown>>
   const warehouse = warehouses.filter(row => row.name === warehouseName)
   expect(warehouse).toHaveLength(1)
+  const product = await createProduct(page)
+  await createStockQuantFixture(page, companyId, id(product), id(source), fixtureName, 10)
+  return { warehouse: warehouse[0]!, product }
+}
+
+/** Setup-only fixtures: keep approval publication out of the shared demo company. */
+export async function isolatedSalesApprovalFixture(page: Page) {
+  const fixtureName = smokeName("approval-tenant")
+  const { organizationId, companyId, currencyId } = await bootstrapSalesFixture(page, fixtureName)
+  // Graph reducers are trusted-fixture-only. Give the local fixture service an
+  // explicit, tenant-scoped workflow author membership; do not bypass policy.
+  const fixtureToken = process.env.STDB_SERVER_TOKEN
+  if (!fixtureToken) throw new Error("Workflow graph fixture requires the local database owner token")
+  const ownerClaims = JSON.parse(Buffer.from(fixtureToken.split(".")[1]!, "base64url").toString("utf8")) as { hex_identity?: string }
+  const ownerIdentity = String(ownerClaims.hex_identity ?? "").replace(/^0x/, "")
+  expect(ownerIdentity).toMatch(/^[0-9a-f]{64}$/i)
+  const graphRoleName = smokeName("fixture-graph-author")
+  await callReducerBff(page, "create_role", [organizationId, {
+    name: graphRoleName, description: "Isolated workflow fixture setup", parent_id: null,
+    permissions: ["workflow:write"], is_active: true, metadata: null,
+  }])
+  await callReducerBff(page, "add_org_member", [ownerIdentity, organizationId, {
+    role_name: graphRoleName, company_id: companyId, job_title: null, department_id: null,
+    employee_id: null, is_active: true, is_default: false, metadata: null,
+  }])
+  const { warehouse, product } = await seedSalesStockFixture(page, fixtureName, organizationId, companyId)
+  await location(page, companyId, false, "customer")
   const pricelistName = smokeName("approval-pricelist")
   await callReducerBff(page, "create_pricelist", [organizationId, stdbParamsToJson({
     companyId, name: pricelistName, currencyId, discountPolicy: { tag: "WithoutDiscount" },
@@ -91,12 +105,10 @@ export async function isolatedSalesApprovalFixture(page: Page) {
   const customers = ((await contactResponse.json()).data as Array<Record<string, unknown>>).filter(row => row.name === customerName)
   expect(customers).toHaveLength(1)
   const customer = customers[0]
-  const product = await createProduct(page)
-  if (!customer || !product) throw new Error("Missing sales reference fixtures")
-  await createStockQuantFixture(page, companyId, id(product), id(source), fixtureName, 10)
+  if (!customer) throw new Error("Missing sales customer fixture")
   const reference = smokeName("isolated-sales-approval")
   const params = toCreateSaleOrderParams({
-    partnerId: id(customer), pricelistId: id(pricelist[0]!), warehouseId: id(warehouse[0]!), clientOrderRef: reference,
+    partnerId: id(customer), pricelistId: id(pricelist[0]!), warehouseId: id(warehouse), clientOrderRef: reference,
   }, pricelists, BigInt(companyId))
   const line = toCreateSaleOrderLineParams({ productId: id(product), uomId: id(product, "uomId", "uom_id"), quantity: 1, priceUnit: 1200 })
   if (!params || !line) throw new Error("Invalid isolated sales fixture")

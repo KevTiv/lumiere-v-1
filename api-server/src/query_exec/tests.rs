@@ -204,6 +204,28 @@ fn authoritative_company_sql_is_bounded_by_scope_and_id() {
 }
 
 #[test]
+fn authoritative_sale_order_pricelist_respects_field_projection() {
+    let mut access = authoritative_access("sale_order:read");
+    let (sql, _) = authoritative_record_sql("sale-orders", 42, 7, 99, Some(&access)).unwrap();
+    assert!(sql.contains("pricelist_id"), "{sql}");
+    let list_columns = stdb_auth::resolve_http_sql_columns("sale-orders", Some(&access)).unwrap();
+    assert!(!list_columns.iter().any(|column| column == "pricelist_id"));
+
+    access.field_permissions.push(
+        serde_json::from_value(json!({
+            "organizationId": 42,
+            "roleId": 7,
+            "resource": "sale-orders",
+            "action": "read",
+            "allowedFields": ["state"],
+        }))
+        .unwrap(),
+    );
+    let (sql, _) = authoritative_record_sql("sale-orders", 42, 7, 99, Some(&access)).unwrap();
+    assert!(!sql.contains("pricelist_id"), "{sql}");
+}
+
+#[test]
 fn authoritative_sql_fails_closed_without_read_permission() {
     let access = authoritative_access("sale_order:write");
     assert!(authoritative_record_sql("sale-orders", 42, 7, 99, Some(&access)).is_err());

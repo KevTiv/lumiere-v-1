@@ -19,8 +19,8 @@ const guidance: Record<SaleOrderNextStep, [string, string, string?]> = {
   unavailable: ['Order lines are unavailable', 'Wait for loading to finish or refresh before continuing.'],
 };
 
-export function SaleOrderNextAction({ step, actionLabel, blockedReason, pending, onContinue, error }: {
-  step: SaleOrderNextStep; error?: string; actionLabel?: string; blockedReason?: string; pending?: boolean; onContinue?: () => void;
+export function SaleOrderNextAction({ step, actionLabel, blockedReason, pending, onContinue, error, setup }: {
+  step: SaleOrderNextStep; error?: string; actionLabel?: string; blockedReason?: string; pending?: boolean; onContinue?: () => void; setup?: ReactNode;
 }) {
   const { t } = useTranslation();
   const [title, description, defaultAction] = guidance[step];
@@ -30,6 +30,7 @@ export function SaleOrderNextAction({ step, actionLabel, blockedReason, pending,
         <p className="text-xs font-medium text-muted-foreground">{t('sales.workspace.nextStep', { defaultValue: 'Next step' })}</p>
         <h2 id="sale-order-next-step-title" className="mt-1 font-semibold">{t(`sales.workspace.steps.${step}.title`, { defaultValue: title })}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{t(`sales.workspace.steps.${step}.description`, { defaultValue: description })}</p>
+        {setup}
         {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
         {blockedReason && <p role="status" className="mt-2 text-sm text-destructive">{blockedReason}</p>}
       </div>

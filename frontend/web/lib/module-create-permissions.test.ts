@@ -9,6 +9,7 @@ const source = readFileSync(new URL("./module-dashboard-configs.ts", import.meta
 /** tab createAction -> resource the matching create reducer passes to check_permission(..., "create"). */
 const expected: Array<[string, string]> = [
   ["createSaleOrder", "sale_order"],
+  ["createPricelist", "pricelist"],
   ["createPurchaseOrder", "purchase_order"],
   ["createProduct", "product"],
   ["createStockPicking", "stock_picking"],

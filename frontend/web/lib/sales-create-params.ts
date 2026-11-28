@@ -54,7 +54,7 @@ export function toCreateSaleOrderParams(
   if (partnerId == null || pricelistId == null || warehouseId == null) return null
 
   const pl = pricelists.find((p) => String(p.id) === String(pricelistRaw))
-  const currencyRaw = pl?.currencyId
+  const currencyRaw = pl?.currencyId ?? pl?.currency_id
   if (currencyRaw === undefined || currencyRaw === null) return null
   const currencyId = nullableBigIntU64(currencyRaw)
   if (currencyId == null) return null

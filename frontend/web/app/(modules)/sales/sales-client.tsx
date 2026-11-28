@@ -11,6 +11,8 @@ import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { quotationPricelistSetupHref, usableQuotationPricelists } from "@/lib/first-sale-readiness"
+import { useCompanyHandoff } from "@/lib/use-company-handoff"
 import { useWarehouseChoice } from "@/lib/use-warehouse-choice"
 import { withFormChoiceSetup } from "@lumiere/ui/lib/form-choice-setup"
 import { CompanyModuleInsights } from "../../../components/module-insights"
@@ -326,9 +328,12 @@ type SalesClientLoadedProps = Omit<SalesClientProps, 'organizationId'> & {
 type SalesCsvImportKind = 'order' | 'orderLine';
 
 export function SalesClient(props: SalesClientProps) {
+  const { t } = useTranslation();
+  const switchingCompany = useCompanyHandoff();
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />;
   }
+  if (switchingCompany) return <p role="status">{t("common.loading")}</p>;
   return <SalesClientLoaded {...props} organizationId={props.organizationId} />;
 }
 
@@ -438,7 +443,8 @@ function SalesClientLoaded({
   const ordersLoading = ordersRead.state.status === 'loading';
   const orderLinesRead = moduleCollection(useSaleOrderLines(orgId, initialOrderLines));
   const orderLines = orderLinesRead.rows;
-  const pricelistsRead = moduleCollection(usePricelists(orgId, initialPricelists));
+  const pricelistsQuery = usePricelists(orgId, initialPricelists);
+  const pricelistsRead = moduleCollection(pricelistsQuery);
   const pricelists = pricelistsRead.rows;
   const pricelistItemsRead = moduleCollection(usePricelistItems(orgId, initialPricelistItems));
   const pricelistItems = pricelistItemsRead.rows;
@@ -1150,15 +1156,35 @@ function SalesClientLoaded({
     return map;
   }, [users]);
 
+  const priceChoicesState = mergeModuleStates([pricelistsRead.state, moduleQueryState(currenciesQuery)]);
+  const quotationPricelists = useMemo(
+    () => priceChoicesState.status === 'ready'
+      ? usableQuotationPricelists(pricelists, currencies, orgId, operatingCompanyId)
+      : [],
+    [priceChoicesState.status, pricelists, currencies, orgId, operatingCompanyId],
+  );
+  const quotationPriceOptions = useMemo(() => {
+    const usableIds = new Set(quotationPricelists.map(row => String(row.id)));
+    const usable = pricelistFieldOptions.filter(option => usableIds.has(option.value));
+    if (usable.length) return usable;
+    const label = priceChoicesState.status === 'loading' ? t('sales.forms.refinement.lookupLoading')
+      : priceChoicesState.status === 'denied' ? t('sales.forms.refinement.lookupDenied')
+        : priceChoicesState.status === 'error' ? t('sales.forms.refinement.lookupFailed')
+          : t('common.lookup.noPricelists');
+    return [{ value: '', label, disabled: true }];
+  }, [priceChoicesState.status, pricelistFieldOptions, quotationPricelists, t]);
+
   const saleOrderFormConfig = useMemo(() => {
     const canSetUp = (resource: string, module: string) => permissionsReady === true &&
       checkPermission(module, 'read').allowed && checkPermission(resource, 'create').allowed;
     const canCreateCustomer = canSetUp('contact', 'module:crm');
-    const canCreatePricelist = canSetUp('pricelist', 'module:sales');
+    const pricelistSetupHref = permissionsReady === true
+      ? quotationPricelistSetupHref(operatingCompanyId, (resource, action) => checkPermission(resource, action).allowed)
+      : null;
     return withFormChoiceSetup(
       mergeSelectOptionsForFields(newSaleOrderForm(t), {
         partnerId: partnerFieldOptions,
-        pricelistId: pricelistFieldOptions,
+        pricelistId: quotationPriceOptions,
         warehouseId: warehouseFieldOptions,
         paymentTermId: paymentTermFieldOptions,
       }),
@@ -1174,20 +1200,21 @@ function SalesClientLoaded({
           } : undefined,
         },
         pricelistId: {
-          ready: pricelistsRead.state.status === 'ready',
-          message: canCreatePricelist
-            ? t('sales.forms.setup.pricelistMissing', { defaultValue: 'Create a price list with a currency in a separate tab, then return to this quotation. Your entries stay here.' })
-            : t('sales.forms.setup.pricelistMissingAsk', { defaultValue: 'No price lists are available. Ask an administrator to create a price list with a currency, then return to this quotation.' }),
-          action: canCreatePricelist ? {
-            href: buildModuleTabHref('sales', 'pricelists'),
+          ready: priceChoicesState.status === 'ready',
+          retry: { label: t('sales.forms.setup.refreshPriceLists'), onRetry: () => { void pricelistsQuery.refetch(); void currenciesQuery.refetch(); } },
+          message: pricelistSetupHref
+            ? t('sales.forms.setup.pricelistMissing', { defaultValue: 'Create a price list with an active currency in a separate tab, then return here and refresh the price lists. Your entries stay here.' })
+            : t('sales.forms.setup.pricelistMissingAsk', { defaultValue: 'No usable price lists are available. Ask an administrator to create one with an active currency, then refresh the price lists.' }),
+          action: pricelistSetupHref ? {
+            href: pricelistSetupHref,
             label: t('sales.forms.setup.openPricelists', { defaultValue: 'Open price lists' }),
           } : undefined,
         },
         warehouseId: warehouseChoiceHelp,
       },
     );
-  }, [t, partnerFieldOptions, pricelistFieldOptions, warehouseFieldOptions, paymentTermFieldOptions, warehouseChoiceHelp,
-    permissionsReady, checkPermission, contactsRead.state.status, pricelistsRead.state.status]);
+  }, [t, partnerFieldOptions, quotationPriceOptions, warehouseFieldOptions, paymentTermFieldOptions, warehouseChoiceHelp,
+    permissionsReady, checkPermission, contactsRead.state.status, priceChoicesState.status, operatingCompanyId, pricelistsQuery.refetch, currenciesQuery.refetch]);
 
   const openCreateSaleOrder = useCallback(
     () => setQuickActionForm({ form: saleOrderFormConfig, action: 'createSaleOrder' }),
@@ -2615,8 +2642,8 @@ function SalesClientLoaded({
     const invalidInput = () => new Error(t('sales.forms.refinement.invalidInput', { defaultValue: 'Check the required choices and entered values. Your entries have been retained.' }));
     if (!tabUsable(actionTabs[action])) throw new Error('Required data is unavailable. Refresh and try again.');
     if (action === 'createSaleOrder') {
-      if ([contactsRead.state, pricelistsRead.state, { status: warehouseStatus }].some((state) => state.status !== "ready")) throw new Error(t("sales.forms.refinement.requiredChoicesUnavailable", { defaultValue: "Required choices are not available. Wait for loading to finish or refresh to try again. Your entries have been retained." }));
-      const p = toCreateSaleOrderParams(formData, pricelists, operatingCompanyId);
+      if ([contactsRead.state, priceChoicesState, { status: warehouseStatus }].some((state) => state.status !== "ready")) throw new Error(t("sales.forms.refinement.requiredChoicesUnavailable", { defaultValue: "Required choices are not available. Wait for loading to finish or refresh to try again. Your entries have been retained." }));
+      const p = toCreateSaleOrderParams(formData, quotationPricelists, operatingCompanyId);
       if (!p || !warehouseFieldOptions.some((choice) => choice.value === String(p.warehouseId))) throw new Error(t('sales.forms.refinement.requiredOrderContext', { defaultValue: 'Choose a customer, an available price list with a currency, and a warehouse. Your entries have been retained.' }));
       const saved = await createSaleOrder.mutateAsync(p);
       phCapture('sale_order_created', { organization_id: organizationId });
@@ -2740,7 +2767,7 @@ function SalesClientLoaded({
         organizationId={organizationId}
         quickCreate={{
           companyId: operatingCompanyId,
-          readiness: mergeModuleStates([contactsRead.state, pricelistsRead.state]),
+          readiness: mergeModuleStates([contactsRead.state, priceChoicesState]),
         }}
         assistantFormBlocked={quickActionForm !== null || partialDeliveryPicking !== null || cancelPickingTarget !== null || creditReturnOrderId !== null || openReturnForm || chatterTarget !== null}
         config={config}
