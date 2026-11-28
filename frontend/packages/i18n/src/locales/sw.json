@@ -210,7 +210,11 @@
       "invoice": "Ankara mpya ya mteja",
       "bill": "Ankara mpya ya msambazaji",
       "expense": "Gharama mpya",
-      "salesOrder": "Agizo jipya la mauzo"
+      "salesOrder": "Agizo jipya la mauzo",
+      "companyRequired": "Chagua kampuni inayotumika kabla ya kuunda rekodi.",
+      "denied": "Huna ruhusa ya kuunda rekodi hii.",
+      "busy": "Funga fomu ya sasa au kamilisha shughuli inayosubiri, kisha ujaribu kuunda haraka tena.",
+      "unavailable": "Fomu ya kuunda rekodi haipatikani. Kagua data au mipangilio inayohitajika katika eneo la kazi, kisha ujaribu tena."
     },
     "preferences": {
       "heading": "Mapendeleo",
@@ -221,6 +225,7 @@
     }
   },
   "workspaceShell": {
+    "breadcrumb": "Njia ya ukurasa",
     "searchShort": "Tafuta…",
     "accountAndPreferences": "Akaunti na mapendeleo",
     "resizeNavigation": "Badilisha upana wa urambazaji",

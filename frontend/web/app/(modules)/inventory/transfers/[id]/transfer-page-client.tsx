@@ -107,10 +107,11 @@ function TransferPageLoaded({
   const { t } = useTranslation();
   const workspaceProfile = useWorkspaceProfile();
   useInventoryModuleSubscription(workspaceProfile === 'finance-alpha' ? 'warehouse' : 'inventory');
-  const workspaceNavigation = transferWorkspaceNavigation(workspaceProfile);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
+  const workspaceNavigation = transferWorkspaceNavigation(workspaceProfile, returnTo);
   const { orgId } = orgBigInts(organizationId);
 
   const { rows: pickings, state: pickingState } = moduleCollection(useStockPickings(orgId, undefined, true, operatingCompanyId));
@@ -185,6 +186,7 @@ function TransferPageLoaded({
     rows: pickings as unknown as Row[],
     currentId: transferId,
     basePath: '/inventory/transfers',
+    returnHref: returnTo ? workspaceNavigation.transfersHref : undefined,
     labelOf: (row) => String(row.name || row.id),
   });
 

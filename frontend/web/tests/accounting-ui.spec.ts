@@ -533,7 +533,11 @@ for (const width of [390, 1440]) {
         await expect(page).toHaveURL(new RegExp(`/accounting/invoices/${recordId}$`))
         await expect(page.getByTestId("return-record-ready")).toHaveAttribute("data-hydrated", "true", { timeout: test.info().timeout })
         await expect(page.getByTestId("return-record-id")).toContainText(recordId)
-        await expect(page.getByTestId("invoice-page").getByRole("link", { name: "Invoices", exact: true })).toHaveAttribute("href", sourceHref)
+        const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb", exact: true })
+        await expect(breadcrumb).toHaveCount(1)
+        await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText("INV/RETURN/031")
+        await expect(breadcrumb.getByRole("link", { name: "Accounting", exact: true })).toHaveAttribute("href", "/accounting")
+        await expect(breadcrumb.getByRole("link", { name: "Invoices", exact: true })).toHaveAttribute("href", sourceHref)
 
         await page.goBack({ waitUntil: "domcontentloaded" })
         await expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search).toBe(sourceHref)

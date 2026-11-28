@@ -82,6 +82,7 @@ import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { useRecordNavigation } from '@/hooks/use-record-navigation';
+import { recordListRoute } from '@/lib/record-list-route';
 import { approvalInboxHref } from '../../../approvals/approval-inbox-view';
 import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
 import { useManagedDocumentUpload } from "@/lib/use-managed-document-upload";
@@ -149,6 +150,8 @@ function SaleOrderPageLoaded({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const ordersHref = buildModuleTabHref('sales', 'orders');
+  const ordersReturnHref = recordListRoute(searchParams.get('returnTo'), ordersHref);
   const { askForm, formDialog } = useFormDialog();
   const { orgId } = orgBigInts(organizationId);
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
@@ -278,6 +281,7 @@ function SaleOrderPageLoaded({
     rows: orders as unknown as OrderRow[],
     currentId: orderId,
     basePath: '/sales/orders',
+    returnHref: ordersReturnHref === ordersHref ? undefined : ordersReturnHref,
     labelOf: (row) => saleOrderPrimaryLabel(row as never) || String(row.id),
   });
 
@@ -382,7 +386,7 @@ function SaleOrderPageLoaded({
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <Button variant="outline" render={<Link href={buildModuleTabHref('sales', 'orders')} />} nativeButton={false}>
+          <Button variant="outline" render={<Link href={ordersReturnHref} />} nativeButton={false}>
             {t('sales.order.backToOrders', { defaultValue: 'Back to orders' })}
           </Button>
         </EmptyContent>
@@ -656,7 +660,7 @@ function SaleOrderPageLoaded({
         testIdPrefix="sale-order"
         breadcrumbs={[
           { label: t('nav.sales'), href: '/sales' },
-          { label: t('sales.salesOrders.title'), href: buildModuleTabHref('sales', 'orders') },
+          { label: t('sales.salesOrders.title'), href: ordersReturnHref },
           { label },
         ]}
         title={label}

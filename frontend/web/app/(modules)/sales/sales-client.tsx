@@ -16,7 +16,8 @@ import { CompanyModuleInsights } from "../../../components/module-insights"
 import { phCapture } from '@/lib/posthog-browser';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { canUseModuleData, mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { listRouteFromQuery, recordHrefWithListRoute } from '@/lib/record-list-route';
 import { toast } from 'sonner';
 import { nullableBigIntU64 } from '@lumiere/erp-shared/form-coercion';
 import { useTranslation } from '@lumiere/i18n';
@@ -378,6 +379,13 @@ function SalesClientLoaded({
   useSalesModuleSubscription();
   const { t } = useTranslation();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const ordersHref = buildModuleTabHref('sales', 'orders');
+  const ordersReturnHref = listRouteFromQuery(ordersHref, searchParams.toString());
+  const orderHref = useCallback((order: Parameters<typeof saleOrderRecordHref>[0]) => {
+    const href = saleOrderRecordHref(order);
+    return href && recordHrefWithListRoute(href, ordersReturnHref === ordersHref ? undefined : ordersReturnHref);
+  }, [ordersHref, ordersReturnHref]);
   const { currentUser, permissionsReady, checkPermission } = useRBAC();
   const documentSession = useErpSession();
   const canPreviewQuotation = permissionsReady === true &&
@@ -398,7 +406,7 @@ function SalesClientLoaded({
   const saleOrdersTableRuntime = useRuntimeListConfig({
     base: saleOrdersTableConfig(t, {
       formatSaleOrderDisplayName: saleOrderPrimaryLabel,
-      recordHref: saleOrderRecordHref,
+      recordHref: orderHref,
     }).view as EntityTableConfig,
     moduleId: 'sales',
     formId: 'new-sale-order',
@@ -1254,7 +1262,7 @@ function SalesClientLoaded({
           />
         ),
       },
-      openHref: saleOrderRecordHref,
+      openHref: orderHref,
       customTabs: [
         {
           id: 'lines',
@@ -1302,7 +1310,7 @@ function SalesClientLoaded({
         },
       ],
     };
-  }, [t, orderLines, partnerLabelById, orgId, operatingCompanyId, stockPickings, accountMoves, returnOrders, accountPayments]);
+  }, [t, orderHref, orderLines, partnerLabelById, orgId, operatingCompanyId, stockPickings, accountMoves, returnOrders, accountPayments]);
 
   const pickingBatchFormConfig = useMemo(
     () =>
@@ -1497,7 +1505,6 @@ function SalesClientLoaded({
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
     const base = saleOrdersTableConfig(t, {
       formatSaleOrderDisplayName: saleOrderPrimaryLabel,
-      recordHref: saleOrderRecordHref,
       onEmptyAction: openCreateSaleOrder,
     });
     const runtimeView = saleOrdersTableRuntime;
@@ -2744,6 +2751,10 @@ function SalesClientLoaded({
       ) : null}
       <ModuleWorkView
         organizationId={organizationId}
+        quickCreate={{
+          companyId: operatingCompanyId,
+          readiness: mergeModuleStates([contactsRead.state, pricelistsRead.state, warehousesRead.state]),
+        }}
         assistantFormBlocked={quickActionForm !== null || partialDeliveryPicking !== null || cancelPickingTarget !== null || creditReturnOrderId !== null || openReturnForm || chatterTarget !== null}
         config={config}
         dashboardCompositionOwned

@@ -292,6 +292,7 @@
     "forecastFinitePeriod": "Choose a custom date range or a calendar preset before creating a forecast snapshot."
   },
   "workspaceShell": {
+    "breadcrumb": "Breadcrumb",
     "searchShort": "Search…",
     "accountAndPreferences": "Account and preferences",
     "resizeNavigation": "Resize navigation",
@@ -18609,7 +18610,11 @@
       "invoice": "New customer invoice",
       "bill": "New vendor bill",
       "expense": "New expense",
-      "salesOrder": "New sales order"
+      "salesOrder": "New sales order",
+      "companyRequired": "Select an active company before creating a record.",
+      "denied": "You do not have permission to create this record.",
+      "busy": "Close the current form or finish the pending operation, then try Quick Create again.",
+      "unavailable": "The create form is unavailable. Check the workspace for required data or setup, then try again."
     },
     "preferences": {
       "heading": "Preferences",

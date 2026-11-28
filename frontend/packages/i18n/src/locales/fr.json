@@ -205,7 +205,11 @@
       "invoice": "Nouvelle facture client",
       "bill": "Nouvelle facture fournisseur",
       "expense": "Nouvelle dépense",
-      "salesOrder": "Nouvelle commande client"
+      "salesOrder": "Nouvelle commande client",
+      "companyRequired": "Sélectionnez une société active avant de créer un enregistrement.",
+      "denied": "Vous n’avez pas l’autorisation de créer cet enregistrement.",
+      "busy": "Fermez le formulaire en cours ou terminez l’opération en attente, puis réessayez la création rapide.",
+      "unavailable": "Le formulaire de création est indisponible. Vérifiez les données ou la configuration requises dans l’espace de travail, puis réessayez."
     },
     "preferences": {
       "heading": "Préférences",
@@ -216,6 +220,7 @@
     }
   },
   "workspaceShell": {
+    "breadcrumb": "Fil d’Ariane",
     "searchShort": "Rechercher…",
     "accountAndPreferences": "Compte et préférences",
     "resizeNavigation": "Redimensionner la navigation",

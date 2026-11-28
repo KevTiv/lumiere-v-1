@@ -42,6 +42,8 @@ import { ReconciliationMoveLineProvider } from "@lumiere/ui/forms/reconciliation
 import { reconciliationAccountChoices, reconciliationPartnerChoices, reconciliationSelectionIssue, type ReconciliationSelectionIssue } from "@lumiere/ui/lib/reconciliation-widget-choices"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useErpSession } from "@lumiere/erp-session"
+import { QuickCreateCompanyNotice } from "@lumiere/ui/pages/module-quick-create"
 import { OwnerQueueScope } from "../../../components/owner-queue-scope"
 import { isDraftVendorBill, isOwnerQueue, overdueInvoiceInputsComplete, overduePostedInvoices } from "@/lib/owner-queues"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "@lumiere/ui/lib/module-url-filters"
@@ -652,6 +654,7 @@ export function AccountingClient(props: AccountingClientProps) {
 }
 
 function AccountingClientLoaded(props: AccountingClientLoadedProps) {
+  const { activeCompanyReady } = useErpSession()
   const switchingCompany = useCompanyHandoff()
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(props.organizationId)
   const retainedCompany = useRef(operatingCompanyId)
@@ -660,6 +663,7 @@ function AccountingClientLoaded(props: AccountingClientLoadedProps) {
   if (retainedCompany.current == null) {
     return (
       <div className="space-y-4 rounded-lg border border-dashed p-6 text-sm text-muted-foreground" role="status">
+        <QuickCreateCompanyNotice moduleId="accounting" ready={activeCompanyReady !== false} />
         <p>Select an active company to open the accounting workspace.</p>
         <a
           href="/settings?section=finance-setup"
@@ -5698,8 +5702,10 @@ function AccountingClientReady({
       {companyAvailable && (overdueQueue || draftBillQueue) && (
         <div className="mb-3"><OwnerQueueScope queue={overdueQueue ? "overdueInvoices" : "draftBills"} /></div>
       )}
+      {!companyAvailable && <QuickCreateCompanyNotice moduleId="accounting" ready />}
       {companyAvailable ? <ModuleWorkView
         organizationId={organizationId}
+        quickCreate={{ companyId: operatingCompanyId, readiness: manualInvoiceReadState }}
         assistantFormBlocked={quickActionForm !== null || showCreateInvoice || showCreateBill || paymentOperationsLocked || invoiceSheetRecord !== null}
         onAssistantFormScopeChange={() => { setShowCreateInvoice(false); setShowCreateBill(false); setQuickActionForm(null); setAssistantFormRequest(null) }}
         assistantCreate={{

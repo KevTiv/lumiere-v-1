@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { Fragment, type ReactNode } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { cn } from "../lib/utils"
@@ -82,20 +83,23 @@ export function RecordPage({
   testIdPrefix,
   className,
 }: RecordPageProps) {
+  const { t } = useTranslation()
   return (
     <div className={cn("min-w-0 space-y-6", className)} data-testid={`${testIdPrefix}-page`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Breadcrumb>
+        <Breadcrumb aria-label={t("workspaceShell.breadcrumb", { defaultValue: "Breadcrumb" })} data-slot="record-breadcrumbs">
           <BreadcrumbList>
             {breadcrumbs.map((crumb, index) => {
               const isLast = index === breadcrumbs.length - 1
               return (
                 <Fragment key={`${crumb.label}-${index}`}>
                   <BreadcrumbItem>
-                    {isLast || !crumb.href ? (
+                    {isLast ? (
                       <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-                    ) : (
+                    ) : crumb.href ? (
                       <BreadcrumbLink render={<Link href={crumb.href} />}>{crumb.label}</BreadcrumbLink>
+                    ) : (
+                      <span>{crumb.label}</span>
                     )}
                   </BreadcrumbItem>
                   {isLast ? null : <BreadcrumbSeparator />}

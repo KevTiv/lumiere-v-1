@@ -9,7 +9,6 @@ import {
   Clock,
   FilePlus2,
   Moon,
-  Plus,
   Receipt,
   Rows3,
   ShoppingCart,
@@ -19,6 +18,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import { useRBAC } from "@/lib/rbac-context"
 import { buildNavGroups, type NavGroup } from "../lib/navigation-catalog"
+import { isQuickCreateHref, QUICK_CREATE_TARGETS, quickCreateHref } from "../lib/quick-create"
 import { isRecordSearchQuery } from "../lib/record-search"
 import { buildCommandWorkspaceLinks } from "../lib/command-workspace-links"
 import { RecordSearchResults, type RecordSearchSummary } from "./erp-command-palette-records"
@@ -56,7 +56,7 @@ function readRecentCommands(): RecentCommandItem[] {
     return parsed
       .filter(
         (item): item is RecentCommandItem =>
-          item && typeof item.label === "string" && typeof item.href === "string" && item.href.startsWith("/"),
+          item && typeof item.label === "string" && typeof item.href === "string" && item.href.startsWith("/") && !item.href.startsWith("//") && !isQuickCreateHref(item.href),
       )
       .slice(0, MAX_RECENT_ITEMS)
   } catch {
@@ -115,7 +115,7 @@ export function ErpCommandPalette({
     setRecordSummary(null)
   }, [onOpenChange, open])
   const router = useRouter()
-  const { checkPermission, isAdmin } = useRBAC()
+  const { checkPermission, isAdmin, permissionsReady } = useRBAC()
   const { t } = useTranslation()
 
   // Load recent items when palette opens.
@@ -207,21 +207,21 @@ export function ErpCommandPalette({
   const hasQuickActions = visibleAiChat || visibleNotebook || visibleJournal
 
   const quickCreates = useMemo(() => {
-    const items: Array<{ label: string; href: string; keywords: string; icon: typeof Plus }> = []
-    if (allowedSurfaceIds.has("accounting") && checkPermission("module:accounting", "create").allowed) {
-      items.push(
-        { label: t("commandPalette.quickCreate.invoice", { defaultValue: "New customer invoice" }), href: "/accounting?tab=invoices&create=1", keywords: "create invoice ar billing", icon: FilePlus2 },
-        { label: t("commandPalette.quickCreate.bill", { defaultValue: "New vendor bill" }), href: "/accounting?tab=bills&create=1", keywords: "create bill ap payable", icon: FilePlus2 },
-      )
+    if (permissionsReady === false || organizationId == null || organizationId <= 0) return []
+    const actions = {
+      invoice: { label: t("commandPalette.quickCreate.invoice", { defaultValue: "New customer invoice" }), keywords: "create invoice ar billing", icon: FilePlus2 },
+      bill: { label: t("commandPalette.quickCreate.bill", { defaultValue: "New vendor bill" }), keywords: "create bill ap payable", icon: FilePlus2 },
+      expense: { label: t("commandPalette.quickCreate.expense", { defaultValue: "New expense" }), keywords: "create expense receipt spend", icon: Receipt },
+      salesOrder: { label: t("commandPalette.quickCreate.salesOrder", { defaultValue: "New sales order" }), keywords: "create quote order sales", icon: ShoppingCart },
     }
-    if (allowedSurfaceIds.has("expenses") && checkPermission("module:expenses", "create").allowed) {
-      items.push({ label: t("commandPalette.quickCreate.expense", { defaultValue: "New expense" }), href: "/expenses?tab=expenses&create=1", keywords: "create expense receipt spend", icon: Receipt })
-    }
-    if (allowedSurfaceIds.has("sales") && checkPermission("module:sales", "create").allowed) {
-      items.push({ label: t("commandPalette.quickCreate.salesOrder", { defaultValue: "New sales order" }), href: "/sales?tab=orders&create=1", keywords: "create quote order sales", icon: ShoppingCart })
-    }
-    return items
-  }, [allowedSurfaceIds, checkPermission, t])
+    return (Object.keys(actions) as Array<keyof typeof actions>).flatMap((action) => {
+      const { module, resource } = QUICK_CREATE_TARGETS[action]
+      return allowedSurfaceIds.has(module) &&
+        checkPermission(resource, "read").allowed && checkPermission(resource, "create").allowed
+        ? [{ ...actions[action], href: quickCreateHref(action) }]
+        : []
+    })
+  }, [allowedSurfaceIds, checkPermission, organizationId, permissionsReady, t])
 
   return (
     <CommandDialog
@@ -297,7 +297,7 @@ export function ErpCommandPalette({
                     <CommandItem
                       key={item.href}
                       value={`${item.label} ${item.keywords}`}
-                      onSelect={() => navigate(item.href, item.label)}
+                      onSelect={() => navigate(item.href)}
                     >
                       <Icon className="h-4 w-4" />
                       {item.label}

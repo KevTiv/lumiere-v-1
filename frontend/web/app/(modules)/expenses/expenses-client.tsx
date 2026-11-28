@@ -28,7 +28,7 @@ import {
   requiredInlineText,
 } from "@/lib/inline-edit-params"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   EntityDetail,
@@ -220,7 +220,12 @@ function ExpensesClientLoaded({
   const [toolbarError, setToolbarError] = useState<string | null>(null)
   const [reportContinuation, setReportContinuation] = useState<WorkflowForm | null>(null)
   const [resolveReceiptAttempt] = useState(createExpenseReceiptAttemptCache)
-  useEffect(() => { setQuickActionForm(null); setWorkflowForm(null); setReportContinuation(null) }, [identity, orgId, operatingCompanyId])
+  // Clear the previous scope before a child workspace can open a new intent.
+  useLayoutEffect(() => {
+    setQuickActionForm(null)
+    setWorkflowForm(null)
+    setReportContinuation(null)
+  }, [identity, orgId, operatingCompanyId])
 
   const expensesRead = moduleCollection(useExpenses(orgId, initialExpenses))
   const expensesRaw = expensesRead.rows
@@ -236,7 +241,8 @@ function ExpensesClientLoaded({
   const sheetsUsable = canUseModuleData(sheetsRead.state)
   const currenciesQuery = useCurrencies()
   const sheetsState = sheetsRead.state
-  const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
+  const pricelistsQuery = usePricelists(orgId, initialPricelists)
+  const pricelists = pricelistsQuery.data ?? []
   const employeesQuery = useEmployees(orgId, initialEmployees)
   const employees = employeesQuery.data ?? []
   const { data: products = [] } = useProducts(orgId)
@@ -1117,6 +1123,10 @@ function ExpensesClientLoaded({
       ) : null}
       <ModuleWorkView
         organizationId={organizationId}
+        quickCreate={{
+          companyId: operatingCompanyId,
+          readiness: mergeModuleStates([moduleQueryState(employeesQuery), moduleQueryState(pricelistsQuery)]),
+        }}
         assistantFormBlocked={quickActionForm !== null || workflowForm !== null || rowAction !== null || expenseCreate.attempt !== null}
         onAssistantFormScopeChange={() => { setQuickActionForm(null); setAssistantPrompt(undefined); activationRequestId.current = undefined }}
         config={config}

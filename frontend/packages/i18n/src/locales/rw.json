@@ -205,7 +205,11 @@
       "invoice": "Fagitire nshya y’umukiriya",
       "bill": "Fagitire nshya y’utanga ibicuruzwa",
       "expense": "Ikiguzi gishya",
-      "salesOrder": "Komande nshya y’umukiriya"
+      "salesOrder": "Komande nshya y’umukiriya",
+      "companyRequired": "Hitamo sosiyete ikora mbere yo gukora inyandiko.",
+      "denied": "Nta burenganzira ufite bwo gukora iyi nyandiko.",
+      "busy": "Funga ifishi ifunguye cyangwa urangize igikorwa gitegereje, wongere ugerageze gukora vuba.",
+      "unavailable": "Ifishi yo gukora inyandiko ntiboneka. Reba amakuru cyangwa igenamiterere bikenewe mu mwanya w’akazi, wongere ugerageze."
     },
     "preferences": {
       "heading": "Ibyifuzo",
@@ -216,6 +220,7 @@
     }
   },
   "workspaceShell": {
+    "breadcrumb": "Inzira y’urupapuro",
     "searchShort": "Shakisha…",
     "accountAndPreferences": "Konti n’ibyifuzo",
     "resizeNavigation": "Hindura ubugari bw’inzira",
