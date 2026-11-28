@@ -61,6 +61,23 @@ describe("saved statement journal drill-down", () => {
     assert.equal(filterStatementJournalItems([{ ...base, date: undefined }], [report], context, 42n, 7n).status, "unavailable")
   })
 
+  it("uses the same report context for navigation and source revalidation", () => {
+    const taggedReport = {
+      ...report,
+      dateFrom: undefined,
+      date_from: { micros_since_unix_epoch: context.fromMicros },
+      targetMove: undefined,
+      target_move: { tag: "Posted" },
+    }
+    assert.equal(statementJournalHref("12", taggedReport, context.returnHref), href)
+    assert.deepEqual(filterStatementJournalItems([base], [taggedReport], context, 42n, 7n).rows, [base])
+    for (const targetMove of [undefined, "allow", { tag: "Unknown" }]) {
+      const incomplete = { ...report, targetMove }
+      assert.equal(statementJournalHref("12", incomplete, context.returnHref), null)
+      assert.equal(filterStatementJournalItems([base], [incomplete], context, 42n, 7n).status, "invalid")
+    }
+  })
+
   it("allows drafts only for the explicit all-entry basis", () => {
     const allReport = { ...report, targetMove: "all" }
     const allContext = { ...context, basis: "all" as const }

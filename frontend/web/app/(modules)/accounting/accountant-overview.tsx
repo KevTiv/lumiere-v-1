@@ -6,6 +6,7 @@ import { ArrowDownLeft, ArrowRight, ArrowUpRight, CalendarClock, CheckCheck, Che
 import { useTranslation } from "@lumiere/i18n"
 import { Badge } from "@lumiere/ui/components/badge"
 import { Button } from "@lumiere/ui/components/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 import { workspaceStyles } from "@lumiere/ui/lib/workspace-styles"
 import { paymentMinorUnitsText } from "@lumiere/erp-shared/payment-allocation-projection"
 import { invoiceRecordHref } from "./invoice-record"
@@ -55,6 +56,10 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
   const activityTotal = model.activity.months.reduce((sum, month) => sum + month.invoices + month.bills, 0)
   const activityMax = Math.max(1, ...model.activity.months.flatMap((month) => [month.invoices, month.bills]))
 
+  function selectQueue(key: OverviewQueueKey) {
+    setSelectedQueue(key)
+    setShowAll(false)
+  }
   function stateText(collection: OverviewCollection): string {
     switch (collection.state.status) {
       case "loading": return tr("loading", "Loading…")
@@ -63,6 +68,14 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
       case "error": return tr("error", "Unable to load")
       default: return ""
     }
+  }
+  function queueStatus(key: OverviewQueueKey) {
+    const queue = model.queues[key]
+    return queue.state.status === "ready"
+      ? <Badge variant={key === "overdue" && queue.rows.length ? "destructive" : "secondary"} className="tabular-nums">
+        <span className="sr-only">{t("moduleInsights.records")}: </span>{queue.rows.length}
+      </Badge>
+      : <span className="max-w-28 text-right text-xs text-muted-foreground">{stateText(queue)}</span>
   }
   function stateNotice(collection: OverviewCollection) {
     if (collection.state.status === "ready") return null
@@ -144,27 +157,50 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
         </>
         return card.tab
           ? <Link key={card.key} href={`/accounting?tab=${card.tab}&filter=queue%3Aopen`} className={className}>{content}</Link>
-          : <button key={card.key} type="button" className={className} onClick={() => { setSelectedQueue(card.key); setShowAll(false) }}>{content}</button>
+          : <button key={card.key} type="button" className={className} onClick={() => selectQueue(card.key)}>{content}</button>
       })}
     </div>
 
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+    <div className="grid gap-3 xl:gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
       <section className="min-w-0 overflow-hidden rounded-xl border bg-card" aria-labelledby="accountant-attention-title">
-        <div className="border-b px-5 py-4"><h3 id="accountant-attention-title" className="font-semibold">{tr("attention", "Needs attention")}</h3><p className="mt-1 text-xs text-muted-foreground">{tr("attentionHint", "Choose a queue to review its records.")}</p></div>
-        <div className="divide-y">{queueDefs.map((definition) => {
-          const queue = model.queues[definition.key]
-          return <button key={definition.key} type="button" aria-pressed={selectedQueue === definition.key} data-testid={`accountant-queue-${definition.key}`}
-            onClick={() => { setSelectedQueue(definition.key); setShowAll(false) }}
+        <div className="space-y-3 px-4 py-3 xl:space-y-0 xl:border-b xl:px-5 xl:py-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 id="accountant-attention-title" className="font-semibold">{tr("attention", "Needs attention")}</h3>
+            <span id="accountant-selected-queue-status" className="flex xl:hidden">{queueStatus(selectedQueue)}</span>
+          </div>
+          <div className="xl:hidden">
+            <Select value={selectedQueue} onValueChange={(value) => {
+              const definition = queueDefs.find(({ key }) => key === value)
+              if (definition) selectQueue(definition.key)
+            }}>
+              <SelectTrigger
+                aria-labelledby="accountant-attention-title"
+                aria-describedby="accountant-selected-queue-status"
+                data-testid="accountant-mobile-queue-picker"
+                className="min-h-11 font-medium"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="w-[var(--radix-select-trigger-width)] max-h-[var(--radix-select-content-available-height)]">
+                {queueDefs.map(({ key, label }) => <SelectItem key={key} value={key}>{label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="hidden text-xs text-muted-foreground xl:mt-1 xl:block">{tr("attentionHint", "Choose a queue to review its records.")}</p>
+        </div>
+        <div className="hidden divide-y xl:block">{queueDefs.map((definition) => (
+          <button key={definition.key} type="button" aria-pressed={selectedQueue === definition.key} data-testid={`accountant-queue-${definition.key}`}
+            onClick={() => selectQueue(definition.key)}
             className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-muted/40 aria-pressed:bg-muted/60 focus-visible:outline-2 focus-visible:outline-ring">
             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-background text-muted-foreground [&>svg]:size-4">{definition.icon}</span>
             <span className="min-w-0 flex-1 text-sm font-medium">{definition.label}</span>
-            {queue.state.status === "ready" ? <Badge variant={definition.key === "overdue" && queue.rows.length ? "destructive" : "secondary"} className="tabular-nums">{queue.rows.length}</Badge> : <span className="max-w-28 text-right text-xs text-muted-foreground">{stateText(queue)}</span>}
+            {queueStatus(definition.key)}
             <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
           </button>
-        })}</div>
+        ))}</div>
       </section>
 
-      <section className="flex min-w-0 flex-col rounded-xl border bg-card" aria-labelledby="accountant-queue-title" aria-live="polite">
+      <section id="accountant-queue-records" className="flex min-w-0 flex-col rounded-xl border bg-card" aria-labelledby="accountant-queue-title" aria-live="polite">
         <div className="border-b px-5 py-4"><h3 id="accountant-queue-title" className="font-semibold">{activeDef.label}</h3><p className="mt-1 text-xs text-muted-foreground">{activeDef.hint}</p></div>
         <div className="flex-1 p-5">
           {stateNotice(activeQueue)}

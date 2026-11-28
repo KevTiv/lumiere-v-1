@@ -11,6 +11,7 @@ import {
 } from "@lumiere/query-hooks/hooks/bff-company-rows"
 import { statementKindForReportType, type StatementKind } from "@lumiere/query-hooks/hooks/read-ui-rows"
 import { Button, ReportContextBar, downloadCsv, resolveCurrencyCode, rowsToCsv } from "@lumiere/ui"
+import { reportBasisKey, reportPeriod } from "./report-workspace-model"
 import { ChevronDown, ChevronRight, FileSpreadsheet, Printer } from "lucide-react"
 import {
   Table,
@@ -198,25 +199,14 @@ export function StatementsPanel({ organizationId, financialReports, hideSelector
 
       {selected ? (
         <>
-          <h2 className="hidden text-lg font-semibold print:block">
+          {!hideSelector && <h2 className="hidden text-lg font-semibold print:block">
             {typeof selected.row.name === "string" && selected.row.name !== "" ? selected.row.name : `#${selected.id}`}
-          </h2>
+          </h2>}
           <ReportContextBar
-            className="print:hidden"
-            period={(() => {
-              const from = selected.row.dateFrom ?? selected.row.date_from
-              const to = selected.row.dateTo ?? selected.row.date_to
-              if (typeof from === "string" && typeof to === "string" && from && to) return `${from} – ${to}`
-              if (typeof to === "string" && to) return `As of ${to}`
-              return null
-            })()}
+            className={hideSelector ? "print:hidden" : undefined}
+            period={reportPeriod(selected.row, locale) ?? t("reports.workspace.unknown")}
             currency={currency}
-            basis={(() => {
-              const raw = selected.row.targetMove ?? selected.row.target_move
-              const normalized = typeof raw === "string" ? raw.toLowerCase() : ""
-              if (normalized.includes("all")) return t("reports.statements.basisAll", { defaultValue: "Posted & draft entries" })
-              return t("reports.statements.basisPosted", { defaultValue: "Posted entries only" })
-            })()}
+            basis={t(reportBasisKey(selected.row))}
             basisExplanation={t("reports.statements.basisExplanation", {
               defaultValue:
                 "Figures are aggregated from the saved statement lines for this report scope. Click any account line to inspect its underlying journal items.",
