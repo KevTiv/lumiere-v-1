@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
-import { Button } from "@lumiere/ui/components/button"
+import { Button, buttonVariants } from "@lumiere/ui/components/button"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useContacts } from "@lumiere/query-hooks/hooks/crm"
 import { apiFetch } from "@lumiere/query-hooks/http"
@@ -241,12 +241,12 @@ export function ActivationChecklistPanel({ organizationId, companyId, collapseWh
             : t("activation.warehouse.ask", { defaultValue: "Ask an administrator to set up an active warehouse in this company before preparing a quotation." })}
         </p>}
         <div className="flex flex-wrap gap-2">
-          {pricelistSetup && <Button variant="outline" render={<Link href={pricelistSetup} />} nativeButton={false}>
+          {pricelistSetup && <Link href={pricelistSetup} className={buttonVariants({ variant: "outline" })}>
             {t("activation.pricelist.open", { defaultValue: "Open price lists" })}
-          </Button>}
-          {warehouseSetup && <Button variant="outline" render={<Link href={warehouseSetup} />} nativeButton={false}>
+          </Link>}
+          {warehouseSetup && <Link href={warehouseSetup} className={buttonVariants({ variant: "outline" })}>
             {t("inventory.warehouseSetup.title")}
-          </Button>}
+          </Link>}
           <Button type="button" disabled={pricelistMissing || warehouseMissing || checks.companyState !== "ready" || (selectedForm != null && (!scope || nativeForms?.pending != null))} onClick={startTask}>{taskLabels[selected]}</Button>
           {selectedForm && outcomeMessage && <Button type="button" variant="outline" onClick={() => router.push(activationTaskHref(selected))}>{t("activation.outcome.openWorkspace", { defaultValue: "Open task workspace" })}</Button>}
           {isAdmin() && checkPermission("admin:organization", "update").allowed && <Button type="button" variant="outline" onClick={() => router.push("/settings?section=organization")}>{t("activation.companySettings", { defaultValue: "Review company settings" })}</Button>}
