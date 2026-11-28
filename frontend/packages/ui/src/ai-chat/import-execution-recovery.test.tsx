@@ -373,20 +373,23 @@ it.each([false, true])(
           }
         } else {
           expect(saved).not.toBeNull()
-          expect(body).toEqual({
-            companyId: 3,
-            expectedRevision: 1,
-            expectedDigest: saved!.digest,
-          })
           if (url.endsWith("/approve")) {
             actions.push("approve")
+            expect(body).toEqual({ companyId: 3, expectedRevision: 1, expectedDigest: saved!.digest })
             saved = {
               ...saved!,
               status: "approved",
               approvedAt: "2026-11-07T01:00:00Z",
             }
-          } else if (url.endsWith("/execute")) {
+          } else if (url.endsWith("/runs")) {
             actions.push("execute")
+            expect(body).toEqual({
+              companyId: 3,
+              requestId: saved!.requestKey,
+              adapter: "historical_journal",
+              config: { proposalId: "10", expectedRevision: 1, expectedDigest: saved!.digest },
+              rows: [{ batchId: "71", itemId: "11", revision: 2 }],
+            })
             saved = {
               ...saved!,
               status: "verified",
@@ -412,6 +415,7 @@ it.each([false, true])(
             }
             if (lostExecutionReply)
               throw new Error("The response was lost after acceptance")
+            return Response.json({ id: "f".repeat(64), taskId, adapter: "historical_journal", status: "queued", rowCount: 1, verifiedRowCount: 0 })
           } else throw new Error(`Unexpected mutation: ${url}`)
         }
         return Response.json(saved)
@@ -461,7 +465,17 @@ it("approved blocked execution can check and resume the exact saved proposal", a
   controls.fetch.mockImplementation(
     async (url: string, options?: RequestInit) => {
       if (options?.method === "POST") {
-        expect(url).toMatch(/\/proposals\/10\/(verify|execute)$/)
+      if (url.endsWith("/runs")) {
+        expect(JSON.parse(String(options.body))).toEqual({
+          companyId: 3,
+          requestId: saved.requestKey,
+          adapter: "historical_journal",
+          config: { proposalId: saved.id, expectedRevision: saved.revision, expectedDigest: saved.digest },
+          rows: [{ batchId: "71", itemId: "11", revision: 2 }],
+        })
+        return Response.json({ id: "f".repeat(64), taskId, adapter: "historical_journal", status: "queued", rowCount: 1, verifiedRowCount: 0 })
+      }
+      expect(url).toMatch(/\/proposals\/10\/verify$/)
         expect(JSON.parse(String(options.body))).toEqual({
           companyId: 3,
           expectedRevision: 1,

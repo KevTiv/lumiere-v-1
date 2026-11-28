@@ -867,7 +867,9 @@ fn authorize_reviewed_workflow_import(
         return Err(ApiError::Forbidden("Contact CSV import is disabled".into()));
     }
     if !stdb_auth::permission_allowed(context.field_access(), spec.table_name, "create") {
-        return Err(ApiError::Forbidden("Import entity create permission denied".into()));
+        return Err(ApiError::Forbidden(
+            "Import entity create permission denied".into(),
+        ));
     }
     validate_currency(spec, currency)?;
     import_read_columns(spec, context.field_access())?;

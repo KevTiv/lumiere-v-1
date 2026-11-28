@@ -36,12 +36,14 @@ pub(in crate::routes::import_reviews) async fn exercise_shop_sales_volume(
          VALUES (8003, 9003, $1, $2, 'shop-sales-volume', $3, 'needs_review', 'prepare_import', '{}')",
         &[&scope.actor, &task_id, &hash],
     ).await?;
-    client.execute(
-        "INSERT INTO lumiere_platform.import_task_review
+    client
+        .execute(
+            "INSERT INTO lumiere_platform.import_task_review
             (organization_id, company_id, actor_identity, request_id, batch_id)
          VALUES (8003, 9003, $1, $2, $3)",
-        &[&scope.actor, &task_id, &batch],
-    ).await?;
+            &[&scope.actor, &task_id, &batch],
+        )
+        .await?;
 
     let values = [
         ("shop", "Volume shop"),
@@ -52,7 +54,10 @@ pub(in crate::routes::import_reviews) async fn exercise_shop_sales_volume(
         ("sale_amount", "6250"),
         ("currency_code", "RWF"),
     ];
-    let proposed = values.iter().copied().collect::<std::collections::BTreeMap<_, _>>();
+    let proposed = values
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeMap<_, _>>();
     let fields = values.iter().map(|(key, value)| {
         json!({"key":key, "label":key, "kind":"text", "sourceValue":value, "required":true})
     }).collect::<Vec<_>>();
@@ -72,46 +77,101 @@ pub(in crate::routes::import_reviews) async fn exercise_shop_sales_volume(
     ).await?.into_iter().map(|row| row.get::<_, i64>(0)).collect::<Vec<_>>();
     ensure!(item_ids.len() == 907);
 
-    let binding = || Some(PreparedTask { actor: scope.actor, request: &task_id });
-    let body = |rows, preview| WriteBody { company_id: scope.company, module: Module::ShopSales, rows, preview };
+    let binding = || {
+        Some(PreparedTask {
+            actor: scope.actor,
+            request: &task_id,
+        })
+    };
+    let body = |rows, preview| WriteBody {
+        company_id: scope.company,
+        module: Module::ShopSales,
+        rows,
+        preview,
+    };
     let mut first_chunk = None;
     let mut receipts = Vec::with_capacity(item_ids.len());
     for ids in item_ids.chunks(200) {
-        let rows = ids.iter().map(|id| Selection {
-            item_id: id.to_string(), revision: 2, customer_id: None, expected_digest: None,
-        }).collect();
-        let tx = client.transaction().await?;
-        let preview = apply_reviewed_rows(&tx, scope, batch, body(rows, true), binding(), &[]).await?;
-        let approved = preview["results"].as_array().context("missing preview outcomes")?.iter().map(|row| {
-            ensure!(row["status"] == "ready");
-            Ok(Selection {
-                item_id: row["itemId"].as_str().context("missing item ID")?.to_owned(),
+        let rows = ids
+            .iter()
+            .map(|id| Selection {
+                item_id: id.to_string(),
                 revision: 2,
                 customer_id: None,
-                expected_digest: Some(row["digest"].as_str().context("missing preview digest")?.to_owned()),
+                expected_digest: None,
             })
-        }).collect::<anyhow::Result<Vec<_>>>()?;
+            .collect();
+        let tx = client.transaction().await?;
+        let preview =
+            apply_reviewed_rows(&tx, scope, batch, body(rows, true), binding(), &[]).await?;
+        let approved = preview["results"]
+            .as_array()
+            .context("missing preview outcomes")?
+            .iter()
+            .map(|row| {
+                ensure!(row["status"] == "ready");
+                Ok(Selection {
+                    item_id: row["itemId"]
+                        .as_str()
+                        .context("missing item ID")?
+                        .to_owned(),
+                    revision: 2,
+                    customer_id: None,
+                    expected_digest: Some(
+                        row["digest"]
+                            .as_str()
+                            .context("missing preview digest")?
+                            .to_owned(),
+                    ),
+                })
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         if first_chunk.is_none() {
             let mut stale = approved[0].clone();
             stale.expected_digest = Some("0".repeat(64));
-            let stale = apply_reviewed_rows(&tx, scope, batch, body(vec![stale], false), binding(), &[]).await?;
+            let stale =
+                apply_reviewed_rows(&tx, scope, batch, body(vec![stale], false), binding(), &[])
+                    .await?;
             ensure!(stale["results"][0]["status"] == "held");
             let mut stale = approved[1].clone();
             stale.revision = 1;
-            let stale = apply_reviewed_rows(&tx, scope, batch, body(vec![stale], false), binding(), &[]).await?;
+            let stale =
+                apply_reviewed_rows(&tx, scope, batch, body(vec![stale], false), binding(), &[])
+                    .await?;
             ensure!(stale["results"][0]["status"] == "held");
-            let unlinked = Some(PreparedTask { actor: "wrong-reviewer", request: &task_id });
+            let unlinked = Some(PreparedTask {
+                actor: "wrong-reviewer",
+                request: &task_id,
+            });
             ensure!(matches!(
-                apply_reviewed_rows(&tx, scope, batch, body(vec![approved[0].clone()], false), unlinked, &[]).await,
+                apply_reviewed_rows(
+                    &tx,
+                    scope,
+                    batch,
+                    body(vec![approved[0].clone()], false),
+                    unlinked,
+                    &[]
+                )
+                .await,
                 Err(ApiError::Conflict(_))
             ));
             let count = workflow_results(&tx, scope, &task_id).await?;
             ensure!(count["counts"] == json!({"verified":0,"alreadyPresent":0}));
         }
-        let saved = apply_reviewed_rows(&tx, scope, batch, body(approved.clone(), false), binding(), &[]).await?;
+        let saved = apply_reviewed_rows(
+            &tx,
+            scope,
+            batch,
+            body(approved.clone(), false),
+            binding(),
+            &[],
+        )
+        .await?;
         tx.commit().await?;
-        let results = saved["results"].as_array().context("missing chunk outcomes")?;
+        let results = saved["results"]
+            .as_array()
+            .context("missing chunk outcomes")?;
         ensure!(results.len() == ids.len() && results.iter().all(|row| row["status"] == "saved"));
         receipts.extend(results.iter().map(|row| row["recordId"].clone()));
         if first_chunk.is_none() {
@@ -125,10 +185,14 @@ pub(in crate::routes::import_reviews) async fn exercise_shop_sales_volume(
     let mut client = pool.get().await?;
     let tx = client.transaction().await?;
     ensure!(
-        apply_reviewed_rows(&tx, scope, batch, body(rows, false), binding(), &[]).await? == first_receipt,
+        apply_reviewed_rows(&tx, scope, batch, body(rows, false), binding(), &[]).await?
+            == first_receipt,
         "a lost chunk receipt must replay to its original exact records",
     );
-    let mut distinct_ids = receipts.iter().filter_map(|id| id.as_str()).collect::<Vec<_>>();
+    let mut distinct_ids = receipts
+        .iter()
+        .filter_map(|id| id.as_str())
+        .collect::<Vec<_>>();
     distinct_ids.sort_unstable();
     distinct_ids.dedup();
     ensure!(distinct_ids.len() == 907);

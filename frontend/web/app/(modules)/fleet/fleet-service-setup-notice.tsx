@@ -4,7 +4,7 @@ import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@lumiere/i18n";
 import { useCreateCompanyFleetServiceType } from "@lumiere/query-hooks/hooks/fleet";
-import { Button } from "@lumiere/ui/components/button";
+import { Button, buttonVariants } from "@lumiere/ui/components/button";
 import { Input } from "@lumiere/ui/components/input";
 import { useRBAC } from "@lumiere/ui/lib/rbac-context";
 import { ModuleDataNotice } from "@lumiere/ui/pages/module-data-notice";
@@ -108,18 +108,18 @@ export function FleetServiceSetupNotice({
                 ) : null}
               </div>
             ) : href ? (
-              <Button
-                size="sm"
-                variant="outline"
-                render={<Link href={href} target="_blank" rel="noopener" />}
-                nativeButton={false}
+              <Link
+                href={href}
+                target="_blank"
+                rel="noopener"
+                className={buttonVariants({ size: "sm", variant: "outline" })}
               >
                 {t(
                   key === "journal"
                     ? "fleet.workspace.recovery.openJournals"
                     : "fleet.workspace.recovery.openAccounts",
                 )}
-              </Button>
+              </Link>
             ) : (
               <p className="text-muted-foreground">{t("fleet.workspace.recovery.askAdmin")}</p>
             )}

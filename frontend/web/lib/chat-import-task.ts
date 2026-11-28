@@ -4,6 +4,7 @@ import { importCoverageSchema, importPreparationIdentity, importPreparationRecei
 
 const requestId = z.string().regex(/^[0-9a-f]{32}$/)
 const positiveId = z.string().regex(/^[1-9]\d*$/)
+const taskConversationKey = /^(?:[a-zA-Z0-9_-]{1,150}|managed-document-v1:[1-9]\d{0,19}:[1-9]\d{0,19})$/
 const sourceSchema = z.object({
   fileName: z.string().min(1).max(255),
   size: z.number().int().positive().max(5_000_000),
@@ -93,7 +94,7 @@ export function chatImportReceiptKey(
 export function chatImportScopeKey(scope: ChatImportScope): string {
   if (!scope.identity || !Number.isSafeInteger(scope.organizationId) || scope.organizationId < 1
     || !Number.isSafeInteger(scope.companyId) || scope.companyId < 1
-    || !/^[a-zA-Z0-9_-]{1,150}$/.test(scope.conversationKey)) throw new Error("Select a company and conversation before importing files.")
+    || !taskConversationKey.test(scope.conversationKey)) throw new Error("Select a company and conversation before importing files.")
   return `lumiere:chat-import:v1:${JSON.stringify([scope.identity, scope.organizationId, scope.companyId, scope.conversationKey])}`
 }
 
