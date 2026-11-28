@@ -66,6 +66,9 @@ fn saved(definition: Definition) -> SavedProposal {
         last_error: None,
         created_at: "2026-11-07T12:00:00Z".into(),
         approved_at: Some("2026-11-07T12:01:00Z".into()),
+        prepared_by: None,
+        approved_by: None,
+        dispatched_by: None,
     }
 }
 
