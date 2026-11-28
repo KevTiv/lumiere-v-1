@@ -945,6 +945,22 @@ pub fn resolve_http_sql_columns(
     if resource_key == "landed-costs" && !cols.iter().any(|column| column == "state") {
         cols.push("state".to_string());
     }
+    // The first-sale workspace needs these fields to establish whether a
+    // stock destination is required and whether the company has an active one.
+    let delivery_field = match resource_key {
+        "sale-orders" => Some("is_dropship"),
+        "stock-locations" => Some("active"),
+        _ => None,
+    };
+    if let Some(field) = delivery_field {
+        if !cols.iter().any(|column| column == field)
+            && field_access.is_none_or(|access| {
+                has_resource_field_projection_permission(Some(access), resource_key, field)
+            })
+        {
+            cols.push(field.into());
+        }
+    }
     // `company_id` is an authorization scope column, not an optional business
     // field. Keep it in custom projections whenever the canonical default
     // projection exposes it so api-server post-filters can verify SQL scope.
@@ -2110,6 +2126,22 @@ mod tests {
                 cols.iter().any(|column| column == field),
                 "expected {field} in sale-orders projection, got: {cols:?}"
             );
+        }
+    }
+
+    #[test]
+    fn first_sale_delivery_fields_preserve_explicit_projections() {
+        for (resource, permission, field, visible_field) in [
+            ("sale-orders", "sale_order:read", "is_dropship", "state"),
+            ("stock-locations", "stock_location:read", "active", "usage"),
+        ] {
+            let mut access = field_access(&[permission]);
+            let cols = resolve_http_sql_columns(resource, Some(&access)).unwrap();
+            assert!(cols.iter().any(|column| column == field), "{resource}");
+
+            select_fields(&mut access, resource, &[visible_field]);
+            let cols = resolve_http_sql_columns(resource, Some(&access)).unwrap();
+            assert!(!cols.iter().any(|column| column == field), "{resource}");
         }
     }
 
