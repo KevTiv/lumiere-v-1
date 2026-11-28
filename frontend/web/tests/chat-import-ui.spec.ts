@@ -507,6 +507,8 @@ test("a clerk hands the same saved import to a named owner and can revoke it", a
         ? [{ id: 9001, organizationId: 8001, name: "Synthetic farm company", currencyId: 1 }]
         : [],
     } }))
+    await viewer.route("**/api/bootstrap/currencies", route => route.fulfill({ json: { data: [{ id: "1", code: "RWF", decimalPlaces: 0 }] } }))
+    await viewer.route("**/api/settings/users?**", route => route.fulfill({ json: { data: [] } }))
     await viewer.route("**/api/import-reviews**", route => {
       const path = new URL(route.request().url()).pathname
       if (actor !== owner || !canRead()) return route.fulfill({ status: 403, json: { error: "Review unavailable" } })
