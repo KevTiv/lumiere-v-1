@@ -3631,6 +3631,9 @@
       }
     },
     "page": {
+      "openImport": "Fungura iyinjiza ry’amakuru",
+      "openingImport": "Birimo gufungura iyinjiza ry’amakuru…",
+      "importColumn": "Iyinjiza ry’amakuru",
       "delete": "Siba",
       "discussion": "Ikiganiro",
       "edit": "Hindura",
@@ -3677,6 +3680,10 @@
       }
     },
     "viewer": {
+      "savedDocumentVersion": "Inkomoko yabitswe ivuye mu Nyandiko",
+      "savedSelection": "Inkomoko yatoranyijwe · {{sheet}} · R{{firstRow}}C{{firstColumn}}:R{{lastRow}}C{{lastColumn}}",
+      "openSourceVersion": "Fungura verisiyo y’inkomoko",
+      "details": "Ibisobanuro by’inyandiko",
       "open": "Reba dosiye",
       "title": "Igaragaza rya dosiye",
       "description": "Reba dosiye yabitswe n’amaverisiyo yayo wemerewe.",

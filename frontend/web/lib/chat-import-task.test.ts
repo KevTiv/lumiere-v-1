@@ -7,6 +7,7 @@ import {
   retryChatImportDecision, readChatImportDecisionPointer, type ChatImportScope, type ChatImportTask,
   parseSavedImportTask, readSavedImportTask, listSavedImportTasks,
 } from "./chat-import-task"
+import { openDocumentImportTask } from "./document-import-source"
 import type { ImportPreparation } from "./import-preparation"
 
 const scope: ChatImportScope = { identity: "actor", organizationId: 7, companyId: 3, conversationKey: "conversation" }
@@ -34,6 +35,41 @@ test("saved tasks reopen outside their original conversation without crossing co
   const saved = await readSavedImportTask(async () => json(original), 3, id)
   assert.equal(saved?.requestId, id)
   await assert.rejects(readSavedImportTask(async () => json(original), 4, id), /company/)
+})
+
+test("a managed import opens a native or existing range task by exact reference only", async () => {
+  const document = { documentId: "41", versionId: "9", checksum: source.sha256, current: false }
+  const saved = task({ managedDocument: { documentId: document.documentId, versionId: document.versionId } })
+  const open = (receipt: unknown) => openDocumentImportTask(async (url, init) => {
+    assert.equal(url, "/api/import-tasks/from-document")
+    assert.equal(init?.method, "POST")
+    assert.deepEqual(JSON.parse(String(init?.body)), { companyId: 3, ...document })
+    return json(receipt)
+  }, 3, document)
+  assert.equal((await open(saved)).requestId, id)
+  assert.equal((await open(task({
+    preparation: {
+      version: 1,
+      files: [{
+        fileName: source.fileName,
+        sourceSha256: source.sha256,
+        managedSelection: {
+          documentId: "41",
+          versionId: "9",
+          current: false,
+          sheetName: "CSV",
+          firstRow: 1,
+          lastRow: 2,
+          firstColumn: 1,
+          lastColumn: 3,
+        },
+      }],
+    },
+  }))).requestId, id)
+  await assert.rejects(open(task()), /document version/)
+  await assert.rejects(open({ ...saved, managedDocument: { documentId: "41", versionId: "10" } }), /document version/)
+  await assert.rejects(open({ ...saved, files: [{ ...saved.files[0], sha256: "d".repeat(64) }] }), /document version/)
+  await assert.rejects(open({ ...saved, companyId: "4" }), /company/)
 })
 
 test("saved workbook coverage accepts separate sheets bound to one exact original", () => {

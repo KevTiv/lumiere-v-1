@@ -11051,6 +11051,9 @@
     "notFound": "Document not found",
     "notFoundHint": "It may have been purged, or belong to another organization.",
     "page": {
+      "openImport": "Open import",
+      "openingImport": "Opening import…",
+      "importColumn": "Import",
       "delete": "Delete",
       "deleted": "In recycle bin",
       "deleteHint": "You can restore it from the recycle bin.",
@@ -11379,6 +11382,7 @@
       "indexDisallowed": "AI indexing is unavailable for this file"
     },
     "viewer": {
+      "savedDocumentVersion": "Source saved from Documents",
       "open": "Preview file",
       "title": "File preview",
       "description": "View a saved file and its permitted versions.",

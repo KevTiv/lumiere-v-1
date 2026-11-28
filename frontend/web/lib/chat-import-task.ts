@@ -19,6 +19,7 @@ const taskSchema = z.object({
   requestId,
   companyId: positiveId,
   conversationKey: z.string().min(1).max(150),
+  managedDocument: z.object({ documentId: positiveId, versionId: positiveId }).optional(),
   status: z.enum(["awaiting_decision", "saved", "needs_review", "inspection_ready", "failed"]),
   decision: z.object({
     id: z.string().min(1).max(200), revision: z.number().int().positive(), status: z.enum(["pending", "approved"]),

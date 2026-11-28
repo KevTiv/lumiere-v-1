@@ -5,7 +5,7 @@ use axum::{
     extract::{DefaultBodyLimit, Path, Query, State},
     http::{header, HeaderValue},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -51,6 +51,16 @@ struct Submission {
     initial_mode: Option<ProcessingMode>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     preparation: Option<Value>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct DocumentSubmission {
+    company_id: u64,
+    document_id: String,
+    version_id: String,
+    checksum: String,
+    current: bool,
 }
 
 #[derive(Deserialize)]
@@ -739,6 +749,11 @@ pub(super) async fn read_task(
         }
     }
     let mut view = json!({"organizationId":scope.organization.to_string(),"requestId":task.get::<_,String>("request_id"),"companyId":task.get::<_,String>("company_id"),"conversationKey":task.get::<_,String>("conversation_key"),"status":task.get::<_,String>("state"),"warnings":task.get::<_,Value>("warnings"),"error":task.get::<_,Option<String>>("error"),"createdAt":task.get::<_,String>("created_at"),"preparation":task.get::<_,Option<Value>>("preparation_json"),"coverage":task.get::<_,Option<Value>>("coverage_json"),"preparationReceipt":task.get::<_,Option<Value>>("preparation_receipt_json"),"decision":decision,"decisionReceipt":latest,"decisionHistory":history,"files":files,"reviews":active});
+    if let Some(reference) =
+        managed_source::document_reference(&task.get::<_, String>("conversation_key"))
+    {
+        view["managedDocument"] = reference;
+    }
     if let Some(mut inspection) = task.get::<_, Option<Value>>("inspection_json") {
         inspection["reviews"] = json!(archived);
         view["inspection"] = inspection;
@@ -757,6 +772,14 @@ async fn create(
         company: body.company_id,
         actor: context.actor_identity(),
     };
+    if body
+        .conversation_key
+        .starts_with(managed_source::DOCUMENT_TASK_PREFIX)
+    {
+        return Err(ApiError::BadRequest(
+            "reserved import source identity".into(),
+        ));
+    }
     let (originals, hash) = decode_submission(&body)?;
     if let Some(preparation) = &body.preparation {
         managed_source::verify_submission(
@@ -769,6 +792,72 @@ async fn create(
         .await?;
     }
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    accept(&pool, scoped, &body, &originals, &hash).await?;
+    Ok(Json(read_task(&pool, scoped, &body.request_id).await?))
+}
+
+async fn create_from_document(
+    State(state): State<Arc<AppState>>,
+    OrgSession { session, .. }: OrgSession,
+    Json(selection): Json<DocumentSubmission>,
+) -> Result<Json<Value>, ApiError> {
+    let context = scope(&state, &session, selection.company_id).await?;
+    let scoped = StorageScope {
+        organization: context.organization_id(),
+        company: selection.company_id,
+        actor: context.actor_identity(),
+    };
+    let parse_id = |value: &str| {
+        value
+            .parse::<u64>()
+            .ok()
+            .filter(|id| *id > 0 && id.to_string() == value)
+            .ok_or_else(|| {
+                ApiError::BadRequest("invalid managed document or version identity".into())
+            })
+    };
+    let document_id = parse_id(&selection.document_id)?;
+    let version_id = parse_id(&selection.version_id)?;
+    let (source, blob) = crate::document_blobs::read_authorized_spreadsheet_source(
+        &state,
+        &session,
+        Some(scoped.company),
+        document_id,
+        (!selection.current).then_some(version_id),
+        Some(&selection.checksum),
+    )
+    .await?;
+    managed_source::verify_document_version(
+        &source,
+        &selection.document_id,
+        &selection.version_id,
+        &selection.checksum,
+    )?;
+    if blob.bytes.len() > MAX_FILE_BYTES {
+        return Err(ApiError::BadRequest(
+            "import source must be at most 5 MB".into(),
+        ));
+    }
+    let (request_id, conversation_key) =
+        managed_source::document_task_identity(scoped.company, document_id, version_id);
+    let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
+    if let Some(request) =
+        managed_source::find_saved_document_task(&pool, scoped, &source, &conversation_key).await?
+    {
+        return Ok(Json(read_task(&pool, scoped, &request).await?));
+    }
+    let body = Submission {
+        company_id: scoped.company,
+        request_id,
+        conversation_key,
+        files: vec![SourceFile {
+            file_name: blob.inspection.file_name,
+            content_base64: STANDARD.encode(blob.bytes),
+        }],
+        initial_mode: None,
+        preparation: None,
+    };
+    let (originals, hash) = decode_submission(&body)?;
     accept(&pool, scoped, &body, &originals, &hash).await?;
     Ok(Json(read_task(&pool, scoped, &body.request_id).await?))
 }
@@ -1211,6 +1300,7 @@ async fn download(
 pub(super) fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/import-tasks", get(list).post(create))
+        .route("/import-tasks/from-document", post(create_from_document))
         .route("/import-tasks/:request", get(read))
         .route("/import-tasks/:request/files/:ordinal", get(download))
         .route("/import-tasks/:request/resume", axum::routing::post(resume))

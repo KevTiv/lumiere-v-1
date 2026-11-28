@@ -3636,6 +3636,9 @@
       }
     },
     "page": {
+      "openImport": "Fungua uingizaji wa data",
+      "openingImport": "Inafungua uingizaji wa data…",
+      "importColumn": "Uingizaji wa data",
       "delete": "Futa",
       "discussion": "Majadiliano",
       "edit": "Hariri",
@@ -3682,6 +3685,10 @@
       }
     },
     "viewer": {
+      "savedDocumentVersion": "Chanzo kilichohifadhiwa kutoka kwenye Nyaraka",
+      "savedSelection": "Chanzo kilichochaguliwa · {{sheet}} · R{{firstRow}}C{{firstColumn}}:R{{lastRow}}C{{lastColumn}}",
+      "openSourceVersion": "Fungua toleo la chanzo",
+      "details": "Maelezo ya hati",
       "open": "Hakiki faili",
       "title": "Hakikisho la faili",
       "description": "Tazama faili iliyohifadhiwa na matoleo yake unayoruhusiwa.",
