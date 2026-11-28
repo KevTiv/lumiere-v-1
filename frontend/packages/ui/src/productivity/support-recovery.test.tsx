@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import type { ReactNode } from "react"
 
@@ -6,7 +7,7 @@ const hooks = vi.hoisted(() => {
   const read = () => ({ data: [] as object[], isLoading: false, isPending: false, isFetching: false, isError: false, error: undefined as unknown, refetch: vi.fn() })
   const mutation = () => ({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false })
   return {
-    conversations: read(), messages: read(), phones: read(), templates: read(), batches: read(), evidence: read(), exclusions: read(), jobs: read(),
+    inboxFetch: vi.fn(), messages: read(), templates: read(), batches: read(), evidence: read(), exclusions: read(), jobs: read(),
     exactJob: vi.fn(), exactJobErrors: vi.fn(),
     open: mutation(), append: mutation(), update: mutation(), createBatch: mutation(), createReminder: mutation(), createTemplate: mutation(), review: mutation(), rollback: mutation(),
   }
@@ -32,10 +33,11 @@ vi.mock("@lumiere/ui", async () => {
   }
 })
 vi.mock("@lumiere/query-hooks/hooks/crm", () => ({
-  useCrmConversations: () => hooks.conversations, useCrmConversationMessages: () => hooks.messages,
-  useContactPhoneIdentities: () => hooks.phones, useOpenCrmConversation: () => hooks.open,
+  useCrmConversationMessages: () => hooks.messages,
+  useOpenCrmConversation: () => hooks.open,
   useAppendCrmConversationMessage: () => hooks.append, useUpdateCrmConversation: () => hooks.update,
 }))
+vi.mock("../../../../web/lib/api-fetch", () => ({ apiFetch: hooks.inboxFetch }))
 vi.mock("@lumiere/query-hooks/hooks/messages", () => ({
   useMessageTemplates: () => hooks.templates, useMessageBatches: () => hooks.batches, useOperationalMessages: () => hooks.evidence,
   useMessageBatchExclusions: () => hooks.exclusions,
@@ -58,7 +60,8 @@ beforeAll(() => {
 })
 beforeEach(() => {
   vi.clearAllMocks()
-  for (const query of [hooks.conversations, hooks.messages, hooks.phones, hooks.templates, hooks.batches, hooks.evidence, hooks.exclusions, hooks.jobs]) {
+  hooks.inboxFetch.mockReset().mockImplementation(async () => Response.json({ data: [] }))
+  for (const query of [hooks.messages, hooks.templates, hooks.batches, hooks.evidence, hooks.exclusions, hooks.jobs]) {
     query.data = []; query.isLoading = false; query.isPending = false; query.isFetching = false; query.isError = false; query.error = undefined
     query.refetch.mockResolvedValue({ data: [], isError: false })
   }
@@ -73,6 +76,10 @@ beforeEach(() => {
   window.localStorage.clear()
 })
 afterEach(cleanup)
+function renderInbox() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(<QueryClientProvider client={client}><CrmInboxPanel organizationId={1} companyId={2n} contactId={7n} /></QueryClientProvider>)
+}
 const batches = () => <MessageBatchesPanel organizationId={1} companyId={2n} contacts={[{ id: "7", name: "Ada", phone: "+250 123" }]} invoices={[]} />
 function savedBatch() {
   hooks.batches.data = [{ id: "9007199254740993", organizationId: "1", companyId: "2", templateId: "5", recipientCount: "1", excludedCount: "2", channel: "WhatsApp", status: "PendingApproval", subjectModel: "account_move" }]
@@ -85,22 +92,28 @@ function savedBatch() {
 }
 
 describe("Supporting workspace source and recovery states", () => {
-  it("shows CRM failure with retry instead of an empty conversation and disables stale commands", () => {
-    hooks.conversations.data = [{ id: "3", contactId: "7", status: "open" }]
-    hooks.conversations.isError = true; hooks.conversations.error = { status: 500 }
-    render(<CrmInboxPanel organizationId={1} contactId={7n} />)
-    expect(screen.getByRole("alert").textContent).toContain("could not be loaded")
+  it("shows CRM failure with retry instead of an empty conversation and disables stale commands", async () => {
+    const conversations = "/api/query/crm-conversations?companyId=2"
+    hooks.inboxFetch.mockImplementation(async (url: string) => url === conversations
+      ? Response.json({ error: "Unavailable" }, { status: 500 })
+      : Response.json({ data: [] }))
+    renderInbox()
+    expect((await screen.findByRole("alert")).textContent).toContain("could not be loaded")
     expect(screen.queryByText("No open conversation")).toBeNull()
     expect(screen.getByRole("button", { name: "Open thread" }).hasAttribute("disabled")).toBe(true)
     fireEvent.click(screen.getByRole("button", { name: "Retry" }))
-    expect(hooks.conversations.refetch).toHaveBeenCalledOnce()
+    await waitFor(() => expect(hooks.inboxFetch.mock.calls.filter(([url]) => url === conversations)).toHaveLength(2))
     expect(hooks.open.mutateAsync).not.toHaveBeenCalled()
   })
   it("keeps an outbound CRM draft after rejection and describes queueing rather than delivery", async () => {
-    hooks.conversations.data = [{ id: "3", contactId: "7", status: "open", channel: "WhatsApp" }]
+    hooks.inboxFetch.mockImplementation(async (url: string) => Response.json({ data:
+      url === "/api/query/crm-conversations?companyId=2"
+        ? [{ id: "3", organizationId: "1", companyId: "2", contactId: "7", status: "open", channel: "WhatsApp" }]
+        : [],
+    }))
     hooks.append.mutateAsync.mockRejectedValue(new Error("Provider setup unavailable"))
-    render(<CrmInboxPanel organizationId={1} contactId={7n} />)
-    fireEvent.change(screen.getByRole("textbox", { name: "Outbound message" }), { target: { value: "Please check invoice 42" } })
+    renderInbox()
+    fireEvent.change(await screen.findByRole("textbox", { name: "Outbound message" }), { target: { value: "Please check invoice 42" } })
     fireEvent.click(screen.getByRole("button", { name: "Queue message" }))
     expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Provider setup unavailable")
     expect((screen.getByRole("textbox", { name: "Outbound message" }) as HTMLInputElement).value).toBe("Please check invoice 42")

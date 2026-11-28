@@ -2415,12 +2415,23 @@ export async function fetchAdminRoleId(page: Page): Promise<number> {
   return id
 }
 
+async function openTechnicalAdminActions(page: Page) {
+  await gotoModule(page, "/settings?section=advanced")
+  const actions = page.getByTestId("settings-admin-actions")
+  await expect(actions).toBeVisible()
+  if ((await actions.getAttribute("open")) === null) {
+    await actions.locator(":scope > summary").click()
+  }
+  await expect(actions).toHaveJSProperty("open", true)
+  return actions
+}
+
 export async function grantPermissionViaSettings(
   page: Page,
   options: { roleId: number; resource: string; action?: string },
 ) {
-  await gotoModule(page, "/settings?section=advanced")
-  await page.getByTestId("settings-admin-action-grantPermission").click()
+  const actions = await openTechnicalAdminActions(page)
+  await actions.getByTestId("settings-admin-action-grantPermission").click()
   await expect(page.getByTestId("form-modal-settings-grant-permission")).toBeVisible()
   // subjectType defaults to Role in settings form config
   await fillField(page, "subjectValue", String(options.roleId))
@@ -2499,8 +2510,8 @@ export async function waitForOrgPermissionAbsent(
 }
 
 export async function revokePermissionViaSettings(page: Page, permissionId: number) {
-  await gotoModule(page, "/settings?section=advanced")
-  await page.getByTestId("settings-admin-action-revokePermission").click()
+  const actions = await openTechnicalAdminActions(page)
+  await actions.getByTestId("settings-admin-action-revokePermission").click()
   await expect(page.getByTestId("form-modal-settings-revoke-permission")).toBeVisible()
   await fillField(page, "permissionId", String(permissionId))
   const [res] = await Promise.all([
