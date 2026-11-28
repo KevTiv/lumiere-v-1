@@ -66,6 +66,9 @@ fn saved(definition: Definition) -> SavedProposal {
         last_error: None,
         created_at: "2026-11-07T12:00:00Z".into(),
         approved_at: Some("2026-11-07T12:01:00Z".into()),
+        prepared_by: None,
+        approved_by: None,
+        dispatched_by: None,
     }
 }
 
@@ -522,6 +525,7 @@ async fn postgres_workflow_keeps_revisions_claims_and_receipts_durable() -> Resu
     let pool = pg_pool::build_pool(&config)?;
     let result = async {
         exercise_storage(&pool).await?;
+        exercise_shared_execution(&pool).await?;
         approved_ready_rows_are_independent_from_held_rows(&pool).await?;
         competing_changed_exports_cannot_both_acquire_approval(&pool).await
     }
@@ -548,6 +552,9 @@ async fn exercise_storage(pool: &deadpool_postgres::Pool) -> Result<()> {
         include_str!("../../../cold_tier/import_tasks_expand.sql"),
         include_str!("../../../cold_tier/import_workflow_expand.sql"),
         include_str!("../../../cold_tier/import_task_inspection_expand.sql"),
+        include_str!("../../../cold_tier/import_native_requests_expand.sql"),
+        include_str!("../../../cold_tier/import_task_handoff_expand.sql"),
+        include_str!("../../../cold_tier/import_workflow_actors_expand.sql"),
     ] {
         client.batch_execute(sql).await?;
     }
@@ -860,6 +867,151 @@ async fn exercise_storage(pool: &deadpool_postgres::Pool) -> Result<()> {
         )
         .await
         .is_err());
+    Ok(())
+}
+
+async fn exercise_shared_execution(pool: &deadpool_postgres::Pool) -> Result<()> {
+    let clerk = StorageScope {
+        actor: "review-clerk",
+        ..scoped()
+    };
+    let owner = "company-owner";
+    let task = "0".repeat(32);
+    let digest = "0".repeat(64);
+    let mut client = pool.get().await?;
+    client.execute(
+        "INSERT INTO lumiere_platform.import_task (organization_id,company_id,actor_identity,request_id,conversation_key,request_sha256,state,approved_mode,decision_request)
+         VALUES (42,5,$1,$2,'reviewed-by-clerk',$3,'needs_review','prepare_import','{}')",
+        &[&clerk.actor,&task,&digest],
+    ).await?;
+    let batch: i64 = client.query_one(
+        "INSERT INTO lumiere_platform.import_review_batch (organization_id,company_id,title,target_entity,source_file,source_sha256,created_by)
+         VALUES (42,5,'Shared expenses','source_observation','shared.csv',$1,$2) RETURNING id",
+        &[&digest,&clerk.actor],
+    ).await?.get(0);
+    client.execute("INSERT INTO lumiere_platform.import_task_review (organization_id,company_id,actor_identity,request_id,batch_id)
+        VALUES (42,5,$1,$2,$3)",&[&clerk.actor,&task,&batch]).await?;
+    let mut row = reviewed(1, 601, "42")?;
+    row.source.source.sha256.clone_from(&digest);
+    let item: i64 = client.query_one(
+        "INSERT INTO lumiere_platform.import_review_item (organization_id,company_id,batch_id,source_key,source_json,proposed_json,confirmed_fields,revision)
+         VALUES (42,5,$1,'shared-601',$2,$3,$4,3) RETURNING id",
+        &[&batch,&serde_json::to_value(&row.source)?,&serde_json::to_value(&row.values)?,&serde_json::to_value(&row.confirmed)?],
+    ).await?.get(0);
+    let body = PrepareBody {
+        company_id: clerk.company,
+        request_key: "0".repeat(32),
+        rows: vec![RowSelection {
+            item_id: item.to_string(),
+            expected_revision: 3,
+        }],
+        configuration: configuration(),
+    };
+    let tx = client.transaction().await?;
+    ensure!(
+        super::super::tasks::handoff::lock_grant(&tx, clerk, owner, &task)
+            .await
+            .is_err()
+    );
+    tx.rollback().await?;
+    client
+        .execute(
+            "INSERT INTO lumiere_platform.import_task_handoff
+        (organization_id,company_id,actor_identity,request_id,recipient_identity,revision)
+         VALUES (42,5,$1,$2,$3,1)",
+            &[&clerk.actor, &task, &owner],
+        )
+        .await?;
+    let tx = client.transaction().await?;
+    super::super::tasks::handoff::lock_grant(&tx, clerk, owner, &task).await?;
+    let rows = storage::reviews(&tx, clerk, &task, &body.rows).await?;
+    let definition = build_definition(&rows, &body.configuration, 0)?;
+    let mut proposal = storage::insert(
+        &tx,
+        clerk,
+        &task,
+        &body,
+        &hash(&serde_json::to_vec(&body)?),
+        &definition,
+    )
+    .await?;
+    storage::approve(&tx, clerk, &task, &mut proposal, 0).await?;
+    tx.execute("UPDATE lumiere_platform.import_workflow_proposal SET prepared_by=$2,approved_by=$2 WHERE id=$1", &[&proposal.id,&owner]).await?;
+    let action = ActionBody {
+        company_id: clerk.company,
+        expected_revision: proposal.revision,
+        expected_digest: proposal.digest.clone(),
+    };
+    let request = native::header_request(clerk, &task, &proposal)?;
+    tx.commit().await?;
+
+    let tx = client.transaction().await?;
+    storage::bind_executor(&tx, clerk, &task, proposal.id, &action, owner).await?;
+    storage::bind_executor(&tx, clerk, &task, proposal.id, &action, clerk.actor).await?;
+    let saved = storage::load(&tx, clerk, &task, proposal.id).await?;
+    ensure!(saved.prepared_by.as_deref() == Some(owner));
+    ensure!(saved.approved_by.as_deref() == Some(owner));
+    ensure!(saved.dispatched_by.as_deref() == Some(owner));
+    ensure!(native::header_request(clerk, &task, &saved)?.request_id == request.request_id);
+    let receipt = json!({"jobId":"1901","status":"success","rowsImported":1,"totalRows":1,
+        "errorRows":0,"records":[{"rowNumber":2,"recordId":"1100"}]});
+    for _ in 0..2 {
+        storage::record_receipt(
+            &tx,
+            clerk,
+            proposal.id,
+            "headers",
+            &request.request_id,
+            &hash(request.csv.as_bytes()),
+            &receipt,
+        )
+        .await?;
+    }
+    tx.commit().await?;
+    let owner_record = binding::read_saved_binding(
+        &client,
+        42,
+        5,
+        owner,
+        &request.request_id,
+        "account_move",
+        &hash(request.csv.as_bytes()),
+        1901,
+        1100,
+        2,
+    )
+    .await?
+    .ok_or_else(|| anyhow::anyhow!("shared execution receipt lost its source task"))?;
+    ensure!(owner_record["taskRequestId"] == task && owner_record["itemId"] == item.to_string());
+    ensure!(binding::read_saved_binding(
+        &client,
+        42,
+        5,
+        clerk.actor,
+        &request.request_id,
+        "account_move",
+        &hash(request.csv.as_bytes()),
+        1901,
+        1100,
+        2
+    )
+    .await?
+    .is_none());
+
+    client
+        .execute(
+            "UPDATE lumiere_platform.import_task_handoff SET recipient_identity=NULL,revision=2
+        WHERE organization_id=42 AND company_id=5 AND actor_identity=$1 AND request_id=$2",
+            &[&clerk.actor, &task],
+        )
+        .await?;
+    let tx = client.transaction().await?;
+    ensure!(
+        storage::bind_executor(&tx, clerk, &task, proposal.id, &action, owner)
+            .await
+            .is_err()
+    );
+    tx.rollback().await?;
     Ok(())
 }
 

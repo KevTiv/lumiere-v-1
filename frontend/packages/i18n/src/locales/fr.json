@@ -4577,6 +4577,26 @@
     }
   },
   "settings": {
+    "importHandoff": {
+      "title": "Transmission pour examen",
+      "description": "Choisissez la personne de cette société qui poursuivra l’examen de cette importation enregistrée.",
+      "recipient": "Personne chargée de l’examen",
+      "chooseRecipient": "Choisir la personne chargée de l’examen",
+      "searchRecipients": "Rechercher une personne",
+      "noRecipients": "Aucune personne admissible",
+      "recipientsLoading": "Vérification des personnes admissibles…",
+      "recipientsError": "Impossible de charger la liste des personnes.",
+      "recipientsDenied": "Le choix d’une personne est indisponible pour cette tâche.",
+      "share": "Envoyer pour examen",
+      "received": "Cette importation vous a été transmise pour examen.",
+      "copyLink": "Copier le lien d’examen",
+      "copied": "Lien copié",
+      "revoke": "Révoquer l’accès",
+      "error": "La transmission a échoué. Vérifiez le destinataire et actualisez la page avant de réessayer.",
+      "continueFromReview": "Ouvrez Décisions pour terminer l’examen partagé et poursuivre à partir de la source confirmée.",
+      "decisionActors": "Historique des décisions",
+      "decisionActor": "Révision {{revision}} · {{actor}}"
+    },
     "importTask": {
       "progressVerifiedRecordCounts": "{{records}} enregistrements historiques vérifiés · {{drafts}} brouillons vérifiés affichés · {{receipts}} reçus d’import",
       "cardSourceCounts": "{{total}} lignes sources · {{ready}} confirmées · {{held}} à décider · {{excluded}} exclues",

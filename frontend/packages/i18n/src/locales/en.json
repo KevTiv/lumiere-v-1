@@ -15539,6 +15539,26 @@
     }
   },
   "settings": {
+    "importHandoff": {
+      "title": "Import review handoff",
+      "description": "Choose the company reviewer who should continue this saved import.",
+      "recipient": "Reviewer",
+      "chooseRecipient": "Choose a reviewer",
+      "searchRecipients": "Search reviewers",
+      "noRecipients": "No eligible reviewers",
+      "recipientsLoading": "Checking eligible reviewers…",
+      "recipientsError": "Reviewers could not be loaded.",
+      "recipientsDenied": "Reviewer choices are unavailable for this task.",
+      "share": "Send for review",
+      "received": "This import was shared with you for review.",
+      "copyLink": "Copy review link",
+      "copied": "Link copied",
+      "revoke": "Revoke access",
+      "error": "The handoff could not be completed. Check the reviewer and refresh before trying again.",
+      "continueFromReview": "Open Decisions to complete the shared review and continue from its confirmed source.",
+      "decisionActors": "Decision history",
+      "decisionActor": "Revision {{revision}} · {{actor}}"
+    },
     "page": {
       "title": "Settings",
       "description": "Manage your account and system configuration"

@@ -125,6 +125,11 @@ export function SavedImportTaskPicker({
                   <p className="mt-1 text-sm font-medium">
                     {statusLabels[task.status]}
                   </p>
+                  {task.handoff?.canManage === false ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.importHandoff.received")}
+                    </p>
+                  ) : null}
                   <p className="text-sm text-muted-foreground">
                     {t("settings.importTask.taskPending", {
                       defaultValue:

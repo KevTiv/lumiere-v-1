@@ -11,7 +11,7 @@ use crate::{
     cold_tier::pg_pool,
     error::ApiError,
     query_exec::row_u64,
-    routes::import::{read_workflow_import, WorkflowImportRequest},
+    routes::import::{read_workflow_import_for_actor, WorkflowImportRequest},
     state::AppState,
     trusted_context::TrustedOperationContext,
 };
@@ -33,28 +33,21 @@ pub(super) async fn record(
     if !supported(entity) {
         return Ok(());
     }
-    if !model::sha256(content_hash)
-        || !valid_request(request)
-        || bindings.is_empty()
-        || bindings.len() > 1000
-    {
-        return Err(ApiError::BadRequest(
-            "invalid native review request association".into(),
-        ));
-    }
-    let mut batches = BTreeSet::new();
-    for row in bindings {
-        batches.insert(
-            row["batchId"]
-                .as_str()
-                .and_then(|id| id.parse::<i64>().ok())
-                .filter(|id| *id > 0)
-                .ok_or_else(|| ApiError::BadRequest("invalid reviewed batch identity".into()))?,
-        );
-    }
-    let batches: Vec<i64> = batches.into_iter().collect();
+    let batches = checked_batches(request, content_hash, bindings)?;
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
+    let shared = tx.query_opt(
+        "SELECT 1 FROM lumiere_platform.import_task_review link
+          JOIN lumiere_platform.import_task_handoff handoff USING (organization_id,company_id,actor_identity,request_id)
+          WHERE link.organization_id=$1::text::numeric AND link.company_id=$2::text::numeric
+            AND link.batch_id=ANY($3::bigint[]) AND NOT link.from_inspection LIMIT 1",
+        &[&scope.organization.to_string(),&scope.company.to_string(),&batches],
+    ).await.map_err(ApiError::internal)?;
+    if shared.is_some() {
+        return Err(ApiError::Conflict(
+            "open the saved task before importing rows from a shared review".into(),
+        ));
+    }
     // All exported batches must belong to the task, and only the submitting
     // actor's prepare-import tasks can acquire this association.
     let tasks = tx.query(
@@ -88,6 +81,106 @@ pub(super) async fn record(
     tx.commit().await.map_err(ApiError::internal)
 }
 
+fn checked_batches(
+    request: &str,
+    content_hash: &str,
+    bindings: &[Value],
+) -> Result<Vec<i64>, ApiError> {
+    if !model::sha256(content_hash)
+        || !valid_request(request)
+        || bindings.is_empty()
+        || bindings.len() > 1000
+    {
+        return Err(ApiError::BadRequest(
+            "invalid native review request association".into(),
+        ));
+    }
+    let mut batches = BTreeSet::new();
+    for row in bindings {
+        batches.insert(
+            row["batchId"]
+                .as_str()
+                .and_then(|id| id.parse::<i64>().ok())
+                .filter(|id| *id > 0)
+                .ok_or_else(|| ApiError::BadRequest("invalid reviewed batch identity".into()))?,
+        );
+    }
+    let batches: Vec<i64> = batches.into_iter().collect();
+    Ok(batches)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) async fn record_for_task(
+    pool: &deadpool_postgres::Pool,
+    scope: StorageScope<'_>,
+    actor: &str,
+    task: &str,
+    entity: &str,
+    request: &str,
+    content_hash: &str,
+    file_name: Option<&str>,
+    bindings: &[Value],
+) -> Result<(), ApiError> {
+    if !supported(entity) {
+        return Err(ApiError::BadRequest(
+            "this destination does not use saved direct import receipts".into(),
+        ));
+    }
+    let batches = checked_batches(request, content_hash, bindings)?;
+    let mut client = pool.get().await.map_err(ApiError::internal)?;
+    let tx = client.transaction().await.map_err(ApiError::internal)?;
+    let org = scope.organization.to_string();
+    let company = scope.company.to_string();
+    tx.query_opt(
+        "SELECT request_id FROM lumiere_platform.import_task WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric
+          AND actor_identity=$3 AND request_id=$4 AND approved_mode='prepare_import' AND state='needs_review' FOR UPDATE",
+        &[&org,&company,&scope.actor,&task],
+    ).await.map_err(ApiError::internal)?.ok_or_else(|| ApiError::NotFound("prepared import task not found".into()))?;
+    super::tasks::handoff::lock_grant(&tx, scope, actor, task).await?;
+    let linked: i64 = tx.query_one(
+        "SELECT count(DISTINCT batch_id) AS linked FROM lumiere_platform.import_task_review
+          WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3
+            AND request_id=$4 AND NOT from_inspection AND batch_id=ANY($5::bigint[])",
+        &[&org,&company,&scope.actor,&task,&batches],
+    ).await.map_err(ApiError::internal)?.get("linked");
+    if linked != batches.len() as i64 {
+        return Err(ApiError::Conflict(
+            "reviewed rows do not belong to this saved task".into(),
+        ));
+    }
+    let rows = json!(bindings);
+    let prior = tx.query_opt(
+        "SELECT 1 FROM lumiere_platform.import_task_native_request old
+          WHERE old.organization_id=$1::text::numeric AND old.company_id=$2::text::numeric AND old.actor_identity=$3
+            AND old.task_request_id=$4 AND old.entity=$5 AND old.native_request_id<>$6
+            AND EXISTS (SELECT 1 FROM lumiere_platform.import_task_handoff handoff
+                         WHERE handoff.organization_id=old.organization_id AND handoff.company_id=old.company_id
+                           AND handoff.actor_identity=old.actor_identity AND handoff.request_id=old.task_request_id)
+            AND EXISTS (SELECT 1 FROM jsonb_array_elements(old.review_rows) old_row
+                         JOIN jsonb_array_elements($7::jsonb) candidate
+                           ON old_row->>'itemId'=candidate->>'itemId') LIMIT 1",
+        &[&org,&company,&scope.actor,&task,&entity,&request,&rows],
+    ).await.map_err(ApiError::internal)?;
+    if prior.is_some() {
+        return Err(ApiError::Conflict(
+            "some reviewed rows already have a saved import attempt; open its results".into(),
+        ));
+    }
+    record_task_as(
+        &tx,
+        scope,
+        Some(actor),
+        task,
+        entity,
+        request,
+        content_hash,
+        file_name,
+        &rows,
+    )
+    .await?;
+    tx.commit().await.map_err(ApiError::internal)
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn record_task(
     tx: &Transaction<'_>,
@@ -99,9 +192,36 @@ async fn record_task(
     file_name: Option<&str>,
     rows: &Value,
 ) -> Result<(), ApiError> {
-    tx.execute("INSERT INTO lumiere_platform.import_task_native_request (organization_id,company_id,actor_identity,task_request_id,native_request_id,entity,content_sha256,file_name,review_rows) VALUES ($1::text::numeric,$2::text::numeric,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING",&[&scope.organization.to_string(),&scope.company.to_string(),&scope.actor,&task,&request,&entity,&content_hash,&file_name,&rows]).await.map_err(ApiError::internal)?;
-    let existing = tx.query_one("SELECT entity,content_sha256,file_name,review_rows FROM lumiere_platform.import_task_native_request WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND task_request_id=$4 AND native_request_id=$5",&[&scope.organization.to_string(),&scope.company.to_string(),&scope.actor,&task,&request]).await.map_err(ApiError::internal)?;
-    if existing.get::<_, String>("entity") != entity
+    record_task_as(
+        tx,
+        scope,
+        None,
+        task,
+        entity,
+        request,
+        content_hash,
+        file_name,
+        rows,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn record_task_as(
+    tx: &Transaction<'_>,
+    scope: StorageScope<'_>,
+    actor: Option<&str>,
+    task: &str,
+    entity: &str,
+    request: &str,
+    content_hash: &str,
+    file_name: Option<&str>,
+    rows: &Value,
+) -> Result<(), ApiError> {
+    tx.execute("INSERT INTO lumiere_platform.import_task_native_request (organization_id,company_id,actor_identity,task_request_id,native_request_id,entity,content_sha256,file_name,review_rows,submitted_by) VALUES ($1::text::numeric,$2::text::numeric,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING",&[&scope.organization.to_string(),&scope.company.to_string(),&scope.actor,&task,&request,&entity,&content_hash,&file_name,&rows,&actor]).await.map_err(ApiError::internal)?;
+    let existing = tx.query_opt("SELECT entity,content_sha256,file_name,review_rows,COALESCE(submitted_by,actor_identity) AS submitter FROM lumiere_platform.import_task_native_request WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND task_request_id=$4 AND native_request_id=$5",&[&scope.organization.to_string(),&scope.company.to_string(),&scope.actor,&task,&request]).await.map_err(ApiError::internal)?.ok_or_else(|| ApiError::Conflict("this native request already belongs to another saved task".into()))?;
+    if existing.get::<_, String>("submitter") != actor.unwrap_or(scope.actor)
+        || existing.get::<_, String>("entity") != entity
         || existing.get::<_, String>("content_sha256") != content_hash
         || existing.get::<_, Option<String>>("file_name").as_deref() != file_name
         || existing.get::<_, Value>("review_rows") != *rows
@@ -113,8 +233,38 @@ async fn record_task(
     Ok(())
 }
 
+pub(crate) async fn lock_review_dispatch(
+    tx: &Transaction<'_>,
+    context: &TrustedOperationContext,
+    company: u64,
+    task: &str,
+    request: &str,
+) -> Result<(), ApiError> {
+    let organization = context.organization_id();
+    let submitter = context.actor_identity();
+    let row = tx.query_opt(
+        "SELECT actor_identity FROM lumiere_platform.import_task_native_request
+          WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric
+            AND COALESCE(submitted_by,actor_identity)=$3 AND task_request_id=$4 AND native_request_id=$5",
+        &[&organization.to_string(),&company.to_string(),&submitter,&task,&request],
+    ).await.map_err(ApiError::internal)?.ok_or_else(|| ApiError::NotFound("saved review import attempt not found".into()))?;
+    let creator: String = row.get("actor_identity");
+    super::tasks::handoff::lock_grant(
+        tx,
+        StorageScope {
+            organization,
+            company,
+            actor: &creator,
+        },
+        submitter,
+        task,
+    )
+    .await
+}
+
 struct Attempt {
     request: String,
+    submitter: String,
     entity: String,
     content_hash: String,
     file_name: Option<String>,
@@ -132,19 +282,20 @@ fn valid_request(value: &str) -> bool {
 }
 
 const ATTEMPT_PAGE: &str = "WITH scoped AS NOT MATERIALIZED (
-    SELECT native_request_id,entity,content_sha256,file_name,review_rows,created_at
+    SELECT native_request_id,entity,content_sha256,file_name,review_rows,created_at,COALESCE(submitted_by,actor_identity) AS submitter
     FROM lumiere_platform.import_task_native_request
     WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND task_request_id=$4
 ), anchor AS (
     SELECT created_at,native_request_id FROM scoped WHERE native_request_id=$5
 )
-SELECT native_request_id,entity,content_sha256,file_name,review_rows,created_at::text
+SELECT native_request_id,entity,content_sha256,file_name,review_rows,created_at::text,submitter
 FROM scoped WHERE $5::text IS NULL OR (created_at,native_request_id) < (SELECT created_at,native_request_id FROM anchor)
 ORDER BY scoped.created_at DESC,native_request_id DESC LIMIT 21";
 
 pub(super) async fn list(
+    state: &AppState,
     context: &TrustedOperationContext,
-    company: u64,
+    scoped: StorageScope<'_>,
     task: &str,
     before: Option<&str>,
 ) -> Result<(Vec<Value>, Option<String>), ApiError> {
@@ -157,9 +308,9 @@ pub(super) async fn list(
         .query(
             ATTEMPT_PAGE,
             &[
-                &context.organization_id().to_string(),
-                &company.to_string(),
-                &context.actor_identity(),
+                &scoped.organization.to_string(),
+                &scoped.company.to_string(),
+                &scoped.actor,
                 &task,
                 &before,
             ],
@@ -170,8 +321,7 @@ pub(super) async fn list(
     let attempts = rows.iter().take(PAGE_SIZE).map(attempt).collect::<Vec<_>>();
     drop(client);
     let results = stream::iter(attempts).map(|attempt|async move {
-        let request=WorkflowImportRequest {entity:attempt.entity.clone(),company_id:company,request_id:attempt.request.clone(),file_name:attempt.file_name.clone().unwrap_or_default(),csv:String::new()};
-        let receipt=match read_workflow_import(context,&request,&attempt.content_hash).await {
+        let receipt=match attempt_receipt(state,context,scoped,&attempt).await {
             Ok(receipt)=>Some(project_receipt(&receipt,&attempt)?),
             Err(ApiError::NotFound(_))=>None,
             Err(error)=>return Err(error),
@@ -186,6 +336,7 @@ pub(super) async fn list(
 fn attempt(row: &tokio_postgres::Row) -> Attempt {
     Attempt {
         request: row.get("native_request_id"),
+        submitter: row.get("submitter"),
         entity: row.get("entity"),
         content_hash: row.get("content_sha256"),
         file_name: row.get("file_name"),
@@ -194,10 +345,38 @@ fn attempt(row: &tokio_postgres::Row) -> Attempt {
     }
 }
 
+async fn attempt_receipt(
+    state: &AppState,
+    context: &TrustedOperationContext,
+    scoped: StorageScope<'_>,
+    attempt: &Attempt,
+) -> Result<Value, ApiError> {
+    let request = WorkflowImportRequest {
+        entity: attempt.entity.clone(),
+        company_id: scoped.company,
+        request_id: attempt.request.clone(),
+        file_name: attempt.file_name.clone().unwrap_or_default(),
+        csv: String::new(),
+    };
+    let client = if attempt.submitter == context.actor_identity() {
+        context.client()
+    } else {
+        &state.stdb
+    };
+    read_workflow_import_for_actor(
+        context,
+        client,
+        &attempt.submitter,
+        &request,
+        &attempt.content_hash,
+    )
+    .await
+}
+
 pub(super) async fn row_results(
     state: &AppState,
     context: &TrustedOperationContext,
-    company: u64,
+    scoped: StorageScope<'_>,
     task: &str,
     request: &str,
     after: u64,
@@ -207,27 +386,21 @@ pub(super) async fn row_results(
             "Invalid native receipt row page".into(),
         ));
     }
-    let org = context.organization_id();
+    let org = scoped.organization;
+    let company = scoped.company;
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
     let client = pool.get().await.map_err(ApiError::internal)?;
-    let saved = client.query_opt("SELECT native_request_id,entity,content_sha256,file_name,review_rows,created_at::text
+    let saved = client.query_opt("SELECT native_request_id,entity,content_sha256,file_name,review_rows,created_at::text,COALESCE(submitted_by,actor_identity) AS submitter
         FROM lumiere_platform.import_task_native_request
         WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND task_request_id=$4 AND native_request_id=$5",
-        &[&org.to_string(),&company.to_string(),&context.actor_identity(),&task,&request]).await.map_err(ApiError::internal)?
+        &[&org.to_string(),&company.to_string(),&scoped.actor,&task,&request]).await.map_err(ApiError::internal)?
         .ok_or_else(|| ApiError::NotFound("Native receipt not found".into()))?;
     let attempt = attempt(&saved);
     let rows = attempt
         .rows
         .as_array()
         .ok_or_else(|| ApiError::Internal("Invalid receipt source rows".into()))?;
-    let native = WorkflowImportRequest {
-        entity: attempt.entity.clone(),
-        company_id: company,
-        request_id: attempt.request.clone(),
-        file_name: attempt.file_name.clone().unwrap_or_default(),
-        csv: String::new(),
-    };
-    let receipt = read_workflow_import(context, &native, &attempt.content_hash).await?;
+    let receipt = attempt_receipt(state, context, scoped, &attempt).await?;
     let projected = project_receipt(&receipt, &attempt)?;
     let job = projected["jobId"]
         .as_str()

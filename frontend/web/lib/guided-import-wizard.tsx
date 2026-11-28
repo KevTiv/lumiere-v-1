@@ -16,7 +16,7 @@ import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useTrackedCsvImport } from "@lumiere/query-hooks/hooks/tracked-csv-import"
 import { csvImportInvalidatesQuery, fetchCsvImportReceipt, type CsvImportRequest } from "@lumiere/query-hooks/hooks/csv-import-request"
 import { reduceImportSourceAdmission, sourceAdmissionForScope } from "./import-source-admission"
-import { guidedImportRequest, trackedImportEntity } from "./guided-import-request"
+import { buildGuidedImportCsv, guidedImportRequest, trackedImportEntity } from "./guided-import-request"
 import { clearImportRecovery, importRecoveryKey, readImportRecovery, retainImportRequest, type ImportRecoveryScope } from "./guided-import-recovery"
 import { previewPreparedProducts, type ProductImportReference } from "./prepared-product-preview"
 import { previewPreparedLocations } from "./prepared-location-preview"
@@ -88,7 +88,6 @@ import {
   type ImportEntityOption,
 } from "@/lib/import-entities"
 import {
-  buildMappedImportCsv,
   filterMappingForHeaders,
   readImportFile,
   type CsvSourceDelimiter,
@@ -123,7 +122,7 @@ function PreparedProductPreviewButton({ organizationId, disabled, onPreview }: {
 
 export type GuidedImportContinuationBlock = "busy" | "unresolved" | null
 export interface GuidedImportWizardHandle {
-  continueFromReview(source: ReviewedImportSource): Promise<boolean>
+  continueFromReview(source: ReviewedImportSource, savedTaskId?: string): Promise<boolean>
 }
 
 export const GuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImportWizardProps>(function GuidedImportWizard(props, ref) {
@@ -177,6 +176,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
   }
   const [sourceAdmission, dispatchSourceAdmission] = useReducer(reduceImportSourceAdmission, null)
   const sourceScopeKey = importRecoveryKey(recoveryScope)
+  const reviewTask = useRef<string | undefined>(undefined)
   const sourceAdmissionId = sourceAdmissionForScope(sourceAdmission, sourceScopeKey)
   useEffect(() => { dispatchSourceAdmission({ type: "scope", scopeKey: sourceScopeKey }) }, [sourceScopeKey])
   const [analysis, setAnalysis] = useState<ImportAnalyzeResponse | null>(null)
@@ -332,6 +332,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
     setAppliedTemplateId(null)
     setImportedJobId(null)
     setImportRequest(null)
+    reviewTask.current = undefined
     importRequestRef.current = null
     setRollbackConfirmId(null)
     analyze.reset()
@@ -340,7 +341,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
   }, [analyze, preview, recoveryScope])
 
   useImperativeHandle(ref, () => ({
-    async continueFromReview(source: ReviewedImportSource) {
+    async continueFromReview(source: ReviewedImportSource, savedTaskId?: string) {
       const blocked = (): GuidedImportContinuationBlock => currentWork.current.busy || readingFileRef.current
         ? "busy" : importRequestRef.current && !currentWork.current.importedJobId ? "unresolved" : null
       const explainBlock = (reason: Exclude<GuidedImportContinuationBlock, null>) => setError(reason === "busy"
@@ -366,6 +367,7 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
       // Keep this owner mounted. Only an explicitly approved, idle draft can
       // be replaced; an unresolved tracked request never loses its identity.
       if (!resetFlow()) return false
+      reviewTask.current = savedTaskId
       setWizardKey(source.targetEntity)
       setCsvText(source.csv); setHeaders(parsed.headers); setRows(parsed.rows)
       setSourceFileName(source.fileName); setSourceFormat("csv"); setSourceSheetName(undefined)
@@ -624,9 +626,9 @@ const ScopedGuidedImportWizard = forwardRef<GuidedImportWizardHandle, GuidedImpo
       const skipRows = new Set(
         duplicateStates.filter((item) => item.action === "skip").map((item) => item.rowIndex),
       )
-      const importCsv = importRequestRef.current?.csvData ?? buildMappedImportCsv(headers, rows, mapping, skipRows)
+      const importCsv = importRequestRef.current?.csvData ?? buildGuidedImportCsv(headers, rows, mapping, skipRows, reviewTask.current)
 
-      const request = importRequestRef.current ?? guidedImportRequest({ organizationId: orgId, companyId, entity: targetEntity, csv: importCsv, fileName: sourceFileName || "source.csv", sourceAdmissionId, companies: companiesQuery.data ?? [] })
+      const request = importRequestRef.current ?? guidedImportRequest({ organizationId: orgId, companyId, entity: targetEntity, csv: importCsv, fileName: sourceFileName || "source.csv", sourceAdmissionId, reviewTaskId: reviewTask.current, companies: companiesQuery.data ?? [] })
       const retain = () => retainImportRequest(window.localStorage, recoveryScope, request)
       if (navigator.locks) await navigator.locks.request(importRecoveryKey(recoveryScope), retain)
       else retain()

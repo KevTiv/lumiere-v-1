@@ -62,7 +62,7 @@ pub(super) async fn read_saved_binding(
          JOIN lumiere_platform.import_workflow_proposal proposal
            ON proposal.organization_id=receipt.organization_id AND proposal.company_id=receipt.company_id AND proposal.id=receipt.proposal_id
          WHERE receipt.organization_id=$1::text::numeric AND receipt.company_id=$2::text::numeric
-           AND proposal.actor_identity=$3 AND receipt.request_id=$4 AND receipt.phase=$5 AND receipt.content_sha256=$6
+           AND COALESCE(proposal.dispatched_by,proposal.actor_identity)=$3 AND receipt.request_id=$4 AND receipt.phase=$5 AND receipt.content_sha256=$6
            AND receipt.receipt_json->>'jobId'=$7 AND proposal.approved_at IS NOT NULL",
         &[&org.to_string(),&company.to_string(),&actor,&request,&phase,&content_hash,&job.to_string()]
     ).await.map_err(ApiError::internal)?;

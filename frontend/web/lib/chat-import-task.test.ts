@@ -72,6 +72,24 @@ test("a managed import opens a native or existing range task by exact reference 
   await assert.rejects(open({ ...saved, companyId: "4" }), /company/)
 })
 
+test("a handed-off task reopens with the original review, creator and authenticated decision actor", async () => {
+  const creator = "d".repeat(64)
+  const reviewer = "e".repeat(64)
+  const note = { decisionId: id, optionId: "other" as const, otherText: "Please verify", revision: 2, createdAt: "2026-11-01T12:00:00Z", actor: creator }
+  const delegated = task({
+    decisionHistory: [note],
+    handoff: { creator, recipient: reviewer, revision: 1, canManage: false, canReview: true },
+  })
+  const loaded = await readSavedImportTask(async () => json(delegated), 3, id)
+  assert.equal(loaded?.requestId, id)
+  assert.equal(loaded?.handoff?.canManage, false)
+  assert.equal(loaded?.handoff?.recipient, reviewer)
+  assert.equal(loaded?.decisionHistory[0]?.actor, creator)
+  await assert.rejects(readSavedImportTask(async () => json(delegated), 4, id), /company/)
+  assert.equal(await readSavedImportTask(async () => json({ error: "not found" }, 404), 3, id), null)
+  assert.equal(parseSavedImportTask(task(), 3).handoff, undefined)
+})
+
 test("saved workbook coverage accepts separate sheets bound to one exact original", () => {
   const workbook = { ...source, fileName: "farm.xlsx" }
   const worksheet = {

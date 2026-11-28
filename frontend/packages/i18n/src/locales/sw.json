@@ -4548,6 +4548,26 @@
       "receiptOpenRecord": "Fungua rekodi iliyohifadhiwa #{{id}}",
       "receiptMoreRows": "Pakia safu zaidi"
     },
+    "importHandoff": {
+      "title": "Kukabidhi uingizaji wa data kwa ukaguzi",
+      "description": "Chagua mkaguzi wa kampuni atakayeendelea na uingizaji huu uliohifadhiwa.",
+      "recipient": "Mkaguzi",
+      "chooseRecipient": "Chagua mkaguzi",
+      "searchRecipients": "Tafuta wakaguzi",
+      "noRecipients": "Hakuna wakaguzi wanaostahili",
+      "recipientsLoading": "Inakagua wakaguzi wanaostahili…",
+      "recipientsError": "Orodha ya wakaguzi haikuweza kupakiwa.",
+      "recipientsDenied": "Wakaguzi hawapatikani kwa kazi hii.",
+      "share": "Tuma kwa ukaguzi",
+      "received": "Uingizaji huu umetumwa kwako kwa ukaguzi.",
+      "copyLink": "Nakili kiungo cha ukaguzi",
+      "copied": "Kiungo kimenakiliwa",
+      "revoke": "Ondoa ruhusa",
+      "error": "Makabidhiano yameshindikana. Hakikisha mkaguzi ni sahihi na onyesha ukurasa upya kabla ya kujaribu tena.",
+      "continueFromReview": "Fungua Maamuzi ili ukamilishe ukaguzi ulioshirikiwa na kuendelea kutoka kwenye chanzo kilichothibitishwa.",
+      "decisionActors": "Historia ya maamuzi",
+      "decisionActor": "Toleo {{revision}} · {{actor}}"
+    },
     "importReview": {
       "grouped": {
         "rowStatus": "Hali ya safu mlalo",

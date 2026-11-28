@@ -522,6 +522,7 @@ struct ImportBody {
     request_id: Option<String>,
     file_name: Option<String>,
     source_admission_id: Option<String>,
+    review_task_id: Option<String>,
     #[serde(default)]
     params: Option<ImportParams>,
 }
@@ -578,6 +579,11 @@ fn inspection_receipt(inspected: &lumiere_file_inspection::InspectedCsv) -> Valu
 }
 
 fn validate_source_reference(body: &ImportBody) -> Result<(), ApiError> {
+    if body.review_task_id.is_some() && body.request_id.is_none() {
+        return Err(ApiError::BadRequest(
+            "a saved review requires a tracked import".into(),
+        ));
+    }
     if body.source_admission_id.is_some() && body.request_id.is_none() {
         return Err(ApiError::BadRequest(
             "sourceAdmissionId requires a tracked import request".into(),
@@ -688,6 +694,7 @@ async fn submit_import(
             spec.job_table,
             request_id,
             body.file_name.as_deref(),
+            body.review_task_id.as_deref(),
             &inspected,
         )
         .await?;
@@ -710,8 +717,28 @@ async fn submit_import(
             {"request_id": request_id, "entity": spec.job_table, "csv_data": body.csv,
              "currency_id": params.currency_id.map(|id| json!({"some": id})).unwrap_or_else(|| json!({"none": []})),
              "file_name": body.file_name.map(|name| json!({"some": name})).unwrap_or_else(|| json!({"none": []}))}]);
+        let mut guard_client = if body.review_task_id.is_some() {
+            let pool = crate::cold_tier::pg_pool::required_pool().map_err(ApiError::unavailable)?;
+            Some(pool.get().await.map_err(ApiError::internal)?)
+        } else {
+            None
+        };
+        let guard = match (guard_client.as_mut(), body.review_task_id.as_deref()) {
+            (Some(client), Some(task)) => {
+                let tx = client.transaction().await.map_err(ApiError::internal)?;
+                super::import_reviews::lock_review_dispatch(
+                    &tx, &trusted, company_id, task, request_id,
+                )
+                .await?;
+                Some(tx)
+            }
+            _ => None,
+        };
         let context =
             dispatch_session_reducer(&state, &session, "import_csv_tracked", args).await?;
+        if let Some(guard) = guard {
+            guard.commit().await.map_err(ApiError::internal)?;
+        }
         let mut response = read_exact_outcome(
             &context,
             spec,
@@ -767,6 +794,7 @@ pub(crate) async fn submit_workflow_import(
             request_id: Some(request.request_id.clone()),
             file_name: Some(request.file_name.clone()),
             source_admission_id: None,
+            review_task_id: None,
             params: Some(ImportParams {
                 company_id: Some(request.company_id),
                 currency_id: None,
@@ -792,6 +820,25 @@ pub(crate) async fn read_workflow_import(
     request: &WorkflowImportRequest,
     content_sha256: &str,
 ) -> Result<Value, ApiError> {
+    read_workflow_import_for_actor(
+        context,
+        context.client(),
+        context.actor_identity(),
+        request,
+        content_sha256,
+    )
+    .await
+}
+
+/// A task-authorized receipt read keeps the viewer's policy and the persisted
+/// submitter's identity separate. No reducer or session runs as the submitter.
+pub(super) async fn read_workflow_import_for_actor(
+    context: &TrustedOperationContext,
+    receipt_client: &stdb_client::StdbClient,
+    submitter: &str,
+    request: &WorkflowImportRequest,
+    content_sha256: &str,
+) -> Result<Value, ApiError> {
     validate_request_id(&request.request_id)?;
     let spec = resolve_import_entity(&request.entity)
         .ok_or_else(|| ApiError::NotFound("Import request not found".into()))?;
@@ -804,8 +851,10 @@ pub(crate) async fn read_workflow_import(
         validate_currency(spec, None)?;
         ReceiptCurrency::Exact(None)
     };
-    read_exact_outcome(
+    read_exact_outcome_for_actor(
         context,
+        receipt_client,
+        submitter,
         spec,
         &request.request_id,
         request.company_id,
@@ -1129,13 +1178,36 @@ async fn read_exact_outcome(
     currency: ReceiptCurrency,
     expected_hash: Option<&str>,
 ) -> Result<Value, ApiError> {
+    read_exact_outcome_for_actor(
+        context,
+        context.client(),
+        context.actor_identity(),
+        spec,
+        request_id,
+        company_id,
+        currency,
+        expected_hash,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn read_exact_outcome_for_actor(
+    context: &TrustedOperationContext,
+    receipt_client: &stdb_client::StdbClient,
+    submitter: &str,
+    spec: &ImportEntity,
+    request_id: &str,
+    company_id: u64,
+    currency: ReceiptCurrency,
+    expected_hash: Option<&str>,
+) -> Result<Value, ApiError> {
     let access = context.field_access();
     let columns = import_read_columns(spec, access)?;
-    let rows = context
-        .client()
+    let rows = receipt_client
         .query_sql(&receipt_sql(
             context.organization_id(),
-            context.actor_identity(),
+            submitter,
             spec.job_table,
         )?)
         .await
@@ -1143,7 +1215,7 @@ async fn read_exact_outcome(
     let receipt = match_receipt(
         &rows,
         context.organization_id(),
-        context.actor_identity(),
+        submitter,
         spec,
         request_id,
         company_id,
@@ -1164,8 +1236,7 @@ async fn read_exact_outcome(
     let job_id = row_number(receipt, "id", "id")
         .filter(|id| *id > 0)
         .ok_or_else(|| ApiError::Internal("Invalid import receipt ID".into()))?;
-    let error_rows = context
-        .client()
+    let error_rows = receipt_client
         .query_sql(&errors_sql(context.organization_id(), job_id))
         .await
         .map_err(ApiError::internal)?;
@@ -1197,8 +1268,7 @@ async fn read_exact_outcome(
         "status":status,"totalRows":total_rows,"rowsImported":imported_rows,"errorRows":error_rows,
         "errors":errors,"errorsRedacted":!detailed});
     if status == "success" && matches!(spec.job_table, "account_move" | "account_move_line") {
-        let mut records = context
-            .client()
+        let mut records = receipt_client
             .query_sql(&accounting_records_sql(context.organization_id(), job_id))
             .await
             .map_err(ApiError::internal)?;
@@ -1704,6 +1774,24 @@ mod tests {
             ReceiptCurrency::Exact(Some(3))
         )
         .is_err());
+    }
+
+    #[test]
+    fn receipt_lookup_keeps_the_submitter_distinct_from_an_authorized_reader() {
+        let spec = resolve_import_entity("product").unwrap();
+        let reader = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let mut reader_receipt = receipt(2, 42);
+        reader_receipt["createUid"] = json!({"__identity__": format!("0x{reader}")});
+        let rows = [reader_receipt, receipt(1, 42)];
+        let currency = ReceiptCurrency::RecordedProduct;
+        assert_eq!(
+            match_receipt(&rows, 7, ACTOR, spec, TOKEN, 42, currency).unwrap()["id"],
+            json!(1)
+        );
+        assert_eq!(
+            match_receipt(&rows, 7, reader, spec, TOKEN, 42, currency).unwrap()["id"],
+            json!(2)
+        );
     }
 
     #[test]

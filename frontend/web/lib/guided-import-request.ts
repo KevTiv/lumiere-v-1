@@ -1,4 +1,5 @@
 import { createCsvImportRequest, supportsTrackedCsvImport } from "@lumiere/query-hooks/hooks/csv-import-request"
+import { buildMappedImportCsv } from "./import-spreadsheet-file"
 import { parseCsvText } from "@lumiere/erp-shared/csv-import-safety"
 
 // UI aliases map to the job tables returned by the existing import API.
@@ -12,7 +13,26 @@ const JOB_TABLES: Record<string, string> = {
 export function trackedImportEntity(entity: string): string { return JOB_TABLES[entity] ?? entity }
 export function isExplicitProductPrice(value: string): boolean { return /^\d{1,12}(?:\.\d{1,6})?$/.test(value.trim()) }
 
-export function guidedImportRequest(args: { organizationId: bigint; companyId: number; entity: string; csv: string; fileName: string; sourceAdmissionId?: string; companies: readonly { id: unknown; currencyId?: unknown }[] }) {
+/** Scoped source evidence follows each mapped row and cannot be remapped. */
+export function buildGuidedImportCsv(
+  headers: string[],
+  rows: string[][],
+  mapping: Record<string, string>,
+  skipped: Set<number>,
+  reviewTaskId?: string,
+): string {
+  if (!reviewTaskId) return buildMappedImportCsv(headers, rows, mapping, skipped)
+  const evidence = ["_review_item_id", "_review_revision"]
+  if (evidence.some((key) => !headers.includes(key)))
+    throw new Error("The saved review row evidence is unavailable. Open the confirmed source again.")
+  const fields = Object.fromEntries(
+    Object.entries(mapping).filter(([source, target]) => !evidence.includes(source) && !evidence.includes(target.toLowerCase())),
+  )
+  for (const field of evidence) fields[field] = field
+  return buildMappedImportCsv(headers, rows, fields, skipped)
+}
+
+export function guidedImportRequest(args: { organizationId: bigint; companyId: number; entity: string; csv: string; fileName: string; sourceAdmissionId?: string; reviewTaskId?: string; companies: readonly { id: unknown; currencyId?: unknown }[] }) {
   const entity = trackedImportEntity(args.entity)
   if (entity === "account_move" || entity === "account_move_line") throw new Error("Use Accounting to import complete journal entries with their lines.")
   if (!supportsTrackedCsvImport(entity)) throw new Error("This import type cannot be submitted from this workspace yet.")
@@ -27,5 +47,5 @@ export function guidedImportRequest(args: { organizationId: bigint; companyId: n
       throw new Error("Enter an explicit sale price and cost price for every product. Save unknown prices for review.")
     }
   }
-  return createCsvImportRequest(args.organizationId, entity, args.csv, args.fileName, { companyId: args.companyId, sourceAdmissionId: args.sourceAdmissionId, ...(currencyId === undefined ? {} : { currencyId }) })
+  return createCsvImportRequest(args.organizationId, entity, args.csv, args.fileName, { companyId: args.companyId, sourceAdmissionId: args.sourceAdmissionId, reviewTaskId: args.reviewTaskId, ...(currencyId === undefined ? {} : { currencyId }) })
 }
