@@ -99,7 +99,7 @@ test.describe("Finance workflow review tools", { tag: "@dev-fixture" }, () => {
     await gotoModule(page, "/expenses?tab=operations", "expenses")
     const panel = page.locator('[data-testid="expenses-capture-panel"]:visible')
     await expect(panel).toBeVisible()
-    await expect(panel).toContainText("Unuploaded file bytes stay in this capture panel only")
+    await expect(panel).toContainText("Queued receipts are saved in this browser until upload is verified.")
     const file = panel.getByTestId("expenses-capture-file")
     await expect(file).toHaveAttribute("accept", ".pdf,.png,.jpg,.jpeg,.webp")
     await file.setInputFiles({
