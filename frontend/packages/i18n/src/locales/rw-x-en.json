@@ -599,7 +599,8 @@
     },
     "forms": {
       "recovery": {
-        "receiptMissing": "Inyemezabwishyu: {{fileName}}. File ntiboneka kuri iki gikoresho. Ongera wongereho iy’umwimerere kugira ngo ukomeze."
+        "receiptMissing": "Inyemezabwishyu: {{fileName}}. File ntiboneka kuri iki gikoresho. Ongera wongereho iy’umwimerere kugira ngo ukomeze.",
+        "scopeChanged": "Ubu busabe ni ubw’ikindi kigo cyangwa indi account. Subira ku kigo cyangwa kuri account byakoreshejwe kugira ngo ubusuzume."
       },
       "newExpenseSheet": {
         "sections": {

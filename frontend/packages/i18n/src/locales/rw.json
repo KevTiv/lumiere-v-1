@@ -20,7 +20,7 @@
   },
   "activation": {
     "guidance": {
-      "quotation": "Kora cyangwa uhitemo urutonde rw’ibiciro rufite ifaranga rikoreshwa, uhitemo umukiriya n’ububiko. Bika devis mbere yo kongeramo ibicuruzwa."
+      "quotation": "Kora cyangwa uhitemo urutonde rw’ibiciro rufite ifaranga rikoreshwa, uhitemo umukiriya n’ububiko. Bika inyandiko y’ibiciro mbere yo kongeramo ibicuruzwa."
     },
     "checks": {
       "pricelist": "Urutonde rw’ibiciro rukora mu ifaranga rikoreshwa",
@@ -2544,7 +2544,15 @@
         "reason": "Impamvu yatanzwe {{reason}}",
         "reasonUnavailable": "Impamvu y’ikibazo yatanzwe n’utanga serivisi ntiboneka.",
         "refresh": "Vugurura amakuru y’uko ubutumwa bwageze ku wo bugenewe"
-      }
+      },
+      "description": "Reba ikiganiro cya WhatsApp n’uyu muntu. Nta cyemezo kiraza ko ubutumwa bugitegereje bwageze ku wohererejwe.",
+      "open": "Fungura ikiganiro",
+      "emptyTitle": "Nta kiganiro gifunguye",
+      "emptyDescription": "Fungura ikiganiro cya WhatsApp n’uyu muntu.",
+      "compose": "Ubutumwa bwo kohereza",
+      "placeholder": "Andika ubutumwa…",
+      "actionFailed": "Ubusabe ntibwakunze. Ubutumwa bwawe buracyabitswe.",
+      "phoneRequired": "Mbere yo gufungura ikiganiro, ongeraho nimero y’uyu muntu ishobora gukoreshwa kuri WhatsApp."
     },
     "relIntel": {
       "title": "Isesengura ry’imibanire",
@@ -3305,7 +3313,13 @@
         "openPricelists": "Fungura intonde z’ibiciro",
         "refreshPriceLists": "Ongera urebe intonde z’ibiciro",
         "pricelistMissing": "Kora urutonde rw’ibiciro rufite ifaranga rikoreshwa mu yindi tab, ugaruke hano wongere urebe intonde. Ibyo wanditse biragumaho.",
-        "pricelistMissingAsk": "Nta rutonde rw’ibiciro rushobora gukoreshwa. Saba umuyobozi gukora urutonde rufite ifaranga rikoreshwa, wongere urebe intonde."
+        "pricelistMissingAsk": "Nta rutonde rw’ibiciro rushobora gukoreshwa. Saba umuyobozi gukora urutonde rufite ifaranga rikoreshwa, wongere urebe intonde.",
+        "customerMissing": "Ongeramo umukiriya mu kandi gafishi ka mushakisha, hanyuma ugaruke kuri iyi nyandiko y’ibiciro. Ibyo wanditse biragumaho.",
+        "customerMissingAsk": "Nta mukiriya uhari. Saba umuyobozi kongeramo umukiriya, hanyuma ugaruke kuri iyi nyandiko y’ibiciro.",
+        "openContacts": "Fungura urutonde rw’abo mukorana",
+        "warehouseMissing": "Ongeramo ububiko mu kandi gafishi ka mushakisha, hanyuma ugaruke kuri iyi nyandiko y’ibiciro. Ibyo wanditse biragumaho.",
+        "warehouseMissingAsk": "Nta bubiko buhari. Saba umuyobozi kongeramo ububiko mu igenamiterere ryabwo, hanyuma ugaruke kuri iyi nyandiko y’ibiciro.",
+        "openWarehouses": "Fungura igenamiterere ry’ububiko"
       },
       "newSaleOrder": {
         "sections": {
@@ -4243,7 +4257,15 @@
     "forms": {
       "recovery": {
         "receiptRetained": "Inyemezabwishyu: {{fileName}}. Komeza kubika umaze kujya kuri interineti.",
-        "receiptMissing": "Inyemezabwishyu: {{fileName}}. Dosiye ntiboneka kuri iki gikoresho. Ongera wongereho iy’umwimerere kugira ngo ukomeze."
+        "receiptMissing": "Inyemezabwishyu: {{fileName}}. Dosiye ntiboneka kuri iki gikoresho. Ongera wongereho iy’umwimerere kugira ngo ukomeze.",
+        "title": "Aho kubika iki kiguzi bigeze",
+        "reviewRequest": "Reba uko iki kiguzi cyabitswe",
+        "scopeChanged": "Ubu busabe ni ubw’ikindi kigo cyangwa indi konti. Subira ku kigo cyangwa kuri konti byakoreshejwe kugira ngo ubusuzume.",
+        "retained": "Ibyo wanditse n’ubusabe bwa mbere biracyabitswe. Reba igisubizo mbere yo kwandika ikindi kiguzi.",
+        "checkStatus": "Reba aho bigeze",
+        "continue": "Komeza kubika",
+        "receiptAttached": "Inyemezabwishyu {{fileName}} yomekweho.",
+        "receiptUploaded": "Inyemezabwishyu {{fileName}} yoherejwe. Tuzagenzura ko yanditswe dukoresheje ubusabe bwa mbere."
       },
       "newExpense": {
         "fields": {
@@ -5675,6 +5697,18 @@
         "askAdmin": "Saba umuyobozi ufite uburenganzira bwo gutegura serivisi yongereho iri hitamo.",
         "refresh": "Ongera urebe amahitamo",
         "choicesChanged": "Mbere yo kubika, hitamo ubwoko bwa serivisi, igitabo cy’ibaruramari, konti y’ibisohoka na konti y’uruhande rwa kabiri biboneka."
+      },
+      "driverChoicesUnavailable": "Nta mukozi ushobora guhitamo. Urashobora gukuraho umushoferi usanzwe.",
+      "inspectorChoicesUnavailable": "Nta mukozi ushobora guhitamo. Ushobora kubika igenzura utagaragaje umugenzuzi.",
+      "savedRequest": "Igikorwa cyo kubika impinduka ku binyabiziga gitegereje kwemezwa.",
+      "retryOriginal": "Kongera kugerageza bikoresha amakuru n’ikiranga ubusabe bwa mbere, n’iyo wongeye gufungura urupapuro.",
+      "retrySavedRequest": "Ongera ugerageze ubusabe bwabitswe",
+      "companyRequired": "Hitamo ikigo kugira ngo urebe kandi ucunge ibinyabiziga byacyo.",
+      "status": {
+        "active": "Kirakoreshwa",
+        "idle": "Gihagaze",
+        "maintenance": "Kiri gusanwa",
+        "offline": "Nta murandasi"
       }
     }
   }

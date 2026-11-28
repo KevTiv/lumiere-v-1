@@ -646,6 +646,10 @@ jobs:
         if: matrix.group == 'workspace'
         run: pnpm --dir web test:e2e:assistant-actions
 
+      - name: Overview activation browser regressions
+        if: matrix.group == 'workspace'
+        run: pnpm --dir web test:e2e:activation-ui
+
       - name: Upload frontend browser diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
