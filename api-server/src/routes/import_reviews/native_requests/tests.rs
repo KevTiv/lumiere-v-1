@@ -107,6 +107,7 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
         include_str!("../../../cold_tier/import_native_requests_expand.sql"),
         include_str!("../../../cold_tier/import_task_handoff_expand.sql"),
         include_str!("../../../cold_tier/import_workflow_actors_expand.sql"),
+        include_str!("../../../cold_tier/import_durable_runs_expand.sql"),
     ] {
         client.batch_execute(sql).await?;
     }
