@@ -47,6 +47,7 @@ import {
   DropdownMenuTrigger,
 } from '@lumiere/ui/components/dropdown-menu';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
+import { buttonVariants } from '@lumiere/ui/components/button';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { moduleQueryState } from '@lumiere/ui/lib/module-data-state';
 import {
@@ -608,9 +609,14 @@ function SaleOrderPageLoaded({
         ? 'sales.workspace.deliveryDestination.setup'
         : 'sales.workspace.deliveryDestination.ask')}</p>
       {canSetUpDestination && <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" render={<Link href={`${buildModuleTabHref('warehouse', 'locations')}&companyId=${operatingCompanyId}`} target="_blank" rel="noopener noreferrer" />} nativeButton={false}>
+        <Link
+          href={`${buildModuleTabHref('warehouse', 'locations')}&companyId=${operatingCompanyId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonVariants({ size: 'sm', variant: 'outline' })}
+        >
           {t('sales.workspace.deliveryDestination.openLocations')}
-        </Button>
+        </Link>
         <Button size="sm" variant="ghost" onClick={() => void locationsQuery.refetch()}>
           {t('sales.workspace.deliveryDestination.refresh')}
         </Button>

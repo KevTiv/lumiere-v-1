@@ -541,7 +541,12 @@ test.describe("Alpha cold-start delivered sale", { tag: ["@p0", "@unauthenticate
     const [order] = (await rows(page, "sale-orders")).filter((row) => row.clientOrderRef === reference)
     if (!order) throw new Error("Quotation did not persist")
     const orderId = id(order)
-    expect(scalarQueryId(order.pricelistId)).toBe(id(pricelist))
+    const quotation = await page.request.get(`/api/authoritative/sale-orders/${orderId}`, {
+      params: { companyId },
+    })
+    await expect(quotation).toBeOK()
+    const { data: savedQuotation } = (await quotation.json()) as { data: { pricelistId?: unknown } }
+    expect(scalarQueryId(savedQuotation.pricelistId)).toBe(id(pricelist))
     expect(await saleOrderState(page, orderId)).toMatch(/^draft$/i)
     expect(await fetchOrderPickings(page, orderId, companyId)).toEqual([])
 
