@@ -163,11 +163,14 @@ export function useCompanyCountryPacks(companyId: bigint, enabled = true) {
 export function useCompanyVerticalPacks(companyId: bigint, enabled = true) {
   return useQuery<CompanyVerticalPackRow[]>({
     queryKey: ["company-vertical-packs", String(companyId)],
-    queryFn: async () => {
-      const response = await apiFetch(`/api/vertical-packs/${companyId}`)
-      if (!response.ok) throw new Error(await parseCallError(response))
+    queryFn: async ({ signal }) => {
+      const response = await apiFetch(`/api/vertical-packs/${companyId}`, { signal, cache: "no-store" })
+      if (!response.ok) {
+        throw Object.assign(new Error(await parseCallError(response)), { status: response.status })
+      }
       const body = (await response.json()) as { data?: CompanyVerticalPackRow[] }
-      return body.data ?? []
+      if (!Array.isArray(body.data)) throw new Error("Company vertical-pack state is unavailable")
+      return body.data
     },
     enabled: enabled && companyId > 0n,
     staleTime: 30_000,

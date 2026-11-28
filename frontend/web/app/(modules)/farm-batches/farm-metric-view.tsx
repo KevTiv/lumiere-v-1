@@ -1,3 +1,4 @@
+import { useTranslation } from "@lumiere/i18n"
 import { useQuery } from "@tanstack/react-query"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { workspaceStyles } from "@lumiere/ui/lib/workspace-styles"
@@ -10,23 +11,23 @@ import {
   type FarmMetric,
 } from "./farm-batch-model"
 
-const unavailableNotes: Record<string, string> = {
-  missingIntake: "Record the opening intake.",
-  invalidHeadcount: "Reconcile the headcount events.",
-  incompleteMortalityCohort: "Confirm which animals are included after the cohort changed.",
-  missingWeighIns: "Record two comparable weigh-ins.",
-  ambiguousWeighIns: "Identify which weigh-ins to use.",
-  changedWeighInCohort: "Use weigh-ins from the same cohort.",
-  missingWholeFlockWeights: "Record comparable whole-batch weights.",
-  missingFeedCoverage: "Confirm the feed records cover the weigh-in period.",
-  missingFeedConsumption: "Record actual feed consumption.",
-  nonpositiveWeightGain: "A positive weight gain is required.",
-  noProcessing: "Record a processing run.",
-  missingProcessingWeight: "Enter the measured input and output weights.",
-  nonpositiveWeight: "Verify the weight used in the calculation.",
-  missingRecognizedCosts: "Unavailable until posted production costs can be allocated to the batch’s exact output lots and sellable weight.",
-  missingTraceableSales: "Unavailable until posted invoices and credit notes can be reconciled with delivered and returned lots and their posted costs.",
-}
+const unavailableNotes = {
+  missingIntake: "farmBatches.recordTheOpeningIntake",
+  invalidHeadcount: "farmBatches.reconcileTheHeadcountEvents",
+  incompleteMortalityCohort: "farmBatches.confirmWhichAnimalsAreIncludedAfterThe",
+  missingWeighIns: "farmBatches.recordTwoComparableWeighins",
+  ambiguousWeighIns: "farmBatches.identifyWhichWeighinsToUse",
+  changedWeighInCohort: "farmBatches.useWeighinsFromTheSameCohort",
+  missingWholeFlockWeights: "farmBatches.recordComparableWholebatchWeights",
+  missingFeedCoverage: "farmBatches.confirmTheFeedRecordsCoverTheWeighin",
+  missingFeedConsumption: "farmBatches.recordActualFeedConsumption",
+  nonpositiveWeightGain: "farmBatches.aPositiveWeightGainIsRequired",
+  noProcessing: "farmBatches.recordAProcessingRun",
+  missingProcessingWeight: "farmBatches.enterTheMeasuredInputAndOutputWeights",
+  nonpositiveWeight: "farmBatches.verifyTheWeightUsedInTheCalculation",
+  missingRecognizedCosts: "farmBatches.unavailableUntilPostedProductionCostsCanBe",
+  missingTraceableSales: "farmBatches.unavailableUntilPostedInvoicesAndCreditNotes",
+} as const
 
 function MetricRow<T>({
   label,
@@ -37,6 +38,10 @@ function MetricRow<T>({
   metric?: FarmMetric<T>
   format: (value: T) => string
 }) {
+  const { t } = useTranslation()
+  const reason = metric?.status === "unavailable"
+    ? unavailableNotes[metric.reason as keyof typeof unavailableNotes]
+    : undefined
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1 px-4 py-3">
       <dt className="text-sm">{label}</dt>
@@ -44,9 +49,7 @@ function MetricRow<T>({
         <dd className={`text-sm ${workspaceStyles.metricValue}`}>{format(metric.value)}</dd>
       ) : (
         <dd className="text-sm text-muted-foreground">
-          {metric?.status === "unavailable"
-            ? (unavailableNotes[metric.reason] ?? "Unavailable")
-            : "Unavailable"}
+          {t(reason ?? "farmBatches.unavailable")}
         </dd>
       )}
     </div>
@@ -103,6 +106,7 @@ function LinkedPostedCosts({
   scopeKey: string
   asOf: string
 }) {
+  const { t } = useTranslation()
   const summary = useQuery({
     queryKey: ["farm-linked-posted-costs", scopeKey, companyId, batchId, asOf],
     queryFn: ({ signal }) =>
@@ -117,21 +121,21 @@ function LinkedPostedCosts({
   const data = summary.isSuccess ? summary.data : undefined
 
   return (
-    <section className="space-y-2" aria-label="Linked posted costs">
-      <h3 className={workspaceStyles.sectionTitle}>Linked posted costs</h3>
+    <section className="space-y-2" aria-label={t("farmBatches.linkedPostedCosts")}>
+      <h3 className={workspaceStyles.sectionTitle}>{t("farmBatches.linkedPostedCosts")}</h3>
       <p className={workspaceStyles.sectionDescription}>
-        Subtotal of verified, accessible journal lines linked to this batch. It can be incomplete and does not supply the production cost or margin metrics.
+        {t("farmBatches.subtotalOfVerifiedAccessibleJournalLinesLinked")}
       </p>
       {summary.isPending && (
         <p role="status" className="text-sm text-muted-foreground">
-          Checking linked costs…
+          {t("farmBatches.checkingLinkedCosts")}
         </p>
       )}
       {summary.isError && (
         <p role="status" className="text-sm text-muted-foreground">
           {summary.error instanceof FarmApiError && summary.error.status === 403
-            ? "Access to the source ledger is required to see linked cost totals."
-            : "Linked cost totals could not be checked."}
+            ? t("farmBatches.accessToTheSourceLedgerIsRequired")
+            : t("farmBatches.linkedCostTotalsCouldNotBeChecked")}
         </p>
       )}
       {data &&
@@ -142,7 +146,7 @@ function LinkedPostedCosts({
                 key={currencyId}
                 className="flex flex-wrap items-baseline justify-between gap-3 px-4 py-3 text-sm"
               >
-                <dt>{String(currencyById.get(currencyId) ?? `Currency #${currencyId}`)}</dt>
+                <dt>{String(currencyById.get(currencyId) ?? t("farmBatches.currencyLabel", { id: currencyId }))}</dt>
                 <dd className={workspaceStyles.metricValue}>{amount}</dd>
               </div>
             ))}
@@ -150,13 +154,13 @@ function LinkedPostedCosts({
         ) : (
           <p className="text-sm text-muted-foreground">
             {data.truncated || data.unverifiedLinks > 0
-              ? "No amounts were verified in the linked costs checked."
-              : "No verified linked costs through this date."}
+              ? t("farmBatches.noAmountsWereVerifiedInTheLinked")
+              : t("farmBatches.noVerifiedLinkedCostsThroughThisDate")}
           </p>
         ))}
       {data && (data.unverifiedLinks > 0 || data.truncated) && (
         <p className="text-sm text-muted-foreground">
-          Some linked costs are outside this subtotal. Review the Costs tab for individual sources.
+          {t("farmBatches.someLinkedCostsAreOutsideThisSubtotal")}
         </p>
       )}
     </section>
@@ -174,11 +178,12 @@ export function FarmMetricsView({
   companyId: string
   scopeKey: string
 }) {
+  const { t } = useTranslation()
   const metrics = batch.metrics
   if (!metrics) {
     return (
       <p role="status" className="text-sm text-muted-foreground">
-        Metrics are unavailable for this batch.
+        {t("farmBatches.metricsAreUnavailableForThisBatch")}
       </p>
     )
   }
@@ -187,50 +192,52 @@ export function FarmMetricsView({
   const kg = (value: number) => `${quantity.format(value)} kg`
   return (
     <div className="space-y-5">
-      <section className="space-y-2" aria-label="Growth and survival">
-        <h2 className={workspaceStyles.sectionTitle}>Growth and survival</h2>
+      <section className="space-y-2" aria-label={t("farmBatches.growthAndSurvival")}>
+        <h2 className={workspaceStyles.sectionTitle}>{t("farmBatches.growthAndSurvival")}</h2>
         <dl className={`divide-y divide-border ${workspaceStyles.surface}`}>
-          <MetricRow label="Live headcount" metric={metrics.liveHeadcount} format={quantity.format} />
+          <MetricRow label={t("farmBatches.liveHeadcount")} metric={metrics.liveHeadcount} format={quantity.format} />
           <MetricRow
-            label="Recorded deaths"
+            label={t("farmBatches.recordedDeaths")}
             metric={{ status: "available", value: metrics.recordedDeaths }}
             format={quantity.format}
           />
-          <MetricRow label="Mortality rate" metric={metrics.mortalityRate} format={percent.format} />
+          <MetricRow label={t("farmBatches.mortalityRate")} metric={metrics.mortalityRate} format={percent.format} />
           <MetricRow
-            label="Average daily gain"
+            label={t("farmBatches.averageDailyGain")}
             metric={metrics.averageDailyGainKg}
-            format={(value) => `${kg(value)} per animal`}
+            format={(value) => t("farmBatches.kgPerAnimal", { value: quantity.format(value) })}
           />
           <MetricRow
-            label="Feed conversion ratio"
+            label={t("farmBatches.feedConversionRatio")}
             metric={metrics.feedConversionRatio}
-            format={(value) => `${quantity.format(value)} kg feed per kg gained`}
+            format={(value) => t("farmBatches.feedPerKg", { value: quantity.format(value) })}
           />
         </dl>
         {metrics.growthWindow && (
           <p className={workspaceStyles.sectionDescription}>
-            Weigh-ins from {farmDateLabel(metrics.growthWindow.openingDate, locale)} (
-            {quantity.format(metrics.growthWindow.openingSampleCount)} sampled,{" "}
-            {kg(metrics.growthWindow.openingMeanWeightKg)} mean) to{" "}
-            {farmDateLabel(metrics.growthWindow.closingDate, locale)} (
-            {quantity.format(metrics.growthWindow.closingSampleCount)} sampled,{" "}
-            {kg(metrics.growthWindow.closingMeanWeightKg)} mean).
+            {t("farmBatches.growthWindow", {
+              openingDate: farmDateLabel(metrics.growthWindow.openingDate, locale),
+              openingSample: quantity.format(metrics.growthWindow.openingSampleCount),
+              openingMean: kg(metrics.growthWindow.openingMeanWeightKg),
+              closingDate: farmDateLabel(metrics.growthWindow.closingDate, locale),
+              closingSample: quantity.format(metrics.growthWindow.closingSampleCount),
+              closingMean: kg(metrics.growthWindow.closingMeanWeightKg),
+            })}
           </p>
         )}
       </section>
-      <section className="space-y-2" aria-label="Processing and financial metrics">
-        <h2 className={workspaceStyles.sectionTitle}>Processing and financial metrics</h2>
+      <section className="space-y-2" aria-label={t("farmBatches.processingAndFinancialMetrics")}>
+        <h2 className={workspaceStyles.sectionTitle}>{t("farmBatches.processingAndFinancialMetrics")}</h2>
         <dl className={`divide-y divide-border ${workspaceStyles.surface}`}>
-          <MetricRow label="Live processing input" metric={metrics.processingLiveInputKg} format={kg} />
-          <MetricRow label="Sellable output" metric={metrics.processingSellableOutputKg} format={kg} />
+          <MetricRow label={t("farmBatches.liveProcessingInput")} metric={metrics.processingLiveInputKg} format={kg} />
+          <MetricRow label={t("farmBatches.sellableOutput")} metric={metrics.processingSellableOutputKg} format={kg} />
           <MetricRow
-            label="Processing yield"
+            label={t("farmBatches.processingYield")}
             metric={metrics.processingYield}
             format={percent.format}
           />
           <MetricRow
-            label="Cost per sellable kilogram"
+            label={t("farmBatches.costPerSellableKilogram")}
             metric={metrics.costPerSellableKg}
             format={({ currency, minorUnitDigits, amountMinorPerKg }) =>
               formatCurrency(locale, currency, minorUnitDigits).format(
@@ -239,7 +246,7 @@ export function FarmMetricsView({
             }
           />
           <MetricRow
-            label="Margin"
+            label={t("farmBatches.margin")}
             metric={metrics.margin}
             format={(value) => formatMargin(locale, value)}
           />

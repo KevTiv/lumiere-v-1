@@ -823,5 +823,14 @@
     "fileUnavailable": "Izina rya file y’inkomoko ntiriboneka",
     "sourceHash": "Ikimenyetso cya file y’umwimerere",
     "sourceDerivative": "Amakuru yoherejwe yateguwe ahereye kuri iyi file. Iri sano ntirigaragaza umurongo wa file y’umwimerere."
+  },
+  "farmBatches": {
+    "importCSVOrExcel": "Tumiza file ya CSV cyangwa Excel",
+    "unavailableUntilPostedInvoicesAndCreditNotes": "Ntibiboneka kugeza invoice n’inyandiko zo kugabanya umwenda bihujwe n’amatsinda yagejejwe ku bakiriya n’ayagaruwe hamwe n’ikiguzi cyayo.",
+    "vendorBill": "Invoice y’uwatanze ibicuruzwa",
+    "expenseReport": "Report y’amafaranga yakoreshejwe",
+    "expenseReportID": "Ikiranga report y’amafaranga yakoreshejwe",
+    "switchToTheOperatingCompanyForThis": "Hindura ujye ku kigo gikora kijyanye n’iyi file yatumijwe cyangwa iri genzura ry’inkomoko.",
+    "saveACSVOrExcelSourceAnd": "Bika file ya CSV cyangwa Excel maze utegure ibyabaye ku matsinda y’amatungo kugira ngo bigenzurwe. Shyiramo ikiranga umukumbi, ikiranga icyabaye, ubwoko bwacyo n’itariki y’igikorwa."
   }
 }
