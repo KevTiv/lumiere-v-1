@@ -289,7 +289,7 @@ async fn approve(
                 ApiError::Forbidden("this user has no durable import identity".into())
             })?;
     let platform_user: String = credential.get("platform_user_id");
-    worker::stored_session(
+    crate::session::load_stored_session(
         &state,
         &authority.actor,
         authority.organization_id,
