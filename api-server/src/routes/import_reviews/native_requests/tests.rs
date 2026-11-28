@@ -219,7 +219,7 @@ async fn exercise(pool: &deadpool_postgres::Pool) -> Result<()> {
     let foreign = client
         .query(
             ATTEMPT_PAGE,
-            &[&"42", &"5", &"actor-two", &task, &Some(request)],
+            &[&"42", &"5", &"actor-two", &task, &Some(request.clone())],
         )
         .await?;
     ensure!(foreign.is_empty());

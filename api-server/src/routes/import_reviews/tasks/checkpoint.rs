@@ -58,13 +58,15 @@ impl SavePosition {
 }
 
 fn envelope(scope: StorageScope<'_>, request: &str, row: Option<&Row>) -> Value {
-    let checkpoint = row.map(|row| json!({
-        "reviewId": row.get::<_, i64>("review_id").to_string(),
-        "group": row.get::<_, String>("issue_group"),
-        "itemId": row.get::<_, Option<i64>>("item_id").map(|id| id.to_string()),
-        "itemRevision": row.get::<_, Option<i32>>("item_revision"),
-        "revision": row.get::<_, i32>("revision"),
-    }));
+    let checkpoint = row.map(|row| {
+        json!({
+            "reviewId": row.get::<_, i64>("review_id").to_string(),
+            "group": row.get::<_, String>("issue_group"),
+            "itemId": row.get::<_, Option<i64>>("item_id").map(|id| id.to_string()),
+            "itemRevision": row.get::<_, Option<i32>>("item_revision"),
+            "revision": row.get::<_, i32>("revision"),
+        })
+    });
     let status = match row {
         None => "empty",
         Some(row) if row.get::<_, bool>("is_current") => "saved",
@@ -101,7 +103,11 @@ async fn require_current_recipient(
         WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 FOR SHARE",
         &[&viewer.organization.to_string(), &viewer.company.to_string(), &creator, &request])
         .await.map_err(ApiError::internal)?;
-    if grant.and_then(|row| row.get::<_, Option<String>>(0)).as_deref() != Some(viewer.actor) {
+    if grant
+        .and_then(|row| row.get::<_, Option<String>>(0))
+        .as_deref()
+        != Some(viewer.actor)
+    {
         return Err(ApiError::NotFound("Import task not found".into()));
     }
     Ok(())
@@ -124,8 +130,18 @@ pub(super) async fn read(
     let mut client = pool.get().await.map_err(ApiError::internal)?;
     let tx = client.transaction().await.map_err(ApiError::internal)?;
     require_current_recipient(&tx, viewer, &creator, &request).await?;
-    let row = tx.query_opt(READ_POSITION, &[&viewer.organization.to_string(), &viewer.company.to_string(), &creator, &request])
-        .await.map_err(ApiError::internal)?;
+    let row = tx
+        .query_opt(
+            READ_POSITION,
+            &[
+                &viewer.organization.to_string(),
+                &viewer.company.to_string(),
+                &creator,
+                &request,
+            ],
+        )
+        .await
+        .map_err(ApiError::internal)?;
     context.require_current_placement(&state.organization_placements)?;
     tx.commit().await.map_err(ApiError::internal)?;
     Ok(Json(envelope(viewer, &request, row.as_ref())))
@@ -155,13 +171,20 @@ pub(super) async fn save(
         WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND actor_identity=$3 AND request_id=$4 AND batch_id=$5 FOR SHARE",
         &[&org,&company,&creator,&request,&review]).await.map_err(ApiError::internal)?;
     if linked.is_none() {
-        return Err(ApiError::NotFound("Review is not available for this import task".into()));
+        return Err(ApiError::NotFound(
+            "Review is not available for this import task".into(),
+        ));
     }
-    let pending = tx.query_opt("SELECT id FROM lumiere_platform.import_review_item
+    let pending = tx
+        .query_opt(
+            "SELECT id FROM lumiere_platform.import_review_item
         WHERE organization_id=$1::text::numeric AND company_id=$2::text::numeric AND batch_id=$3
         AND state='needs_review' AND ($4::bigint IS NULL OR (id=$4 AND revision=$5))
         ORDER BY id LIMIT 1 FOR SHARE",
-        &[&org,&company,&review,&item,&body.item_revision]).await.map_err(ApiError::internal)?;
+            &[&org, &company, &review, &item, &body.item_revision],
+        )
+        .await
+        .map_err(ApiError::internal)?;
     if pending.is_none() {
         return Err(ApiError::Conflict("The review position changed".into()));
     }
@@ -179,9 +202,14 @@ pub(super) async fn save(
             .await.map_err(ApiError::internal)?
     };
     if saved != 1 {
-        return Err(ApiError::Conflict("The saved review checkpoint changed".into()));
+        return Err(ApiError::Conflict(
+            "The saved review checkpoint changed".into(),
+        ));
     }
-    let row = tx.query_opt(READ_POSITION, &[&org,&company,&creator,&request]).await.map_err(ApiError::internal)?;
+    let row = tx
+        .query_opt(READ_POSITION, &[&org, &company, &creator, &request])
+        .await
+        .map_err(ApiError::internal)?;
     context.require_current_placement(&state.organization_placements)?;
     tx.commit().await.map_err(ApiError::internal)?;
     Ok(Json(envelope(viewer, &request, row.as_ref())))
@@ -201,10 +229,28 @@ mod tests {
             item_revision: Some(2),
             expected_revision: 0,
         };
-        assert_eq!(position().position().ok(), Some((42, Some(9007199254740993))));
+        assert_eq!(
+            position().position().ok(),
+            Some((42, Some(9007199254740993)))
+        );
         assert_eq!(positive_id("01"), None);
-        assert!(SavePosition { item_revision: None, ..position() }.position().is_err());
-        assert!(SavePosition { expected_revision: -1, ..position() }.position().is_err());
-        assert!(SavePosition { group: "issue:".into(), ..position() }.position().is_err());
+        assert!(SavePosition {
+            item_revision: None,
+            ..position()
+        }
+        .position()
+        .is_err());
+        assert!(SavePosition {
+            expected_revision: -1,
+            ..position()
+        }
+        .position()
+        .is_err());
+        assert!(SavePosition {
+            group: "issue:".into(),
+            ..position()
+        }
+        .position()
+        .is_err());
     }
 }

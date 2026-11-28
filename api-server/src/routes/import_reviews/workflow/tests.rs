@@ -361,9 +361,15 @@ fn receipt_ids_require_exact_outcomes_and_never_use_order_or_latest_job() -> Res
     receipt["records"][1]["rowNumber"] = json!(3);
     ensure!(native::receipt_ids(&receipt, 2).is_err());
     receipt["status"] = json!("partial");
-    ensure!(matches!(native::receipt_ids(&receipt, 2), Err(ApiError::Conflict(_))));
+    ensure!(matches!(
+        native::receipt_ids(&receipt, 2),
+        Err(ApiError::Conflict(_))
+    ));
     receipt["status"] = json!("pending");
-    ensure!(matches!(native::receipt_ids(&receipt, 2), Err(ApiError::Unavailable(_))));
+    ensure!(matches!(
+        native::receipt_ids(&receipt, 2),
+        Err(ApiError::Unavailable(_))
+    ));
     Ok(())
 }
 
@@ -400,11 +406,21 @@ fn durable_accounting_verifies_11_entries_22_lines_and_582400_per_side() -> Resu
     reviewed_rows.push(held);
     let proposal = saved(build_definition(&reviewed_rows, &configuration(), 0)?);
     ensure!(proposal.definition.summary.blocked_count == 1);
-    let mut sources = reviewed_rows.iter().take(11)
-        .map(|row| SourceRevision { batch_id: row.batch, item_id: row.id, revision: row.revision })
+    let mut sources = reviewed_rows
+        .iter()
+        .take(11)
+        .map(|row| SourceRevision {
+            batch_id: row.batch,
+            item_id: row.id,
+            revision: row.revision,
+        })
         .collect::<Vec<_>>();
     durable::validate_sources(&proposal, &sources)?;
-    sources.push(SourceRevision { batch_id: 11, item_id: 12, revision: 3 });
+    sources.push(SourceRevision {
+        batch_id: 11,
+        item_id: 12,
+        revision: 3,
+    });
     ensure!(durable::validate_sources(&proposal, &sources).is_err());
     sources.pop();
     sources.swap(0, 1);
@@ -420,9 +436,20 @@ fn durable_accounting_verifies_11_entries_22_lines_and_582400_per_side() -> Resu
     let resumed_lines = native::line_request(scoped(), "task", &proposal, &header_ids)?;
     ensure!(headers.csv.lines().count() == 12);
     ensure!(journal_lines.csv.lines().count() == 23);
-    ensure!(journal_lines.request_id == resumed_lines.request_id && journal_lines.csv == resumed_lines.csv);
+    ensure!(
+        journal_lines.request_id == resumed_lines.request_id
+            && journal_lines.csv == resumed_lines.csv
+    );
     let (moves, lines) = record_fixture(&proposal)?;
-    let result = native::verify_records(scoped(), "task", &proposal, &header_ids, &line_ids, &moves, &lines)?;
+    let result = native::verify_records(
+        scoped(),
+        "task",
+        &proposal,
+        &header_ids,
+        &line_ids,
+        &moves,
+        &lines,
+    )?;
     ensure!(result.record_count == 11 && result.line_count == 22 && result.posted_count == 0);
     ensure!(result.total_debit == "582400" && result.total_credit == "582400");
     Ok(())

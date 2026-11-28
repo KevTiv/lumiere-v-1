@@ -513,10 +513,11 @@ test.describe("Alpha cold-start delivered sale", { tag: ["@p0", "@unauthenticate
     await fillField(page, "clientOrderRef", reference)
     await chooseSelectOptionByValue(page, "partnerId", id(customer))
     await chooseSelectOptionByValue(page, "warehouseId", id(warehouse))
-    await expect(page.getByRole("link", { name: "Open price lists", exact: true })).toBeVisible()
+    const openPriceLists = page.getByRole("link", { name: "Open price lists (opens in a new tab)", exact: true })
+    await expect(openPriceLists).toBeVisible()
     const [priceSetup] = await Promise.all([
       page.waitForEvent("popup"),
-      page.getByRole("link", { name: "Open price lists", exact: true }).click(),
+      openPriceLists.click(),
     ])
     await priceSetup.waitForURL((url) => url.pathname === "/sales" && url.searchParams.get("tab") === "pricelists")
     await priceSetup.getByTestId("module-create-sales-pricelists").click()

@@ -73,7 +73,8 @@ pub(super) fn validate_sources(
         })
     {
         return Err(ApiError::Conflict(
-            "the run must use the approved journal proposal's exact ordered source revisions".into(),
+            "the run must use the approved journal proposal's exact ordered source revisions"
+                .into(),
         ));
     }
     Ok(())
@@ -86,7 +87,9 @@ fn scope(authority: &RunAuthority) -> Result<StorageScope<'_>, ApiError> {
     {
         return Err(ApiError::Forbidden("invalid journal run authority".into()));
     }
-    authority.context.require_company_scope(&[authority.company_id])?;
+    authority
+        .context
+        .require_company_scope(&[authority.company_id])?;
     Ok(StorageScope {
         organization: authority.organization_id,
         company: authority.company_id,

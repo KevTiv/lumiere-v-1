@@ -268,7 +268,7 @@ function ExecutionPanel({
     void workflow.refetch()
   }
   const transition = useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       proposal: current,
       action,
     }: {
