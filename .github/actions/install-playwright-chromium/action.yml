@@ -8,10 +8,26 @@ runs:
       working-directory: frontend/web
       run: |
         set -euo pipefail
-        # Hosted runners use both Azure and EC2 regional mirrors. Replace
-        # those archive URLs, but leave the security archive and other sources alone.
+        # Hosted runners use both Azure and EC2 regional mirrors. Keep the
+        # Ubuntu security archive and use the public mirror for the other archives.
         for sources in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
           [[ -f "$sources" ]] || continue
           sudo sed -Ei 's|https?://([a-zA-Z0-9-]+\.)*archive\.ubuntu\.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' "$sources"
         done
+
+        # Chromium's dependencies come from Ubuntu. Keep unrelated runner feeds
+        # out of Playwright's apt-get update, which fails if any feed is unavailable.
+        ubuntu_sources="$(mktemp -d)"
+        apt_config=/etc/apt/apt.conf.d/99-playwright-sources
+        cleanup() {
+          sudo rm -f -- "$apt_config"
+          rm -f -- "$ubuntu_sources/ubuntu.sources"
+          rmdir -- "$ubuntu_sources"
+        }
+        trap cleanup EXIT
+        if [[ -f /etc/apt/sources.list.d/ubuntu.sources ]]; then
+          ln -s /etc/apt/sources.list.d/ubuntu.sources "$ubuntu_sources/ubuntu.sources"
+        fi
+        printf 'Dir::Etc::sourceparts "%s";\n' "$ubuntu_sources" | sudo tee "$apt_config" >/dev/null
+
         pnpm exec playwright install --with-deps chromium

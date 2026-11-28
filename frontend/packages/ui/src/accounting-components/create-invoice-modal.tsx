@@ -468,7 +468,7 @@ function ReleasedCreateInvoiceModal({
           </div>
         </section>
         {kind === "invoice" ? <Collapsible className="flex min-w-0 flex-col gap-3 border-t pt-5">
-          <CollapsibleTrigger render={<Button variant="ghost" className="h-auto min-h-11 justify-between whitespace-normal px-0 text-left" />} data-testid="create-invoice-content-toggle">
+          <CollapsibleTrigger render={<Button variant="ghost" className="h-auto pointer-coarse:min-h-11 justify-between whitespace-normal px-0 text-left" />} data-testid="create-invoice-content-toggle">
             {t("accounting.authoring.documentContent", { defaultValue: "Document content" })}<ChevronDown data-icon="inline-end" />
           </CollapsibleTrigger>
           <dl className="grid min-w-0 gap-3 sm:grid-cols-2" data-testid="create-invoice-content-summary">
@@ -481,11 +481,11 @@ function ReleasedCreateInvoiceModal({
           </dl>
           <CollapsibleContent className="flex min-w-0 flex-col gap-4">
             <p className="text-xs text-muted-foreground">{t("accounting.authoring.documentContentHint", { defaultValue: "Company defaults prefill this document. Edit a section to override it, or clear it explicitly. Use company default to restore inherited text." })}</p>
-            {contentFields.map(({ key, label, limit }) => <div key={key} className="min-w-0 space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><Label htmlFor={`invoice-content-${key}`}>{label}</Label>{Object.hasOwn(contentOverrides, key) ? <Button variant="ghost" size="sm" onClick={() => setContentOverrides((previous) => { const next = { ...previous }; delete next[key]; return next })}>Use company default</Button> : null}</div><Textarea id={`invoice-content-${key}`} aria-label={label} value={effectiveProfile[key]} maxLength={limit} onChange={(event) => setContentOverrides((previous) => ({ ...previous, [key]: event.target.value }))} rows={key === "terms" ? 4 : 3} /></div>)}
+            {contentFields.map(({ key, label, limit }) => <div key={key} className="min-w-0 space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><Label htmlFor={`invoice-content-${key}`}>{label}</Label>{Object.hasOwn(contentOverrides, key) ? <Button variant="ghost" size="sm" onClick={() => setContentOverrides((previous) => { const next = { ...previous }; delete next[key]; return next })}>Use company default</Button> : null}</div><Textarea variant="plain" id={`invoice-content-${key}`} aria-label={label} value={effectiveProfile[key]} maxLength={limit} onChange={(event) => setContentOverrides((previous) => ({ ...previous, [key]: event.target.value }))} rows={key === "terms" ? 4 : 3} /></div>)}
           </CollapsibleContent>
         </Collapsible> : null}
         <section className="space-y-2 border-t pt-5">
-          <Label>{t("accounting.forms.newInvoice.notesOptional")}</Label><Textarea aria-label={t("accounting.forms.newInvoice.notesOptional")} value={notes} maxLength={8000} onChange={(event) => setNotes(event.target.value)} rows={3} />
+          <Label>{t("accounting.forms.newInvoice.notesOptional")}</Label><Textarea variant="plain" aria-label={t("accounting.forms.newInvoice.notesOptional")} value={notes} maxLength={8000} onChange={(event) => setNotes(event.target.value)} rows={3} />
         </section>
       </fieldset>
       </div>

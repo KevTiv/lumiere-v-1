@@ -31,7 +31,7 @@ function CountdownCard({ item }: { item: CountdownItem }) {
       className={cn(
         "relative flex flex-col items-center justify-center p-4 rounded-2xl",
         "bg-gradient-to-b border backdrop-blur-sm",
-        "transition-all duration-300 hover:scale-105",
+        "transition-[transform,width] duration-300 hover:scale-105",
         widgetCountdownGradientClass[color]
       )}
     >
@@ -52,7 +52,7 @@ function CountdownCard({ item }: { item: CountdownItem }) {
       {progress !== undefined && (
         <div className="absolute bottom-2 left-3 right-3 h-1 rounded-full bg-muted/20 overflow-hidden">
           <div
-            className={cn("h-full rounded-full transition-all", widgetCountdownBarClass[color])}
+            className={cn("h-full rounded-full transition-[transform,width]", widgetCountdownBarClass[color])}
             style={{ width: `${progress}%` }}
           />
         </div>

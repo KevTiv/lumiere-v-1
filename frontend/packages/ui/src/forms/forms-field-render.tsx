@@ -11,6 +11,7 @@ import { NumericInput } from "../components/numeric-input"
 import { Checkbox } from "../components/checkbox"
 import { Switch } from "../components/switch"
 import { Label } from "../components/label"
+import { ExplainPopover } from "../components/contextual-help"
 import {
   Select,
   SelectContent,
@@ -52,6 +53,7 @@ interface FormFieldRendererProps {
   values?: FormValues
   value: unknown
   onChange: (value: unknown) => void
+  onBlur?: () => void
   error?: string
   aiSuggestion?: {
     confidence: number
@@ -64,6 +66,7 @@ export function FormFieldRenderer({
   values,
   value,
   onChange,
+  onBlur,
   error,
   aiSuggestion,
 }: FormFieldRendererProps) {
@@ -434,9 +437,21 @@ export function FormFieldRenderer({
   // Checkbox and switch handle their own labels
   const showLabel = field.type !== "checkbox" && field.type !== "switch"
 
+  const helpConfig =
+    typeof field.help === "string"
+      ? { title: field.label || field.name, description: field.help }
+      : field.help
+        ? { title: field.help.title || field.label || field.name, ...field.help }
+        : null
+
   return (
     <div
       data-form-field={field.name}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          onBlur?.()
+        }
+      }}
       className={cn(
         fieldWidthClasses[width] ?? "col-span-12",
         "space-y-1.5 rounded-md",
@@ -445,13 +460,24 @@ export function FormFieldRenderer({
       )}
     >
       {showLabel && field.label && (
-        <Label
-          htmlFor={field.id}
-          className="text-sm font-medium text-foreground"
-        >
-          {field.label}
-          {field.required && <span className="ml-1 text-muted-foreground" aria-label="required">*</span>}
-        </Label>
+        <div className="flex items-center gap-1.5">
+          <Label
+            htmlFor={field.id}
+            className="text-sm font-medium text-foreground"
+          >
+            {field.label}
+            {field.required && <span className="ml-1 text-muted-foreground" aria-label="required">*</span>}
+          </Label>
+          {helpConfig ? (
+            <ExplainPopover
+              title={helpConfig.title}
+              description={helpConfig.description}
+              formula={helpConfig.formula}
+              learnMoreHref={helpConfig.learnMoreHref}
+              learnMoreLabel={helpConfig.learnMoreLabel}
+            />
+          ) : null}
+        </div>
       )}
       {renderField()}
       {field.description && field.type !== "switch" && (

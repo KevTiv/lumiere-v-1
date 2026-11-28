@@ -431,18 +431,56 @@ function DocumentViewerBody({
     request,
   ])
 
+  const stateRef = useRef<ViewerState>(state)
+  stateRef.current = state
+
   useEffect(() => {
-    const refresh = () => setReload((value) => value + 1)
-    const visibility = () => {
-      if (document.visibilityState === "visible") refresh()
+    let checkController: AbortController | null = null
+    const verify = () => {
+      const currentState = stateRef.current
+      if (currentState.request !== requestRef.current || currentState.status !== "ready") return
+      const shown = currentState.manifest.source
+      checkController?.abort()
+      const controller = new AbortController()
+      checkController = controller
+      void readDocumentViewerManifest({
+        scope,
+        documentId,
+        versionId: selectedVersion === "current" ? undefined : selectedVersion,
+        includeVersions,
+        fetcher: apiFetch,
+        signal: controller.signal,
+      })
+        .then((manifest) => {
+          if (controller.signal.aborted || requestRef.current !== currentState.request) return
+          const next = manifest.source
+          if (
+            next.url !== shown.url ||
+            next.versionId !== shown.versionId ||
+            next.checksum !== shown.checksum ||
+            next.size !== shown.size ||
+            next.mimeType !== shown.mimeType
+          ) {
+            setReload((value) => value + 1)
+          }
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted || requestRef.current !== currentState.request) return
+          if (error instanceof DOMException && error.name === "AbortError") return
+          setState({ request: currentState.request, status: "error", error })
+        })
     }
-    window.addEventListener("focus", refresh)
+    const visibility = () => {
+      if (document.visibilityState === "visible") verify()
+    }
+    window.addEventListener("focus", verify)
     document.addEventListener("visibilitychange", visibility)
     return () => {
-      window.removeEventListener("focus", refresh)
+      checkController?.abort()
+      window.removeEventListener("focus", verify)
       document.removeEventListener("visibilitychange", visibility)
     }
-  }, [])
+  }, [scope.organizationId, scope.companyId, documentId, includeVersions, selectedVersion])
 
   useEffect(() => {
     setDownloading(false)

@@ -1121,7 +1121,7 @@ function ExpensesClientLoaded({
         onAssistantFormScopeChange={() => { setQuickActionForm(null); setAssistantPrompt(undefined); activationRequestId.current = undefined }}
         config={config}
         dashboardCompositionOwned
-        dashboardContent={<CompanyModuleInsights input={{ module: "expenses", organizationId, companyId: operatingCompanyId, records: { rows: sheetsRaw, state: sheetsState }, currencies: { rows: currenciesQuery.data ?? [], state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
+        dashboardContent={<CompanyModuleInsights input={{ module: "expenses", organizationId, companyId: operatingCompanyId, records: { rows: sheetsRaw, state: sheetsState }, currencies: { rows: currenciesQuery.data ?? [], state: moduleQueryState(currenciesQuery) } }} sections={liveSections} domainSections={expensesRead.state.status === "ready" && sheetsState.status === "ready" ? liveSections.filter((section) => section.id === "exp-charts") : []} />}
         data={data}
         dataState={dataState}
         onOpenCreateForm={(tabId, assistant) => {

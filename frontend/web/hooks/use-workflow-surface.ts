@@ -66,13 +66,41 @@ export function useWorkflowSurface(options: { organizationId?: number | bigint }
         });
         return;
       }
+      const createdCount = notice.result?.createdRecords?.length ?? 0;
+      const targetRef = notice.result?.next ?? notice.result?.createdRecords?.[0];
+      const targetHref = targetRef ? workflowRecordHref(targetRef, workspaceProfile) : undefined;
+      const description =
+        createdCount > 0
+          ? t('erpWorkflow.createdRecords', { count: createdCount })
+          : undefined;
+
       showWorkflowToast(
         notice.kind === 'info'
-          ? { kind: 'info', title: t('erpWorkflow.approvalPending') }
-          : { kind: 'success', title: t('erpWorkflow.applied') },
+          ? {
+              kind: 'info',
+              title: t('erpWorkflow.approvalPending'),
+              description,
+              action: targetHref
+                ? {
+                    label: t('erpWorkflow.openRecord', { defaultValue: 'Open record' }),
+                    onClick: () => router.push(targetHref),
+                  }
+                : undefined,
+            }
+          : {
+              kind: 'success',
+              title: t('erpWorkflow.applied'),
+              description,
+              action: targetHref
+                ? {
+                    label: t('erpWorkflow.openRecord', { defaultValue: 'Open record' }),
+                    onClick: () => router.push(targetHref),
+                  }
+                : undefined,
+            },
       );
     },
-    [t],
+    [router, t, workspaceProfile],
   );
 
   const navigate = useCallback(

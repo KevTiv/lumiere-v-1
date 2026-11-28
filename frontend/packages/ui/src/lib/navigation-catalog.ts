@@ -77,6 +77,7 @@ export function buildNavGroups(
       items: [
         { surfaceId: "overview", label: t("nav.overview"), href: "/overview", icon: LayoutDashboard, resource: "dashboard:overview" },
         { surfaceId: "tasks", label: t("nav.tasks"), href: "/tasks", icon: KanbanSquare, resource: "dashboard:tasks" },
+        { surfaceId: "approvals", label: "Approvals", href: "/approvals", icon: ClipboardCheck, resource: "module:workflows" },
       ],
     },
     {
@@ -85,7 +86,6 @@ export function buildNavGroups(
         { surfaceId: "forensics", label: t("nav.forensics"), href: "/forensics", icon: FileSearch, resource: "dashboard:analytics" },
         { surfaceId: "trackers", label: t("nav.trackers"), href: "/trackers", icon: Activity, resource: "dashboard:analytics" },
         { surfaceId: "ai-skills", label: "AI Skills", href: "/ai-skills", icon: Sparkles, resource: "dashboard:analytics" },
-        { surfaceId: "approvals", label: "Approvals", href: "/approvals", icon: ClipboardCheck, resource: "module:workflows" },
         { surfaceId: "ai-action-drafts", label: "AI Approvals", href: "/ai-action-drafts", icon: Sparkles, resource: "dashboard:analytics" },
       ],
     },

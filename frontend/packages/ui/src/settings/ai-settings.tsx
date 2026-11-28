@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import {
   useAiAgents,
   useCreateAiAgent,
@@ -152,7 +152,6 @@ async function fetchQuery(resource: string): Promise<Row[]> {
 
 export function AiSettings() {
   const { t } = useTranslation()
-  const { toast } = useToast()
   const { organizationId, activeCompanyId } = useErpSession()
 
   const orgReady = organizationId != null && organizationId > 0
@@ -249,15 +248,13 @@ export function AiSettings() {
       setMembers(m)
       setInsights(i)
     } catch (e) {
-      toast({
-        title: t("settings.ai.loadError"),
+      toast.error(t("settings.ai.loadError"), {
         description: e instanceof Error ? e.message : t("settings.ai.loadErrorDescription"),
-        variant: "destructive",
       })
     } finally {
       setLoading(false)
     }
-  }, [orgReady, t, toast])
+  }, [orgReady, t])
 
   const refreshAll = useCallback(async () => {
     if (!orgReady) return
@@ -269,15 +266,13 @@ export function AiSettings() {
       await refetchAgents()
       await allowlistQuery.refetch()
     } catch (e) {
-      toast({
-        title: t("settings.ai.loadError"),
+      toast.error(t("settings.ai.loadError"), {
         description: e instanceof Error ? e.message : t("settings.ai.loadErrorDescription"),
-        variant: "destructive",
       })
     } finally {
       setLoading(false)
     }
-  }, [orgReady, refetchAgents, t, toast])
+  }, [orgReady, refetchAgents, t])
 
   useEffect(() => {
     if (!orgReady) return
@@ -293,7 +288,7 @@ export function AiSettings() {
     if (!orgId) return
     const aid = Number.parseInt(newMember.aiAgentId, 10)
     if (!Number.isFinite(aid)) {
-      toast({ title: t("settings.ai.pickAgent"), variant: "destructive" })
+      toast.error(t("settings.ai.pickAgent"))
       return
     }
     try {
@@ -311,7 +306,7 @@ export function AiSettings() {
         companyId: null,
         params: params as unknown as Record<string, unknown>,
       })
-      toast({ title: t("settings.ai.memberCreated") })
+      toast.success(t("settings.ai.memberCreated"))
       setCreateMemberOpen(false)
       setNewMember({
         name: "",
@@ -323,10 +318,8 @@ export function AiSettings() {
       })
       await refreshAll()
     } catch (e) {
-      toast({
-        title: t("settings.ai.mutationError"),
+      toast.error(t("settings.ai.mutationError"), {
         description: e instanceof Error ? e.message : "",
-        variant: "destructive",
       })
     }
   }
@@ -335,13 +328,11 @@ export function AiSettings() {
     try {
       const cid = row.companyId != null && row.companyId !== undefined ? num(row.companyId) : null
       await dismissInsightMutation.mutateAsync({ companyId: cid, insightId: num(row.id) })
-      toast({ title: t("settings.ai.insightDismissed") })
+      toast.success(t("settings.ai.insightDismissed"))
       await refreshAll()
     } catch (e) {
-      toast({
-        title: t("settings.ai.mutationError"),
+      toast.error(t("settings.ai.mutationError"), {
         description: e instanceof Error ? e.message : "",
-        variant: "destructive",
       })
     }
   }
@@ -359,16 +350,14 @@ export function AiSettings() {
       })
       if (!params) throw new Error(t("common.paramsMapper.invalidInsight"))
       await createInsightMutation.mutateAsync({ companyId: null, params: params as unknown as Record<string, unknown> })
-      toast({ title: t("settings.ai.insightCreated") })
+      toast.success(t("settings.ai.insightCreated"))
       setSampleInsightOpen(false)
       setSampleTitle("")
       setSampleDescription("")
       await refreshAll()
     } catch (e) {
-      toast({
-        title: t("settings.ai.mutationError"),
+      toast.error(t("settings.ai.mutationError"), {
         description: e instanceof Error ? e.message : "",
-        variant: "destructive",
       })
     }
   }
@@ -382,17 +371,14 @@ export function AiSettings() {
     const id = num(agent.id)
     try {
       await setActionMutation.mutateAsync({ agentId: id, action, enabled })
-      toast({
-        title: enabled ? "Action enabled" : "Action disabled",
+      toast.success(enabled ? "Action enabled" : "Action disabled", {
         description: action.replace(/_/g, " "),
       })
       await refetchAgents()
       await allowlistQuery.refetch()
     } catch (e) {
-      toast({
-        title: t("settings.ai.mutationError"),
+      toast.error(t("settings.ai.mutationError"), {
         description: e instanceof Error ? e.message : "",
-        variant: "destructive",
       })
     }
   }
@@ -402,19 +388,17 @@ export function AiSettings() {
     const raw = spendByAgent[String(agentId)] ?? "0"
     const tokens = Math.round(Number.parseFloat(raw))
     if (!Number.isFinite(tokens) || tokens <= 0) {
-      toast({ title: t("settings.ai.tokensInvalid"), variant: "destructive" })
+      toast.error(t("settings.ai.tokensInvalid"))
       return
     }
     try {
       await recordSpendMutation.mutateAsync({ agentId, tokensUsed: tokens })
-      toast({ title: t("settings.ai.spendRecorded") })
+      toast.success(t("settings.ai.spendRecorded"))
       setSpendByAgent((prev) => ({ ...prev, [String(agentId)]: "" }))
       await refreshAll()
     } catch (e) {
-      toast({
-        title: t("settings.ai.mutationError"),
+      toast.error(t("settings.ai.mutationError"), {
         description: e instanceof Error ? e.message : "",
-        variant: "destructive",
       })
     }
   }
@@ -528,12 +512,10 @@ export function AiSettings() {
                                   allowlistId: id,
                                   enabled: checked,
                                 })
-                                toast({ title: t("settings.ai.allowlistUpdated") })
+                                toast.success(t("settings.ai.allowlistUpdated"))
                               } catch (e) {
-                                toast({
-                                  title: t("settings.ai.mutationError"),
+                                toast.error(t("settings.ai.mutationError"), {
                                   description: e instanceof Error ? e.message : "",
-                                  variant: "destructive",
                                 })
                               }
                             })()
@@ -553,12 +535,10 @@ export function AiSettings() {
                           void (async () => {
                             try {
                               await deleteAllowlistMutation.mutateAsync(id)
-                              toast({ title: t("settings.ai.allowlistDeleted") })
+                              toast.success(t("settings.ai.allowlistDeleted"))
                             } catch (e) {
-                              toast({
-                                title: t("settings.ai.mutationError"),
+                              toast.error(t("settings.ai.mutationError"), {
                                 description: e instanceof Error ? e.message : "",
-                                variant: "destructive",
                               })
                             }
                           })()
@@ -596,20 +576,19 @@ export function AiSettings() {
                 void gatewayHealthMutation.mutate(undefined, {
                   onSuccess: (data) => {
                     const ok = data.configured === true && data.upstreamOk === true
-                    toast({
-                      title: ok ? t("settings.ai.memoryGatewayOk") : t("settings.ai.memoryGatewayDown"),
-                      description:
-                        typeof data.message === "string"
-                          ? data.message
-                          : data.detail ?? JSON.stringify(data.gateway ?? data),
-                      variant: ok ? "default" : "destructive",
-                    })
+                    const description =
+                      typeof data.message === "string"
+                        ? data.message
+                        : data.detail ?? JSON.stringify(data.gateway ?? data)
+                    if (ok) {
+                      toast.success(t("settings.ai.memoryGatewayOk"), { description })
+                    } else {
+                      toast.error(t("settings.ai.memoryGatewayDown"), { description })
+                    }
                   },
                   onError: (e) => {
-                    toast({
-                      title: t("settings.ai.memoryGatewayDown"),
+                    toast.error(t("settings.ai.memoryGatewayDown"), {
                       description: e instanceof Error ? e.message : String(e),
-                      variant: "destructive",
                     })
                   },
                 })
@@ -654,8 +633,7 @@ export function AiSettings() {
                 setMemorySearchPreview(null)
                 void memoryIngestMutation.mutate({ companyId: activeCompanyId, resources: [{ resource_kind: memoryResourceKind, resource_id: memoryResourceId }] }, {
                   onSuccess: (data) => {
-                    toast({
-                      title: t("settings.ai.memoryIngestDone"),
+                    toast.success(t("settings.ai.memoryIngestDone"), {
                       description: t("settings.ai.memoryIngestOutcome", {
                         indexed: data.indexed,
                         unchanged: data.unchanged,
@@ -664,10 +642,8 @@ export function AiSettings() {
                     })
                   },
                   onError: (e) =>
-                    toast({
-                      title: t("settings.ai.mutationError"),
+                    toast.error(t("settings.ai.mutationError"), {
                       description: e instanceof Error ? e.message : "",
-                      variant: "destructive",
                     }),
                 })
               }}
@@ -718,16 +694,13 @@ export function AiSettings() {
                         .map((h) => `${h.resource_kind}:${h.resource_id}`)
                         .join(" · ")
                       setMemorySearchPreview(top || t("settings.ai.memoryNoHits"))
-                      toast({
-                        title: t("settings.ai.memorySearchDone"),
+                      toast.success(t("settings.ai.memorySearchDone"), {
                         description: `${t("settings.ai.memoryHitsLabel")}: ${String(hits.length)}`,
                       })
                     },
                     (e: unknown) =>
-                      toast({
-                        title: t("settings.ai.mutationError"),
+                      toast.error(t("settings.ai.mutationError"), {
                         description: e instanceof Error ? e.message : "",
-                        variant: "destructive",
                       }),
                   )
               }
@@ -848,16 +821,14 @@ export function AiSettings() {
                             void (async () => {
                               try {
                                 await setActiveMutation.mutateAsync({ agentId: id, isActive: c })
-                                toast({
-                                  title: c
+                                toast.success(
+                                  c
                                     ? t("settings.ai.agentActivated")
                                     : t("settings.ai.agentDeactivated"),
-                                })
+                                )
                               } catch (e) {
-                                toast({
-                                  title: t("settings.ai.mutationError"),
+                                toast.error(t("settings.ai.mutationError"), {
                                   description: e instanceof Error ? e.message : "",
-                                  variant: "destructive",
                                 })
                               }
                             })()
@@ -1017,7 +988,7 @@ export function AiSettings() {
             const params = toCreateAiAgentParams(data)
             if (!params) throw new Error(t("common.paramsMapper.invalidAgent"))
             await createAgentMutation.mutateAsync(params as unknown as Record<string, unknown>)
-            toast({ title: t("settings.ai.agentCreated") })
+            toast.success(t("settings.ai.agentCreated"))
             setCreateAgentOpen(false)
           } catch (e) {
             setCreateAgentError(e instanceof Error ? e.message : t("settings.ai.mutationError"))
@@ -1055,7 +1026,7 @@ export function AiSettings() {
                 agentId: aid,
                 params: buildUpdateAiAgentParams(data),
               })
-              toast({ title: t("settings.ai.agentUpdated") })
+              toast.success(t("settings.ai.agentUpdated"))
               setEditAgent(null)
             } catch (e) {
               setEditAgentError(e instanceof Error ? e.message : t("settings.ai.mutationError"))
@@ -1146,7 +1117,7 @@ export function AiSettings() {
           if (!orgId) return
           try {
             await createAllowlistMutation.mutateAsync(data)
-            toast({ title: t("settings.ai.allowlistCreated") })
+            toast.success(t("settings.ai.allowlistCreated"))
             setAllowlistOpen(false)
             await allowlistQuery.refetch()
           } catch (e) {

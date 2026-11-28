@@ -17,6 +17,7 @@ import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/
 import type { QueryResourceState } from "@lumiere/api-client"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { useTranslation } from "@lumiere/i18n"
+import { toast } from "sonner"
 import { useErpSession } from "@lumiere/erp-session"
 import { useAuthorizedPeople } from "@/lib/use-authorized-people"
 import { Badge } from "@lumiere/ui/components/badge"
@@ -1820,7 +1821,7 @@ function PurchasingClientLoaded({
               if (!first) return
               await openCreateRfqFromRequisition(String(first.id)).catch(
                 (e: unknown) => {
-                  window.alert(e instanceof Error ? e.message : String(e))
+                  toast.error(e instanceof Error ? e.message : String(e))
                 },
               )
             },
@@ -2146,7 +2147,7 @@ function PurchasingClientLoaded({
             view_vendors: () => setActiveTab("vendors"),
             create_purchase_blanket_order: () => {
               void openBlanketOrderCreate().catch((e: unknown) => {
-                window.alert(e instanceof Error ? e.message : String(e))
+                toast.error(e instanceof Error ? e.message : String(e))
               })
             },
             create_purchase_contract: () => {

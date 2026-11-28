@@ -17,6 +17,7 @@ import { formValuesDiffer } from "./use-unsaved-changes-guard"
 import { toDraftValues, useFormDraft } from "./form-draft"
 import { Button } from "../components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
+import { Kbd } from "../components/kbd"
 import { Separator } from "../components/separator"
 import { Textarea } from "../components/textarea"
 import { Check, Loader2, Sparkles } from "lucide-react"
@@ -611,6 +612,16 @@ export function ModularForm({
                 values={values}
                 value={values[field.name]}
                 onChange={(value) => handleChange(field.name, value)}
+                onBlur={() => {
+                  const err = validateField(field, values[field.name])
+                  setErrors((prev) => {
+                    if (err) return prev[field.name] === err ? prev : { ...prev, [field.name]: err }
+                    if (!(field.name in prev)) return prev
+                    const next = { ...prev }
+                    delete next[field.name]
+                    return next
+                  })
+                }}
                 error={errors[field.name]}
                 aiSuggestion={aiAppliedFields[field.name]}
               />
@@ -747,6 +758,9 @@ export function ModularForm({
                 : <Check className="mr-2 h-4 w-4" />
               }
               {config.submitLabel || t("common.submit")}
+              <Kbd aria-hidden="true" className="ml-1.5 hidden bg-primary-foreground/15 text-primary-foreground sm:inline-flex">
+                ⌘↵
+              </Kbd>
             </Button>
           </div>
         </div>

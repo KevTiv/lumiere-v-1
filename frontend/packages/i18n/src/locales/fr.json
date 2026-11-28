@@ -196,7 +196,27 @@
       "scheduled-reports": "Rapports planifiés"
     }
   },
+  "commandPalette": {
+    "recent": {
+      "heading": "Récents"
+    },
+    "quickCreate": {
+      "heading": "Création rapide",
+      "invoice": "Nouvelle facture client",
+      "bill": "Nouvelle facture fournisseur",
+      "expense": "Nouvelle dépense",
+      "salesOrder": "Nouvelle commande client"
+    },
+    "preferences": {
+      "heading": "Préférences",
+      "lightMode": "Passer au thème clair",
+      "darkMode": "Passer au thème sombre",
+      "comfortableDensity": "Passer à l’affichage confortable",
+      "compactDensity": "Passer à l’affichage compact"
+    }
+  },
   "workspaceShell": {
+    "searchShort": "Rechercher…",
     "accountAndPreferences": "Compte et préférences",
     "resizeNavigation": "Redimensionner la navigation",
     "preferences": "Préférences de l’espace de travail",
@@ -220,6 +240,7 @@
     "search": "Rechercher des modules et des enregistrements"
   },
   "common": {
+    "clearSearch": "Effacer la recherche",
     "name": "Nom",
     "importSource": {
       "title": "Source d’importation enregistrée",
@@ -2995,6 +3016,9 @@
     }
   },
   "erpWorkflow": {
+    "createdRecords": "{{count}} enregistrements liés créés.",
+    "createdRecords_one": "{{count}} enregistrement lié créé.",
+    "openRecord": "Ouvrir l’enregistrement",
     "applied": "Terminé",
     "retry": "Réessayer",
     "confirm": {
@@ -5121,6 +5145,13 @@
       }
     },
     "statements": {
+      "basisAll": "Écritures comptabilisées et brouillons",
+      "basisPosted": "Écritures comptabilisées uniquement",
+      "basisExplanation": "Les chiffres sont calculés à partir des lignes enregistrées pour ce rapport. Sélectionnez une ligne de compte pour consulter les écritures correspondantes.",
+      "statusEmpty": "Aucune ligne",
+      "statusError": "Échec du chargement",
+      "statusReady": "{{count}} lignes",
+      "statusReady_one": "{{count}} ligne",
       "columns": {
         "amount": "Montant",
         "comparison": "Comparaison",

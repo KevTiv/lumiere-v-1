@@ -38,7 +38,7 @@ export function BudgetProgressWidget({ data }: { data: BudgetProgressData }) {
             </div>
             <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
               <div
-                className={`h-full rounded-full ${barColor} transition-all`}
+                className={`h-full rounded-full ${barColor} transition-[width] duration-300`}
                 style={{ width: `${Math.min(pct, 100)}%` }}
               />
             </div>

@@ -1090,7 +1090,7 @@ function SubscriptionsClientLoaded({
         isPending={isFormMutationPending}
         submissionDisabled={!quickActionUsable}
         formLeadingActions={planSetupMissing ? <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" render={<Link href="/accounting?tab=journals" target="_blank" rel="noopener noreferrer" />} nativeButton={false}>{t("subscriptions.workflow.openAccounting")}</Button>
+          <Button type="button" variant="outline" render={<Link href="/accounting?tab=account-journals" target="_blank" rel="noopener noreferrer" />} nativeButton={false}>{t("subscriptions.workflow.openAccounting")}</Button>
           <Button type="button" variant="outline" render={<Link href="/sales?tab=pricelists" target="_blank" rel="noopener noreferrer" />} nativeButton={false}>{t("subscriptions.workflow.openCatalog")}</Button>
           <Button type="button" variant="outline" onClick={() => { void pricelistsQuery.refetch(); void productsQuery.refetch(); void journalsQuery.refetch() }}>{t("subscriptions.workflow.refreshSetup")}</Button>
         </div> : !quickActionUsable ? <Button type="button" variant="outline" onClick={() => {

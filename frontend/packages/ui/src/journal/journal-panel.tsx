@@ -726,7 +726,7 @@ function ScopedJournalPanel({ open, onClose, scope }: JournalPanelProps & { scop
                           key={p}
                           onClick={() => setPriority(p as NotePriority)}
                           className={cn(
-                            "w-2 h-2 rounded-full transition-all",
+                            "w-2 h-2 rounded-full transition-colors",
                             pConfig.dotColor,
                             priority === p ? "ring-2 ring-offset-1 ring-primary" : "opacity-40 hover:opacity-70"
                           )}

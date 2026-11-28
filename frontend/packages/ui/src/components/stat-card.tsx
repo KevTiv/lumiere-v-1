@@ -3,6 +3,7 @@
 import type { ComponentType, ReactNode } from "react"
 import { TrendingDown, TrendingUp } from "lucide-react"
 import { cn } from "../lib/utils"
+import { MetricInfoPopover, type MetricInfoPopoverProps } from "./contextual-help"
 
 export type StatCardTone = "default" | "success" | "warning" | "destructive" | "info"
 
@@ -13,6 +14,10 @@ const toneIconClass: Record<StatCardTone, string> = {
   destructive: "bg-destructive/10 text-destructive",
   info: "bg-info/10 text-info",
 }
+
+export type StatCardHelp =
+  | string
+  | Pick<MetricInfoPopoverProps, "definition" | "formula" | "basis" | "scope" | "freshness">
 
 export interface StatCardProps {
   label: ReactNode
@@ -28,6 +33,8 @@ export interface StatCardProps {
   invertChange?: boolean
   /** Small line under the value (unit, context). Shown after the delta. */
   footer?: ReactNode
+  /** Contextual explanation popover describing the metric formula, basis, and scope. */
+  help?: StatCardHelp
   onClick?: () => void
   className?: string
   testId?: string
@@ -43,11 +50,14 @@ export function StatCard({
   changeLabel = "vs last period",
   invertChange = false,
   footer,
+  help,
   onClick,
   className,
   testId,
 }: StatCardProps) {
   const clickable = typeof onClick === "function"
+  const helpConfig = typeof help === "string" ? { definition: help } : help
+  const helpLabel = typeof label === "string" ? label : "Metric"
   return (
     <div
       data-testid={testId}
@@ -71,7 +81,14 @@ export function StatCard({
       )}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <span title={typeof label === "string" ? label : undefined} className="min-w-0 truncate pt-0.5 text-xs font-medium text-muted-foreground">{label}</span>
+        <div className="flex min-w-0 items-center gap-1.5 pt-0.5">
+          <span title={typeof label === "string" ? label : undefined} className="min-w-0 truncate text-xs font-medium text-muted-foreground">{label}</span>
+          {helpConfig ? (
+            <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+              <MetricInfoPopover label={helpLabel} {...helpConfig} />
+            </span>
+          ) : null}
+        </div>
         {Icon ? (
           <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", toneIconClass[tone])}>
             <Icon className="h-4 w-4" />

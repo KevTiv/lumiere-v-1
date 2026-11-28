@@ -3,6 +3,7 @@
 import { presentableActions, type AnyWorkflowAction } from "@lumiere/erp-workflows"
 
 import { Button } from "../components/button"
+import { BlockerPopover } from "../components/contextual-help"
 
 export interface RecordWorkflowActionsProps<TRecord> {
   actions: ReadonlyArray<AnyWorkflowAction<TRecord>>
@@ -17,7 +18,7 @@ export interface RecordWorkflowActionsProps<TRecord> {
 
 /**
  * Actions valid for a record's current state, for record sheets and detail workspaces. Actions
- * that are relevant but blocked stay visible, disabled, with the reason as a tooltip.
+ * that are relevant but blocked stay visible, disabled, with an accessible BlockerPopover explaining why.
  */
 export function RecordWorkflowActions<TRecord>({
   actions,
@@ -33,7 +34,7 @@ export function RecordWorkflowActions<TRecord>({
     <div className={className ?? "flex flex-wrap items-center gap-2"} data-testid="record-workflow-actions">
       {presentable.map((action) => {
         const blocked = action.blockedReason?.(record)
-        return (
+        const button = (
           <Button
             key={action.id}
             size="sm"
@@ -45,13 +46,26 @@ export function RecordWorkflowActions<TRecord>({
                   : "outline"
             }
             disabled={blocked != null || pendingActionIds?.has(action.id)}
-            title={blocked}
             onClick={() => onRun(action, record)}
             data-testid={`record-workflow-action-${action.id}`}
           >
             {action.label}
           </Button>
         )
+
+        if (blocked != null) {
+          return (
+            <BlockerPopover
+              key={action.id}
+              title={`${action.label} unavailable`}
+              reason={blocked}
+            >
+              {button}
+            </BlockerPopover>
+          )
+        }
+
+        return button
       })}
     </div>
   )

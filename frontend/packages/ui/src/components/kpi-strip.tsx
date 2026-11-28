@@ -4,12 +4,19 @@ import { cn } from "../lib/utils"
 import type { KpiTone } from "../lib/kpi-tiles"
 import { Skeleton } from "./skeleton"
 import { workspaceStyles } from "../lib/workspace-styles"
+import { MetricInfoPopover, type MetricInfoPopoverProps } from "./contextual-help"
+
+export type KpiTileHelp =
+  | string
+  | Pick<MetricInfoPopoverProps, "definition" | "formula" | "basis" | "scope" | "freshness">
 
 export interface KpiStripTile {
   key: string
   label: string
   value: string | number
   hint?: string
+  /** Optional contextual explanation popover describing how this KPI is computed. */
+  help?: KpiTileHelp
   tone?: KpiTone
   active: boolean
   /** Absent for a figure that cannot filter; the tile is then plain text, not a button. */
@@ -43,9 +50,17 @@ export function KpiStrip({ tiles, loading = false, className }: KpiStripProps) {
       data-loading={loading ? "true" : undefined}
     >
       {tiles.map((tile) => {
+        const helpConfig = typeof tile.help === "string" ? { definition: tile.help } : tile.help
         const body = (
           <>
-            <span title={tile.label} className="max-w-full truncate text-xs font-medium text-muted-foreground">{tile.label}</span>
+            <div className="flex w-full min-w-0 items-center justify-between gap-1">
+              <span title={tile.label} className="min-w-0 truncate text-xs font-medium text-muted-foreground">{tile.label}</span>
+              {helpConfig ? (
+                <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                  <MetricInfoPopover label={tile.label} {...helpConfig} />
+                </span>
+              ) : null}
+            </div>
             {loading ? (
               <Skeleton className="mt-1 h-6 w-16 max-w-full" data-testid={`kpi-tile-${tile.key}-loading`} />
             ) : (

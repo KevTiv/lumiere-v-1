@@ -865,11 +865,24 @@ function SettingsLoaded({
       id: "advanced",
       groupId: "platform",
       title: "Technical administration",
-      description: "Maintain access, sessions and audit records. Some tasks require existing record IDs.",
+      description: "Developer & superuser controls for raw sessions, permissions, and audit records.",
       icon: Wrench,
       content: (
-        <section className="rounded-xl border border-dashed border-border bg-card p-4">
-          {actionCards(adminActions, "settings-admin-action-")}
+        <section className="space-y-3 rounded-xl border border-dashed border-border bg-card p-4">
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground">Developer &amp; superuser controls</p>
+            <p className="max-w-2xl text-xs leading-5 text-muted-foreground">
+              These direct administrative operations modify low-level records and require existing internal IDs. Routine workspace setup is handled in Company setup and Organization settings.
+            </p>
+          </div>
+          <details data-testid="settings-admin-actions" className="group rounded-lg border border-border/70 bg-muted/20 p-3">
+            <summary className="cursor-pointer select-none text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+              Show direct administration actions ({adminActions.length})
+            </summary>
+            <div className="mt-3">
+              {actionCards(adminActions, "settings-admin-action-")}
+            </div>
+          </details>
         </section>
       ),
     },

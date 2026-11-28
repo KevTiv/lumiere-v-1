@@ -166,7 +166,7 @@ export function NotebookCellComponent({
   return (
     <div
       className={cn(
-        "group relative border rounded-lg transition-all",
+        "group relative border rounded-lg transition-[border-color,box-shadow]",
         isSelected ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/50"
       )}
       onClick={onSelect}

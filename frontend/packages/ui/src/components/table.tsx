@@ -58,7 +58,7 @@ function Table({ className, children, pagination = true, bounded, viewportLabel,
           data-slot="table"
           className={cn(
             "w-full caption-bottom text-sm",
-            bounded && "[&>thead]:sticky [&>thead]:top-0 [&>thead]:z-10 [&>thead]:bg-muted [&>thead]:shadow-[0_1px_0_var(--border)]",
+            bounded && "[&>thead]:sticky [&>thead]:top-0 [&>thead]:z-10 [&>thead]:bg-muted [&>thead]:shadow-[0_1px_0_hsl(var(--border))]",
             className,
           )}
           {...props}

@@ -13,6 +13,10 @@ export { Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage } 
 export * from "./components/toast";
 export * from "./components/toaster";
 export { Toaster as SonnerToaster } from "./components/sonner";
+export * from "./components/contextual-help";
+export * from "./components/workflow-progress-bar";
+export * from "./components/document-chain";
+export * from "./reports/report-context-bar";
 export * from "./hooks/use-mobile";
 export * from "./lib/utils";
 export * from "./lib/theme-colors";

@@ -149,6 +149,7 @@ export const purchaseOrdersTableConfig = (
           { value: "Sent", label: t("purchasing.purchaseOrders.filters.state.options.Sent") },
           { value: "ToApprove", label: t("purchasing.purchaseOrders.filters.state.options.ToApprove") },
           { value: "Approved", label: t("purchasing.purchaseOrders.filters.state.options.Approved") },
+          { value: "Purchase", label: t("purchasing.purchaseOrders.states.Purchase", { defaultValue: "Purchase order" }) },
           { value: "Done", label: t("purchasing.purchaseOrders.filters.state.options.Done") },
           { value: "Cancelled", label: t("purchasing.purchaseOrders.filters.state.options.Cancelled") },
         ],

@@ -1,14 +1,17 @@
 "use client"
 
-import { Check } from "lucide-react"
+import { Check, CircleDot } from "lucide-react"
 
 import { cn } from "../lib/utils"
 import { Badge } from "../components/badge"
+import { ExplainPopover } from "../components/contextual-help"
 import type { BadgeVariant } from "../lib/entity-view-types"
 
 export interface StatusBarStep {
   id: string
   label: string
+  /** Optional plain-language explanation of what this stage represents. */
+  description?: string
 }
 
 export interface StatusBarProps {
@@ -25,8 +28,8 @@ export interface StatusBarProps {
 }
 
 /**
- * The stages of a record as a row: finished ones are ticked, the current one is highlighted, the
- * rest are muted. Presentation only; the record's actions are what change its stage.
+ * The stages of a record as a connected lifecycle rail: finished ones are ticked, the current
+ * one is highlighted, and the rest are muted. Preserves all data-testid & data-state contracts.
  */
 export function StatusBar({ steps, current, terminal, className }: StatusBarProps) {
   const currentIndex = terminal ? -1 : steps.findIndex((step) => step.id === current)
@@ -35,7 +38,10 @@ export function StatusBar({ steps, current, terminal, className }: StatusBarProp
     <ol
       aria-label="Status"
       data-testid="status-bar"
-      className={cn("flex flex-wrap items-center gap-1.5 text-sm", className)}
+      className={cn(
+        "inline-flex flex-wrap items-center gap-1 rounded-lg border border-border/60 bg-muted/25 px-2.5 py-1.5 text-xs",
+        className,
+      )}
     >
       {steps.map((step, index) => {
         const state =
@@ -46,21 +52,51 @@ export function StatusBar({ steps, current, terminal, className }: StatusBarProp
             data-testid={`status-bar-step-${step.id}`}
             data-state={state}
             aria-current={state === "current" ? "step" : undefined}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1",
-              state === "current" && "border-primary bg-primary text-primary-foreground font-medium",
-              state === "done" && "border-border bg-muted text-foreground",
-              state === "upcoming" && "border-dashed border-border text-muted-foreground",
-            )}
+            className="inline-flex items-center gap-1"
           >
-            {state === "done" ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : null}
-            {step.label}
+            {index > 0 ? (
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "h-px w-3 shrink-0 transition-colors",
+                  state === "done" || state === "current" ? "bg-primary/50" : "bg-border",
+                )}
+              />
+            ) : null}
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-medium transition-colors",
+                state === "current" && "bg-primary text-primary-foreground shadow-2xs",
+                state === "done" && "bg-primary/10 text-primary",
+                state === "upcoming" && "text-muted-foreground",
+              )}
+            >
+              {state === "done" ? (
+                <Check className="size-3 shrink-0" aria-hidden="true" />
+              ) : state === "current" ? (
+                <CircleDot className="size-3 shrink-0" aria-hidden="true" />
+              ) : (
+                <span className="size-1.5 shrink-0 rounded-full bg-muted-foreground/40" aria-hidden="true" />
+              )}
+              <span>{step.label}</span>
+              {step.description ? (
+                <ExplainPopover
+                  title={step.label}
+                  description={step.description}
+                  icon="info"
+                  className={cn(
+                    state === "current" &&
+                      "text-primary-foreground/80 hover:bg-primary-foreground/15 hover:text-primary-foreground",
+                  )}
+                />
+              ) : null}
+            </span>
           </li>
         )
       })}
       {terminal ? (
-        <li data-testid="status-bar-terminal" aria-current="step">
-          <Badge variant={terminal.variant ?? "destructive"} className="px-3 py-1 text-sm">
+        <li data-testid="status-bar-terminal" aria-current="step" className="ml-1">
+          <Badge variant={terminal.variant ?? "destructive"} className="px-2.5 py-0.5 text-xs">
             {terminal.label}
           </Badge>
         </li>

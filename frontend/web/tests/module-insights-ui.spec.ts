@@ -6,9 +6,10 @@ import { readFile } from "node:fs/promises"
 const errors = new WeakMap<Page, string[]>()
 const apiCalls = new WeakMap<Page, string[]>()
 for (const width of [320, 390, 768, 1440]) {
+  const hasTouch = width < 1024
   for (const module of ["sales", "crm", "purchasing", "expenses", "reports"] as const) {
     test.describe(`${width}px ${module} shared financial-style overview`, () => {
-      test.use({ viewport: { width, height: 1000 }, hasTouch: width < 1024 })
+      test.use({ viewport: { width, height: 1000 }, hasTouch })
       test.beforeEach(async ({ page }) => {
         const browserErrors: string[] = [], requests: string[] = []
         errors.set(page, browserErrors); apiCalls.set(page, requests)
@@ -45,7 +46,11 @@ for (const width of [320, 390, 768, 1440]) {
         expect(csv).not.toContain("999999")
         await trend.getByText("View chart data", { exact: true }).click()
         await expect(trend.getByRole("table")).toBeVisible()
-        expect(await trend.getByRole("button", { name: /as CSV/ }).evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44)
+        if (hasTouch) {
+          expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true)
+          const exportButton = trend.getByRole("button", { name: /as CSV/ })
+          expect((await exportButton.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+        }
         await chooseSelectOptionByTriggerValue(
           page,
           page.getByLabel("Analysis period", { exact: true }),

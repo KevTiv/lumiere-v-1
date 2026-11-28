@@ -1,13 +1,15 @@
 "use client"
 
-import { createContext, useEffect, useRef, useState, type ReactNode } from "react"
-import { LogOut, Monitor, Moon, Search, Sun, UserRound } from "lucide-react"
+import { createContext, Fragment, useEffect, useRef, useState, type ReactNode } from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { ChevronRight, LogOut, Monitor, Moon, Search, Sun, UserRound } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "../components/button"
 import { Popover, PopoverContent, PopoverDescription, PopoverTitle, PopoverTrigger } from "../components/popover"
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "../components/sidebar"
-import { useTheme, type Theme } from "../components/theme-provider"
-import { readPreference } from "../lib/theme-storage"
+import { useTheme, type Density, type Theme } from "../components/theme-provider"
+import { readPreference, writePreference } from "../lib/theme-storage"
 import { cn } from "../lib/utils"
 import { HeaderTrailingProvider } from "./dashboard-header"
 import { CompanySwitcher } from "../settings/company-switcher"
@@ -28,6 +30,53 @@ interface WorkspaceDock {
 const DOCK_MIN_REM: Record<WorkspaceTool, number> = { assistant: 22.5, notebook: 25 }
 // Leave 32rem for work, 4rem for its gutters, 3rem for icon navigation, and .75rem for the gap.
 const WORKSPACE_MIN_REM = 32 + 4 + 3 + 0.75
+
+function formatBreadcrumbSegment(segment: string): string {
+  if (/^\d+$/.test(segment)) return `#${segment}`
+  return segment
+    .split("-")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
+}
+
+function WorkspaceBreadcrumbs() {
+  const pathname = usePathname()
+  if (!pathname || pathname === "/") return null
+  const segments = pathname.split("/").filter(Boolean)
+  if (segments.length === 0) return null
+
+  return (
+    <nav
+      aria-label="Breadcrumb"
+      data-testid="workspace-breadcrumbs"
+      className="hidden min-w-0 items-center gap-1 text-xs text-muted-foreground md:flex"
+    >
+      {segments.map((segment, index) => {
+        const href = `/${segments.slice(0, index + 1).join("/")}`
+        const isLast = index === segments.length - 1
+        const label = formatBreadcrumbSegment(segment)
+        return (
+          <Fragment key={href}>
+            {index > 0 && <ChevronRight className="size-3 shrink-0 text-muted-foreground/60" aria-hidden="true" />}
+            {isLast ? (
+              <span className="truncate font-medium text-foreground max-w-[14rem]" aria-current="page">
+                {label}
+              </span>
+            ) : (
+              <Link
+                href={href}
+                className="truncate max-w-[10rem] rounded px-1 py-0.5 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
+                {label}
+              </Link>
+            )}
+          </Fragment>
+        )
+      })}
+    </nav>
+  )
+}
 
 function WorkspaceNavigationTrigger() {
   const { isMobile, openMobile, open } = useSidebar()
@@ -54,8 +103,16 @@ function accountUserLabel(profile: DashboardAccountProps["userProfile"]): string
   return parts.length ? parts.join(" ") : profile?.email?.trim() ?? ""
 }
 
-function WorkspaceAccountMenu({ userProfile, onSignOut }: DashboardAccountProps) {
-  const { theme, setTheme } = useTheme()
+function WorkspaceAccountMenu({
+  userProfile,
+  onSignOut,
+  contentWidth,
+  onContentWidthChange,
+}: DashboardAccountProps & {
+  contentWidth: ContentWidth
+  onContentWidthChange: (next: ContentWidth) => void
+}) {
+  const { theme, setTheme, density, setDensity } = useTheme()
   const { t } = useTranslation()
   const { open, setOpen } = useSidebar()
   const { currentUser, roles } = useRBAC()
@@ -67,6 +124,10 @@ function WorkspaceAccountMenu({ userProfile, onSignOut }: DashboardAccountProps)
     { value: "light", label: t("workspaceShell.light", { defaultValue: "Light" }), icon: Sun },
     { value: "dark", label: t("workspaceShell.dark", { defaultValue: "Dark" }), icon: Moon },
     { value: "system", label: t("workspaceShell.system", { defaultValue: "System" }), icon: Monitor },
+  ]
+  const densities: { value: Density; label: string }[] = [
+    { value: "comfortable", label: t("workspaceShell.comfortable", { defaultValue: "Comfortable" }) },
+    { value: "compact", label: t("workspaceShell.compact", { defaultValue: "Compact" }) },
   ]
 
   return (
@@ -97,6 +158,31 @@ function WorkspaceAccountMenu({ userProfile, onSignOut }: DashboardAccountProps)
             ))}
           </div>
         </fieldset>
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-medium">{t("workspaceShell.density", { defaultValue: "Density" })}</legend>
+          <div className="grid grid-cols-2 gap-1">
+            {densities.map(({ value, label }) => (
+              <Button key={value} size="sm" variant={density === value ? "secondary" : "outline"}
+                aria-pressed={density === value} onClick={() => setDensity(value)}
+                data-testid={`workspace-density-${value}`}>
+                {label}
+              </Button>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset className="hidden space-y-2 md:block">
+          <legend className="text-xs font-medium">{t("workspaceShell.contentWidth")}</legend>
+          <div className="grid grid-cols-2 gap-1">
+            <Button size="sm" variant={contentWidth === "centered" ? "secondary" : "outline"}
+              aria-pressed={contentWidth === "centered"} onClick={() => onContentWidthChange("centered")}>
+              {t("workspaceShell.centered", { defaultValue: "Centered" })}
+            </Button>
+            <Button size="sm" variant={contentWidth === "full" ? "secondary" : "outline"}
+              aria-pressed={contentWidth === "full"} onClick={() => onContentWidthChange("full")}>
+              {t("workspaceShell.fullWidth", { defaultValue: "Full width" })}
+            </Button>
+          </div>
+        </fieldset>
         <fieldset className="hidden space-y-2 md:block">
           <legend className="text-xs font-medium">{t("workspaceShell.navigation", { defaultValue: "Navigation" })}</legend>
           <div className="grid grid-cols-2 gap-1">
@@ -120,7 +206,7 @@ function WorkspaceAccountMenu({ userProfile, onSignOut }: DashboardAccountProps)
   )
 }
 
-/** Shared shell composition, inspired by Studio Admin's compact header and inset workspace. */
+/** Shared shell composition, inspired by Linear's flush split-pane sidebar and crisp inset canvas. */
 export function DashboardWorkspace({ sidebar, children, overlays, dockRequest, notifications, headerTools, onOpenSearch, forceCollapsed = false, userProfile, onSignOut }: {
   sidebar: ReactNode | ((collapsed: boolean) => ReactNode)
   children: ReactNode
@@ -134,10 +220,22 @@ export function DashboardWorkspace({ sidebar, children, overlays, dockRequest, n
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const { t } = useTranslation()
   const [width, setWidth] = useState<ContentWidth>("centered")
+  const [shortcutLabel, setShortcutLabel] = useState("⌘K")
   const shell = useRef<HTMLDivElement>(null)
   const [dockContainer, setDockContainer] = useState<HTMLDivElement | null>(null)
   const [availableRem, setAvailableRem] = useState(0)
   const managesTools = typeof overlays === "function"
+
+  const handleWidthChange = (next: ContentWidth) => {
+    setWidth(next)
+    writePreference(CONTENT_WIDTH_KEY, next)
+  }
+
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && !/Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent)) {
+      setShortcutLabel("Ctrl K")
+    }
+  }, [])
 
   useEffect(() => {
     const element = shell.current
@@ -174,32 +272,38 @@ export function DashboardWorkspace({ sidebar, children, overlays, dockRequest, n
   return (
     <DashboardWorkspaceContext value={true}>
       <SidebarProvider ref={shell} resizable open={collapseNavigation ? false : sidebarOpen} onOpenChange={setSidebarOpen}
-        className="h-svh min-h-0 overflow-hidden bg-muted/20 text-foreground md:gap-3 md:p-3"
+        className="h-svh min-h-0 overflow-hidden bg-sidebar text-foreground"
         style={{ "--sidebar-width-icon": "3rem" } as React.CSSProperties}>
-        <div data-testid="erp-workspace-stack" className="relative isolate flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background md:rounded-2xl md:border md:border-border/70 md:shadow-sm [&_[data-slot=sidebar-container]]:absolute [&_[data-slot=sidebar-container]]:h-full">
+        <div data-testid="erp-workspace-stack" className="relative isolate flex min-h-0 min-w-0 flex-1 overflow-hidden bg-sidebar [&_[data-slot=sidebar-container]]:absolute [&_[data-slot=sidebar-container]]:h-full">
           {typeof sidebar === "function" ? sidebar(collapseNavigation) : sidebar}
-          <SidebarInset className="min-h-0 min-w-0 overflow-auto scroll-smooth bg-background">
-            <header data-testid="workspace-header" className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background/95 px-3 backdrop-blur-sm sm:px-5">
+          <SidebarInset className="min-h-0 min-w-0 overflow-auto scroll-smooth bg-background md:my-2 md:mr-2 md:rounded-xl md:border md:border-border/60 md:shadow-xs">
+            <header data-testid="workspace-header" className="sticky top-0 z-20 flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-background/95 px-3 backdrop-blur-sm sm:px-4">
               <div className="flex min-w-0 items-center gap-2">
                 <WorkspaceNavigationTrigger />
-                <span className="h-4 w-px bg-border" aria-hidden="true" />
+                <span className="h-4 w-px bg-border/70" aria-hidden="true" />
+                <WorkspaceBreadcrumbs />
                 <MobileCompanySwitcher />
-                <Button variant="ghost" onClick={onOpenSearch} aria-label={t("workspaceShell.search", { defaultValue: "Search modules and records" })}
-                  data-testid="workspace-search" className="min-w-0 gap-2 text-muted-foreground sm:w-64 sm:justify-start">
-                  <Search className="size-4 shrink-0" />
-                  <span className="hidden truncate text-xs sm:inline sm:text-sm">{t("workspaceShell.search", { defaultValue: "Search modules and records" })}</span>
-                  <kbd className="ml-auto hidden rounded border bg-muted px-1.5 py-0.5 text-[10px] sm:inline-block">⌘ / Ctrl K</kbd>
-                </Button>
               </div>
               <div className="flex shrink-0 items-center gap-1">
+                <Button variant="ghost" size="sm" onClick={onOpenSearch} aria-label={t("workspaceShell.search", { defaultValue: "Search modules and records" })}
+                  data-testid="workspace-search" className="h-8 min-w-0 gap-2 border border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/60 sm:w-52 sm:justify-start">
+                  <Search className="size-3.5 shrink-0" />
+                  <span className="hidden truncate text-xs sm:inline">{t("workspaceShell.searchShort", { defaultValue: "Search..." })}</span>
+                  <kbd className="ml-auto hidden rounded border border-border/80 bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground sm:inline-block">{shortcutLabel}</kbd>
+                </Button>
                 {headerTools}
-                <WorkspaceAccountMenu userProfile={userProfile} onSignOut={onSignOut} />
+                <WorkspaceAccountMenu
+                  userProfile={userProfile}
+                  onSignOut={onSignOut}
+                  contentWidth={width}
+                  onContentWidthChange={handleWidthChange}
+                />
                 {notifications}
               </div>
             </header>
             <HeaderTrailingProvider value={null}>
               <div data-testid="workspace-content" data-content-width={width}
-                className={cn("mx-auto w-full min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7", width === "centered" && "max-w-[1600px]")}>
+                className={cn("mx-auto w-full min-w-0 flex-1 px-4 py-4 sm:px-6 lg:px-7 lg:py-6", width === "centered" && "max-w-[1600px]")}>
                 {children}
               </div>
             </HeaderTrailingProvider>
@@ -211,7 +315,7 @@ export function DashboardWorkspace({ sidebar, children, overlays, dockRequest, n
           data-docked={docked ?? undefined}
           className={cn(
             "min-h-0 min-w-0",
-            docked ? "relative flex-none overflow-hidden bg-background md:rounded-2xl md:border md:border-border/70" : "contents",
+            docked ? "relative flex-none overflow-hidden bg-background md:my-2 md:mr-2 md:rounded-xl md:border md:border-border/60 md:shadow-xs" : "contents",
           )}
           style={docked ? { width: `${DOCK_MIN_REM[docked]}rem` } : undefined}
         />}

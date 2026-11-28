@@ -62,7 +62,7 @@ export function ActivityRingWidget({ data }: { data: ActivityRingData }) {
                   strokeDasharray={circumference}
                   strokeDashoffset={offset}
                   className={cn(
-                    "transition-all duration-700 ease-out",
+                    "transition-[stroke-dashoffset,width] duration-700 ease-out",
                     widgetAccentTileClass[ring.color].stroke
                   )}
                   style={{
@@ -102,7 +102,7 @@ export function ActivityRingWidget({ data }: { data: ActivityRingData }) {
                     <div className="flex-1 h-1.5 rounded-full bg-muted/30 overflow-hidden">
                       <div
                         className={cn(
-                          "h-full rounded-full transition-all duration-500",
+                          "h-full rounded-full transition-[stroke-dashoffset,width] duration-500",
                           widgetAccentTileClass[ring.color].bar
                         )}
                         style={{ width: `${percentage}%` }}

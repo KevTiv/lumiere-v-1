@@ -99,8 +99,8 @@ function DashboardSidebarContent({
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
-    <aside id="dashboard-navigation" data-testid="dashboard-sidebar" className="flex h-full min-h-0 flex-col bg-background text-foreground">
-      <div className={cn("flex h-14 shrink-0 items-center justify-between border-b border-border/70 px-3", isCollapsed && "justify-center px-0")}>
+    <aside id="dashboard-navigation" data-testid="dashboard-sidebar" className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
+      <div className={cn("flex h-12 shrink-0 items-center justify-between border-b border-sidebar-border/70 px-3", isCollapsed && "justify-center px-0")}>
         {!isCollapsed && (
           <span className="truncate text-sm font-semibold tracking-[-0.01em] text-sidebar-foreground">{t("nav.erpSystem")}</span>
         )}
