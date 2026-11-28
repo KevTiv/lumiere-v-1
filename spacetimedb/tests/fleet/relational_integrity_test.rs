@@ -4,8 +4,9 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::fleet::fleet::{
     create_fleet_vehicle, create_fleet_vehicle_service_type, fleet_vehicle,
-    fleet_vehicle_service_type, update_fleet_vehicle, update_fleet_vehicle_details, CreateFleetVehicleParams,
-    CreateFleetVehicleServiceTypeParams, UpdateFleetVehicleDetailsParams, UpdateFleetVehicleParams,
+    fleet_vehicle_service_type, update_fleet_vehicle, update_fleet_vehicle_details,
+    CreateFleetVehicleParams, CreateFleetVehicleServiceTypeParams, UpdateFleetVehicleDetailsParams,
+    UpdateFleetVehicleParams,
 };
 use crate::hr::employees::{create_employee, hr_employee, CreateEmployeeParams};
 use crate::test_harness::OrgFixture;
