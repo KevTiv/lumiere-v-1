@@ -1,8 +1,32 @@
 import { chooseSelectOptionByTriggerValue } from "./e2e/helpers-legacy"
-import { test, expect, type Locator, type Page } from "@playwright/test"
+import { test as base, expect, type Locator, type Page } from "@playwright/test"
 
-const unexpectedRequests = new WeakMap<Page, string[]>()
 const exactInvoice = "9007199254740993"
+const test = base.extend<{ workflowReady: void }>({
+  // Compiling /workflows in Next's dev server has its own setup budget.
+  workflowReady: [
+    async ({ page }, use) => {
+      const requests: string[] = []
+      page.on("request", (request) => {
+        if (new URL(request.url()).pathname.startsWith("/api/")) requests.push(request.url())
+      })
+      try {
+        await page.goto("/workflows")
+        await expect(page.getByTestId("workflow-fixture-disclosure")).toHaveAttribute("data-hydrated", "true")
+        await expect(page.getByTestId(`entity-row-${exactInvoice}`)).toBeVisible()
+        await page.evaluate(async () => {
+          await document.fonts.ready
+        })
+        await expect(page.locator("body")).toHaveCSS("font-family", /Geist/)
+        await use()
+      } finally {
+        expect(requests, "Workflow fixtures must not call ERP APIs").toEqual([])
+      }
+    },
+    { auto: true, timeout: 90_000 },
+  ],
+})
+
 async function noOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1)
 }
@@ -34,19 +58,6 @@ async function approveEmail(page: Page) {
 for (const width of [320, 390, 768, 1440]) {
   test.describe(`${width}px actual accounting workflows with synthetic boundaries`, () => {
     test.use({ viewport: { width, height: width < 768 ? 844 : 1000 }, hasTouch: width < 1024 })
-    test.beforeEach(async ({ page }) => {
-      const requests: string[] = []
-      unexpectedRequests.set(page, requests)
-      page.on("request", (request) => { if (new URL(request.url()).pathname.startsWith("/api/")) requests.push(request.url()) })
-      await page.goto("/workflows")
-      await expect(page.getByTestId("workflow-fixture-disclosure")).toHaveAttribute("data-hydrated", "true")
-      await expect(page.getByTestId(`entity-row-${exactInvoice}`)).toBeVisible()
-      await page.evaluate(async () => { await document.fonts.ready })
-      await expect(page.locator("body")).toHaveCSS("font-family", /Geist/)
-    })
-    test.afterEach(async ({ page }) => {
-      expect(unexpectedRequests.get(page), "Workflow fixtures must not call ERP APIs").toEqual([])
-    })
 
     test("saved worklists preserve exact record identity and isolate company and document-kind preferences", async ({ page }) => {
       const list = page.getByTestId("accounting-invoice-worklist")
