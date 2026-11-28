@@ -19,14 +19,15 @@ function timestamp(iso: string) {
 /** Fixture prerequisite only. The invoice, posting, payment and settlement are operated in the browser. */
 export async function seedFirstSaleAccounting(page: Page, companyId: number, currencyId: number) {
   const accounts = [
-    { internalType: "receivable", group: "asset", code: "1100", reconcile: true },
-    { internalType: "income", group: "income", code: "4000", reconcile: false },
-    { internalType: "liquidity", group: "asset", code: "1200", reconcile: true },
+    { internalType: "receivable", group: "asset", code: "1100", name: "Fixture receivable", reconcile: true },
+    { internalType: "income", group: "income", code: "4000", name: "Fixture income", reconcile: false },
+    { internalType: "liquidity", group: "asset", code: "1200", name: "Fixture liquidity", reconcile: true },
+    { internalType: "expense", group: "expense", code: "5000", name: "Cost of Goods Sold", reconcile: false },
+    { internalType: "asset", group: "asset", code: "1400", name: "Inventory Valuation", reconcile: false },
   ] as const
   const accountIds = new Map<string, number>()
   for (const account of accounts) {
-    const { internalType, group, code, reconcile } = account
-    const name = `Fixture ${internalType}`
+    const { internalType, group, code, name, reconcile } = account
     const accountType = await create(page, "account-account-types", "create_account_account_type", {
       params: {
         name, type: internalType, internal_group: { [group]: [] }, include_initial_balance: true,
