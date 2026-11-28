@@ -14,9 +14,9 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 mod durable;
-mod reconciliation;
 #[cfg(test)]
 mod durable_postgres_tests;
+mod reconciliation;
 
 pub(super) use durable::{execute_chunk, validate_durable_group};
 #[cfg(test)]
@@ -647,8 +647,7 @@ async fn apply_reviewed_rows(
         .map_err(ApiError::internal)?
         .is_some()
     } else {
-        tx
-        .query_one(
+        tx.query_one(
             "WITH links AS (
                  SELECT link.from_inspection, task.approved_mode, task.state
                  FROM lumiere_platform.import_task_review link
@@ -749,9 +748,7 @@ async fn apply_reviewed_rows(
         let mut existing = row.existing(tx, &key).await?;
         let mut saved_id = None;
         if !body.preview && matches!(existing, Existing::None) {
-            saved_id = row
-                .save(tx, batch, id, revision, scope.actor, &key)
-                .await?;
+            saved_id = row.save(tx, batch, id, revision, scope.actor, &key).await?;
             if saved_id.is_none() {
                 existing = row.existing(tx, &key).await?;
             } else if durable
@@ -761,7 +758,9 @@ async fn apply_reviewed_rows(
                         if Some(record.id) == saved_id && record.item == id && record.revision == revision
                 )
             {
-                return Err(ApiError::Conflict("saved backfill could not be verified".into()));
+                return Err(ApiError::Conflict(
+                    "saved backfill could not be verified".into(),
+                ));
             }
         }
         let saved = match existing {
@@ -798,7 +797,11 @@ async fn apply_reviewed_rows(
             }
             let same_source = (saved.item, saved.revision) == (id, revision);
             (
-                if durable && same_source { "saved" } else { "matched" },
+                if durable && same_source {
+                    "saved"
+                } else {
+                    "matched"
+                },
                 saved.id,
             )
         } else {

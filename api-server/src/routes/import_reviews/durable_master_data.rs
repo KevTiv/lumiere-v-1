@@ -33,8 +33,10 @@ impl Export {
     fn parse(data: &Value) -> Result<(Self, Option<u64>, InspectedCsv), ApiError> {
         let export: Self = serde_json::from_value(data.clone())
             .map_err(|_| ApiError::BadRequest("Invalid reviewed export".into()))?;
-        if !matches!(export.entity.as_str(), "product" | "contact" | "stock_location")
-            || !export.file_name.ends_with(".csv")
+        if !matches!(
+            export.entity.as_str(),
+            "product" | "contact" | "stock_location"
+        ) || !export.file_name.ends_with(".csv")
             || export.file_name.len() > 255
         {
             return Err(ApiError::BadRequest(
@@ -62,7 +64,12 @@ fn stale() -> ApiError {
 }
 
 fn evidence_columns(csv: &InspectedCsv) -> Result<(usize, usize), ApiError> {
-    let index = |name| csv.headers.iter().position(|header| header == name).ok_or_else(stale);
+    let index = |name| {
+        csv.headers
+            .iter()
+            .position(|header| header == name)
+            .ok_or_else(stale)
+    };
     Ok((index("_review_item_id")?, index("_review_revision")?))
 }
 
@@ -121,13 +128,21 @@ pub(super) async fn validate(
     let approved: BTreeMap<_, _> = group
         .rows
         .iter()
-        .map(|row| (row.item_id.to_string(), (row.batch_id.to_string(), row.revision)))
+        .map(|row| {
+            (
+                row.item_id.to_string(),
+                (row.batch_id.to_string(), row.revision),
+            )
+        })
         .collect();
     if csv.rows.len() != approved.len()
         || !bindings.iter().all(|row| {
-            row["itemId"].as_str().and_then(|id| approved.get(id)).is_some_and(|(batch, revision)| {
-                row["batchId"] == batch.as_str() && row["revision"] == *revision
-            })
+            row["itemId"]
+                .as_str()
+                .and_then(|id| approved.get(id))
+                .is_some_and(|(batch, revision)| {
+                    row["batchId"] == batch.as_str() && row["revision"] == *revision
+                })
         })
     {
         return Err(stale());
@@ -158,7 +173,9 @@ pub(super) async fn execute_chunk(
     )
     .await?;
     if receipt["status"] == "pending" {
-        return Err(ApiError::Unavailable("Checking the saved native import.".into()));
+        return Err(ApiError::Unavailable(
+            "Checking the saved native import.".into(),
+        ));
     }
     let scoped = StorageScope {
         organization: authority.organization_id,
@@ -169,10 +186,19 @@ pub(super) async fn execute_chunk(
     let mut seen = BTreeSet::new();
     let mut failed = 0;
     let mut cursor = 0;
-    let approved: BTreeSet<_> = chunk.rows.iter().map(|row| row.item_id.to_string()).collect();
+    let approved: BTreeSet<_> = chunk
+        .rows
+        .iter()
+        .map(|row| row.item_id.to_string())
+        .collect();
     loop {
         let page = native_requests::row_results(
-            state, &authority.context, scoped, &group.task_id, &chunk.id, cursor,
+            state,
+            &authority.context,
+            scoped,
+            &group.task_id,
+            &chunk.id,
+            cursor,
         )
         .await?;
         for row in page["rows"].as_array().ok_or_else(stale)? {
@@ -188,7 +214,11 @@ pub(super) async fn execute_chunk(
                     verified.insert(item.to_owned());
                 }
                 Some("failed" | "rolled_back") => failed += 1,
-                _ => return Err(ApiError::Unavailable("Checking the exact saved record.".into())),
+                _ => {
+                    return Err(ApiError::Unavailable(
+                        "Checking the exact saved record.".into(),
+                    ))
+                }
             }
         }
         match page["nextRow"].as_u64() {
@@ -200,10 +230,12 @@ pub(super) async fn execute_chunk(
     if seen != approved {
         return Err(stale());
     }
-    Ok(ChunkReceipt { result: json!({
-        "entity": export.entity, "requestId": chunk.id, "jobId": receipt["jobId"],
-        "verifiedItemIds": verified, "failedRows": failed, "heldRows": 0
-    }) })
+    Ok(ChunkReceipt {
+        result: json!({
+            "entity": export.entity, "requestId": chunk.id, "jobId": receipt["jobId"],
+            "verifiedItemIds": verified, "failedRows": failed, "heldRows": 0
+        }),
+    })
 }
 
 #[cfg(test)]
@@ -212,8 +244,13 @@ mod tests {
 
     #[test]
     fn chunk_preserves_exact_cells_and_rejects_changed_revisions() -> Result<(), ApiError> {
-        let input = validate_csv("_review_item_id,_review_revision,name\n1,2,\"Lee, Sr.\"\n2,1,Other\n")?;
-        let row = SourceRevision { batch_id: 3, item_id: 1, revision: 2 };
+        let input =
+            validate_csv("_review_item_id,_review_revision,name\n1,2,\"Lee, Sr.\"\n2,1,Other\n")?;
+        let row = SourceRevision {
+            batch_id: 3,
+            item_id: 1,
+            revision: 2,
+        };
         let output = selected_csv(&input, &[row.clone()])?;
         assert_eq!(validate_csv(&output)?.rows, [input.rows[0].clone()]);
         assert!(selected_csv(&input, &[SourceRevision { revision: 3, ..row }]).is_err());

@@ -230,9 +230,12 @@ mod tests {
         }
         let mut optional_customer = row;
         optional_customer["customerId"] = json!("18");
-        assert!(
-            approvals("sales", &json!({"rows":[optional_customer.clone()]}), &approved).is_ok()
-        );
+        assert!(approvals(
+            "sales",
+            &json!({"rows":[optional_customer.clone()]}),
+            &approved
+        )
+        .is_ok());
         assert!(approvals("warehouse", &json!({"rows":[optional_customer]}), &approved).is_err());
     }
 
@@ -243,8 +246,9 @@ mod tests {
             {"status":"matched","itemId":"2","recordId":"8"},
             {"status":"held","itemId":"3"},
             {"status":"conflict","itemId":"4"}
-        ]})).unwrap();
-        assert_eq!(result["verifiedItemIds"], json!(["1","2"]));
+        ]}))
+        .unwrap();
+        assert_eq!(result["verifiedItemIds"], json!(["1", "2"]));
         assert_eq!(result["heldRows"], 1);
         assert_eq!(result["failedRows"], 1);
         assert!(annotate_receipt(json!({"results":[{"status":"saved","itemId":"1"}]})).is_err());

@@ -343,9 +343,18 @@ async fn run(
         actor: &creator,
         ..viewer
     };
-    run_approved(state, session, &context, scoped, task, id, body, allow_write)
-        .await
-        .map(|(proposal, _)| proposal.view())
+    run_approved(
+        state,
+        session,
+        &context,
+        scoped,
+        task,
+        id,
+        body,
+        allow_write,
+    )
+    .await
+    .map(|(proposal, _)| proposal.view())
 }
 
 #[allow(clippy::too_many_arguments)]
